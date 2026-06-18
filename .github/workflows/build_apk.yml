@@ -30,13 +30,31 @@ jobs:
       - name: Crear proyecto Flutter base
         run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
 
-      - name: Actualizar Kotlin a 1.9.10
+      - name: Actualizar Kotlin a 1.9.22
         run: |
-          sed -i "s/ext.kotlin_version = '1.7.1'/ext.kotlin_version = '1.9.10'/" tmp_app/android/build.gradle
-          sed -i "s/org.jetbrains.kotlin.android\" version \"1.7.1\"/org.jetbrains.kotlin.android\" version \"1.9.10\"/" tmp_app/android/settings.gradle
-          echo "✅ Kotlin actualizado"
-          grep -n "kotlin" tmp_app/android/build.gradle || true
-          grep -n "kotlin" tmp_app/android/settings.gradle || true
+          python3 - <<'EOF'
+          import re, os
+          
+          # Actualizar settings.gradle
+          sg = 'tmp_app/android/settings.gradle'
+          if os.path.exists(sg):
+              content = open(sg).read()
+              content = re.sub(r'org\.jetbrains\.kotlin\.android["\s]+version["\s]+["\'][^"\']+["\']', 
+                               'org.jetbrains.kotlin.android" version "1.9.22"', content)
+              open(sg, 'w').write(content)
+              print("settings.gradle actualizado:")
+              print(content)
+          
+          # Actualizar build.gradle
+          bg = 'tmp_app/android/build.gradle'
+          if os.path.exists(bg):
+              content = open(bg).read()
+              content = re.sub(r"kotlin_version\s*=\s*['\"][^'\"]+['\"]", 
+                               "kotlin_version = '1.9.22'", content)
+              open(bg, 'w').write(content)
+              print("build.gradle actualizado:")
+              print(content)
+          EOF
 
       - name: Copiar código
         run: |
