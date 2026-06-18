@@ -37,11 +37,19 @@ jobs:
       - name: Inject Supabase
         working-directory: tmp_app
         run: |
-          find . -name "main.dart" -exec grep -l "TU_PROYECTO" {} \;
-          find . -name "main.dart" -exec sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" {} \;
-          find . -name "main.dart" -exec sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" {} \;
-          find . -name "main.dart" -exec grep -n "supabase" {} \;
-          echo "✅ Done"
+          SUPA_URL="${{ secrets.SUPABASE_URL }}"
+          SUPA_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
+          echo "URL length: ${#SUPA_URL}"
+          echo "KEY length: ${#SUPA_KEY}"
+          python3 -c "
+          import re
+          content = open('lib/main.dart').read()
+          content = content.replace('https://TU_PROYECTO.supabase.co', '${{ secrets.SUPABASE_URL }}')
+          content = content.replace('TU_ANON_KEY', '${{ secrets.SUPABASE_ANON_KEY }}')
+          open('lib/main.dart', 'w').write(content)
+          lines = [l for l in open('lib/main.dart') if 'supabase' in l.lower()]
+          print('Supabase lines:', lines[:5])
+          "
       - run: flutter build apk --release --split-per-abi
         working-directory: tmp_app
       - name: Collect APKs
