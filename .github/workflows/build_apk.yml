@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout código
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Instalar Java 17
@@ -20,40 +20,40 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Instalar Flutter
+      - name: Instalar Flutter 3.24
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
+          flutter-version: '3.24.0'
           channel: 'stable'
           cache: true
 
-      - name: Crear estructura Android nativa
+      - name: Crear estructura Android
         run: |
-          flutter create --org com.hetnacnc --project-name hetna_cnc hetna_base
-          cp -r hetna_base/android ./android
-          cp hetna_base/analysis_options.yaml ./analysis_options.yaml 2>/dev/null || true
-          rm -rf hetna_base
-          echo "✅ Estructura Android creada"
+          flutter create --org com.hetnacnc --project-name hetna_cnc tmp_project
+          cp -r tmp_project/android ./android
+          rm -rf tmp_project
 
       - name: flutter pub get
         run: flutter pub get
 
-      - name: Inyectar credenciales Supabase
-        run: |
-          sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" lib/main.dart
-          sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" lib/main.dart
+      - name: Inyectar Supabase URL
+        run: sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" lib/main.dart
+
+      - name: Inyectar Supabase Key
+        run: sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" lib/main.dart
 
       - name: Build APK
         run: flutter build apk --release --split-per-abi
 
-      - name: Renombrar APKs
+      - name: Preparar APKs
         run: |
           DATE=$(date +'%Y%m%d')
           mkdir -p apk_output
           cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
-             apk_output/HetnaCNC_arm64_${DATE}.apk
+             apk_output/HetnaCNC_arm64_${DATE}.apk || true
           cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
-             apk_output/HetnaCNC_arm32_${DATE}.apk
+             apk_output/HetnaCNC_arm32_${DATE}.apk || true
+          ls -lh apk_output/
 
       - name: Subir APKs
         uses: actions/upload-artifact@v4
@@ -61,19 +61,3 @@ jobs:
           name: HetnaCNC-APK
           path: apk_output/
           retention-days: 30
-
-      - name: Crear Release
-        uses: softprops/action-gh-release@v2
-        if: github.ref == 'refs/heads/main'
-        with:
-          tag_name: v${{ github.run_number }}
-          name: "HETNA CNC v${{ github.run_number }}"
-          body: |
-            APK compilado automáticamente
-            - arm64 → teléfonos modernos ✅ recomendado
-            - arm32 → teléfonos antiguos
-          files: apk_output/*.apk
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
