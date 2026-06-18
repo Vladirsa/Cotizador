@@ -12,9 +12,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK 33
+      - name: Install Android SDK 34
         run: |
-          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;33.0.2"
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-34" "build-tools;34.0.0"
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.19.6
@@ -23,12 +23,14 @@ jobs:
       - name: Fix versions
         run: |
           sed -i 's/1.7.10/1.9.22/' tmp_app/android/settings.gradle
+          sed -i 's/"com.android.application" version "7.3.0"/"com.android.application" version "8.1.0"/' tmp_app/android/settings.gradle
           sed -i 's/gradle-7.6.3-all.zip/gradle-8.3-all.zip/' tmp_app/android/gradle/wrapper/gradle-wrapper.properties
-          sed -i 's/flutter.compileSdkVersion/33/' tmp_app/android/app/build.gradle
-          sed -i 's/flutter.targetSdkVersion/33/' tmp_app/android/app/build.gradle
+          sed -i 's/flutter.compileSdkVersion/34/' tmp_app/android/app/build.gradle
+          sed -i 's/flutter.targetSdkVersion/34/' tmp_app/android/app/build.gradle
           sed -i 's/flutter.minSdkVersion/21/' tmp_app/android/app/build.gradle
-          echo "=== app build.gradle ===" && cat tmp_app/android/app/build.gradle
-          echo "=== gradle wrapper ===" && cat tmp_app/android/gradle/wrapper/gradle-wrapper.properties
+          echo "=== settings.gradle ===" && cat tmp_app/android/settings.gradle
+          echo "=== app/build.gradle ===" && cat tmp_app/android/app/build.gradle
+          echo "=== gradle-wrapper ===" && cat tmp_app/android/gradle/wrapper/gradle-wrapper.properties
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
         working-directory: tmp_app
