@@ -1,39 +1,51 @@
-name: hetna_cnc
-description: Cotizador profesional HETNA CNC
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.0.0 <4.0.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-
-  supabase_flutter: 1.10.25
-
-  pdf: ^3.10.8
-  printing: ^5.12.0
-  path_provider: ^2.1.2
-
-  flutter_local_notifications: ^17.0.0
-
-  sqflite: ^2.3.2
-  shared_preferences: ^2.2.3
-
-  intl: ^0.19.0
-  uuid: ^4.3.3
-  cached_network_image: ^3.3.1
-  google_fonts: ^6.2.1
-  cupertino_icons: ^1.0.6
-
-dependency_overrides:
-  sign_in_with_apple: ^4.3.0
-
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-
-flutter:
-  uses-material-design: true
+name: Build HETNA CNC APK
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.24.0
+          channel: stable
+      - run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
+      - name: Fix Android versions
+        run: |
+          cd tmp_app/android
+          sed -i 's/kotlin.android" version "[^"]*"/kotlin.android" version "1.9.22"/' settings.gradle
+          sed -i 's/com.android.application" version "[^"]*"/com.android.application" version "8.1.0"/' settings.gradle
+          sed -i 's/gradle-[0-9]*\.[0-9]*-[a-z]*.zip/gradle-8.3-all.zip/' gradle/wrapper/gradle-wrapper.properties
+          cd app
+          sed -i 's/compileSdk.*/compileSdk = 34/' build.gradle
+          sed -i 's/targetSdk.*/targetSdk = 34/' build.gradle
+          sed -i 's/minSdk.*/minSdk = 21/' build.gradle
+          cat build.gradle
+      - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
+      - run: flutter pub get
+        working-directory: tmp_app
+      - name: Inject Supabase
+        working-directory: tmp_app
+        run: |
+          sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" lib/main.dart
+          sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" lib/main.dart
+      - run: flutter build apk --release --split-per-abi
+        working-directory: tmp_app
+      - name: Collect APKs
+        run: |
+          mkdir -p apk_output
+          cp tmp_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk apk_output/HetnaCNC_arm64.apk || true
+          cp tmp_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk apk_output/HetnaCNC_arm32.apk || true
+          ls -lh apk_output/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HetnaCNC-APK
+          path: apk_output/
+          retention-days: 30
