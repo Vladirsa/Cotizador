@@ -1,41 +1,33 @@
 name: Build HETNA CNC APK
-
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   build:
     name: Compilar APK Android
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Instalar Java 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
       - name: Instalar Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
           cache: true
-
       - name: Crear proyecto Flutter base
         run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
-
-      - name: Actualizar Kotlin y SDK versions
+      - name: Actualizar versiones Android
         run: |
           python3 - <<'EOF'
           import re, os
 
-          # Actualizar settings.gradle - Kotlin 1.9.22
           sg = 'tmp_app/android/settings.gradle'
           if os.path.exists(sg):
               content = open(sg).read()
@@ -46,7 +38,6 @@ jobs:
               open(sg, 'w').write(content)
               print("settings.gradle OK")
 
-          # Actualizar app/build.gradle - compileSdk y targetSdk a 34
           app_bg = 'tmp_app/android/app/build.gradle'
           if os.path.exists(app_bg):
               content = open(app_bg).read()
@@ -56,27 +47,31 @@ jobs:
               content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 34', content)
               open(app_bg, 'w').write(content)
               print("app/build.gradle OK")
-              print(open(app_bg).read())
+
+          gw = 'tmp_app/android/gradle/wrapper/gradle-wrapper.properties'
+          if os.path.exists(gw):
+              content = open(gw).read()
+              content = re.sub(r'gradle-[0-9.]+-all\.zip', 'gradle-8.3-all.zip', content)
+              content = re.sub(r'gradle-[0-9.]+-bin\.zip', 'gradle-8.3-bin.zip', content)
+              open(gw, 'w').write(content)
+              print("gradle-wrapper.properties OK")
+              print(open(gw).read())
           EOF
       - name: Copiar código
         run: |
           cp -r lib/* tmp_app/lib/
           cp pubspec.yaml tmp_app/pubspec.yaml
-
       - name: flutter pub get
         working-directory: tmp_app
         run: flutter pub get
-
       - name: Inyectar Supabase
         working-directory: tmp_app
         run: |
           sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" lib/main.dart
           sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" lib/main.dart
-
       - name: Build APK
         working-directory: tmp_app
         run: flutter build apk --release --split-per-abi
-
       - name: Recoger APKs
         run: |
           DATE=$(date +'%Y%m%d')
@@ -86,7 +81,6 @@ jobs:
           cp tmp_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
              apk_output/HetnaCNC_arm32_${DATE}.apk || true
           ls -lh apk_output/
-
       - name: Subir APKs
         uses: actions/upload-artifact@v4
         with:
