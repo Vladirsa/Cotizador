@@ -12,22 +12,23 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - name: Install Android SDK 33
+        run: |
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager "platforms;android-33" "build-tools;33.0.2"
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: 3.24.0
+          flutter-version: 3.19.6
           channel: stable
       - run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
-      - name: Fix Android versions
+      - name: Fix versions
         run: |
-          cd tmp_app/android
-          sed -i 's/kotlin.android" version "[^"]*"/kotlin.android" version "1.9.22"/' settings.gradle
-          sed -i 's/com.android.application" version "[^"]*"/com.android.application" version "8.1.0"/' settings.gradle
-          printf 'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-8.3-all.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists\n' > gradle/wrapper/gradle-wrapper.properties
-          cat gradle/wrapper/gradle-wrapper.properties
-          sed -i 's/compileSdk.*/compileSdk = 34/' app/build.gradle
-          sed -i 's/targetSdk.*/targetSdk = 34/' app/build.gradle
-          sed -i 's/minSdk.*/minSdk = 21/' app/build.gradle
-          cat app/build.gradle
+          sed -i 's/1.7.10/1.9.22/' tmp_app/android/settings.gradle
+          sed -i 's/gradle-7.6.3-all.zip/gradle-8.3-all.zip/' tmp_app/android/gradle/wrapper/gradle-wrapper.properties
+          sed -i 's/flutter.compileSdkVersion/33/' tmp_app/android/app/build.gradle
+          sed -i 's/flutter.targetSdkVersion/33/' tmp_app/android/app/build.gradle
+          sed -i 's/flutter.minSdkVersion/21/' tmp_app/android/app/build.gradle
+          echo "=== app build.gradle ===" && cat tmp_app/android/app/build.gradle
+          echo "=== gradle wrapper ===" && cat tmp_app/android/gradle/wrapper/gradle-wrapper.properties
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
         working-directory: tmp_app
