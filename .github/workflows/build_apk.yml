@@ -1,90 +1,39 @@
-name: Build HETNA CNC APK
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-jobs:
-  build:
-    name: Compilar APK Android
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Instalar Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - name: Instalar Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.0'
-          channel: 'stable'
-          cache: true
-      - name: Crear proyecto Flutter base
-        run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
-      - name: Actualizar versiones Android
-        run: |
-          python3 - <<'EOF'
-          import re, os
+name: hetna_cnc
+description: Cotizador profesional HETNA CNC
+publish_to: 'none'
+version: 1.0.0+1
 
-          sg = 'tmp_app/android/settings.gradle'
-          if os.path.exists(sg):
-              content = open(sg).read()
-              content = re.sub(r'org\.jetbrains\.kotlin\.android["\s]+version["\s]+["\'][^"\']+["\']',
-                               'org.jetbrains.kotlin.android" version "1.9.22"', content)
-              content = re.sub(r'"com\.android\.application"\s+version\s+"[^"]+"',
-                               '"com.android.application" version "8.1.0"', content)
-              open(sg, 'w').write(content)
-              print("settings.gradle:\n" + content)
+environment:
+  sdk: '>=3.0.0 <4.0.0'
 
-          app_bg = 'tmp_app/android/app/build.gradle'
-          if os.path.exists(app_bg):
-              content = open(app_bg).read()
-              print("ANTES:\n" + content)
-              content = re.sub(r'compileSdk\s*=?\s*flutter\.compileSdkVersion', 'compileSdk = 34', content)
-              content = re.sub(r'compileSdk\s*=?\s*\d+', 'compileSdk = 34', content)
-              content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 34', content)
-              content = re.sub(r'targetSdk\s*=?\s*flutter\.targetSdkVersion', 'targetSdk = 34', content)
-              content = re.sub(r'targetSdk\s*=?\s*\d+', 'targetSdk = 34', content)
-              content = re.sub(r'minSdk\s*=?\s*flutter\.minSdkVersion', 'minSdk = 21', content)
-              open(app_bg, 'w').write(content)
-              print("DESPUES:\n" + content)
+dependencies:
+  flutter:
+    sdk: flutter
 
-          gw = 'tmp_app/android/gradle/wrapper/gradle-wrapper.properties'
-          if os.path.exists(gw):
-              content = open(gw).read()
-              content = re.sub(r'gradle-[0-9.]+-[a-z]+\.zip', 'gradle-8.3-all.zip', content)
-              open(gw, 'w').write(content)
-              print("gradle-wrapper:\n" + content)
-          EOF
-      - name: Copiar código
-        run: |
-          cp -r lib/* tmp_app/lib/
-          cp pubspec.yaml tmp_app/pubspec.yaml
-      - name: flutter pub get
-        working-directory: tmp_app
-        run: flutter pub get
-      - name: Inyectar Supabase
-        working-directory: tmp_app
-        run: |
-          sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" lib/main.dart
-          sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" lib/main.dart
-      - name: Build APK
-        working-directory: tmp_app
-        run: flutter build apk --release --split-per-abi
-      - name: Recoger APKs
-        run: |
-          DATE=$(date +'%Y%m%d')
-          mkdir -p apk_output
-          cp tmp_app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
-             apk_output/HetnaCNC_arm64_${DATE}.apk || true
-          cp tmp_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
-             apk_output/HetnaCNC_arm32_${DATE}.apk || true
-          ls -lh apk_output/
-      - name: Subir APKs
-        uses: actions/upload-artifact@v4
-        with:
-          name: HetnaCNC-APK
-          path: apk_output/
-          retention-days: 30
+  supabase_flutter: 1.10.25
+
+  pdf: ^3.10.8
+  printing: ^5.12.0
+  path_provider: ^2.1.2
+
+  flutter_local_notifications: ^17.0.0
+
+  sqflite: ^2.3.2
+  shared_preferences: ^2.2.3
+
+  intl: ^0.19.0
+  uuid: ^4.3.3
+  cached_network_image: ^3.3.1
+  google_fonts: ^6.2.1
+  cupertino_icons: ^1.0.6
+
+dependency_overrides:
+  sign_in_with_apple: ^4.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
