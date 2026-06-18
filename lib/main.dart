@@ -13,8 +13,8 @@ import 'screens/home_screen.dart';
 // NO cambies estos valores manualmente — usa GitHub Secrets:
 //   SUPABASE_URL = https://ldfmkfbhcbsbecfbzsny.supabase.co
 //   SUPABASE_ANON_KEY = tu publishable key (sb_publishable_...)
-const supabaseUrl = 'https://TU_PROYECTO.supabase.co';
-const supabaseKey = 'TU_ANON_KEY';
+const supabaseUrl = String.fromEnvironment('SUPABASE_URL', defaultValue: 'https://ldfmkfbhcbsbecfbzsny.supabase.co');
+const supabaseKey = String.fromEnvironment('SUPABASE_KEY', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
