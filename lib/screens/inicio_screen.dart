@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
-import '../services/supabase_service.dart';
+import '../models/models.dart';
 
 class InicioScreen extends StatefulWidget {
   const InicioScreen({super.key});
