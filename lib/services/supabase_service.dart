@@ -237,8 +237,8 @@ class SupabaseService {
         .select('*, clientes(nombre, empresa, whatsapp)')
         .order('created_at', ascending: false);
 
-    if (estado != null) query = query.eq('estado', estado) as dynamic;
-    if (clienteId != null) query = query.eq('cliente_id', clienteId) as dynamic;
+if (estado != null) query = query.eq('estado', estado!);
+if (clienteId != null) query = query.eq('cliente_id', clienteId!);
 
     final res = await query;
     return res.map((j) => Cotizacion.fromJson(j)).toList();
@@ -291,7 +291,7 @@ class SupabaseService {
         .select('*, clientes(nombre, empresa, whatsapp)')
         .order('created_at', ascending: false);
 
-    if (estado != null) query = query.eq('estado', estado) as dynamic;
+    if (estado != null) query = query.eq('estado', estado!);
 
     final res = await query;
     return res.map((j) => Pedido.fromJson(j)).toList();
