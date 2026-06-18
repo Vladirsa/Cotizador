@@ -31,12 +31,8 @@ jobs:
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
         working-directory: tmp_app
-      - name: Build APK
+      - run: flutter build apk --release --split-per-abi
         working-directory: tmp_app
-        run: |
-          flutter build apk --release --split-per-abi \
-            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_KEY=${{ secrets.SUPABASE_ANON_KEY }}
       - name: Collect APKs
         run: |
           mkdir -p apk_output
