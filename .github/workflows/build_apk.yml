@@ -37,10 +37,11 @@ jobs:
       - name: Inject Supabase
         working-directory: tmp_app
         run: |
-          sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" lib/main.dart
-          sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" lib/main.dart
-          grep -n "supabase" lib/main.dart | head -5
-          echo "✅ Supabase inyectado"
+          find . -name "main.dart" -exec grep -l "TU_PROYECTO" {} \;
+          find . -name "main.dart" -exec sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" {} \;
+          find . -name "main.dart" -exec sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" {} \;
+          find . -name "main.dart" -exec grep -n "supabase" {} \;
+          echo "✅ Done"
       - run: flutter build apk --release --split-per-abi
         working-directory: tmp_app
       - name: Collect APKs
