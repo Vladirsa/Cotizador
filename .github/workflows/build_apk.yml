@@ -39,6 +39,8 @@ jobs:
         run: |
           sed -i "s|https://TU_PROYECTO.supabase.co|${{ secrets.SUPABASE_URL }}|g" lib/main.dart
           sed -i "s|TU_ANON_KEY|${{ secrets.SUPABASE_ANON_KEY }}|g" lib/main.dart
+          grep -n "supabase" lib/main.dart | head -5
+          echo "✅ Supabase inyectado"
       - run: flutter build apk --release --split-per-abi
         working-directory: tmp_app
       - name: Collect APKs
