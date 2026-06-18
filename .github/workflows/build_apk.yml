@@ -28,6 +28,11 @@ jobs:
           sed -i 's/flutter.compileSdkVersion/34/' tmp_app/android/app/build.gradle
           sed -i 's/flutter.targetSdkVersion/34/' tmp_app/android/app/build.gradle
           sed -i 's/flutter.minSdkVersion/21/' tmp_app/android/app/build.gradle
+      - name: Add Internet Permission
+        run: |
+          MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
+          grep -q "INTERNET" $MANIFEST || sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' $MANIFEST
+          cat $MANIFEST
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
         working-directory: tmp_app
