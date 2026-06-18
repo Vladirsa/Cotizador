@@ -218,7 +218,14 @@ Si algún producto le interesa, con gusto le elaboramos una cotización personal
 
     await _abrirWhatsApp(whatsapp, mensaje);
   }
-
+// ─── ABRIR CHAT DIRECTO ─────────────────────
+  static Future<void> abrirChat({
+    required String numero,
+    required String nombre,
+  }) async {
+    final mensaje = 'Hola $nombre, te contacto de HETNA CNC.';
+    await _abrirWhatsApp(numero, mensaje);
+  }
   // ─── FUNCIÓN BASE ───────────────────────────
   static Future<void> _abrirWhatsApp(
       String numero, String mensaje) async {
