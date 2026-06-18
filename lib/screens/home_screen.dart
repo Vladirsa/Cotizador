@@ -1,8 +1,7 @@
 // ============================================
 // lib/screens/home_screen.dart
-// Navegación principal con barra inferior
+// Navegación con 7 pestañas incluyendo Marketing
 // ============================================
-
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/supabase_service.dart';
@@ -11,18 +10,18 @@ import 'alertas_screen.dart';
 import 'clientes_screen.dart';
 import 'cotizar_screen.dart';
 import 'avances_screen.dart';
+import 'marketing_screen.dart';
 import 'config_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
-
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
-  int _alertasPendientes = 0;
+  int _alertas = 0;
 
   final _pantallas = const [
     InicioScreen(),
@@ -30,19 +29,17 @@ class _HomeScreenState extends State<HomeScreen> {
     ClientesScreen(),
     CotizarScreen(),
     AvancesScreen(),
+    MarketingScreen(),
     ConfigScreen(),
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _cargarAlertas();
-  }
+  void initState() { super.initState(); _cargarAlertas(); }
 
   Future<void> _cargarAlertas() async {
     try {
-      final count = await SupabaseService.countAlertasPendientes();
-      if (mounted) setState(() => _alertasPendientes = count);
+      final n = await SupabaseService.countAlertasPendientes();
+      if (mounted) setState(() => _alertas = n);
     } catch (_) {}
   }
 
@@ -51,25 +48,19 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       body: IndexedStack(index: _tab, children: _pantallas),
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 0.5)),
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 58,
-            child: Row(
-              children: [
-                _NavBtn(index: 0, current: _tab, icon: Icons.dashboard_outlined, label: 'Inicio', onTap: _setTab),
-                _NavBtn(index: 1, current: _tab, icon: Icons.notifications_outlined, label: 'Alertas', onTap: _setTab, badge: _alertasPendientes),
-                _NavBtn(index: 2, current: _tab, icon: Icons.people_outline, label: 'Clientes', onTap: _setTab),
-                _NavBtn(index: 3, current: _tab, icon: Icons.description_outlined, label: 'Cotizar', onTap: _setTab),
-                _NavBtn(index: 4, current: _tab, icon: Icons.local_shipping_outlined, label: 'Avances', onTap: _setTab),
-                _NavBtn(index: 5, current: _tab, icon: Icons.settings_outlined, label: 'Config.', onTap: _setTab),
-              ],
-            ),
-          ),
-        ),
+        decoration: const BoxDecoration(color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+        child: SafeArea(child: SizedBox(height: 58,
+          child: Row(children: [
+            _NavBtn(0, _tab, Icons.dashboard_outlined, 'Inicio', _setTab),
+            _NavBtn(1, _tab, Icons.notifications_outlined, 'Alertas', _setTab, badge: _alertas),
+            _NavBtn(2, _tab, Icons.people_outline, 'Clientes', _setTab),
+            _NavBtn(3, _tab, Icons.description_outlined, 'Cotizar', _setTab),
+            _NavBtn(4, _tab, Icons.local_shipping_outlined, 'Avances', _setTab),
+            _NavBtn(5, _tab, Icons.campaign_outlined, 'Marketing', _setTab),
+            _NavBtn(6, _tab, Icons.settings_outlined, 'Config.', _setTab),
+          ]),
+        )),
       ),
     );
   }
@@ -81,70 +72,29 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _NavBtn extends StatelessWidget {
-  final int index, current;
+  final int index, current, badge;
   final IconData icon;
   final String label;
   final Function(int) onTap;
-  final int badge;
-
-  const _NavBtn({
-    required this.index,
-    required this.current,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.badge = 0,
-  });
+  const _NavBtn(this.index, this.current, this.icon, this.label, this.onTap, {this.badge = 0});
 
   @override
   Widget build(BuildContext context) {
     final active = index == current;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onTap(index),
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(icon,
-                    size: 24,
-                    color: active ? AppColors.azul : AppColors.textoSecundario),
-                if (badge > 0)
-                  Positioned(
-                    top: -4,
-                    right: -4,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: const BoxDecoration(
-                        color: AppColors.rojo,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(
-                          badge > 9 ? '9+' : '$badge',
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 9),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 2),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: active ? AppColors.azul : AppColors.textoSecundario,
-                  fontWeight:
-                      active ? FontWeight.w600 : FontWeight.normal,
-                )),
-          ],
-        ),
-      ),
-    );
+    return Expanded(child: GestureDetector(
+      onTap: () => onTap(index),
+      behavior: HitTestBehavior.opaque,
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Stack(clipBehavior: Clip.none, children: [
+          Icon(icon, size: 22, color: active ? AppColors.azul : AppColors.textoSecundario),
+          if (badge > 0) Positioned(top: -4, right: -4,
+            child: Container(width: 14, height: 14, decoration: const BoxDecoration(color: AppColors.rojo, shape: BoxShape.circle),
+              child: Center(child: Text('$badge', style: const TextStyle(color: Colors.white, fontSize: 8))))),
+        ]),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(fontSize: 9, color: active ? AppColors.azul : AppColors.textoSecundario,
+          fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
+      ]),
+    ));
   }
 }
