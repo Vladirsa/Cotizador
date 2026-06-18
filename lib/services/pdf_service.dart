@@ -97,11 +97,11 @@ class PdfService {
                     pw.Text(
                         'Fecha: ${_fmtFecha.format(cotizacion.createdAt ?? DateTime.now())}',
                         style: pw.TextStyle(
-                            color: PdfColors.white70, fontSize: 9)),
+                            color: const PdfColor(1, 1, 1, 0.7), fontSize: 9)),
                     pw.Text(
                         'Vigencia: ${cotizacion.vigenciaDias} días hábiles',
                         style: pw.TextStyle(
-                            color: PdfColors.white70, fontSize: 9)),
+                            color: const PdfColor(1, 1, 1, 0.7), fontSize: 9)),
                   ],
                 ),
               ),
