@@ -24,6 +24,9 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this);
+    _tabs.addListener(() {
+      if (_tabs.index == 0) _cargar();
+    });
     _cargar();
   }
 
