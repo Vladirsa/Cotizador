@@ -228,20 +228,27 @@ class SupabaseService {
     return cot;
   }
 
-  static Future<List<Cotizacion>> getCotizaciones({
+static Future<List<Cotizacion>> getCotizaciones({
     String? estado,
     String? clienteId,
   }) async {
-    var query = _db
+    var q = _db
         .from('cotizaciones')
-        .select('*, clientes(nombre, empresa, whatsapp)')
-        .order('created_at', ascending: false);
+        .select('*, clientes(nombre, empresa, whatsapp)');
 
-if (estado != null) query = query.eq('estado', estado!);
-if (clienteId != null) query = query.eq('cliente_id', clienteId!);
-
-    final res = await query;
-    return res.map((j) => Cotizacion.fromJson(j)).toList();
+    if (estado != null && clienteId != null) {
+      final res = await q.eq('estado', estado).eq('cliente_id', clienteId).order('created_at', ascending: false);
+      return res.map((j) => Cotizacion.fromJson(j)).toList();
+    } else if (estado != null) {
+      final res = await q.eq('estado', estado).order('created_at', ascending: false);
+      return res.map((j) => Cotizacion.fromJson(j)).toList();
+    } else if (clienteId != null) {
+      final res = await q.eq('cliente_id', clienteId).order('created_at', ascending: false);
+      return res.map((j) => Cotizacion.fromJson(j)).toList();
+    } else {
+      final res = await q.order('created_at', ascending: false);
+      return res.map((j) => Cotizacion.fromJson(j)).toList();
+    }
   }
 
   static Future<void> cambiarEstadoCotizacion(
@@ -285,16 +292,21 @@ if (clienteId != null) query = query.eq('cliente_id', clienteId!);
   // ═══════════════════════════════════════════
   // PEDIDOS
   // ═══════════════════════════════════════════
-  static Future<List<Pedido>> getPedidos({String? estado}) async {
-    var query = _db
-        .from('pedidos')
-        .select('*, clientes(nombre, empresa, whatsapp)')
-        .order('created_at', ascending: false);
-
-    if (estado != null) query = query.eq('estado', estado!);
-
-    final res = await query;
-    return res.map((j) => Pedido.fromJson(j)).toList();
+ static Future<List<Pedido>> getPedidos({String? estado}) async {
+    if (estado != null) {
+      final res = await _db
+          .from('pedidos')
+          .select('*, clientes(nombre, empresa, whatsapp)')
+          .eq('estado', estado)
+          .order('created_at', ascending: false);
+      return res.map((j) => Pedido.fromJson(j)).toList();
+    } else {
+      final res = await _db
+          .from('pedidos')
+          .select('*, clientes(nombre, empresa, whatsapp)')
+          .order('created_at', ascending: false);
+      return res.map((j) => Pedido.fromJson(j)).toList();
+    }
   }
 
   static Future<void> actualizarEtapaPedido(
