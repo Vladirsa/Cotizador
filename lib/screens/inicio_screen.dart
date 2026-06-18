@@ -132,7 +132,7 @@ class _UltimasCotizaciones extends StatefulWidget {
 }
 
 class _UltimasCotizacionesState extends State<_UltimasCotizaciones> {
-  List<Map<String, dynamic>> _cotizaciones = [];
+  List<Cotizacion> _cotizaciones = [];
 
   @override
   void initState() {
