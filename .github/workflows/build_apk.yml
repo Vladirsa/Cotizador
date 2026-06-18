@@ -27,11 +27,18 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Crear proyecto Flutter completo
-        run: |
-          flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
+      - name: Crear proyecto Flutter base
+        run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
 
-      - name: Copiar nuestro código
+      - name: Actualizar Kotlin a 1.9.10
+        run: |
+          sed -i "s/ext.kotlin_version = '1.7.1'/ext.kotlin_version = '1.9.10'/" tmp_app/android/build.gradle
+          sed -i "s/org.jetbrains.kotlin.android\" version \"1.7.1\"/org.jetbrains.kotlin.android\" version \"1.9.10\"/" tmp_app/android/settings.gradle
+          echo "✅ Kotlin actualizado"
+          grep -n "kotlin" tmp_app/android/build.gradle || true
+          grep -n "kotlin" tmp_app/android/settings.gradle || true
+
+      - name: Copiar código
         run: |
           cp -r lib/* tmp_app/lib/
           cp pubspec.yaml tmp_app/pubspec.yaml
@@ -58,6 +65,7 @@ jobs:
              apk_output/HetnaCNC_arm64_${DATE}.apk || true
           cp tmp_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
              apk_output/HetnaCNC_arm32_${DATE}.apk || true
+          ls -lh apk_output/
 
       - name: Subir APKs
         uses: actions/upload-artifact@v4
