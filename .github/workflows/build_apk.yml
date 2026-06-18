@@ -17,16 +17,25 @@ jobs:
           flutter-version: 3.24.0
           channel: stable
       - run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
-      - name: Fix Android versions
+     - name: Fix Android versions
         run: |
           cd tmp_app/android
           sed -i 's/kotlin.android" version "[^"]*"/kotlin.android" version "1.9.22"/' settings.gradle
           sed -i 's/com.android.application" version "[^"]*"/com.android.application" version "8.1.0"/' settings.gradle
-          sed -i 's/gradle-[0-9]*\.[0-9]*-[a-z]*.zip/gradle-8.3-all.zip/' gradle/wrapper/gradle-wrapper.properties
+          cat > gradle/wrapper/gradle-wrapper.properties << 'PROPS'
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.3-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          PROPS
+          echo "=== gradle-wrapper.properties ==="
+          cat gradle/wrapper/gradle-wrapper.properties
           cd app
           sed -i 's/compileSdk.*/compileSdk = 34/' build.gradle
           sed -i 's/targetSdk.*/targetSdk = 34/' build.gradle
           sed -i 's/minSdk.*/minSdk = 21/' build.gradle
+          echo "=== app/build.gradle ==="
           cat build.gradle
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
