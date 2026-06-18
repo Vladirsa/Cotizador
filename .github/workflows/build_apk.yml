@@ -28,30 +28,15 @@ jobs:
           sed -i 's/flutter.compileSdkVersion/34/' tmp_app/android/app/build.gradle
           sed -i 's/flutter.targetSdkVersion/34/' tmp_app/android/app/build.gradle
           sed -i 's/flutter.minSdkVersion/21/' tmp_app/android/app/build.gradle
-          echo "=== settings.gradle ===" && cat tmp_app/android/settings.gradle
-          echo "=== app/build.gradle ===" && cat tmp_app/android/app/build.gradle
-          echo "=== gradle-wrapper ===" && cat tmp_app/android/gradle/wrapper/gradle-wrapper.properties
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
         working-directory: tmp_app
-      - name: Inject Supabase
+      - name: Build APK
         working-directory: tmp_app
         run: |
-          SUPA_URL="${{ secrets.SUPABASE_URL }}"
-          SUPA_KEY="${{ secrets.SUPABASE_ANON_KEY }}"
-          echo "URL length: ${#SUPA_URL}"
-          echo "KEY length: ${#SUPA_KEY}"
-          python3 -c "
-          import re
-          content = open('lib/main.dart').read()
-          content = content.replace('https://TU_PROYECTO.supabase.co', '${{ secrets.SUPABASE_URL }}')
-          content = content.replace('TU_ANON_KEY', '${{ secrets.SUPABASE_ANON_KEY }}')
-          open('lib/main.dart', 'w').write(content)
-          lines = [l for l in open('lib/main.dart') if 'supabase' in l.lower()]
-          print('Supabase lines:', lines[:5])
-          "
-      - run: flutter build apk --release --split-per-abi
-        working-directory: tmp_app
+          flutter build apk --release --split-per-abi \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_KEY=${{ secrets.SUPABASE_ANON_KEY }}
       - name: Collect APKs
         run: |
           mkdir -p apk_output
