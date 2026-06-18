@@ -30,32 +30,34 @@ jobs:
       - name: Crear proyecto Flutter base
         run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
 
-      - name: Actualizar Kotlin a 1.9.22
+      - name: Actualizar Kotlin y SDK versions
         run: |
           python3 - <<'EOF'
           import re, os
-          
-          # Actualizar settings.gradle
+
+          # Actualizar settings.gradle - Kotlin 1.9.22
           sg = 'tmp_app/android/settings.gradle'
           if os.path.exists(sg):
               content = open(sg).read()
-              content = re.sub(r'org\.jetbrains\.kotlin\.android["\s]+version["\s]+["\'][^"\']+["\']', 
+              content = re.sub(r'org\.jetbrains\.kotlin\.android["\s]+version["\s]+["\'][^"\']+["\']',
                                'org.jetbrains.kotlin.android" version "1.9.22"', content)
+              content = re.sub(r'"com\.android\.application"\s+version\s+"[^"]+"',
+                               '"com.android.application" version "8.1.0"', content)
               open(sg, 'w').write(content)
-              print("settings.gradle actualizado:")
-              print(content)
-          
-          # Actualizar build.gradle
-          bg = 'tmp_app/android/build.gradle'
-          if os.path.exists(bg):
-              content = open(bg).read()
-              content = re.sub(r"kotlin_version\s*=\s*['\"][^'\"]+['\"]", 
-                               "kotlin_version = '1.9.22'", content)
-              open(bg, 'w').write(content)
-              print("build.gradle actualizado:")
-              print(content)
-          EOF
+              print("settings.gradle OK")
 
+          # Actualizar app/build.gradle - compileSdk y targetSdk a 34
+          app_bg = 'tmp_app/android/app/build.gradle'
+          if os.path.exists(app_bg):
+              content = open(app_bg).read()
+              content = re.sub(r'compileSdk\s+\d+', 'compileSdk 34', content)
+              content = re.sub(r'targetSdk\s+flutter\.targetSdkVersion', 'targetSdk 34', content)
+              content = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 34', content)
+              content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 34', content)
+              open(app_bg, 'w').write(content)
+              print("app/build.gradle OK")
+              print(open(app_bg).read())
+          EOF
       - name: Copiar código
         run: |
           cp -r lib/* tmp_app/lib/
