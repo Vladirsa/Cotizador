@@ -27,6 +27,14 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Crear estructura Android nativa
+        run: |
+          flutter create --org com.hetnacnc --project-name hetna_cnc hetna_base
+          cp -r hetna_base/android ./android
+          cp hetna_base/analysis_options.yaml ./analysis_options.yaml 2>/dev/null || true
+          rm -rf hetna_base
+          echo "✅ Estructura Android creada"
+
       - name: flutter pub get
         run: flutter pub get
 
