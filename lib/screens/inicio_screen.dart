@@ -142,7 +142,7 @@ class _UltimasCotizacionesState extends State<_UltimasCotizaciones> {
 
   Future<void> _cargar() async {
     try {
-      final res = await SupabaseService.getCotizacionesRecientes();
+      final res = await SupabaseService.getCotizaciones();
       if (mounted) setState(() => _cotizaciones = res);
     } catch (_) {}
   }
