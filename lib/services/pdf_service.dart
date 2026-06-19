@@ -92,7 +92,7 @@ class PdfService {
                     pw.SizedBox(height: 4),
                     pw.Text('No. ${cotizacion.folio ?? ""}',
                         style: pw.TextStyle(
-                            color: PdfColors.white, fontSize: 11)),
+                            color: const PdfColor(1, 1, 1, 0.7), fontSize: 9)),
                     pw.SizedBox(height: 2),
                     pw.Text(
                         'Fecha: ${_fmtFecha.format(cotizacion.createdAt ?? DateTime.now())}',
