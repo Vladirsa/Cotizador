@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
 import '../services/pdf_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class CotizarScreen extends StatefulWidget {
   const CotizarScreen({super.key});
@@ -278,24 +279,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   }
 
   Future<void> _enviarWA() async {
-    if (_clienteSeleccionado == null) return;
-    final cot = Cotizacion(
-      folio: 'COT-PREVIEW',
-      cliente: _clienteSeleccionado,
-      items: _items,
-      descuentoPct: _descuentoPct,
-      ivaPct: _ivaPct,
-      costoEnvio: _costoEnvio,
-      metodoPago: _metodoPago,
-      condicionEntrega: _condicionEntrega,
-      fechaEntrega: _fechaEntrega,
-    );
-    await WhatsAppService.enviarCotizacion(
-      cotizacion: cot,
-      nombreCliente: _clienteSeleccionado!.nombre,
-      whatsapp: _clienteSeleccionado!.whatsappNumero,
-      empresa: _clienteSeleccionado!.empresa ?? '',
-    );
+    if (_clienteSeleccionado == null || _items.isEmpty) return;
+    final fmt = NumberFormat('\$#,##0', 'es_MX');
+    final itemsTexto = _items.map((i) => '• ${i.nombreProducto} x${i.cantidad} = ${fmt.format(i.subtotal)}').join('\n');
+    final mensaje = '¡Hola ${_clienteSeleccionado!.nombre}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n$itemsTexto\n\nSubtotal: ${fmt.format(_subtotal)}\nIVA 16%: ${fmt.format(_montoIva)}\n*TOTAL: ${fmt.format(_total)}*\n\nMétodo de pago: $_metodoPago\n\n¿Te parece bien? Quedamos a tus órdenes 😊';
+    final numero = _clienteSeleccionado!.whatsappNumero.replaceAll(RegExp(r'[^0-9]'), '');
+    final url = 'https://wa.me/52$numero?text=${Uri.encodeComponent(mensaje)}';
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
   }
 
   Future<void> _convertirPedido() async {
