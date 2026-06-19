@@ -291,41 +291,34 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   }
 
   Future<void> _convertirPedido() async {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Guardando cotización y creando pedido...')));
+    if (_clienteSeleccionado == null || _items.isEmpty) return;
+    try {
+      final cot = Cotizacion(
+        folio: 'COT-${DateTime.now().millisecondsSinceEpoch}',
+        cliente: _clienteSeleccionado,
+        clienteId: _clienteSeleccionado!.id,
+        items: _items,
+        descuentoPct: _descuentoPct,
+        ivaPct: _ivaPct,
+        costoEnvio: _costoEnvio,
+        metodoPago: _metodoPago,
+        condicionEntrega: _condicionEntrega,
+        fechaEntrega: _fechaEntrega,
+        notas: _notas,
+        estado: 'Pedido',
+        createdAt: DateTime.now(),
+      );
+      final cotGuardada = await SupabaseService.crearCotizacion(cot, _items);
+      await SupabaseService.convertirEnPedido(cotGuardada);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('✅ Pedido creado correctamente'), backgroundColor: Color(0xFF1d9e75)));
+        setState(() { _items = []; _clienteSeleccionado = null; });
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
-}
-
-class _ItemRow extends StatelessWidget {
-  final CotizacionItem item;
-  final VoidCallback onEliminar;
-  final ValueChanged<int> onCantidadChanged;
-  const _ItemRow({required this.item, required this.onEliminar, required this.onCantidadChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    final fmt = NumberFormat('\$#,##0.00', 'es_MX');
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
-      child: Row(children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(item.nombreProducto, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-          Text(fmt.format(item.precioUnitario), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-        ])),
-        Row(children: [
-          IconButton(icon: const Icon(Icons.remove_circle_outline, size: 18), padding: EdgeInsets.zero,
-            onPressed: item.cantidad > 1 ? () => onCantidadChanged(item.cantidad - 1) : null),
-          Text('${item.cantidad}', style: const TextStyle(fontWeight: FontWeight.w600)),
-          IconButton(icon: const Icon(Icons.add_circle_outline, size: 18), padding: EdgeInsets.zero,
-            onPressed: () => onCantidadChanged(item.cantidad + 1)),
-        ]),
-        Text(fmt.format(item.subtotal), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.azul)),
-        IconButton(icon: const Icon(Icons.close, size: 16, color: AppColors.rojo), padding: EdgeInsets.zero, onPressed: onEliminar),
-      ]),
-    );
-  }
-}
 
 class _CatalogoPDFs extends StatefulWidget {
   const _CatalogoPDFs();
