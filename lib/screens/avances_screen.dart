@@ -18,15 +18,30 @@ class _AvancesScreenState extends State<AvancesScreen> {
   List<Pedido> _pedidos = [];
   bool _cargando = true;
 
-  @override
-  void initState() { super.initState(); _cargar(); }
+ @override
+  void initState() { 
+    super.initState(); 
+    _cargar();
+  }
 
-  Future<void> _cargar() async {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cargar();
+  }
+
+ Future<void> _cargar() async {
+    if (!mounted) return;
     setState(() => _cargando = true);
     try {
       final pedidos = await SupabaseService.getPedidos();
-      if (mounted) setState(() { _pedidos = pedidos; _cargando = false; });
-    } catch (_) { if (mounted) setState(() => _cargando = false); }
+      if (mounted) setState(() { 
+        _pedidos = pedidos; 
+        _cargando = false; 
+      });
+    } catch (e) { 
+      if (mounted) setState(() => _cargando = false); 
+    }
   }
 
   @override
