@@ -137,6 +137,7 @@ class Producto {
     this.aplicaIva = true,
     this.unidadMedida = 'Pieza',
     this.stockDisponible = 0,
+    this.stockMinimo = 1,
     this.ubicacionFisica,
     this.imagenUrl,
     this.pdfUrl,
