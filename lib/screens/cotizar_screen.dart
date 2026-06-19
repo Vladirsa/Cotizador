@@ -210,58 +210,39 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     ]),
   );
 
-Future<void> _seleccionarCliente() async {
+  Future<void> _seleccionarCliente() async {
     final clientes = await SupabaseService.getClientes();
     if (!mounted) return;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.7,
-        builder: (_, ctrl) => Column(children: [
-          const Padding(padding: EdgeInsets.all(12),
-            child: Text('Seleccionar cliente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
-          Expanded(child: ListView.builder(
-            controller: ctrl,
-            itemCount: clientes.length,
+    showModalBottomSheet(context: context, isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(initialChildSize: 0.7, builder: (_, ctrl) =>
+        Container(color: Colors.white, child: Column(children: [
+          const Padding(padding: EdgeInsets.all(12), child: Text('Seleccionar cliente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+          Expanded(child: ListView.builder(controller: ctrl, itemCount: clientes.length,
             itemBuilder: (_, i) => ListTile(
               title: Text(clientes[i].nombreCompleto),
               subtitle: Text(clientes[i].tipoCliente),
-              onTap: () {
-                setState(() => _clienteSeleccionado = clientes[i]);
-                Navigator.pop(context);
-              },
+              onTap: () { setState(() => _clienteSeleccionado = clientes[i]); Navigator.pop(context); },
             ))),
-        ])));
+        ]))));
   }
 
- Future<void> _agregarProducto() async {
+  Future<void> _agregarProducto() async {
     final productos = await SupabaseService.getProductos();
     if (!mounted) return;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.7,
-        builder: (_, ctrl) => Column(children: [
-          const Padding(padding: EdgeInsets.all(12),
-            child: Text('Agregar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
-          Expanded(child: ListView.builder(
-            controller: ctrl,
-            itemCount: productos.length,
+    showModalBottomSheet(context: context, isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(initialChildSize: 0.7, builder: (_, ctrl) =>
+        Container(color: Colors.white, child: Column(children: [
+          const Padding(padding: EdgeInsets.all(12), child: Text('Agregar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+          Expanded(child: ListView.builder(controller: ctrl, itemCount: productos.length,
             itemBuilder: (_, i) => ListTile(
               title: Text(productos[i].nombre),
-              subtitle: Text(productos[i].categoriaNombre ?? ''),
-              trailing: Text('\$${productos[i].precioVenta.toStringAsFixed(0)}',
-                style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1a3a5c))),
+              subtitle: Text('\$${productos[i].precioVenta.toStringAsFixed(0)}'),
               onTap: () {
                 setState(() => _items.add(CotizacionItem.fromProducto(productos[i])));
                 Navigator.pop(context);
               },
             ))),
-        ])));
+        ]))));
   }
 
   Future<void> _seleccionarFecha() async {
