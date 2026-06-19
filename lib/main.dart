@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/notificaciones_service.dart';
 import 'screens/home_screen.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 // ─── CONFIGURAR SUPABASE ─────────────────────
 // Credenciales inyectadas automáticamente por GitHub Actions
@@ -18,6 +19,8 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+  await initializeDateFormatting('es_MX', null);
 
   // Inicializar Supabase
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
