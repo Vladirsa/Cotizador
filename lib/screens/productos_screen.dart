@@ -192,7 +192,7 @@ class _FormProductoState extends State<_FormProducto> {
   late final _precio = TextEditingController(text: widget.producto?.precioVenta.toString() ?? '0');
   late final _stock = TextEditingController(text: widget.producto?.stockDisponible.toString() ?? '0');
   late final _stockMin = TextEditingController(text: widget.producto?.stockMinimo.toString() ?? '1');
-  late final _ubicacion = TextEditingController(text: widget.producto?.ubicacionFisica);
+  late final _ubicacion = TextEditingController(text: widget.producto?.ubicacionFisica ?? '');
   String? _categoriaId;
   String _unidad = 'Pieza';
   bool _aplicaIva = true;
@@ -308,7 +308,7 @@ class _FormProductoState extends State<_FormProducto> {
         unidadMedida: _unidad,
         stockDisponible: int.tryParse(_stock.text) ?? 0,
         stockMinimo: int.tryParse(_stockMin.text) ?? 1,
-        ubicacionFisica: _ubicacion.text.trim().isEmpty ? null : _ubicacion.text.trim(),
+        ubicacionFisica: null,
       );
       if (widget.producto == null) {
         await SupabaseService.crearProducto(producto);
