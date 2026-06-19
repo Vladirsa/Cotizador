@@ -118,6 +118,7 @@ class Producto {
   final String unidadMedida;
   final int stockDisponible;
   final int stockMinimo;
+  final String? ubicacionFisica;
   final String? imagenUrl;
   final String? pdfUrl;
   final bool activo;
