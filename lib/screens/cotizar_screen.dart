@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
-import '../services/whatsapp_service.dart';
 import '../services/pdf_service.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class CotizarScreen extends StatefulWidget {
   const CotizarScreen({super.key});
@@ -44,6 +43,9 @@ class _CotizarScreenState extends State<CotizarScreen> with SingleTickerProvider
   }
 }
 
+// ═══════════════════════════════════════════
+// NUEVA COTIZACIÓN
+// ═══════════════════════════════════════════
 class _NuevaCotizacion extends StatefulWidget {
   const _NuevaCotizacion();
   @override
@@ -59,9 +61,9 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   String _metodoPago = '50% anticipo / 50% entrega';
   String _condicionEntrega = 'LAB — En planta HETNA';
   DateTime? _fechaEntrega;
-  int? _diasHabiles;
   String _notas = '';
   bool _generando = false;
+  bool _guardando = false;
 
   final _metodosPago = ['50% anticipo / 50% entrega', 'Pago total anticipado', 'Crédito 30 días', 'Crédito 60 días', 'Transferencia bancaria'];
   final _condiciones = ['LAB — En planta HETNA', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente', 'Instalación incluida'];
@@ -75,75 +77,96 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0.00', 'es_MX');
-    return ListView(padding: const EdgeInsets.all(14), children: [
-      // Cliente
-      _bloque('Cliente', Icons.person_outline, _clienteSeleccionado == null
-        ? ElevatedButton.icon(onPressed: _seleccionarCliente, icon: const Icon(Icons.person_search), label: const Text('Seleccionar cliente'))
-        : ListTile(contentPadding: EdgeInsets.zero,
-            title: Text(_clienteSeleccionado!.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-            subtitle: Text('${_clienteSeleccionado!.rfc ?? ""} · ${_clienteSeleccionado!.ciudad ?? ""}', style: const TextStyle(fontSize: 11)),
-            trailing: TextButton(onPressed: _seleccionarCliente, child: const Text('Cambiar')))),
+    final puedeAccionar = _items.isNotEmpty && _clienteSeleccionado != null;
 
-      // Productos
+    return ListView(padding: const EdgeInsets.all(14), children: [
+      // ─── Cliente ───
+      _bloque('Cliente', Icons.person_outline,
+        _clienteSeleccionado == null
+          ? ElevatedButton.icon(
+              onPressed: _seleccionarCliente,
+              icon: const Icon(Icons.person_search),
+              label: const Text('Seleccionar cliente'))
+          : ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: CircleAvatar(backgroundColor: AppColors.azulClaro,
+                child: Text(_clienteSeleccionado!.nombre[0].toUpperCase(),
+                  style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
+              title: Text(_clienteSeleccionado!.nombreCompleto,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              subtitle: Text('${_clienteSeleccionado!.rfc ?? ""} · ${_clienteSeleccionado!.ciudad ?? ""}',
+                style: const TextStyle(fontSize: 11)),
+              trailing: TextButton(onPressed: _seleccionarCliente, child: const Text('Cambiar')))),
+
+      // ─── Productos ───
       _bloque('Productos', Icons.inventory_2_outlined, Column(children: [
-        ..._items.map((item) => _ItemRow(item: item, onEliminar: () => setState(() => _items.remove(item)),
-          onCantidadChanged: (v) => setState(() => item.cantidad = v))),
-        OutlinedButton.icon(onPressed: _agregarProducto, icon: const Icon(Icons.add), label: const Text('Agregar producto')),
+        if (_items.isEmpty)
+          Container(padding: const EdgeInsets.all(12),
+            child: const Text('Agrega productos a la cotización', style: TextStyle(color: AppColors.textoSecundario, fontSize: 12))),
+        ..._items.map((item) => _ItemRow(
+          key: ValueKey(item.productoId),
+          item: item,
+          onEliminar: () => setState(() => _items.remove(item)),
+          onCantidadChanged: (v) => setState(() => item.cantidad = v),
+        )),
+        OutlinedButton.icon(
+          onPressed: _agregarProducto,
+          icon: const Icon(Icons.add),
+          label: const Text('Agregar producto')),
       ])),
 
-      // Condiciones
+      // ─── Condiciones ───
       _bloque('Condiciones de entrega', Icons.local_shipping_outlined, Column(children: [
         Row(children: [
           Expanded(child: _campo('Fecha entrega', child: GestureDetector(
             onTap: _seleccionarFecha,
-            child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.grisBorde)),
-              child: Text(_fechaEntrega != null ? DateFormat('dd/MM/yyyy').format(_fechaEntrega!) : 'Seleccionar',
-                style: TextStyle(fontSize: 13, color: _fechaEntrega != null ? Colors.black : AppColors.textoSecundario))),
-          ))),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.grisBorde)),
+              child: Text(
+                _fechaEntrega != null ? DateFormat('dd/MM/yyyy').format(_fechaEntrega!) : 'Seleccionar',
+                style: TextStyle(fontSize: 13, color: _fechaEntrega != null ? Colors.black : AppColors.textoSecundario)))))),
           const SizedBox(width: 8),
           Expanded(child: _campo('Días hábiles', child: TextField(
-            decoration: const InputDecoration(hintText: '15 días', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-            keyboardType: TextInputType.number, style: const TextStyle(fontSize: 13),
-            onChanged: (v) => _diasHabiles = int.tryParse(v),
-          ))),
+            decoration: const InputDecoration(hintText: '15', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+            keyboardType: TextInputType.number, style: const TextStyle(fontSize: 13)))),
         ]),
         const SizedBox(height: 8),
         _campo('Condición de entrega', child: DropdownButtonFormField<String>(
           value: _condicionEntrega,
           decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-          items: _condiciones.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
-          onChanged: (v) => setState(() => _condicionEntrega = v!),
-        )),
+          items: _condiciones.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 12)))).toList(),
+          onChanged: (v) => setState(() => _condicionEntrega = v!))),
         const SizedBox(height: 8),
         _campo('Método de pago', child: DropdownButtonFormField<String>(
           value: _metodoPago,
           decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
           items: _metodosPago.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 12)))).toList(),
-          onChanged: (v) => setState(() => _metodoPago = v!),
-        )),
+          onChanged: (v) => setState(() => _metodoPago = v!))),
         const SizedBox(height: 8),
         _campo('Notas y observaciones', child: TextField(
-          decoration: const InputDecoration(hintText: 'Garantías, accesorios, condiciones especiales...', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+          decoration: const InputDecoration(
+            hintText: 'Garantías, accesorios, condiciones especiales...',
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
           maxLines: 3, style: const TextStyle(fontSize: 13),
-          onChanged: (v) => setState(() => _notas = v),
-        )),
+          onChanged: (v) => setState(() => _notas = v))),
       ])),
 
-      // Resumen financiero
+      // ─── Resumen financiero ───
       _bloque('Resumen financiero', Icons.calculate_outlined, Column(children: [
         Row(children: [
           Expanded(child: _campo('Descuento %', child: TextField(
-            decoration: const InputDecoration(hintText: '0', suffixText: '%', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+            decoration: const InputDecoration(hintText: '0', suffixText: '%',
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             keyboardType: TextInputType.number, style: const TextStyle(fontSize: 13),
-            onChanged: (v) => setState(() => _descuentoPct = double.tryParse(v) ?? 0),
-          ))),
+            onChanged: (v) => setState(() => _descuentoPct = double.tryParse(v) ?? 0)))),
           const SizedBox(width: 8),
           Expanded(child: _campo('Costo envío', child: TextField(
-            decoration: const InputDecoration(hintText: '0', prefixText: '\$', contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+            decoration: const InputDecoration(hintText: '0', prefixText: '\$',
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             keyboardType: TextInputType.number, style: const TextStyle(fontSize: 13),
-            onChanged: (v) => setState(() => _costoEnvio = double.tryParse(v) ?? 0),
-          ))),
+            onChanged: (v) => setState(() => _costoEnvio = double.tryParse(v) ?? 0)))),
         ]),
         const SizedBox(height: 8),
         _filaTotal('Subtotal', fmt.format(_subtotal)),
@@ -157,34 +180,37 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         ]),
       ])),
 
-      // Botones de acción
+      const SizedBox(height: 8),
+
+      // ─── Botones ───
+      ElevatedButton.icon(
+        onPressed: puedeAccionar ? _generarPDF : null,
+        icon: _generando
+          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          : const Icon(Icons.picture_as_pdf),
+        label: const Text('Generar PDF profesional')),
       const SizedBox(height: 8),
       ElevatedButton.icon(
-        onPressed: _items.isEmpty || _clienteSeleccionado == null ? null : _generarPDF,
-        icon: _generando ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Icon(Icons.picture_as_pdf),
-        label: const Text('Generar PDF profesional'),
-      ),
-      const SizedBox(height: 8),
-      ElevatedButton.icon(
-        onPressed: _items.isEmpty || _clienteSeleccionado == null ? null : _enviarWA,
+        onPressed: puedeAccionar ? _enviarWA : null,
         icon: const Icon(Icons.chat),
         label: const Text('Enviar cotización por WhatsApp'),
-        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
-      ),
+        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
       const SizedBox(height: 8),
       ElevatedButton.icon(
-        onPressed: _items.isEmpty || _clienteSeleccionado == null ? null : _convertirPedido,
-        icon: const Icon(Icons.check_circle_outline),
+        onPressed: puedeAccionar && !_guardando ? _convertirPedido : null,
+        icon: _guardando
+          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          : const Icon(Icons.check_circle_outline),
         label: const Text('Convertir en PEDIDO'),
-        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF185fa5)),
-      ),
+        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF185fa5))),
       const SizedBox(height: 20),
     ]);
   }
 
   Widget _bloque(String titulo, IconData icon, Widget contenido) => Container(
     margin: const EdgeInsets.only(bottom: 10),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     padding: const EdgeInsets.all(12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
@@ -194,61 +220,75 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       ]),
       const SizedBox(height: 10),
       contenido,
-    ]),
-  );
+    ]));
 
-  Widget _campo(String label, {required Widget child}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-    const SizedBox(height: 4),
-    child,
-  ]);
+  Widget _campo(String label, {required Widget child}) =>
+    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      const SizedBox(height: 4),
+      child,
+    ]);
 
   Widget _filaTotal(String label, String valor, {Color? color}) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 3),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
       Text(valor, style: TextStyle(fontSize: 12, color: color ?? Colors.black, fontWeight: FontWeight.w500)),
-    ]),
-  );
+    ]));
 
   Future<void> _seleccionarCliente() async {
     final clientes = await SupabaseService.getClientes();
     if (!mounted) return;
-    showModalBottomSheet(context: context, isScrollControlled: true,
-      builder: (_) => DraggableScrollableSheet(initialChildSize: 0.7, builder: (_, ctrl) =>
-        Container(color: Colors.white, child: Column(children: [
-          const Padding(padding: EdgeInsets.all(12), child: Text('Seleccionar cliente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
-          Expanded(child: ListView.builder(controller: ctrl, itemCount: clientes.length,
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false, initialChildSize: 0.7,
+        builder: (_, ctrl) => Column(children: [
+          const Padding(padding: EdgeInsets.all(12),
+            child: Text('Seleccionar cliente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+          Expanded(child: ListView.builder(
+            controller: ctrl, itemCount: clientes.length,
             itemBuilder: (_, i) => ListTile(
+              leading: CircleAvatar(backgroundColor: AppColors.azulClaro,
+                child: Text(clientes[i].nombre[0].toUpperCase(), style: const TextStyle(color: AppColors.azul))),
               title: Text(clientes[i].nombreCompleto),
               subtitle: Text(clientes[i].tipoCliente),
               onTap: () { setState(() => _clienteSeleccionado = clientes[i]); Navigator.pop(context); },
             ))),
-        ]))));
+        ])));
   }
 
   Future<void> _agregarProducto() async {
     final productos = await SupabaseService.getProductos();
     if (!mounted) return;
-    showModalBottomSheet(context: context, isScrollControlled: true,
-      builder: (_) => DraggableScrollableSheet(initialChildSize: 0.7, builder: (_, ctrl) =>
-        Container(color: Colors.white, child: Column(children: [
-          const Padding(padding: EdgeInsets.all(12), child: Text('Agregar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
-          Expanded(child: ListView.builder(controller: ctrl, itemCount: productos.length,
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      builder: (_) => DraggableScrollableSheet(
+        expand: false, initialChildSize: 0.7,
+        builder: (_, ctrl) => Column(children: [
+          const Padding(padding: EdgeInsets.all(12),
+            child: Text('Seleccionar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+          Expanded(child: ListView.builder(
+            controller: ctrl, itemCount: productos.length,
             itemBuilder: (_, i) => ListTile(
               title: Text(productos[i].nombre),
-              subtitle: Text('\$${productos[i].precioVenta.toStringAsFixed(0)}'),
+              subtitle: Text(productos[i].categoriaNombre ?? ''),
+              trailing: Text('\$${productos[i].precioVenta.toStringAsFixed(0)}',
+                style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.azul)),
               onTap: () {
                 setState(() => _items.add(CotizacionItem.fromProducto(productos[i])));
                 Navigator.pop(context);
               },
             ))),
-        ]))));
+        ])));
   }
 
   Future<void> _seleccionarFecha() async {
-    final fecha = await showDatePicker(context: context, initialDate: DateTime.now().add(const Duration(days: 15)),
-      firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+    final fecha = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().add(const Duration(days: 15)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)));
     if (fecha != null) setState(() => _fechaEntrega = fecha);
   }
 
@@ -272,7 +312,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg);
       await PdfService.compartirPdf(bytes, 'Cotizacion_HETNA_${cot.folio}.pdf');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error PDF: $e')));
     } finally {
       if (mounted) setState(() => _generando = false);
     }
@@ -282,16 +322,19 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     if (_clienteSeleccionado == null || _items.isEmpty) return;
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final itemsTexto = _items.map((i) => '• ${i.nombreProducto} x${i.cantidad} = ${fmt.format(i.subtotal)}').join('\n');
-    final mensaje = '¡Hola ${_clienteSeleccionado!.nombre}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n$itemsTexto\n\nSubtotal: ${fmt.format(_subtotal)}\nIVA 16%: ${fmt.format(_montoIva)}\n*TOTAL: ${fmt.format(_total)}*\n\nMétodo de pago: $_metodoPago\n\n¿Te parece bien? Quedamos a tus órdenes 😊';
+    final mensaje = '¡Hola ${_clienteSeleccionado!.nombre}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n$itemsTexto\n\nSubtotal: ${fmt.format(_subtotal)}\nIVA 16%: ${fmt.format(_montoIva)}\n*TOTAL: ${fmt.format(_total)}*\n\nMétodo de pago: $_metodoPago\n\n¿Te parece bien? Quedamos a tus órdenes 😊\n\n_HETNA CNC — Router CNC · Láser · Plasma_';
     final numero = _clienteSeleccionado!.whatsappNumero.replaceAll(RegExp(r'[^0-9]'), '');
     final url = 'https://wa.me/52$numero?text=${Uri.encodeComponent(mensaje)}';
-    if (await canLaunchUrl(Uri.parse(url))) {
+    try {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error WA: $e')));
     }
   }
 
   Future<void> _convertirPedido() async {
     if (_clienteSeleccionado == null || _items.isEmpty) return;
+    setState(() => _guardando = true);
     try {
       final cot = Cotizacion(
         folio: 'COT-${DateTime.now().millisecondsSinceEpoch}',
@@ -312,14 +355,58 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       await SupabaseService.convertirEnPedido(cotGuardada);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ Pedido creado correctamente'), backgroundColor: Color(0xFF1d9e75)));
-        setState(() { _items = []; _clienteSeleccionado = null; });
+          content: Text('✅ ¡Pedido creado correctamente!'),
+          backgroundColor: AppColors.verde));
+        setState(() { _items = []; _clienteSeleccionado = null; _notas = ''; _descuentoPct = 0; _costoEnvio = 0; });
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) setState(() => _guardando = false);
     }
   }
+}
 
+// ═══════════════════════════════════════════
+// ITEM ROW
+// ═══════════════════════════════════════════
+class _ItemRow extends StatelessWidget {
+  final CotizacionItem item;
+  final VoidCallback onEliminar;
+  final ValueChanged<int> onCantidadChanged;
+  const _ItemRow({super.key, required this.item, required this.onEliminar, required this.onCantidadChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat('\$#,##0.00', 'es_MX');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
+      child: Row(children: [
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(item.nombreProducto, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          Text(fmt.format(item.precioUnitario), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        ])),
+        Row(children: [
+          IconButton(icon: const Icon(Icons.remove_circle_outline, size: 18), padding: EdgeInsets.zero,
+            onPressed: item.cantidad > 1 ? () => onCantidadChanged(item.cantidad - 1) : null),
+          Text('${item.cantidad}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+          IconButton(icon: const Icon(Icons.add_circle_outline, size: 18), padding: EdgeInsets.zero,
+            onPressed: () => onCantidadChanged(item.cantidad + 1)),
+        ]),
+        Text(fmt.format(item.subtotal),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.azul)),
+        IconButton(icon: const Icon(Icons.close, size: 16, color: AppColors.rojo),
+          padding: EdgeInsets.zero, onPressed: onEliminar),
+      ]),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════
+// CATÁLOGO Y PDFs
+// ═══════════════════════════════════════════
 class _CatalogoPDFs extends StatefulWidget {
   const _CatalogoPDFs();
   @override
@@ -332,74 +419,62 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> {
   String _categoria = 'Todos';
   bool _cargando = true;
 
-  final _categorias = ['Todos', 'Maquinaria CNC', 'Refacciones', 'Herramientas', 'Consumibles', 'Servicios', 'Diseños CNC'];
-
   @override
-  void initState() {
-    super.initState();
-    _cargar();
-  }
+  void initState() { super.initState(); _cargar(); }
 
   Future<void> _cargar() async {
     try {
       final prods = await SupabaseService.getProductos();
       final pdfs = await SupabaseService.getPdfs();
       if (mounted) setState(() { _productos = prods; _pdfs = pdfs; _cargando = false; });
-    } catch (_) {
-      if (mounted) setState(() => _cargando = false);
-    }
+    } catch (_) { if (mounted) setState(() => _cargando = false); }
   }
 
   @override
   Widget build(BuildContext context) {
+    final categorias = ['Todos', ..._productos.map((p) => p.categoriaNombre ?? '').where((c) => c.isNotEmpty).toSet().toList()];
     final filtrados = _categoria == 'Todos' ? _productos : _productos.where((p) => p.categoriaNombre == _categoria).toList();
 
-    return _cargando
-      ? const Center(child: CircularProgressIndicator())
+    return _cargando ? const Center(child: CircularProgressIndicator())
       : ListView(padding: const EdgeInsets.all(14), children: [
-          // Filtros categoría
-          SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: _categorias.map((c) =>
+          SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: categorias.map((c) =>
             GestureDetector(onTap: () => setState(() => _categoria = c),
-              child: Container(margin: const EdgeInsets.only(right: 6, bottom: 12), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                decoration: BoxDecoration(color: _categoria == c ? AppColors.azul : Colors.white, borderRadius: BorderRadius.circular(20),
+              child: Container(margin: const EdgeInsets.only(right: 6, bottom: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                decoration: BoxDecoration(color: _categoria == c ? AppColors.azul : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: _categoria == c ? AppColors.azul : AppColors.grisBorde)),
-                child: Text(c, style: TextStyle(fontSize: 11, color: _categoria == c ? Colors.white : AppColors.textoSecundario))))).toList())),
-
-          // Productos
+                child: Text(c, style: TextStyle(fontSize: 11,
+                  color: _categoria == c ? Colors.white : AppColors.textoSecundario))))).toList())),
+          if (filtrados.isEmpty)
+            const Center(child: Text('No hay productos en esta categoría', style: TextStyle(color: AppColors.textoSecundario))),
           ...filtrados.map((p) => Container(
             margin: const EdgeInsets.only(bottom: 6),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.grisBorde, width: 0.5)),
             child: ListTile(
               title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
               subtitle: Text('SKU: ${p.sku ?? "—"} · Stock: ${p.stockDisponible}', style: const TextStyle(fontSize: 11)),
-              trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text('\$${p.precioVenta.toStringAsFixed(0)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.azul)),
-                Text(p.categoriaNombre ?? '', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-              ]),
-            ))),
-
+              trailing: Text('\$${p.precioVenta.toStringAsFixed(0)}',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.azul))))),
           const SizedBox(height: 12),
           ElevatedButton.icon(onPressed: () {}, icon: const Icon(Icons.chat), label: const Text('Enviar catálogo por WhatsApp'),
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
-          const Divider(height: 20),
-
-          // PDFs almacenados
-          Text('PDFs almacenados'.toUpperCase(), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario, letterSpacing: 1)),
-          const SizedBox(height: 8),
-          ..._pdfs.map((pdf) => Container(
-            margin: const EdgeInsets.only(bottom: 6),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-            child: ListTile(
-              leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.rojoClaro, borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo, size: 18)),
-              title: Text(pdf.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-              subtitle: Text(pdf.tamanoTexto, style: const TextStyle(fontSize: 11)),
-              trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                IconButton(icon: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20), onPressed: () {}),
-                IconButton(icon: const Icon(Icons.open_in_new, size: 18), onPressed: () {}),
-              ]),
-            ))),
-          OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.upload_file), label: const Text('Subir nuevo PDF')),
+          if (_pdfs.isNotEmpty) ...[
+            const Divider(height: 20),
+            const Text('PDFs ALMACENADOS', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario, letterSpacing: 1)),
+            const SizedBox(height: 8),
+            ..._pdfs.map((pdf) => Container(
+              margin: const EdgeInsets.only(bottom: 6),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+              child: ListTile(
+                leading: Container(width: 36, height: 36, decoration: BoxDecoration(color: AppColors.rojoClaro, borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo, size: 18)),
+                title: Text(pdf.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                subtitle: Text(pdf.tamanoTexto),
+                trailing: IconButton(icon: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20), onPressed: () {})))),
+          ],
           const SizedBox(height: 20),
         ]);
   }
