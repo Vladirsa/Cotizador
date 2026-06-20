@@ -120,13 +120,13 @@ class PdfService {
                   pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
                 pw.SizedBox(height: 8),
                 if (rfcEmpresa.isNotEmpty)
-                  pw.Text('RFC: $rfcEmpresa', style: pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+                  pw.Text('RFC: $rfcEmpresa', style: pw.TextStyle(fontSize: 8, color: const PdfColor(1, 1, 1, 0.7))),
                 if (direccion.isNotEmpty)
-                  pw.Text(direccion, style: pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+                  pw.Text(direccion, style: pw.TextStyle(fontSize: 8, color: const PdfColor(1, 1, 1, 0.7))),
                 pw.Text('Tel: $tel1${tel2.isNotEmpty ? " / $tel2" : ""}',
-                  style: pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+                  style: pw.TextStyle(fontSize: 8, color: const PdfColor(1, 1, 1, 0.7))),
                 if (correoEmpresa.isNotEmpty)
-                  pw.Text(correoEmpresa, style: pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+                  pw.Text(correoEmpresa, style: pw.TextStyle(fontSize: 8, color: const PdfColor(1, 1, 1, 0.7))),
                 pw.Text(web, style: pw.TextStyle(fontSize: 8, color: PdfColors.white)),
               ]),
               // Datos de la cotización
@@ -276,11 +276,11 @@ class PdfService {
               pw.Text('¡Gracias por su preferencia!',
                 style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
               pw.Text('Estamos para servirle — $nombreEmpresa',
-                style: pw.TextStyle(fontSize: 9, color: PdfColors.white70)),
+                style: pw.TextStyle(fontSize: 9, color: const PdfColor(1, 1, 1, 0.7))),
             ]),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
               pw.Text(web, style: pw.TextStyle(fontSize: 9, color: PdfColors.white)),
-              pw.Text(tel1, style: pw.TextStyle(fontSize: 9, color: PdfColors.white70)),
+              pw.Text(tel1, style: pw.TextStyle(fontSize: 9, color: const PdfColor(1, 1, 1, 0.7))),
             ]),
           ])),
       ],
