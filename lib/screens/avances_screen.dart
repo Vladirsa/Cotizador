@@ -261,29 +261,27 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
 
         const SizedBox(height: 6),
         Row(children: [
-          if (tieneWA) Expanded(child: ElevatedButton.icon(
-            onPressed: _enviandoWA ? null : _notificarCliente,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF25D366), padding: const EdgeInsets.symmetric(vertical: 8)),
-            child: _enviandoWA
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Icon(Icons.chat, size: 14, color: Colors.white),
-                  SizedBox(width: 4),
-                  Text('Notificar WA', style: TextStyle(fontSize: 12, color: Colors.white)),
-                ]))),
+          if (tieneWA) Expanded(child: _enviandoWA
+            ? ElevatedButton(
+                onPressed: null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366), padding: const EdgeInsets.symmetric(vertical: 8)),
+                child: const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)))
+            : ElevatedButton.icon(
+                onPressed: _notificarCliente,
+                icon: const Icon(Icons.chat, size: 14, color: Colors.white),
+                label: const Text('Notificar WA', style: TextStyle(fontSize: 12, color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF25D366), padding: const EdgeInsets.symmetric(vertical: 8)))),
           if (tieneWA && !_esEntregado) const SizedBox(width: 6),
           if (!_esEntregado) Expanded(child: OutlinedButton.icon(
             onPressed: () => _cambiarEtapa('Entregado'),
+            icon: const Icon(Icons.check_circle_outline, size: 14),
+            label: const Text('Entregado', style: TextStyle(fontSize: 12)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.verde,
               side: const BorderSide(color: AppColors.verde),
-              padding: const EdgeInsets.symmetric(vertical: 8)),
-            child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(Icons.check_circle_outline, size: 14),
-              SizedBox(width: 4),
-              Text('Entregado', style: TextStyle(fontSize: 12)),
-            ]))),
+              padding: const EdgeInsets.symmetric(vertical: 8)))),
           if (_esEntregado) const Expanded(child: Center(child: Text('✅ Pedido entregado',
             style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)))),
         ]),
