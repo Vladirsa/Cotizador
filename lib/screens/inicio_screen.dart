@@ -383,17 +383,24 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   // TAB 5 — INVENTARIO
   // ══════════════════════════════════════
   Widget _tabInventario() {
-    final bajos = _materiales.where((m) => (m['stock_actual'] as int? ?? 0) <= (m['stock_minimo'] as int? ?? 1)).toList();
-    final categorias = _materiales.map((m) => m['categoria'] as String? ?? '').toSet().toList()..sort();
+    // Deduplicar por id para evitar duplicados si la query retorna filas repetidas
+    final seen = <String>{};
+    final materiales = _materiales.where((m) {
+      final id = m['id']?.toString() ?? m['nombre']?.toString() ?? '';
+      return seen.add(id);
+    }).toList();
 
-    final valorTotal = _materiales.fold(0.0, (s, m) =>
+    final bajos = materiales.where((m) => (m['stock_actual'] as int? ?? 0) <= (m['stock_minimo'] as int? ?? 1)).toList();
+    final categorias = materiales.map((m) => m['categoria'] as String? ?? '').toSet().toList()..sort();
+
+    final valorTotal = materiales.fold(0.0, (s, m) =>
       s + ((m['stock_actual'] as int? ?? 0) * ((m['costo_unitario'] as num?)?.toDouble() ?? 0)));
 
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
 
       // Resumen
       Row(children: [
-        Expanded(child: _statCard('Total materiales', '${_materiales.length}', AppColors.azul, Icons.inventory_2_outlined)),
+        Expanded(child: _statCard('Total materiales', '${materiales.length}', AppColors.azul, Icons.inventory_2_outlined)),
         const SizedBox(width: 8),
         Expanded(child: _statCard('Stock bajo', '${bajos.length}', bajos.isEmpty ? AppColors.verde : AppColors.rojo, Icons.warning_amber_outlined)),
       ]),
@@ -425,7 +432,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const SizedBox(height: 12),
       _seccion('INVENTARIO POR CATEGORÍA'),
       ...categorias.map((cat) {
-        final items = _materiales.where((m) => m['categoria'] == cat).toList();
+        final items = materiales.where((m) => m['categoria'] == cat).toList();
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(padding: const EdgeInsets.only(top: 8, bottom: 4),
             child: Text(cat.toUpperCase(), style: const TextStyle(fontSize: 10, color: AppColors.azul, letterSpacing: 1, fontWeight: FontWeight.w600))),
