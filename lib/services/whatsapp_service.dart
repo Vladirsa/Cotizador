@@ -17,15 +17,21 @@ class WhatsAppService {
   }) async {
     final n = normalizarNumero(numero);
     if (n.isEmpty) return false;
-    final url = 'https://wa.me/$n?text=${Uri.encodeComponent(mensaje)}';
     try {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // Intentar primero con wa.me
+      final uri = Uri.parse('https://wa.me/$n?text=${Uri.encodeComponent(mensaje)}');
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return true;
+    } catch (_) {
+      try {
+        // Fallback con intent directo
+        final uri2 = Uri.parse('intent://send/$n#Intent;scheme=whatsapp;package=com.whatsapp;end');
+        await launchUrl(uri2, mode: LaunchMode.externalApplication);
         return true;
+      } catch (_) {
+        return false;
       }
-      return false;
-    } catch (_) { return false; }
+    }
   }
 
   static String mensajeSeguimiento({
