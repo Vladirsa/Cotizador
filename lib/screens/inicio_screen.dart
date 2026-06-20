@@ -424,7 +424,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       Text(label, style: const TextStyle(fontSize: 9, color: Colors.white60), textAlign: TextAlign.center),
     ]));
 
-  Widget _heroDivider() => Container(width: 1, height: 36, color: Colors.white20, margin: const EdgeInsets.symmetric(horizontal: 4));
+  Widget _heroDivider() => Container(width: 1, height: 36, color: Colors.white.withOpacity(0.2),, margin: const EdgeInsets.symmetric(horizontal: 4));
 
   Widget _finStat(String label, String valor, Color color) => Expanded(
     child: Container(padding: const EdgeInsets.all(8),
