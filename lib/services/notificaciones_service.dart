@@ -1,11 +1,6 @@
-// ============================================
 // lib/services/notificaciones_service.dart
-// Alertas push locales en Android
-// ============================================
-
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
-import 'package:timezone/data/latest.dart' as tz_data;
 
 class NotificacionesService {
   static final _plugin = FlutterLocalNotificationsPlugin();
@@ -13,157 +8,119 @@ class NotificacionesService {
 
   static Future<void> inicializar() async {
     if (_inicializado) return;
-    tz_data.initializeTimeZones();
-
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: androidSettings);
-
-    await _plugin.initialize(
-      settings,
-      onDidReceiveNotificationResponse: (details) {
-        // Navegar a la pantalla de alertas cuando toca la notificación
-      },
-    );
-
-    // Crear canal de notificaciones
-    const canal = AndroidNotificationChannel(
-      'hetna_cnc_alertas',
-      'Alertas HETNA CNC',
-      description: 'Seguimientos de cotizaciones y pedidos',
-      importance: Importance.high,
-      playSound: true,
-    );
-
-    await _plugin
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(canal);
-
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const settings = InitializationSettings(android: android);
+    await _plugin.initialize(settings);
     _inicializado = true;
   }
 
-  // ─── PROGRAMAR ALERTA DÍA 3 ─────────────────
-  static Future<void> programarSeguimientoDia3({
-    required int id,
-    required String clienteNombre,
-    required String folio,
-    required DateTime fechaEnvio,
+  // ─── Notificación de nueva cotización ───
+  static Future<void> nuevaCotizacion({
+    required String nombreCliente,
+    required double total,
+    String? folio,
   }) async {
-    await _programar(
-      id: id * 100 + 3,
-      titulo: '📋 Seguimiento cotización',
-      cuerpo: '$clienteNombre — $folio · 3 días sin respuesta',
-      fecha: fechaEnvio.add(const Duration(days: 3)),
+    await _vibrar();
+    await _mostrar(
+      id: 1,
+      titulo: '🎉 Nueva cotización — $nombreCliente',
+      cuerpo: folio != null
+        ? '$folio · \$${total.toStringAsFixed(0)}'
+        : '\$${total.toStringAsFixed(0)}',
+      canal: 'cotizaciones',
+      nombreCanal: 'Cotizaciones',
     );
   }
 
-  // ─── PROGRAMAR ALERTA DÍA 5 ─────────────────
-  static Future<void> programarSeguimientoDia5({
-    required int id,
-    required String clienteNombre,
-    required String folio,
-    required DateTime fechaEnvio,
+  // ─── Notificación de nuevo pedido ───
+  static Future<void> nuevoPedido({
+    required String nombreCliente,
+    required double total,
+    String? folio,
   }) async {
-    await _programar(
-      id: id * 100 + 5,
-      titulo: '⚠️ Cotización por vencer',
-      cuerpo: '$clienteNombre — $folio · Envía mensaje urgente',
-      fecha: fechaEnvio.add(const Duration(days: 5)),
+    await _vibrar(fuerte: true);
+    await _mostrar(
+      id: 2,
+      titulo: '📦 Nuevo pedido confirmado',
+      cuerpo: '$nombreCliente — \$${total.toStringAsFixed(0)}',
+      canal: 'pedidos',
+      nombreCanal: 'Pedidos',
     );
   }
 
-  // ─── PROGRAMAR CUPÓN DÍA 7 ──────────────────
-  static Future<void> programarCuponDia7({
-    required int id,
-    required String clienteNombre,
-    required String folio,
-    required DateTime fechaEnvio,
+  // ─── Notificación de alerta de seguimiento ───
+  static Future<void> alertaSeguimiento({
+    required String nombreCliente,
+    required String tipo,
+    String? folio,
   }) async {
-    await _programar(
-      id: id * 100 + 7,
-      titulo: '🎟 Envía cupón de cierre',
-      cuerpo: '$clienteNombre — $folio · Descuento especial disponible',
-      fecha: fechaEnvio.add(const Duration(days: 7)),
+    await _vibrar();
+    final titulos = {
+      'seguimiento_dia3': '⏰ Seguimiento día 3',
+      'seguimiento_dia5': '🔴 Seguimiento día 5 — Urgente',
+      'seguimiento_dia7': '⚠️ Último aviso — Día 7',
+      'post_entrega': '✅ Recordatorio post entrega',
+    };
+    await _mostrar(
+      id: 3,
+      titulo: titulos[tipo] ?? '📋 Alerta de seguimiento',
+      cuerpo: 'Cliente: $nombreCliente${folio != null ? " · $folio" : ""}',
+      canal: 'alertas',
+      nombreCanal: 'Alertas de seguimiento',
     );
   }
 
-  // ─── ALERTA INMEDIATA (AVANCE DE PEDIDO) ────
-  static Future<void> alertaAvancePedido({
-    required String folio,
-    required String etapa,
-    required String clienteNombre,
-  }) async {
-    await _mostrarInmediata(
-      titulo: '🚀 Notifica avance a tu cliente',
-      cuerpo: '$folio · $etapa → $clienteNombre',
-    );
+  // ─── Vibrar el teléfono ───
+  static Future<void> _vibrar({bool fuerte = false}) async {
+    try {
+      if (fuerte) {
+        // Vibración larga para pedidos
+        await HapticFeedback.heavyImpact();
+        await Future.delayed(const Duration(milliseconds: 200));
+        await HapticFeedback.heavyImpact();
+        await Future.delayed(const Duration(milliseconds: 200));
+        await HapticFeedback.heavyImpact();
+      } else {
+        // Vibración normal para alertas
+        await HapticFeedback.mediumImpact();
+        await Future.delayed(const Duration(milliseconds: 150));
+        await HapticFeedback.mediumImpact();
+      }
+    } catch (_) {}
   }
 
-  // ─── ALERTA POST-ENTREGA ─────────────────────
-  static Future<void> alertaPostEntrega({
-    required String folio,
-    required String clienteNombre,
-  }) async {
-    await _mostrarInmediata(
-      titulo: '🎉 Envía redes sociales',
-      cuerpo: '$folio entregado · Manda tus redes a $clienteNombre',
-    );
-  }
-
-  // ─── FUNCIONES BASE ──────────────────────────
-  static Future<void> _programar({
+  // ─── Mostrar notificación ───
+  static Future<void> _mostrar({
     required int id,
     required String titulo,
     required String cuerpo,
-    required DateTime fecha,
+    required String canal,
+    required String nombreCanal,
   }) async {
-    final tzFecha = tz.TZDateTime.from(fecha, tz.local);
-    if (tzFecha.isBefore(tz.TZDateTime.now(tz.local))) return;
-
-    await _plugin.zonedSchedule(
-      id,
-      titulo,
-      cuerpo,
-      tzFecha,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'hetna_cnc_alertas',
-          'Alertas HETNA CNC',
-          channelDescription: 'Seguimientos de cotizaciones y pedidos',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
+    if (!_inicializado) await inicializar();
+    final androidDetails = AndroidNotificationDetails(
+      canal, nombreCanal,
+      channelDescription: 'Notificaciones HETNA CNC',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 300, 200, 300]),
+      icon: '@mipmap/ic_launcher',
     );
+    final details = NotificationDetails(android: androidDetails);
+    await _plugin.show(id, titulo, cuerpo, details);
   }
 
-  static Future<void> _mostrarInmediata({
-    required String titulo,
-    required String cuerpo,
-  }) async {
-    await _plugin.show(
-      DateTime.now().millisecondsSinceEpoch.hashCode,
-      titulo,
-      cuerpo,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'hetna_cnc_alertas',
-          'Alertas HETNA CNC',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-      ),
+  // ─── Test de notificación ───
+  static Future<void> probar() async {
+    await _vibrar(fuerte: true);
+    await _mostrar(
+      id: 99,
+      titulo: '✅ HETNA CNC — Notificaciones activas',
+      cuerpo: 'Las alertas y pedidos te llegarán aquí',
+      canal: 'test',
+      nombreCanal: 'Prueba',
     );
-  }
-
-  static Future<void> cancelarAlertas(int cotizacionId) async {
-    await _plugin.cancel(cotizacionId * 100 + 3);
-    await _plugin.cancel(cotizacionId * 100 + 5);
-    await _plugin.cancel(cotizacionId * 100 + 7);
   }
 }
