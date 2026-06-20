@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
@@ -50,7 +49,217 @@ class _CotizarScreenState extends State<CotizarScreen> with SingleTickerProvider
 }
 
 // ═══════════════════════════════════════════
-// NUEVA COTIZACIÓN
+// LISTA DE COTIZACIONES
+// ═══════════════════════════════════════════
+class _ListaCotizaciones extends StatefulWidget {
+  @override
+  State<_ListaCotizaciones> createState() => _ListaCotizacionesState();
+}
+
+class _ListaCotizacionesState extends State<_ListaCotizaciones> {
+  List<Cotizacion> _cotizaciones = [];
+  bool _cargando = true;
+  String _filtro = 'Todos';
+  final _fmt = NumberFormat('\$#,##0', 'es_MX');
+
+  final _estados = ['Todos', 'Borrador', 'Enviada', 'Aprobada', 'Pedido', 'Vencida'];
+  final _colores = {
+    'Borrador': Colors.grey, 'Enviada': Color(0xFF185fa5),
+    'Aprobada': Color(0xFF1d9e75), 'Pedido': Color(0xFF7c3aed),
+    'Vencida': Color(0xFFef9f27), 'Rechazada': Color(0xFFe24b4a),
+  };
+
+  @override
+  void initState() { super.initState(); _cargar(); }
+
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
+    try {
+      final cots = await SupabaseService.getCotizaciones();
+      // Para cada cotización sin items, cargar sus items para mostrar monto
+      for (final c in cots) {
+        if (c.items.isEmpty && c.id != null && c.total == 0) {
+          final items = await SupabaseService.getCotizacionItems(c.id!);
+          c.items.addAll(items);
+        }
+      }
+      if (mounted) setState(() { _cotizaciones = cots; _cargando = false; });
+    } catch (_) { if (mounted) setState(() => _cargando = false); }
+  }
+
+  List<Cotizacion> get _filtradas => _filtro == 'Todos'
+    ? _cotizaciones
+    : _cotizaciones.where((c) => c.estado == _filtro).toList();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      // Filtros
+      Container(color: Colors.white, padding: const EdgeInsets.all(10),
+        child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children:
+          _estados.map((e) {
+            final color = _colores[e] ?? AppColors.azul;
+            final count = e == 'Todos' ? _cotizaciones.length
+              : _cotizaciones.where((c) => c.estado == e).length;
+            final activo = _filtro == e;
+            return GestureDetector(
+              onTap: () => setState(() => _filtro = e),
+              child: Container(margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: activo ? (e == 'Todos' ? AppColors.azul : color) : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: activo ? (e == 'Todos' ? AppColors.azul : color) : AppColors.grisBorde)),
+                child: Text('$e ($count)', style: TextStyle(fontSize: 11,
+                  color: activo ? Colors.white : AppColors.textoSecundario,
+                  fontWeight: activo ? FontWeight.w600 : FontWeight.normal))));
+          }).toList()))),
+
+      Expanded(child: _cargando
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(onRefresh: _cargar, child: _filtradas.isEmpty
+            ? const Center(child: Text('No hay cotizaciones', style: TextStyle(color: AppColors.textoSecundario)))
+            : ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: _filtradas.length,
+                itemBuilder: (_, i) => _TarjetaCotizacion(
+                  cotizacion: _filtradas[i],
+                  colores: _colores,
+                  onActualizar: _cargar)))),
+    ]);
+  }
+}
+
+// ═══════════════════════════════════════════
+// TARJETA DE COTIZACIÓN
+// ═══════════════════════════════════════════
+class _TarjetaCotizacion extends StatelessWidget {
+  final Cotizacion cotizacion;
+  final Map<String, Color> colores;
+  final VoidCallback onActualizar;
+  const _TarjetaCotizacion({required this.cotizacion, required this.colores, required this.onActualizar});
+
+  @override
+  Widget build(BuildContext context) {
+    final fmt = NumberFormat('\$#,##0', 'es_MX');
+    final color = colores[cotizacion.estado] ?? Colors.grey;
+    final nombre = cotizacion.cliente?.nombre ?? cotizacion.cliente?.empresa ?? 'Sin cliente';
+    // Calcular monto real
+    final montoItems = cotizacion.items.fold(0.0, (s, i) => s + i.subtotal);
+    final monto = cotizacion.total > 0 ? cotizacion.total
+      : montoItems > 0 ? montoItems * 1.16
+      : 0.0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(color: color, width: 4),
+          top: BorderSide(color: AppColors.grisBorde, width: 0.5),
+          right: BorderSide(color: AppColors.grisBorde, width: 0.5),
+          bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+      child: Column(children: [
+        // Info principal
+        Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(nombre, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            Text(cotizacion.folio ?? '', style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            if (cotizacion.createdAt != null)
+              Text(DateFormat('dd/MM/yyyy').format(cotizacion.createdAt!),
+                style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+            const SizedBox(height: 4),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+              child: Text(cotizacion.estado, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+          ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(monto > 0 ? fmt.format(monto) : 'Sin monto',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                color: monto > 0 ? AppColors.azul : AppColors.textoSecundario)),
+            if (cotizacion.items.isNotEmpty)
+              Text('${cotizacion.items.length} producto${cotizacion.items.length > 1 ? "s" : ""}',
+                style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+          ]),
+        ])),
+
+        // Botones de acción
+        Container(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          child: Row(children: [
+            // EDITAR
+            Expanded(child: ElevatedButton.icon(
+              onPressed: () => _editarCotizacion(context),
+              icon: const Icon(Icons.edit_outlined, size: 15, color: Colors.white),
+              label: const Text('Editar', style: TextStyle(fontSize: 12, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.azul,
+                padding: const EdgeInsets.symmetric(vertical: 8)))),
+            const SizedBox(width: 6),
+            // Cambiar a Enviada si está en Borrador
+            if (cotizacion.estado == 'Borrador')
+              ElevatedButton(
+                onPressed: () => _cambiarEstado(context, 'Enviada'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF185fa5),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                child: const Text('→ Enviada', style: TextStyle(fontSize: 11, color: Colors.white))),
+            if (cotizacion.estado == 'Enviada')
+              ElevatedButton(
+                onPressed: () => _cambiarEstado(context, 'Aprobada'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1d9e75),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                child: const Text('→ Aprobada', style: TextStyle(fontSize: 11, color: Colors.white))),
+            if (cotizacion.estado == 'Aprobada')
+              ElevatedButton(
+                onPressed: () => _convertirPedido(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7c3aed),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                child: const Text('→ Pedido', style: TextStyle(fontSize: 11, color: Colors.white))),
+          ])),
+      ]));
+  }
+
+  void _editarCotizacion(BuildContext context) {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => Scaffold(
+        appBar: AppBar(
+          title: Text('Editar — ${cotizacion.folio ?? "cotización"}'),
+          backgroundColor: Colors.white),
+        body: _NuevaCotizacion(
+          cotizacionEditar: cotizacion,
+          onGuardada: () { Navigator.pop(context); onActualizar(); }))));
+  }
+
+  Future<void> _cambiarEstado(BuildContext context, String nuevoEstado) async {
+    try {
+      await SupabaseService.cambiarEstadoCotizacion(cotizacion.id!, nuevoEstado);
+      onActualizar();
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✅ Estado → $nuevoEstado'), backgroundColor: AppColors.azul));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _convertirPedido(BuildContext context) async {
+    try {
+      await SupabaseService.convertirEnPedido(cotizacion);
+      onActualizar();
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('✅ ¡Pedido creado! Visible en Avances'),
+        backgroundColor: AppColors.verde));
+    } catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+}
+
+// ═══════════════════════════════════════════
+// NUEVA / EDITAR COTIZACIÓN
 // ═══════════════════════════════════════════
 class _NuevaCotizacion extends StatefulWidget {
   final VoidCallback? onGuardada;
@@ -69,16 +278,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   double _costoEnvio = 0;
   String _metodoPago = '50% anticipo / 50% entrega';
   String _condicionEntrega = 'LAB — En planta HETNA';
-  String _tiempoEntrega = '15 días';
   String _notas = '';
   bool _generando = false;
   bool _guardando = false;
+
   bool get _esEdicion => widget.cotizacionEditar != null;
-
-  final _metodosPago = ['50% anticipo / 50% entrega', 'Pago total anticipado', 'Crédito 30 días', 'Crédito 60 días', 'Transferencia bancaria'];
-  final _condiciones = ['LAB — En planta HETNA', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente', 'Instalación incluida'];
-  final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días', 'A convenir'];
-
   double get _subtotal => _items.fold(0, (s, i) => s + i.subtotal);
   double get _montoDescuento => _subtotal * _descuentoPct / 100;
   double get _baseIva => _subtotal - _montoDescuento;
@@ -86,22 +290,25 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   double get _total => _baseIva + _montoIva + _costoEnvio;
   bool get _puedeAccionar => _items.isNotEmpty && _cliente != null;
 
+  final _metodosPago = ['50% anticipo / 50% entrega', 'Pago total anticipado', 'Crédito 30 días', 'Transferencia bancaria'];
+  final _condiciones = ['LAB — En planta HETNA', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
+  final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
+  String _tiempoEntrega = '15 días';
+
   @override
   void initState() {
     super.initState();
-    // Si viene para editar, cargar datos
     if (_esEdicion) {
       final c = widget.cotizacionEditar!;
       _cliente = c.cliente;
       _items = List.from(c.items);
       _descuentoPct = c.descuentoPct;
-      _ivaPct = c.ivaPct;
+      _ivaPct = c.ivaPct > 0 ? c.ivaPct : 16;
       _aplicaIva = c.ivaPct > 0;
       _costoEnvio = c.costoEnvio;
       _metodoPago = c.metodoPago ?? '50% anticipo / 50% entrega';
       _condicionEntrega = c.condicionEntrega ?? 'LAB — En planta HETNA';
       _notas = c.notas ?? '';
-      // Cargar items si están vacíos
       if (_items.isEmpty && c.id != null) {
         SupabaseService.getCotizacionItems(c.id!).then((items) {
           if (mounted) setState(() => _items = items);
@@ -117,8 +324,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
       if (_esEdicion)
         Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: AppColors.ambar.withOpacity(0.3))),
+          decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8)),
           child: Row(children: [
             const Icon(Icons.edit, size: 16, color: AppColors.ambar),
             const SizedBox(width: 8),
@@ -127,22 +333,21 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           ])),
 
       // ─── Cliente ───
-      _bloque('Cliente', Icons.person_outline,
-        _cliente == null
-          ? Column(children: [
-              ElevatedButton.icon(onPressed: _seleccionarCliente,
-                icon: const Icon(Icons.person_search), label: const Text('Seleccionar cliente')),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(onPressed: _nuevoClienteRapido,
-                icon: const Icon(Icons.person_add_outlined), label: const Text('Agregar nuevo cliente')),
-            ])
-          : ListTile(contentPadding: EdgeInsets.zero,
-              leading: CircleAvatar(backgroundColor: AppColors.azulClaro,
-                child: Text(_cliente!.nombre[0].toUpperCase(),
-                  style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
-              title: Text(_cliente!.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-              subtitle: Text(_cliente!.tipoCliente, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-              trailing: TextButton(onPressed: _seleccionarCliente, child: const Text('Cambiar')))),
+      _bloque('Cliente', Icons.person_outline, _cliente == null
+        ? Column(children: [
+            ElevatedButton.icon(onPressed: _seleccionarCliente,
+              icon: const Icon(Icons.person_search), label: const Text('Seleccionar cliente')),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(onPressed: _nuevoClienteRapido,
+              icon: const Icon(Icons.person_add_outlined), label: const Text('Agregar nuevo cliente')),
+          ])
+        : ListTile(contentPadding: EdgeInsets.zero,
+            leading: CircleAvatar(backgroundColor: AppColors.azulClaro,
+              child: Text(_cliente!.nombre[0].toUpperCase(),
+                style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
+            title: Text(_cliente!.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: Text(_cliente!.tipoCliente),
+            trailing: TextButton(onPressed: _seleccionarCliente, child: const Text('Cambiar')))),
 
       // ─── Productos ───
       _bloque('Productos', Icons.inventory_2_outlined, Column(children: [
@@ -151,7 +356,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             child: Text('Agrega productos a la cotización',
               style: TextStyle(color: AppColors.textoSecundario, fontSize: 12))),
         ..._items.map((item) => _ItemRow(
-          key: ValueKey(item.productoId ?? item.nombreProducto),
+          key: ValueKey('${item.productoId}_${item.nombreProducto}'),
           item: item,
           onEliminar: () => setState(() => _items.remove(item)),
           onCantidadChanged: (v) => setState(() => item.cantidad = v),
@@ -159,56 +364,55 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         const SizedBox(height: 8),
         Row(children: [
           Expanded(child: ElevatedButton.icon(onPressed: _agregarProducto,
-            icon: const Icon(Icons.add, size: 18), label: const Text('Agregar producto'))),
+            icon: const Icon(Icons.add, size: 18), label: const Text('Del catálogo'))),
           const SizedBox(width: 8),
           Expanded(child: OutlinedButton.icon(onPressed: _productoNuevo,
-            icon: const Icon(Icons.add_box_outlined, size: 18), label: const Text('Producto nuevo'))),
+            icon: const Icon(Icons.add_box_outlined, size: 18), label: const Text('Nuevo rápido'))),
         ]),
       ])),
 
       // ─── Condiciones ───
       _bloque('Condiciones', Icons.local_shipping_outlined, Column(children: [
         Row(children: [
-          Expanded(child: _campoLabel('Tiempo de entrega', child: DropdownButtonFormField<String>(
+          Expanded(child: _campo('Tiempo entrega', child: DropdownButtonFormField<String>(
             value: _tiempos.contains(_tiempoEntrega) ? _tiempoEntrega : '15 días',
             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             items: _tiempos.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))).toList(),
             onChanged: (v) => setState(() => _tiempoEntrega = v!)))),
           const SizedBox(width: 8),
-          Expanded(child: _campoLabel('Método de pago', child: DropdownButtonFormField<String>(
+          Expanded(child: _campo('Método de pago', child: DropdownButtonFormField<String>(
             value: _metodosPago.contains(_metodoPago) ? _metodoPago : _metodosPago.first,
             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             items: _metodosPago.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 11)))).toList(),
             onChanged: (v) => setState(() => _metodoPago = v!)))),
         ]),
         const SizedBox(height: 8),
-        _campoLabel('Notas', child: TextField(
-          controller: TextEditingController(text: _notas),
-          decoration: const InputDecoration(hintText: 'Garantías, accesorios, condiciones...',
+        _campo('Notas', child: TextFormField(
+          initialValue: _notas,
+          decoration: const InputDecoration(hintText: 'Garantías, condiciones especiales...',
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
           maxLines: 2, style: const TextStyle(fontSize: 13),
           onChanged: (v) => _notas = v)),
       ])),
 
-      // ─── Resumen financiero ───
-      _bloque('Resumen', Icons.calculate_outlined, Column(children: [
+      // ─── Resumen ───
+      _bloque('Resumen financiero', Icons.calculate_outlined, Column(children: [
         Row(children: [
-          Expanded(child: _campoLabel('Descuento %', child: TextField(
-            controller: TextEditingController(text: _descuentoPct > 0 ? _descuentoPct.toString() : ''),
+          Expanded(child: _campo('Descuento %', child: TextFormField(
+            initialValue: _descuentoPct > 0 ? _descuentoPct.toStringAsFixed(0) : '',
             decoration: const InputDecoration(hintText: '0', suffixText: '%',
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             keyboardType: TextInputType.number,
             onChanged: (v) => setState(() => _descuentoPct = double.tryParse(v) ?? 0)))),
           const SizedBox(width: 8),
-          Expanded(child: _campoLabel('Costo envío', child: TextField(
-            controller: TextEditingController(text: _costoEnvio > 0 ? _costoEnvio.toString() : ''),
+          Expanded(child: _campo('Envío', child: TextFormField(
+            initialValue: _costoEnvio > 0 ? _costoEnvio.toStringAsFixed(0) : '',
             decoration: const InputDecoration(hintText: '0', prefixText: '\$',
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             keyboardType: TextInputType.number,
             onChanged: (v) => setState(() => _costoEnvio = double.tryParse(v) ?? 0)))),
         ]),
         const SizedBox(height: 8),
-        // IVA Switch
         Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: _aplicaIva ? AppColors.verdeClaro : AppColors.gris,
@@ -225,23 +429,22 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
               activeColor: AppColors.verde),
           ])),
         const SizedBox(height: 10),
-        if (_descuentoPct > 0) _filaTot('Descuento ${_descuentoPct.toInt()}%', '-${fmt.format(_montoDescuento)}', AppColors.verde),
-        if (_costoEnvio > 0) _filaTot('Envío', fmt.format(_costoEnvio), AppColors.textoSecundario),
-        if (_aplicaIva) _filaTot('IVA ${_ivaPct.toInt()}%', fmt.format(_montoIva), AppColors.textoSecundario),
+        if (_descuentoPct > 0) _fila('Descuento ${_descuentoPct.toInt()}%', '-${fmt.format(_montoDescuento)}', AppColors.verde),
+        if (_aplicaIva) _fila('IVA ${_ivaPct.toInt()}%', fmt.format(_montoIva), AppColors.textoSecundario),
+        if (_costoEnvio > 0) _fila('Envío', fmt.format(_costoEnvio), AppColors.textoSecundario),
         const Divider(),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text('TOTAL', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.azul)),
-          Text(fmt.format(_total), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.azul)),
+          const Text('TOTAL', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.azul)),
+          Text(fmt.format(_total), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.azul)),
         ]),
       ])),
 
       const SizedBox(height: 8),
 
-      // ─── Botones ───
+      // ─── Botones de acción ───
       ElevatedButton.icon(
-        onPressed: _puedeAccionar ? _generarPDF : null,
-        icon: _generando
-          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+        onPressed: _puedeAccionar && !_generando ? _generarPDF : null,
+        icon: _generando ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
           : const Icon(Icons.picture_as_pdf),
         label: const Text('Generar y ver PDF')),
       const SizedBox(height: 8),
@@ -253,19 +456,18 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       const SizedBox(height: 8),
       Row(children: [
         Expanded(child: OutlinedButton.icon(
-          onPressed: _puedeAccionar ? _guardar : null,
+          onPressed: _puedeAccionar && !_guardando ? _guardar : null,
           icon: const Icon(Icons.save_outlined),
           label: Text(_esEdicion ? 'Guardar cambios' : 'Guardar borrador'))),
         const SizedBox(width: 8),
         Expanded(child: ElevatedButton.icon(
           onPressed: _puedeAccionar && !_guardando ? _convertirPedido : null,
-          icon: _guardando
-            ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          icon: _guardando ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.check_circle_outline),
-          label: const Text('→ PEDIDO'),
+          label: const Text('→ Convertir a PEDIDO'),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde))),
       ]),
-      const SizedBox(height: 20),
+      const SizedBox(height: 24),
     ]);
   }
 
@@ -277,16 +479,14 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [Icon(icon, size: 16, color: AppColors.azul), const SizedBox(width: 6),
         Text(titulo, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.azul))]),
-      const SizedBox(height: 10),
-      contenido,
-    ]));
+      const SizedBox(height: 10), contenido]));
 
-  Widget _campoLabel(String label, {required Widget child}) =>
+  Widget _campo(String label, {required Widget child}) =>
     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       const SizedBox(height: 4), child]);
 
-  Widget _filaTot(String label, String valor, Color color) => Padding(
+  Widget _fila(String label, String valor, Color color) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 3),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
@@ -306,12 +506,10 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _nuevoClienteRapido() async {
     final n = TextEditingController(), wa = TextEditingController();
-    String tipo = 'Cliente potencial';
-    showModalBottomSheet(context: context, isScrollControlled: true,
+    await showModalBottomSheet(context: context, isScrollControlled: true,
       builder: (_) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: StatefulBuilder(builder: (ctx, setS) => Container(
-          padding: const EdgeInsets.all(16),
+        child: Container(padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('Nuevo cliente rápido', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
@@ -321,22 +519,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             TextField(controller: wa, keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'WhatsApp',
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(value: tipo,
-              decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-              items: ['Cliente potencial', 'Cliente activo', 'Cliente frecuente', 'Distribuidor']
-                .map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-              onChanged: (v) => setS(() => tipo = v!)),
             const SizedBox(height: 12),
             ElevatedButton(onPressed: () async {
               if (n.text.isEmpty) return;
               final c = await SupabaseService.crearCliente(Cliente(
                 nombre: n.text.trim(),
                 whatsapp: wa.text.trim().isEmpty ? null : wa.text.trim(),
-                tipoCliente: tipo));
+                tipoCliente: 'Cliente potencial'));
               if (mounted) { setState(() => _cliente = c); Navigator.pop(context); }
             }, child: const Text('Guardar cliente')),
-          ])))));
+          ]))));
   }
 
   Future<void> _agregarProducto() async {
@@ -351,7 +543,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _productoNuevo() async {
     final n = TextEditingController(), p = TextEditingController();
-    showModalBottomSheet(context: context, isScrollControlled: true,
+    await showModalBottomSheet(context: context, isScrollControlled: true,
       builder: (_) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(padding: const EdgeInsets.all(16),
@@ -390,11 +582,10 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   }
 
   Future<void> _enviarWA() async {
-    if (_cliente == null || _items.isEmpty) return;
+    if (_cliente == null) return;
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final itemsTexto = _items.map((i) => '• ${i.nombreProducto} x${i.cantidad} = ${fmt.format(i.subtotal)}').join('\n');
-    final ivaTexto = _aplicaIva ? '\nIVA ${_ivaPct.toInt()}%: ${fmt.format(_montoIva)}' : '';
-    final msg = '¡Hola ${_cliente!.nombre}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n$itemsTexto\n\nSubtotal: ${fmt.format(_subtotal - _montoDescuento)}$ivaTexto\n*TOTAL: ${fmt.format(_total)}*\n\nTiempo de entrega: $_tiempoEntrega\nMétodo de pago: $_metodoPago\n\n¿Te parece bien? Quedamos a tus órdenes 😊\n_HETNA CNC_';
+    final msg = '¡Hola ${_cliente!.nombre}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n$itemsTexto\n\nSubtotal: ${fmt.format(_baseIva)}${_aplicaIva ? "\nIVA ${_ivaPct.toInt()}%: ${fmt.format(_montoIva)}" : ""}\n*TOTAL: ${fmt.format(_total)}*\n\nTiempo de entrega: $_tiempoEntrega\nMétodo de pago: $_metodoPago\n\n¿Te parece bien? 😊 — *HETNA CNC*';
     await WhatsAppService.abrirChat(numero: _cliente!.whatsappNumero, mensaje: msg);
   }
 
@@ -408,7 +599,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ Cotización actualizada'), backgroundColor: AppColors.verde));
-          Navigator.pop(context);
+          widget.onGuardada?.call();
         }
       } else {
         final cot = _buildCotizacion(estado: 'Borrador');
@@ -448,188 +639,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   }
 
   Cotizacion _buildCotizacion({String? id, String? folio, String? estado}) => Cotizacion(
-    id: id,
-    folio: folio,
-    cliente: _cliente,
-    clienteId: _cliente?.id,
-    items: _items,
-    estado: estado ?? 'Borrador',
-    descuentoPct: _descuentoPct,
-    ivaPct: _aplicaIva ? _ivaPct : 0,
-    costoEnvio: _costoEnvio,
-    metodoPago: _metodoPago,
-    condicionEntrega: _condicionEntrega,
-    notas: _notas,
-    createdAt: DateTime.now(),
-  );
-}
-
-// ═══════════════════════════════════════════
-// LISTA DE COTIZACIONES CON EDICIÓN
-// ═══════════════════════════════════════════
-class _ListaCotizaciones extends StatefulWidget {
-  @override
-  State<_ListaCotizaciones> createState() => _ListaCotizacionesState();
-}
-
-class _ListaCotizacionesState extends State<_ListaCotizaciones> {
-  List<Cotizacion> _cotizaciones = [];
-  bool _cargando = true;
-  String _filtro = 'Todos';
-  final _fmt = NumberFormat('\$#,##0', 'es_MX');
-
-  final _estados = ['Todos', 'Borrador', 'Enviada', 'Aprobada', 'Pedido', 'Vencida', 'Rechazada'];
-  final _colores = {
-    'Borrador': Colors.grey, 'Enviada': Color(0xFF185fa5),
-    'Aprobada': Color(0xFF1d9e75), 'Pedido': Color(0xFF7c3aed),
-    'Vencida': Color(0xFFef9f27), 'Rechazada': Color(0xFFe24b4a),
-  };
-
-  @override
-  void initState() { super.initState(); _cargar(); }
-
-  Future<void> _cargar() async {
-    setState(() => _cargando = true);
-    try {
-      final cots = await SupabaseService.getCotizaciones();
-      if (mounted) setState(() { _cotizaciones = cots; _cargando = false; });
-    } catch (_) { if (mounted) setState(() => _cargando = false); }
-  }
-
-  List<Cotizacion> get _filtradas => _filtro == 'Todos'
-    ? _cotizaciones
-    : _cotizaciones.where((c) => c.estado == _filtro).toList();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(children: [
-      // Filtros
-      Container(color: Colors.white, padding: const EdgeInsets.all(10),
-        child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children:
-          _estados.map((e) {
-            final color = _colores[e] ?? AppColors.azul;
-            final count = e == 'Todos' ? _cotizaciones.length
-              : _cotizaciones.where((c) => c.estado == e).length;
-            final activo = _filtro == e;
-            return GestureDetector(
-              onTap: () => setState(() => _filtro = e),
-              child: Container(margin: const EdgeInsets.only(right: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: activo ? (e == 'Todos' ? AppColors.azul : color) : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: activo ? (e == 'Todos' ? AppColors.azul : color) : AppColors.grisBorde)),
-                child: Text('$e ($count)', style: TextStyle(fontSize: 10,
-                  color: activo ? Colors.white : AppColors.textoSecundario))));
-          }).toList()))),
-
-      Expanded(child: _cargando
-        ? const Center(child: CircularProgressIndicator())
-        : RefreshIndicator(onRefresh: _cargar, child: _filtradas.isEmpty
-            ? const Center(child: Text('No hay cotizaciones', style: TextStyle(color: AppColors.textoSecundario)))
-            : ListView.builder(
-                padding: const EdgeInsets.all(12),
-                itemCount: _filtradas.length,
-                itemBuilder: (_, i) => _TarjetaCotizacion(
-                  cotizacion: _filtradas[i],
-                  colores: _colores,
-                  onActualizar: _cargar)))),
-    ]);
-  }
-}
-
-class _TarjetaCotizacion extends StatelessWidget {
-  final Cotizacion cotizacion;
-  final Map<String, Color> colores;
-  final VoidCallback onActualizar;
-  const _TarjetaCotizacion({required this.cotizacion, required this.colores, required this.onActualizar});
-
-  @override
-  Widget build(BuildContext context) {
-    final fmt = NumberFormat('\$#,##0', 'es_MX');
-    final color = colores[cotizacion.estado] ?? Colors.grey;
-    final nombre = cotizacion.cliente?.nombre ?? cotizacion.cliente?.empresa ?? 'Sin cliente';
-    // Mostrar total o subtotal+iva estimado
-    final monto = cotizacion.total > 0 ? cotizacion.total
-      : cotizacion.subtotal > 0 ? cotizacion.subtotal * 1.16 : 0.0;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-        border: Border(left: BorderSide(color: color, width: 4),
-          top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
-      child: Column(children: [
-        // Info principal
-        Padding(padding: const EdgeInsets.all(12), child: Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nombre, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-            Text(cotizacion.folio ?? '', style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-            if (cotizacion.createdAt != null)
-              Text(DateFormat('dd/MM/yyyy').format(cotizacion.createdAt!),
-                style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-            const SizedBox(height: 4),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(cotizacion.estado, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
-          ])),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(fmt.format(monto),
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.azul)),
-            if (cotizacion.items.isNotEmpty)
-              Text('${cotizacion.items.length} producto${cotizacion.items.length > 1 ? "s" : ""}',
-                style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-          ]),
-        ])),
-
-        // Botones de acción
-        Container(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          child: Row(children: [
-            // Editar
-            Expanded(child: OutlinedButton.icon(
-              onPressed: () => _editarCotizacion(context),
-              icon: const Icon(Icons.edit_outlined, size: 14),
-              label: const Text('Editar', style: TextStyle(fontSize: 12)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.azul,
-                side: const BorderSide(color: AppColors.azul),
-                padding: const EdgeInsets.symmetric(vertical: 6)))),
-            const SizedBox(width: 6),
-            // Cambiar estado
-            ...['Enviada', 'Aprobada', 'Pedido'].where((e) => e != cotizacion.estado).take(2).map((e) {
-              final c = colores[e] ?? Colors.grey;
-              return Padding(padding: const EdgeInsets.only(left: 6),
-                child: ElevatedButton(
-                  onPressed: () => _cambiarEstado(context, e),
-                  style: ElevatedButton.styleFrom(backgroundColor: c,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6)),
-                  child: Text('→ $e', style: const TextStyle(fontSize: 11, color: Colors.white))));
-            }),
-          ])),
-      ]));
-  }
-
-  void _editarCotizacion(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => Scaffold(
-        appBar: AppBar(title: Text('Editar — ${cotizacion.folio ?? ""}')),
-        body: _NuevaCotizacion(
-          cotizacionEditar: cotizacion,
-          onGuardada: onActualizar))));
-  }
-
-  Future<void> _cambiarEstado(BuildContext context, String nuevoEstado) async {
-    try {
-      await SupabaseService.cambiarEstadoCotizacion(cotizacion.id!, nuevoEstado);
-      onActualizar();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Estado → $nuevoEstado'), backgroundColor: AppColors.azul));
-    } catch (e) {
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
+    id: id, folio: folio, cliente: _cliente, clienteId: _cliente?.id,
+    items: _items, estado: estado ?? 'Borrador',
+    descuentoPct: _descuentoPct, ivaPct: _aplicaIva ? _ivaPct : 0,
+    costoEnvio: _costoEnvio, metodoPago: _metodoPago,
+    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: DateTime.now());
 }
 
 // ═══════════════════════════════════════════
@@ -647,30 +661,35 @@ class _ItemRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0.00', 'es_MX');
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Text(item.nombreProducto,
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
           IconButton(icon: const Icon(Icons.close, size: 16, color: AppColors.rojo),
-            padding: EdgeInsets.zero, onPressed: onEliminar),
+            padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onEliminar),
         ]),
+        const SizedBox(height: 6),
         Row(children: [
           Expanded(child: TextFormField(
             initialValue: item.precioUnitario.toStringAsFixed(0),
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(prefixText: '\$', labelText: 'Precio', isDense: true,
+            decoration: const InputDecoration(prefixText: '\$', labelText: 'Precio unit.', isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6)),
             style: const TextStyle(fontSize: 13),
             onChanged: (v) => onPrecioChanged(double.tryParse(v) ?? item.precioUnitario))),
           const SizedBox(width: 12),
           Row(children: [
-            IconButton(icon: const Icon(Icons.remove_circle_outline, size: 20), padding: EdgeInsets.zero,
+            IconButton(icon: const Icon(Icons.remove_circle_outline, size: 22, color: AppColors.rojo),
+              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
               onPressed: item.cantidad > 1 ? () => onCantidadChanged(item.cantidad - 1) : null),
-            Text('${item.cantidad}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-            IconButton(icon: const Icon(Icons.add_circle_outline, size: 20), padding: EdgeInsets.zero,
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text('${item.cantidad}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+            IconButton(icon: const Icon(Icons.add_circle_outline, size: 22, color: AppColors.verde),
+              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
               onPressed: () => onCantidadChanged(item.cantidad + 1)),
           ]),
           const SizedBox(width: 8),
@@ -698,8 +717,7 @@ class _SelectorClienteState extends State<_SelectorCliente> {
   List<Cliente> get _filtrados => _busqueda.isEmpty ? widget.clientes
     : widget.clientes.where((c) =>
         c.nombre.toLowerCase().contains(_busqueda.toLowerCase()) ||
-        (c.empresa?.toLowerCase().contains(_busqueda.toLowerCase()) ?? false) ||
-        (c.whatsapp?.contains(_busqueda) ?? false)).toList();
+        (c.empresa?.toLowerCase().contains(_busqueda.toLowerCase()) ?? false)).toList();
 
   @override
   Widget build(BuildContext context) {
@@ -712,7 +730,8 @@ class _SelectorClienteState extends State<_SelectorCliente> {
           const Text('Seleccionar cliente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           TextField(autofocus: true,
-            decoration: InputDecoration(hintText: 'Buscar...', prefixIcon: const Icon(Icons.search, size: 20),
+            decoration: InputDecoration(hintText: 'Buscar por nombre o empresa...',
+              prefixIcon: const Icon(Icons.search, size: 20),
               filled: true, fillColor: AppColors.gris,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
             onChanged: (v) => setState(() => _busqueda = v)),
@@ -728,11 +747,12 @@ class _SelectorClienteState extends State<_SelectorCliente> {
             final c = _filtrados[i];
             return ListTile(
               leading: CircleAvatar(backgroundColor: AppColors.azulClaro,
-                child: Text(c.nombre[0].toUpperCase(), style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
+                child: Text(c.nombre[0].toUpperCase(),
+                  style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
               title: Text(c.nombreCompleto, style: const TextStyle(fontSize: 13)),
               subtitle: Text(c.tipoCliente, style: const TextStyle(fontSize: 11)),
               trailing: c.whatsappNumero.isNotEmpty
-                ? const Icon(Icons.chat, color: Color(0xFF25D366), size: 16) : null,
+                ? const Icon(Icons.chat, color: Color(0xFF25D366), size: 18) : null,
               onTap: () { widget.onSeleccionado(c); Navigator.pop(context); });
           })),
       ]));
@@ -763,22 +783,25 @@ class _SelectorProductoState extends State<_SelectorProducto> {
           const Text('Seleccionar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           TextField(autofocus: true,
-            decoration: InputDecoration(hintText: 'Buscar...', prefixIcon: const Icon(Icons.search, size: 20),
+            decoration: InputDecoration(hintText: 'Buscar producto...',
+              prefixIcon: const Icon(Icons.search, size: 20),
               filled: true, fillColor: AppColors.gris,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
             onChanged: (v) => setState(() => _busqueda = v)),
         ])),
-        Expanded(child: ListView.builder(
-          itemCount: _filtrados.length,
-          itemBuilder: (_, i) {
-            final p = _filtrados[i];
-            return ListTile(
-              title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-              subtitle: Text(p.categoriaNombre ?? '', style: const TextStyle(fontSize: 11)),
-              trailing: Text('\$${p.precioVenta.toStringAsFixed(0)}',
-                style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul, fontSize: 14)),
-              onTap: () { widget.onSeleccionado(p); Navigator.pop(context); });
-          })),
+        Expanded(child: _filtrados.isEmpty
+          ? const Center(child: Text('No hay productos', style: TextStyle(color: AppColors.textoSecundario)))
+          : ListView.builder(
+              itemCount: _filtrados.length,
+              itemBuilder: (_, i) {
+                final p = _filtrados[i];
+                return ListTile(
+                  title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  subtitle: Text(p.categoriaNombre ?? p.unidadMedida, style: const TextStyle(fontSize: 11)),
+                  trailing: Text('\$${p.precioVenta.toStringAsFixed(0)}',
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul, fontSize: 15)),
+                  onTap: () { widget.onSeleccionado(p); Navigator.pop(context); });
+              })),
       ]));
   }
 }
@@ -816,9 +839,9 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> {
               child: const Column(children: [
                 Icon(Icons.picture_as_pdf, size: 48, color: AppColors.textoSecundario),
                 SizedBox(height: 8),
-                Text('No hay PDFs subidos', style: TextStyle(color: AppColors.textoSecundario)),
+                Text('No hay catálogos subidos aún', style: TextStyle(color: AppColors.textoSecundario)),
                 SizedBox(height: 4),
-                Text('Próximamente podrás subir catálogos y listas de precios',
+                Text('Aquí aparecerán los PDFs de catálogos y listas de precios\npara enviar por WhatsApp a tus clientes.',
                   style: TextStyle(fontSize: 11, color: AppColors.textoSecundario), textAlign: TextAlign.center),
               ]))
           else
@@ -829,12 +852,10 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> {
               child: ListTile(
                 leading: Container(width: 40, height: 40,
                   decoration: BoxDecoration(color: AppColors.rojoClaro, borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo, size: 22)),
+                  child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo)),
                 title: Text(pdf.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                 subtitle: Text(pdf.tamanoTexto),
-                trailing: IconButton(
-                  icon: const Icon(Icons.chat, color: Color(0xFF25D366)),
-                  onPressed: () {})))),
+                trailing: const Icon(Icons.chat, color: Color(0xFF25D366))))),
           const SizedBox(height: 20),
         ]);
   }
