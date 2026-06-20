@@ -1,18 +1,11 @@
-// ============================================
-// lib/screens/alertas_screen.dart
-// Pantalla de alertas y seguimiento automático
-// ============================================
-
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
-import '../services/whatsapp_service.dart';
 
 class AlertasScreen extends StatefulWidget {
   const AlertasScreen({super.key});
-
   @override
   State<AlertasScreen> createState() => _AlertasScreenState();
 }
@@ -22,332 +15,270 @@ class _AlertasScreenState extends State<AlertasScreen> {
   bool _cargando = true;
 
   @override
-  void initState() {
-    super.initState();
-    _cargar();
-  }
+  void initState() { super.initState(); _cargar(); }
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
       final alertas = await SupabaseService.getAlertasPendientes();
-      setState(() => _alertas = alertas);
-    } catch (e) {
-      _mostrarError('Error al cargar alertas: $e');
-    } finally {
-      setState(() => _cargando = false);
+      if (mounted) setState(() { _alertas = alertas; _cargando = false; });
+    } catch (_) {
+      if (mounted) setState(() => _cargando = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.gris,
       appBar: AppBar(
-        title: const Text('Seguimientos pendientes'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _cargar,
-          ),
-        ],
+        title: Row(children: [
+          const Text('Alertas de seguimiento'),
+          if (_alertas.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(color: AppColors.rojo, borderRadius: BorderRadius.circular(20)),
+              child: Text('${_alertas.length}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700))),
+          ],
+        ]),
+        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)],
       ),
       body: _cargando
-          ? const Center(child: CircularProgressIndicator())
-          : _alertas.isEmpty
-              ? _sinAlertas()
-              : RefreshIndicator(
-                  onRefresh: _cargar,
-                  child: ListView(
-                    padding: const EdgeInsets.all(14),
-                    children: [
-                      ..._alertas.map((a) => _TarjetaAlerta(
-                            alerta: a,
-                            onEnviado: () => _marcarCompletada(a),
-                          )),
-                    ],
-                  ),
-                ),
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(onRefresh: _cargar, child: _alertas.isEmpty
+            ? _pantallaVacia()
+            : ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: _alertas.length,
+                itemBuilder: (_, i) => _TarjetaAlerta(
+                  alerta: _alertas[i],
+                  onCompletada: () { _cargar(); },
+                ))),
     );
   }
 
-  Widget _sinAlertas() => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.check_circle_outline,
-                size: 64, color: Color(0xFF1d9e75)),
-            const SizedBox(height: 12),
-            const Text('¡Todo al día!',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text('No hay seguimientos pendientes por ahora.',
-                style: TextStyle(color: AppColors.textoSecundario)),
-          ],
-        ),
-      );
-
-  Future<void> _marcarCompletada(Alerta alerta) async {
-    await SupabaseService.marcarAlertaCompletada(alerta.id);
-    setState(() => _alertas.remove(alerta));
-  }
-
-  void _mostrarError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
-  }
+  Widget _pantallaVacia() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+    Container(width: 80, height: 80, decoration: BoxDecoration(color: AppColors.verdeClaro, shape: BoxShape.circle),
+      child: const Icon(Icons.check_circle_outline, size: 40, color: AppColors.verde)),
+    const SizedBox(height: 16),
+    const Text('¡Todo al día!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.verde)),
+    const SizedBox(height: 8),
+    const Text('No hay seguimientos pendientes por ahora.', style: TextStyle(color: AppColors.textoSecundario)),
+    const SizedBox(height: 24),
+    const Text('Las alertas aparecen automáticamente\ncuando una cotización lleva días sin respuesta.',
+      textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+  ]));
 }
 
-// ─── TARJETA DE ALERTA ──────────────────────
-class _TarjetaAlerta extends StatelessWidget {
+class _TarjetaAlerta extends StatefulWidget {
   final Alerta alerta;
-  final VoidCallback onEnviado;
+  final VoidCallback onCompletada;
+  const _TarjetaAlerta({required this.alerta, required this.onCompletada});
+  @override
+  State<_TarjetaAlerta> createState() => _TarjetaAlertaState();
+}
 
-  const _TarjetaAlerta({required this.alerta, required this.onEnviado});
+class _TarjetaAlertaState extends State<_TarjetaAlerta> {
+  bool _enviando = false;
+
+  // Mensajes predefinidos editables por tipo
+  static const Map<String, String> _mensajesBase = {
+    'seguimiento_dia3': '¡Hola [NOMBRE]! 😊 Te escribo de *HETNA CNC* para saber si pudiste revisar la cotización [FOLIO]. ¿Tienes alguna duda o quieres ajustar algo? Estamos para ayudarte.',
+    'seguimiento_dia5': '¡Hola [NOMBRE]! Te contacto nuevamente de *HETNA CNC* sobre la cotización [FOLIO]. ¿Podemos platicar para ver si hay algo que podamos mejorar en la propuesta?',
+    'seguimiento_dia7': '¡Hola [NOMBRE]! Es el último aviso de *HETNA CNC* sobre tu cotización [FOLIO] que vence pronto. Si te interesa, podemos hacer un ajuste especial para cerrar esta semana. 🎯',
+    'post_entrega': '¡Hola [NOMBRE]! Esperamos que estés disfrutando tu pedido de *HETNA CNC*. Nos gustaría saber tu opinión 😊 Y si tienes amigos que necesiten algo similar, con gusto los atendemos.\n\nSíguenos: Instagram @hetna_cnc',
+    'default': '¡Hola [NOMBRE]! Te escribo de *HETNA CNC* con relación a tu cotización [FOLIO]. ¿Podemos ayudarte en algo?',
+  };
+
+  String _generarMensaje() {
+    final tipo = widget.alerta.tipo ?? 'default';
+    final template = _mensajesBase[tipo] ?? _mensajesBase['default']!;
+    return template
+      .replaceAll('[NOMBRE]', widget.alerta.clienteNombre ?? 'Cliente')
+      .replaceAll('[FOLIO]', widget.alerta.cotizacionFolio ?? 'sin folio');
+  }
+
+  Color get _colorTipo {
+    switch (widget.alerta.tipo) {
+      case 'seguimiento_dia3': return AppColors.ambar;
+      case 'seguimiento_dia5': return AppColors.rojo;
+      case 'seguimiento_dia7': return const Color(0xFF7c3aed);
+      case 'post_entrega': return AppColors.verde;
+      default: return AppColors.azul;
+    }
+  }
+
+  String get _etiquetaTipo {
+    switch (widget.alerta.tipo) {
+      case 'seguimiento_dia3': return 'Día 3 sin respuesta';
+      case 'seguimiento_dia5': return 'Día 5 — Urgente';
+      case 'seguimiento_dia7': return 'Día 7 — Último aviso';
+      case 'post_entrega': return 'Post entrega';
+      default: return 'Seguimiento';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cfg = _config();
-    final fmt = NumberFormat('#,##0.00', 'es_MX');
+    final color = _colorTipo;
+    final wa = widget.alerta.clienteWhatsapp ?? '';
+    final tieneWA = wa.isNotEmpty;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: cfg['color'] as Color, width: 1.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Título
-            Row(children: [
-              Icon(cfg['icono'] as IconData,
-                  size: 16, color: cfg['color'] as Color),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(cfg['titulo'] as String,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: cfg['color'] as Color)),
-              ),
-            ]),
-            const SizedBox(height: 6),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: color, width: 4),
+          top: BorderSide(color: AppColors.grisBorde, width: 0.5),
+          right: BorderSide(color: AppColors.grisBorde, width: 0.5),
+          bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+      padding: const EdgeInsets.all(14),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-            // Cliente y folio
-            RichText(
-              text: TextSpan(
-                style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF111827)),
-                children: [
-                  TextSpan(
-                      text: alerta.clienteNombre ?? '',
-                      style: const TextStyle(fontWeight: FontWeight.w600)),
-                  if (alerta.clienteEmpresa != null)
-                    TextSpan(
-                        text: ' — ${alerta.clienteEmpresa}',
-                        style: const TextStyle(
-                            color: Color(0xFF6B7280))),
-                ],
-              ),
-            ),
-            if (alerta.cotizacionFolio != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                '${alerta.cotizacionFolio} · \$${fmt.format(alerta.cotizacionTotal ?? 0)} MXN',
-                style: const TextStyle(
-                    fontSize: 12, color: Color(0xFF6B7280)),
-              ),
+        // Header
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(widget.alerta.clienteNombre ?? 'Sin cliente',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            if (widget.alerta.clienteEmpresa != null)
+              Text(widget.alerta.clienteEmpresa!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            if (widget.alerta.cotizacionFolio != null)
+              Text('Cotización: ${widget.alerta.cotizacionFolio}',
+                style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+          ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+              child: Text(_etiquetaTipo, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+            if (widget.alerta.cotizacionTotal != null) ...[
+              const SizedBox(height: 4),
+              Text('\$${widget.alerta.cotizacionTotal!.toStringAsFixed(0)}',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
             ],
+          ]),
+        ]),
 
-            // Mensaje preview
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFf0f7f4),
-                borderRadius: BorderRadius.circular(6),
-                border: const Border(
-                  left: BorderSide(color: Color(0xFF25D366), width: 2),
-                ),
-              ),
-              child: Text(
-                _mensajePreview(),
-                style: const TextStyle(
-                    fontSize: 11, color: Color(0xFF1a3a5c), height: 1.5),
-              ),
-            ),
+        const SizedBox(height: 10),
 
-            const SizedBox(height: 10),
+        // Vista previa del mensaje
+        Container(padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
+            border: const Border(left: BorderSide(color: Color(0xFF25D366), width: 2))),
+          child: Text(_generarMensaje(), style: const TextStyle(fontSize: 11, height: 1.5, color: AppColors.azul))),
 
-            // Botones
-            Row(children: [
-              Expanded(
-                child: _BotonWA(
-                  label: cfg['botonTexto'] as String,
-                  color: cfg['color'] as Color,
-                  onTap: () => _enviarWA(context),
-                ),
-              ),
-              const SizedBox(width: 8),
-              GestureDetector(
-                onTap: onEnviado,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                  decoration: BoxDecoration(
-                    color: AppColors.gris,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.grisBorde),
-                  ),
-                  child: const Text('Hecho',
-                      style: TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
-                ),
-              ),
-            ]),
-          ],
-        ),
-      ),
+        const SizedBox(height: 10),
+
+        // Botones
+        Row(children: [
+          // Editar mensaje
+          OutlinedButton.icon(
+            onPressed: () => _editarMensaje(context),
+            icon: const Icon(Icons.edit_outlined, size: 14),
+            label: const Text('Editar', style: TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6))),
+          const SizedBox(width: 6),
+
+          // Enviar WA
+          Expanded(child: ElevatedButton.icon(
+            onPressed: (!tieneWA || _enviando) ? null : _enviarWhatsApp,
+            icon: _enviando
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.chat, size: 14),
+            label: Text(tieneWA ? 'Enviar WA' : 'Sin WA', style: const TextStyle(fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: tieneWA ? const Color(0xFF25D366) : Colors.grey,
+              padding: const EdgeInsets.symmetric(vertical: 6)))),
+          const SizedBox(width: 6),
+
+          // Completar
+          ElevatedButton.icon(
+            onPressed: _marcarCompletada,
+            icon: const Icon(Icons.check, size: 14),
+            label: const Text('Listo', style: TextStyle(fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.azul,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6))),
+        ]),
+
+        if (!tieneWA)
+          const Padding(padding: EdgeInsets.only(top: 6),
+            child: Text('⚠ Este cliente no tiene WhatsApp registrado. Edítalo en CRM → Clientes.',
+              style: TextStyle(fontSize: 10, color: AppColors.ambar))),
+      ]),
     );
   }
 
-  Map<String, dynamic> _config() {
-    switch (alerta.tipo) {
-      case 'seguimiento_dia3':
-        return {
-          'titulo': 'Día 3 sin respuesta',
-          'icono': Icons.access_time,
-          'color': AppColors.rojo,
-          'botonTexto': 'Abrir WhatsApp',
-        };
-      case 'seguimiento_dia5':
-        return {
-          'titulo': 'Día 5 — Urgencia',
-          'icono': Icons.warning_amber_outlined,
-          'color': AppColors.rojo,
-          'botonTexto': 'Abrir WhatsApp',
-        };
-      case 'cupon_dia7':
-        return {
-          'titulo': 'Día 7 — Enviar cupón',
-          'icono': Icons.local_offer_outlined,
-          'color': AppColors.ambar,
-          'botonTexto': 'Enviar cupón WA',
-        };
-      case 'post_entrega_redes':
-        return {
-          'titulo': 'Post-entrega — Enviar redes',
-          'icono': Icons.share_outlined,
-          'color': AppColors.verde,
-          'botonTexto': 'Enviar redes WA',
-        };
-      default:
-        return {
-          'titulo': alerta.titulo,
-          'icono': Icons.notifications_outlined,
-          'color': const Color(0xFF185fa5),
-          'botonTexto': 'Abrir WhatsApp',
-        };
-    }
+  void _editarMensaje(BuildContext context) {
+    final ctrl = TextEditingController(text: _generarMensaje());
+    showModalBottomSheet(context: context, isScrollControlled: true,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(padding: const EdgeInsets.all(16), height: 400,
+          child: Column(children: [
+            const Text('Editar mensaje', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 10),
+            Expanded(child: TextField(controller: ctrl, maxLines: null, expands: true,
+              decoration: const InputDecoration(contentPadding: EdgeInsets.all(12)),
+              style: const TextStyle(fontSize: 13))),
+            const SizedBox(height: 10),
+            ElevatedButton.icon(
+              onPressed: () { Navigator.pop(context); _enviarMensaje(ctrl.text); },
+              icon: const Icon(Icons.chat, size: 16),
+              label: const Text('Enviar este mensaje por WA'),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
+          ]))));
   }
 
-  String _mensajePreview() {
-    final nombre = alerta.clienteNombre?.split(' ').first ?? 'Cliente';
-    final folio = alerta.cotizacionFolio ?? '';
-    final fmt = NumberFormat('#,##0.00', 'es_MX');
-    final total = fmt.format(alerta.cotizacionTotal ?? 0);
-
-    switch (alerta.tipo) {
-      case 'seguimiento_dia3':
-        return '💬 "Hola $nombre, ¿pudo revisar la cotización $folio? Estoy disponible para cualquier ajuste. — HETNA CNC"';
-      case 'seguimiento_dia5':
-        return '⏰ "Hola $nombre, la cotización $folio por \$$total MXN está por vencer. ¿Hay algo que podamos ajustar? — HETNA CNC"';
-      case 'cupon_dia7':
-        return '🎁 "Hola $nombre, tenemos un 5% adicional para usted si confirma esta semana. Código: ${WhatsAppService.generarCodigoCupon(folio)}"';
-      case 'post_entrega_redes':
-        return '🎉 "¡Gracias $nombre! Síguenos: @hetna_cnc · Al seguirnos recibe 3% en su próxima compra 🎁"';
-      default:
-        return alerta.mensajeWa ?? '';
-    }
+  Future<void> _enviarWhatsApp() async {
+    await _enviarMensaje(_generarMensaje());
   }
 
-  Future<void> _enviarWA(BuildContext context) async {
-    final wa = alerta.clienteWhatsapp ?? '';
-    if (wa.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El cliente no tiene WhatsApp registrado')),
-      );
-      return;
-    }
-
+  Future<void> _enviarMensaje(String mensaje) async {
+    setState(() => _enviando = true);
     try {
-      switch (alerta.tipo) {
-        case 'seguimiento_dia3':
-          await WhatsAppService.enviarSeguimientoDia3(
-            whatsapp: wa,
-            nombreCliente: alerta.clienteNombre ?? '',
-            folio: alerta.cotizacionFolio ?? '',
-            total: alerta.cotizacionTotal ?? 0,
-          );
-          break;
-        case 'seguimiento_dia5':
-          await WhatsAppService.enviarSeguimientoDia5(
-            whatsapp: wa,
-            nombreCliente: alerta.clienteNombre ?? '',
-            folio: alerta.cotizacionFolio ?? '',
-            total: alerta.cotizacionTotal ?? 0,
-            vencimiento:
-                DateTime.now().add(const Duration(days: 2)),
-          );
-          break;
-        case 'cupon_dia7':
-          await WhatsAppService.enviarCuponCierre(
-            whatsapp: wa,
-            nombreCliente: alerta.clienteNombre ?? '',
-            folio: alerta.cotizacionFolio ?? '',
-            codigoCupon: WhatsAppService.generarCodigoCupon(
-                alerta.cotizacionFolio ?? ''),
-          );
-          break;
-        case 'post_entrega_redes':
-          await WhatsAppService.enviarRedesSociales(
-            whatsapp: wa,
-            nombreCliente: alerta.clienteNombre ?? '',
-            instagram: '@hetna_cnc',
-            facebook: 'HETNA CNC',
-            tiktok: '@hetnacnc',
-          );
-          break;
+      final wa = widget.alerta.clienteWhatsapp ?? '';
+      // Limpiar número y asegurar formato correcto
+      var numero = wa.replaceAll(RegExp(r'[^0-9]'), '');
+      // Si tiene 10 dígitos agregar código de México
+      if (numero.length == 10) numero = '52$numero';
+      // Si tiene 12 dígitos con 52 al inicio, dejar como está
+      // Si tiene 13 dígitos con 521, dejar como está
+
+      if (numero.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ Número de WhatsApp no válido'), backgroundColor: AppColors.rojo));
+        return;
       }
-      onEnviado();
+
+      final url = 'https://wa.me/$numero?text=${Uri.encodeComponent(mensaje)}';
+      final uri = Uri.parse(url);
+
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        // Intentar con wa.me directo
+        final urlDirecto = Uri.parse('whatsapp://send?phone=$numero&text=${Uri.encodeComponent(mensaje)}');
+        if (await canLaunchUrl(urlDirecto)) {
+          await launchUrl(urlDirecto, mode: LaunchMode.externalApplication);
+        } else {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('❌ No se pudo abrir WhatsApp. Verifica que esté instalado.'),
+              backgroundColor: AppColors.rojo));
+        }
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+    } finally {
+      if (mounted) setState(() => _enviando = false);
     }
   }
-}
 
-class _BotonWA extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _BotonWA(
-      {required this.label, required this.color, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => ElevatedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.chat, size: 16),
-        label: Text(label, style: const TextStyle(fontSize: 12)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+  Future<void> _marcarCompletada() async {
+    try {
+      await SupabaseService.marcarAlertaCompletada(widget.alerta.id!);
+      widget.onCompletada();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
 }
