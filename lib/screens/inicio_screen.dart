@@ -268,44 +268,74 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   // ══════════════════════════════════════
   // TAB 3 — COTIZACIONES
   // ══════════════════════════════════════
-  Widget _tabCotizaciones() {
+ Widget _tabCotizaciones() {
     final estados = ['Todos', 'Borrador', 'Enviada', 'Aprobada', 'Pedido', 'Vencida'];
+    String _filtro = 'Todos';
+
     return StatefulBuilder(builder: (ctx, setS) {
-      String filtro = 'Todos';
+      final filtradas = _filtro == 'Todos'
+        ? _cotizaciones
+        : _cotizaciones.where((c) => c.estado == _filtro).toList();
+
       return Column(children: [
+        // ─── Filtros ───
         Container(color: Colors.white, padding: const EdgeInsets.all(10),
           child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children:
             estados.map((e) {
               final color = _coloresEstado[e] ?? AppColors.azul;
-              final count = e == 'Todos' ? _cotizaciones.length : _cotizaciones.where((c) => c.estado == e).length;
+              final count = e == 'Todos'
+                ? _cotizaciones.length
+                : _cotizaciones.where((c) => c.estado == e).length;
+              final activo = _filtro == e;
               return GestureDetector(
-                onTap: () => setS(() => filtro = e),
-                child: Container(margin: const EdgeInsets.only(right: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                onTap: () => setS(() => _filtro = e),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: filtro == e ? (e == 'Todos' ? AppColors.azul : color) : Colors.white,
+                    color: activo ? (e == 'Todos' ? AppColors.azul : color) : Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: filtro == e ? (e == 'Todos' ? AppColors.azul : color) : AppColors.grisBorde)),
-                  child: Text('$e ($count)', style: TextStyle(fontSize: 10,
-                    color: filtro == e ? Colors.white : AppColors.textoSecundario))));
+                    border: Border.all(
+                      color: activo ? (e == 'Todos' ? AppColors.azul : color) : AppColors.grisBorde)),
+                  child: Text('$e ($count)', style: TextStyle(fontSize: 11,
+                    color: activo ? Colors.white : AppColors.textoSecundario,
+                    fontWeight: activo ? FontWeight.w600 : FontWeight.normal))));
             }).toList()))),
-        Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [
-          // Resumen
-          Container(padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-            child: Row(children: estados.where((e) => e != 'Todos').map((e) {
-              final color = _coloresEstado[e] ?? Colors.grey;
-              final count = _cotizaciones.where((c) => c.estado == e).length;
-              return Expanded(child: Column(children: [
-                Text('$count', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: count > 0 ? color : AppColors.textoSecundario)),
-                Text(e, style: const TextStyle(fontSize: 8, color: AppColors.textoSecundario), textAlign: TextAlign.center),
-              ]));
-            }).toList()),
-          ),
-          // Lista
-          ...(filtro == 'Todos' ? _cotizaciones : _cotizaciones.where((c) => c.estado == filtro).toList())
-            .map((c) => _itemCotizacion(c)),
-        ])),
+
+        // ─── Resumen por estado ───
+        Container(color: Colors.white, padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+          child: Row(children: estados.where((e) => e != 'Todos').map((e) {
+            final color = _coloresEstado[e] ?? Colors.grey;
+            final count = _cotizaciones.where((c) => c.estado == e).length;
+            final monto = _cotizaciones.where((c) => c.estado == e).fold(0.0, (s, c) => s + c.total);
+            return Expanded(child: GestureDetector(
+              onTap: () => setS(() => _filtro = e),
+              child: Container(
+                margin: const EdgeInsets.only(right: 4),
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                decoration: BoxDecoration(
+                  color: _filtro == e ? color.withOpacity(0.1) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8)),
+                child: Column(children: [
+                  Text('$count', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                    color: count > 0 ? color : AppColors.textoSecundario)),
+                  Text(e, style: const TextStyle(fontSize: 7, color: AppColors.textoSecundario), textAlign: TextAlign.center),
+                  if (monto > 0) Text(_fmt.format(monto), style: TextStyle(fontSize: 7, color: color), textAlign: TextAlign.center),
+                ]))));
+          }).toList())),
+
+        // ─── Lista ───
+        Expanded(child: RefreshIndicator(onRefresh: _cargar, child: filtradas.isEmpty
+          ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(Icons.description_outlined, size: 48, color: AppColors.textoSecundario),
+              const SizedBox(height: 8),
+              Text('No hay cotizaciones en "$_filtro"',
+                style: const TextStyle(color: AppColors.textoSecundario)),
+            ]))
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: filtradas.length,
+              itemBuilder: (_, i) => _itemCotizacion(filtradas[i])))),
       ]);
     });
   }
