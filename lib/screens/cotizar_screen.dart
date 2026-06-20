@@ -187,38 +187,55 @@ class _TarjetaCotizacion extends StatelessWidget {
         // Botones de acción
         Container(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Row(children: [
-            // EDITAR
-            Expanded(child: ElevatedButton.icon(
-              onPressed: () => _editarCotizacion(context),
-              icon: const Icon(Icons.edit_outlined, size: 15, color: Colors.white),
-              label: const Text('Editar', style: TextStyle(fontSize: 12, color: Colors.white)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.azul,
-                padding: const EdgeInsets.symmetric(vertical: 8)))),
-            const SizedBox(width: 6),
-            // Cambiar a Enviada si está en Borrador
-            if (cotizacion.estado == 'Borrador')
-              ElevatedButton(
-                onPressed: () => _cambiarEstado(context, 'Enviada'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF185fa5),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                child: const Text('→ Enviada', style: TextStyle(fontSize: 11, color: Colors.white))),
-            if (cotizacion.estado == 'Enviada')
-              ElevatedButton(
-                onPressed: () => _cambiarEstado(context, 'Aprobada'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1d9e75),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                child: const Text('→ Aprobada', style: TextStyle(fontSize: 11, color: Colors.white))),
-            if (cotizacion.estado == 'Aprobada')
-              ElevatedButton(
-                onPressed: () => _convertirPedido(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF7c3aed),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                child: const Text('→ Pedido', style: TextStyle(fontSize: 11, color: Colors.white))),
+          child: Column(children: [
+            Row(children: [
+              // EDITAR — disponible en Borrador y Pedido
+              if (cotizacion.estado == 'Borrador' || cotizacion.estado == 'Pedido')
+                Expanded(child: ElevatedButton.icon(
+                  onPressed: () => _editarCotizacion(context),
+                  icon: const Icon(Icons.edit_outlined, size: 15, color: Colors.white),
+                  label: const Text('Editar', style: TextStyle(fontSize: 12, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.azul,
+                    padding: const EdgeInsets.symmetric(vertical: 8)))),
+              if (cotizacion.estado == 'Borrador' || cotizacion.estado == 'Pedido')
+                const SizedBox(width: 6),
+              // Cambiar estado
+              if (cotizacion.estado == 'Borrador')
+                ElevatedButton(
+                  onPressed: () => _cambiarEstado(context, 'Enviada'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF185fa5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                  child: const Text('→ Enviada', style: TextStyle(fontSize: 11, color: Colors.white))),
+              if (cotizacion.estado == 'Enviada')
+                Expanded(child: ElevatedButton(
+                  onPressed: () => _cambiarEstado(context, 'Aprobada'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1d9e75),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                  child: const Text('→ Aprobada', style: TextStyle(fontSize: 11, color: Colors.white)))),
+              if (cotizacion.estado == 'Aprobada')
+                Expanded(child: ElevatedButton(
+                  onPressed: () => _convertirPedido(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7c3aed),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                  child: const Text('→ Pedido', style: TextStyle(fontSize: 11, color: Colors.white)))),
+            ]),
+            // Botón ELIMINAR solo para Borrador
+            if (cotizacion.estado == 'Borrador') ...[
+              const SizedBox(height: 6),
+              SizedBox(width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _eliminarCotizacion(context),
+                  icon: const Icon(Icons.delete_outline, size: 15, color: AppColors.rojo),
+                  label: const Text('Eliminar borrador', style: TextStyle(fontSize: 12, color: AppColors.rojo)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.rojo,
+                    side: const BorderSide(color: AppColors.rojo),
+                    padding: const EdgeInsets.symmetric(vertical: 8)))),
+            ],
           ])),
       ]));
   }
@@ -254,6 +271,32 @@ class _TarjetaCotizacion extends StatelessWidget {
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _eliminarCotizacion(BuildContext context) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar borrador'),
+        content: Text('¿Eliminar la cotización ${cotizacion.folio ?? ''}? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+        ]));
+    if (confirmar == true) {
+      try {
+        await SupabaseService.eliminarCotizacion(cotizacion.id!);
+        onActualizar();
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('🗑️ Borrador eliminado'),
+          backgroundColor: AppColors.rojo));
+      } catch (e) {
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     }
   }
 }
