@@ -389,3 +389,43 @@ class SupabaseService {
     await _db.from('inventario_bodega').insert(material);
   }
 }
+// ═══════════════════════════════════════════
+  // OBTENER ITEMS DE UNA COTIZACIÓN
+  // ═══════════════════════════════════════════
+  static Future<List<CotizacionItem>> getCotizacionItems(String cotizacionId) async {
+    try {
+      final res = await _db.from('cotizacion_items')
+          .select()
+          .eq('cotizacion_id', cotizacionId)
+          .order('created_at');
+      return (res as List).map((j) => CotizacionItem.fromJson(j as Map<String, dynamic>)).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // ACTUALIZAR COTIZACIÓN EXISTENTE
+  // ═══════════════════════════════════════════
+  static Future<void> actualizarCotizacion(
+      Cotizacion cotizacion, List<CotizacionItem> items) async {
+    await _db.from('cotizaciones').update({
+      'estado': cotizacion.estado,
+      'descuento_pct': cotizacion.descuentoPct,
+      'iva_pct': cotizacion.ivaPct,
+      'iva_monto': cotizacion.montoIva,
+      'costo_envio': cotizacion.costoEnvio,
+      'subtotal': cotizacion.subtotal,
+      'total': cotizacion.total,
+      'metodo_pago': cotizacion.metodoPago,
+      'condicion_entrega': cotizacion.condicionEntrega,
+      'notas': cotizacion.notas,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', cotizacion.id!);
+    await _db.from('cotizacion_items').delete().eq('cotizacion_id', cotizacion.id!);
+    if (items.isNotEmpty) {
+      await _db.from('cotizacion_items').insert(
+        items.map((i) => i.toJson(cotizacion.id!)).toList());
+    }
+  }
+}
