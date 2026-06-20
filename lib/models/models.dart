@@ -290,30 +290,52 @@ class Cotizacion {
   double get montoIva => baseIva * ivaPct / 100;
   double get total => baseIva + montoIva + costoEnvio;
 
-  factory Cotizacion.fromJson(Map<String, dynamic> json) => Cotizacion(
-        id: json['id'],
-        folio: json['folio'],
-        clienteId: json['cliente_id'],
-        estado: json['estado'] ?? 'Borrador',
-        descuentoPct: (json['descuento_pct'] ?? 0).toDouble(),
-        descuentoFijo: (json['descuento_fijo'] ?? 0).toDouble(),
-        ivaPct: (json['iva_pct'] ?? 16).toDouble(),
-        costoEnvio: (json['costo_envio'] ?? 0).toDouble(),
-        metodoPago: json['metodo_pago'],
-        condicionEntrega: json['condicion_entrega'],
-        fechaEntrega: json['fecha_entrega'] != null
-            ? DateTime.parse(json['fecha_entrega'])
-            : null,
-        diasHabiles: json['dias_habiles'],
-        vigenciaDias: json['vigencia_dias'] ?? 7,
-        notas: json['notas'],
-        pdfUrl: json['pdf_url'],
-        createdAt: json['created_at'] != null
-            ? DateTime.parse(json['created_at'])
-            : null,
+  factory Cotizacion.fromJson(Map<String, dynamic> json) {
+    // Parsear cliente del join
+    Cliente? clienteObj;
+    if (json['clientes'] != null && json['clientes'] is Map) {
+      final cl = json['clientes'] as Map<String, dynamic>;
+      clienteObj = Cliente(
+        id: json['cliente_id'],
+        nombre: cl['nombre'] ?? '',
+        whatsapp: cl['whatsapp'],
+        empresa: cl['empresa'],
+        tipoCliente: 'Cliente activo',
       );
-}
+    }
 
+    // Parsear items
+    List<CotizacionItem> itemsList = [];
+    if (json['cotizacion_items'] != null) {
+      itemsList = (json['cotizacion_items'] as List)
+          .map((i) => CotizacionItem.fromJson(i as Map<String, dynamic>))
+          .toList();
+    }
+
+    return Cotizacion(
+      id: json['id'],
+      folio: json['folio'],
+      clienteId: json['cliente_id'],
+      cliente: clienteObj,
+      estado: json['estado'] ?? 'Borrador',
+      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
+      descuentoPct: (json['descuento_pct'] as num?)?.toDouble() ?? 0,
+      descuentoFijo: (json['descuento_fijo'] as num?)?.toDouble() ?? 0,
+      ivaPct: (json['iva_pct'] as num?)?.toDouble() ?? 16,
+      costoEnvio: (json['costo_envio'] as num?)?.toDouble() ?? 0,
+      total: (json['total'] as num?)?.toDouble() ?? 0,
+      metodoPago: json['metodo_pago'],
+      condicionEntrega: json['condicion_entrega'],
+      fechaEntrega: json['fecha_entrega'] != null
+          ? DateTime.tryParse(json['fecha_entrega']) : null,
+      diasHabiles: json['dias_habiles'],
+      vigenciaDias: json['vigencia_dias'] ?? 7,
+      notas: json['notas'],
+      items: itemsList,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at']) : null,
+    );
+  }
 // ─── PEDIDO ──────────────────────────────────
 class Pedido {
   final String? id;
@@ -350,26 +372,32 @@ class Pedido {
     return idx < 0 ? 0 : ((idx + 1) * 100 ~/ etapas.length);
   }
 
-  factory Pedido.fromJson(Map<String, dynamic> json) => Pedido(
-        id: json['id'],
-        folio: json['folio'],
-        cotizacionId: json['cotizacion_id'],
-        estado: json['estado'] ?? 'Pedido',
-        total: json['total']?.toDouble(),
-        fechaEntregaEstimada: json['fecha_entrega_estimada'] != null
-            ? DateTime.parse(json['fecha_entrega_estimada'])
-            : null,
-        fechaEntregado: json['fecha_entregado'] != null
-            ? DateTime.parse(json['fecha_entregado'])
-            : null,
-        notasInternas: json['notas_internas'],
-        redesEnviadas: json['redes_enviadas'] ?? false,
-        cuponSeguidorEnviado: json['cupon_seguidor_enviado'] ?? false,
-        createdAt: json['created_at'] != null
-            ? DateTime.parse(json['created_at'])
-            : null,
+  factory Pedido.fromJson(Map<String, dynamic> json) {
+    Cliente? clienteObj;
+    if (json['clientes'] != null && json['clientes'] is Map) {
+      final cl = json['clientes'] as Map<String, dynamic>;
+      clienteObj = Cliente(
+        id: json['cliente_id'],
+        nombre: cl['nombre'] ?? '',
+        whatsapp: cl['whatsapp'],
+        empresa: cl['empresa'],
+        tipoCliente: 'Cliente activo',
       );
-}
+    }
+    return Pedido(
+      id: json['id'],
+      folio: json['folio'] ?? '',
+      cotizacionId: json['cotizacion_id'],
+      clienteId: json['cliente_id'],
+      cliente: clienteObj,
+      estado: json['estado'] ?? 'Pedido',
+      total: (json['total'] as num?)?.toDouble(),
+      fechaEntregaEstimada: json['fecha_entrega_estimada'] != null
+          ? DateTime.tryParse(json['fecha_entrega_estimada']) : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at']) : null,
+    );
+  }
 
 // ─── ALERTA ──────────────────────────────────
 class Alerta {
