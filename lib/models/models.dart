@@ -1,6 +1,5 @@
 // ============================================
 // lib/models/models.dart
-// Modelos de datos HETNA CNC
 // ============================================
 
 // ─── CLIENTE ────────────────────────────────
@@ -51,9 +50,7 @@ class Cliente {
         correo: json['correo'],
         tipoCliente: json['tipo_cliente'] ?? 'Cliente potencial',
         notas: json['notas'],
-        createdAt: json['created_at'] != null
-            ? DateTime.parse(json['created_at'])
-            : null,
+        createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -118,9 +115,9 @@ class Producto {
   final String unidadMedida;
   final int stockDisponible;
   final int stockMinimo;
-  final String? ubicacionFisica;
   final String? imagenUrl;
   final String? pdfUrl;
+  final String? ubicacionFisica;
   final bool activo;
 
   Producto({
@@ -138,9 +135,9 @@ class Producto {
     this.unidadMedida = 'Pieza',
     this.stockDisponible = 0,
     this.stockMinimo = 1,
-    this.ubicacionFisica,
     this.imagenUrl,
     this.pdfUrl,
+    this.ubicacionFisica,
     this.activo = true,
   });
 
@@ -161,6 +158,7 @@ class Producto {
         stockMinimo: json['stock_minimo'] ?? 1,
         imagenUrl: json['imagen_url'],
         pdfUrl: json['pdf_url'],
+        ubicacionFisica: json['ubicacion_fisica'],
         activo: json['activo'] ?? true,
       );
 
@@ -221,7 +219,7 @@ class CotizacionItem {
   factory CotizacionItem.fromJson(Map<String, dynamic> json) => CotizacionItem(
         id: json['id'],
         productoId: json['producto_id'],
-        nombreProducto: json['nombre_producto'],
+        nombreProducto: json['nombre_producto'] ?? '',
         sku: json['sku'],
         cantidad: json['cantidad'] ?? 1,
         precioUnitario: (json['precio_unitario'] ?? 0).toDouble(),
@@ -284,8 +282,7 @@ class Cotizacion {
   });
 
   double get subtotal => items.fold(0, (s, i) => s + i.subtotal);
-  double get montoDescuento =>
-      (subtotal * descuentoPct / 100) + descuentoFijo;
+  double get montoDescuento => (subtotal * descuentoPct / 100) + descuentoFijo;
   double get baseIva => subtotal - montoDescuento;
   double get montoIva => baseIva * ivaPct / 100;
   double get total => baseIva + montoIva + costoEnvio;
@@ -303,7 +300,6 @@ class Cotizacion {
         tipoCliente: 'Cliente activo',
       );
     }
-
     // Parsear items
     List<CotizacionItem> itemsList = [];
     if (json['cotizacion_items'] != null) {
@@ -311,19 +307,16 @@ class Cotizacion {
           .map((i) => CotizacionItem.fromJson(i as Map<String, dynamic>))
           .toList();
     }
-
     return Cotizacion(
       id: json['id'],
       folio: json['folio'],
       clienteId: json['cliente_id'],
       cliente: clienteObj,
       estado: json['estado'] ?? 'Borrador',
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0,
       descuentoPct: (json['descuento_pct'] as num?)?.toDouble() ?? 0,
       descuentoFijo: (json['descuento_fijo'] as num?)?.toDouble() ?? 0,
       ivaPct: (json['iva_pct'] as num?)?.toDouble() ?? 16,
       costoEnvio: (json['costo_envio'] as num?)?.toDouble() ?? 0,
-      total: (json['total'] as num?)?.toDouble() ?? 0,
       metodoPago: json['metodo_pago'],
       condicionEntrega: json['condicion_entrega'],
       fechaEntrega: json['fecha_entrega'] != null
@@ -331,16 +324,20 @@ class Cotizacion {
       diasHabiles: json['dias_habiles'],
       vigenciaDias: json['vigencia_dias'] ?? 7,
       notas: json['notas'],
+      pdfUrl: json['pdf_url'],
       items: itemsList,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) : null,
     );
   }
+}
+
 // ─── PEDIDO ──────────────────────────────────
 class Pedido {
   final String? id;
   final String folio;
   final String? cotizacionId;
+  final String? clienteId;
   final Cliente? cliente;
   String estado;
   final double? total;
@@ -355,6 +352,7 @@ class Pedido {
     this.id,
     required this.folio,
     this.cotizacionId,
+    this.clienteId,
     this.cliente,
     this.estado = 'Pedido',
     this.total,
@@ -394,14 +392,20 @@ class Pedido {
       total: (json['total'] as num?)?.toDouble(),
       fechaEntregaEstimada: json['fecha_entrega_estimada'] != null
           ? DateTime.tryParse(json['fecha_entrega_estimada']) : null,
+      fechaEntregado: json['fecha_entregado'] != null
+          ? DateTime.tryParse(json['fecha_entregado']) : null,
+      notasInternas: json['notas_internas'],
+      redesEnviadas: json['redes_enviadas'] ?? false,
+      cuponSeguidorEnviado: json['cupon_seguidor_enviado'] ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) : null,
     );
   }
+}
 
 // ─── ALERTA ──────────────────────────────────
 class Alerta {
-  final String id;
+  final String? id;
   final String tipo;
   final String titulo;
   final String? mensajeWa;
@@ -414,7 +418,7 @@ class Alerta {
   bool completada;
 
   Alerta({
-    required this.id,
+    this.id,
     required this.tipo,
     required this.titulo,
     this.mensajeWa,
@@ -429,29 +433,18 @@ class Alerta {
 
   factory Alerta.fromJson(Map<String, dynamic> json) => Alerta(
         id: json['id'],
-        tipo: json['tipo'],
-        titulo: json['titulo'],
+        tipo: json['tipo'] ?? 'default',
+        titulo: json['titulo'] ?? '',
         mensajeWa: json['mensaje_wa'],
         clienteNombre: json['cliente_nombre'],
         clienteEmpresa: json['cliente_empresa'],
         clienteWhatsapp: json['cliente_whatsapp'],
         cotizacionFolio: json['cotizacion_folio'],
-        cotizacionTotal: json['cotizacion_total']?.toDouble(),
+        cotizacionTotal: (json['cotizacion_total'] as num?)?.toDouble(),
         fechaProgramada: json['fecha_programada'] != null
-            ? DateTime.parse(json['fecha_programada'])
-            : null,
+            ? DateTime.tryParse(json['fecha_programada']) : null,
         completada: json['completada'] ?? false,
       );
-
-  String get colorTipo {
-    switch (tipo) {
-      case 'seguimiento_dia3':
-      case 'seguimiento_dia5': return '#e24b4a';
-      case 'cupon_dia7': return '#ef9f27';
-      case 'post_entrega_redes': return '#1d9e75';
-      default: return '#185fa5';
-    }
-  }
 }
 
 // ─── PDF CATÁLOGO ────────────────────────────
@@ -482,8 +475,7 @@ class PdfCatalogo {
         tamanoMb: json['tamano_mb']?.toDouble(),
         categoria: json['categoria'],
         createdAt: json['created_at'] != null
-            ? DateTime.parse(json['created_at'])
-            : null,
+            ? DateTime.tryParse(json['created_at']) : null,
       );
 
   String get tamanoTexto =>
