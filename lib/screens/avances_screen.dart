@@ -296,13 +296,20 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
       // Ofrecer notificar por WA
       if (mounted && (widget.pedido.cliente?.whatsappNumero ?? '').isNotEmpty) {
         final etiqueta = widget.etiquetas[nueva] ?? nueva;
-        showDialog(context: context, builder: (_) => AlertDialog(
+        final etapaParaNotificar = nueva;
+        final ctx = context;
+        showDialog(context: ctx, builder: (_) => AlertDialog(
           title: Text('→ $etiqueta'),
           content: Text('¿Notificar a ${widget.pedido.cliente?.nombre} por WhatsApp?'),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('No')),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('No')),
             ElevatedButton.icon(
-              onPressed: () { Navigator.pop(context); _notificarCliente(etapa: nueva); },
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                Future.microtask(() => _notificarCliente(etapa: etapaParaNotificar));
+              },
               icon: const Icon(Icons.chat, size: 14),
               label: const Text('Sí, notificar'),
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
