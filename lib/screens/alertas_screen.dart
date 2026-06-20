@@ -36,9 +36,11 @@ class _AlertasScreenState extends State<AlertasScreen> {
           const Text('Alertas de seguimiento'),
           if (_alertas.isNotEmpty) ...[
             const SizedBox(width: 8),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: AppColors.rojo, borderRadius: BorderRadius.circular(20)),
-              child: Text('${_alertas.length}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700))),
+              child: Text('${_alertas.length}',
+                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700))),
           ],
         ]),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)],
@@ -52,21 +54,22 @@ class _AlertasScreenState extends State<AlertasScreen> {
                 itemCount: _alertas.length,
                 itemBuilder: (_, i) => _TarjetaAlerta(
                   alerta: _alertas[i],
-                  onCompletada: () { _cargar(); },
-                ))),
+                  onCompletada: _cargar))),
     );
   }
 
   Widget _pantallaVacia() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-    Container(width: 80, height: 80, decoration: BoxDecoration(color: AppColors.verdeClaro, shape: BoxShape.circle),
+    Container(width: 80, height: 80,
+      decoration: const BoxDecoration(color: AppColors.verdeClaro, shape: BoxShape.circle),
       child: const Icon(Icons.check_circle_outline, size: 40, color: AppColors.verde)),
     const SizedBox(height: 16),
     const Text('¡Todo al día!', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.verde)),
     const SizedBox(height: 8),
-    const Text('No hay seguimientos pendientes por ahora.', style: TextStyle(color: AppColors.textoSecundario)),
-    const SizedBox(height: 24),
-    const Text('Las alertas aparecen automáticamente\ncuando una cotización lleva días sin respuesta.',
-      textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+    const Text('No hay seguimientos pendientes.', style: TextStyle(color: AppColors.textoSecundario)),
+    const SizedBox(height: 16),
+    const Padding(padding: EdgeInsets.symmetric(horizontal: 32),
+      child: Text('Las alertas aparecen automáticamente cuando una cotización lleva días sin respuesta.',
+        textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
   ]));
 }
 
@@ -80,15 +83,21 @@ class _TarjetaAlerta extends StatefulWidget {
 
 class _TarjetaAlertaState extends State<_TarjetaAlerta> {
   bool _enviando = false;
+  late String _mensaje;
 
-  // Mensajes predefinidos editables por tipo
-  static const Map<String, String> _mensajesBase = {
-    'seguimiento_dia3': '¡Hola [NOMBRE]! 😊 Te escribo de *HETNA CNC* para saber si pudiste revisar la cotización [FOLIO]. ¿Tienes alguna duda o quieres ajustar algo? Estamos para ayudarte.',
-    'seguimiento_dia5': '¡Hola [NOMBRE]! Te contacto nuevamente de *HETNA CNC* sobre la cotización [FOLIO]. ¿Podemos platicar para ver si hay algo que podamos mejorar en la propuesta?',
-    'seguimiento_dia7': '¡Hola [NOMBRE]! Es el último aviso de *HETNA CNC* sobre tu cotización [FOLIO] que vence pronto. Si te interesa, podemos hacer un ajuste especial para cerrar esta semana. 🎯',
-    'post_entrega': '¡Hola [NOMBRE]! Esperamos que estés disfrutando tu pedido de *HETNA CNC*. Nos gustaría saber tu opinión 😊 Y si tienes amigos que necesiten algo similar, con gusto los atendemos.\n\nSíguenos: Instagram @hetna_cnc',
-    'default': '¡Hola [NOMBRE]! Te escribo de *HETNA CNC* con relación a tu cotización [FOLIO]. ¿Podemos ayudarte en algo?',
+  static const _mensajesBase = {
+    'seguimiento_dia3': '¡Hola [NOMBRE]! 😊 Te escribo de *HETNA CNC* para saber si pudiste revisar la cotización [FOLIO]. ¿Tienes alguna duda? Estamos para ayudarte.',
+    'seguimiento_dia5': '¡Hola [NOMBRE]! Te contacto nuevamente de *HETNA CNC* sobre la cotización [FOLIO]. ¿Podemos platicar para ajustar algo?',
+    'seguimiento_dia7': '¡Hola [NOMBRE]! La cotización [FOLIO] vence pronto. Si te interesa, podemos hacer un ajuste especial esta semana. 🎯 — *HETNA CNC*',
+    'post_entrega': '¡Hola [NOMBRE]! Esperamos que estés disfrutando tu pedido de *HETNA CNC*. ¿Cómo te fue? 😊\n\nSíguenos: @hetna_cnc',
+    'default': '¡Hola [NOMBRE]! Te escribo de *HETNA CNC* con relación a tu cotización [FOLIO]. ¿Podemos ayudarte?',
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _mensaje = _generarMensaje();
+  }
 
   String _generarMensaje() {
     final tipo = widget.alerta.tipo ?? 'default';
@@ -98,7 +107,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
       .replaceAll('[FOLIO]', widget.alerta.cotizacionFolio ?? 'sin folio');
   }
 
-  Color get _colorTipo {
+  Color get _color {
     switch (widget.alerta.tipo) {
       case 'seguimiento_dia3': return AppColors.ambar;
       case 'seguimiento_dia5': return AppColors.rojo;
@@ -108,162 +117,179 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
     }
   }
 
-  String get _etiquetaTipo {
+  String get _etiqueta {
     switch (widget.alerta.tipo) {
-      case 'seguimiento_dia3': return 'Día 3 sin respuesta';
-      case 'seguimiento_dia5': return 'Día 5 — Urgente';
-      case 'seguimiento_dia7': return 'Día 7 — Último aviso';
-      case 'post_entrega': return 'Post entrega';
-      default: return 'Seguimiento';
+      case 'seguimiento_dia3': return '⏰ Día 3 sin respuesta';
+      case 'seguimiento_dia5': return '🔴 Día 5 — Urgente';
+      case 'seguimiento_dia7': return '⚠️ Día 7 — Último aviso';
+      case 'post_entrega': return '✅ Post entrega';
+      default: return '📋 Seguimiento';
     }
+  }
+
+  bool get _tieneWA {
+    final wa = widget.alerta.clienteWhatsapp ?? '';
+    return wa.isNotEmpty;
   }
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorTipo;
-    final wa = widget.alerta.clienteWhatsapp ?? '';
-    final tieneWA = wa.isNotEmpty;
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: color, width: 4),
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(
+          left: BorderSide(color: _color, width: 4),
           top: BorderSide(color: AppColors.grisBorde, width: 0.5),
           right: BorderSide(color: AppColors.grisBorde, width: 0.5),
           bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
-      padding: const EdgeInsets.all(14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-        // Header
-        Row(children: [
+        // ─── Header ───
+        Padding(padding: const EdgeInsets.fromLTRB(14, 12, 14, 0), child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(widget.alerta.clienteNombre ?? 'Sin cliente',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             if (widget.alerta.clienteEmpresa != null)
-              Text(widget.alerta.clienteEmpresa!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+              Text(widget.alerta.clienteEmpresa!,
+                style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
             if (widget.alerta.cotizacionFolio != null)
               Text('Cotización: ${widget.alerta.cotizacionFolio}',
                 style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(_etiquetaTipo, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: _color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+              child: Text(_etiqueta, style: TextStyle(fontSize: 10, color: _color, fontWeight: FontWeight.w600))),
             if (widget.alerta.cotizacionTotal != null) ...[
               const SizedBox(height: 4),
-              Text('\$${widget.alerta.cotizacionTotal!.toStringAsFixed(0)}',
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
+              Text('\$${NumberFormat('#,##0', 'es_MX').format(widget.alerta.cotizacionTotal!)}',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.azul)),
             ],
           ]),
-        ]),
+        ])),
 
-        const SizedBox(height: 10),
+        // ─── Mensaje preview ───
+        Padding(padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFf0fdf4),
+              borderRadius: BorderRadius.circular(8),
+              border: const Border(left: BorderSide(color: Color(0xFF25D366), width: 3))),
+            child: Text(_mensaje, style: const TextStyle(fontSize: 11, height: 1.5, color: Color(0xFF1a3a2a))))),
 
-        // Vista previa del mensaje
-        Container(padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
-            border: const Border(left: BorderSide(color: Color(0xFF25D366), width: 2))),
-          child: Text(_generarMensaje(), style: const TextStyle(fontSize: 11, height: 1.5, color: AppColors.azul))),
-
-        const SizedBox(height: 10),
-
-        // Botones
-        Row(children: [
+        // ─── Botones ───
+        Padding(padding: const EdgeInsets.all(12), child: Row(children: [
           // Editar mensaje
-          OutlinedButton.icon(
+          OutlinedButton(
             onPressed: () => _editarMensaje(context),
-            icon: const Icon(Icons.edit_outlined, size: 14),
-            label: const Text('Editar', style: TextStyle(fontSize: 12)),
-            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6))),
-          const SizedBox(width: 6),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              side: BorderSide(color: _color)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.edit_outlined, size: 14, color: _color),
+              const SizedBox(width: 4),
+              Text('Editar', style: TextStyle(fontSize: 12, color: _color)),
+            ])),
+
+          const SizedBox(width: 8),
 
           // Enviar WA
-          Expanded(child: ElevatedButton.icon(
-            onPressed: (!tieneWA || _enviando) ? null : _enviarWhatsApp,
-            icon: _enviando
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Icon(Icons.chat, size: 14),
-            label: Text(tieneWA ? 'Enviar WA' : 'Sin WA', style: const TextStyle(fontSize: 12)),
+          Expanded(child: ElevatedButton(
+            onPressed: _tieneWA && !_enviando ? _enviarWA : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: tieneWA ? const Color(0xFF25D366) : Colors.grey,
-              padding: const EdgeInsets.symmetric(vertical: 6)))),
-          const SizedBox(width: 6),
+              backgroundColor: _tieneWA ? const Color(0xFF25D366) : Colors.grey.shade300,
+              padding: const EdgeInsets.symmetric(vertical: 8)),
+            child: _enviando
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.chat, size: 16, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Text(_tieneWA ? 'Enviar WA' : 'Sin WA',
+                    style: TextStyle(fontSize: 12, color: _tieneWA ? Colors.white : Colors.grey)),
+                ]))),
 
-          // Completar
-          ElevatedButton.icon(
+          const SizedBox(width: 8),
+
+          // Marcar completada
+          ElevatedButton(
             onPressed: _marcarCompletada,
-            icon: const Icon(Icons.check, size: 14),
-            label: const Text('Listo', style: TextStyle(fontSize: 12)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azul,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6))),
-        ]),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.check, size: 14, color: Colors.white),
+              SizedBox(width: 4),
+              Text('Listo', style: TextStyle(fontSize: 12, color: Colors.white)),
+            ])),
+        ])),
 
-        if (!tieneWA)
-          const Padding(padding: EdgeInsets.only(top: 6),
-            child: Text('⚠ Este cliente no tiene WhatsApp registrado. Edítalo en CRM → Clientes.',
-              style: TextStyle(fontSize: 10, color: AppColors.ambar))),
-      ]),
-    );
+        if (!_tieneWA)
+          Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            child: Container(padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(6)),
+              child: const Row(children: [
+                Icon(Icons.warning_amber, size: 14, color: AppColors.ambar),
+                SizedBox(width: 6),
+                Expanded(child: Text('Sin WhatsApp registrado. Ve a Clientes y agrégalo.',
+                  style: TextStyle(fontSize: 10, color: AppColors.ambar))),
+              ]))),
+      ]));
   }
 
   void _editarMensaje(BuildContext context) {
-    final ctrl = TextEditingController(text: _generarMensaje());
+    final ctrl = TextEditingController(text: _mensaje);
     showModalBottomSheet(context: context, isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Container(padding: const EdgeInsets.all(16), height: 400,
-          child: Column(children: [
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        padding: EdgeInsets.only(
+          left: 16, right: 16, top: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16),
+        child: Column(children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             const Text('Editar mensaje', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 10),
-            Expanded(child: TextField(controller: ctrl, maxLines: null, expands: true,
-              decoration: const InputDecoration(contentPadding: EdgeInsets.all(12)),
-              style: const TextStyle(fontSize: 13))),
-            const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: () { Navigator.pop(context); _enviarMensaje(ctrl.text); },
-              icon: const Icon(Icons.chat, size: 16),
-              label: const Text('Enviar este mensaje por WA'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
-          ]))));
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          ]),
+          const SizedBox(height: 10),
+          Expanded(child: TextField(
+            controller: ctrl, maxLines: null, expands: true,
+            decoration: InputDecoration(
+              filled: true, fillColor: AppColors.gris,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
+            style: const TextStyle(fontSize: 13))),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: OutlinedButton(
+              onPressed: () { setState(() => _mensaje = ctrl.text); Navigator.pop(context); },
+              child: const Text('Solo guardar'))),
+            const SizedBox(width: 8),
+            Expanded(child: ElevatedButton(
+              onPressed: () { setState(() => _mensaje = ctrl.text); Navigator.pop(context); _enviarWA(); },
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
+              child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Icon(Icons.chat, size: 16), SizedBox(width: 6), Text('Enviar WA'),
+              ]))),
+          ]),
+        ])));
   }
 
-  Future<void> _enviarWhatsApp() async {
-    await _enviarMensaje(_generarMensaje());
-  }
-
-  Future<void> _enviarMensaje(String mensaje) async {
+  Future<void> _enviarWA() async {
+    if (!_tieneWA) return;
     setState(() => _enviando = true);
     try {
-      final wa = widget.alerta.clienteWhatsapp ?? '';
-      // Limpiar número y asegurar formato correcto
-      var numero = wa.replaceAll(RegExp(r'[^0-9]'), '');
-      // Si tiene 10 dígitos agregar código de México
+      var numero = (widget.alerta.clienteWhatsapp ?? '').replaceAll(RegExp(r'[^0-9]'), '');
       if (numero.length == 10) numero = '52$numero';
-      // Si tiene 12 dígitos con 52 al inicio, dejar como está
-      // Si tiene 13 dígitos con 521, dejar como está
-
-      if (numero.isEmpty) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('❌ Número de WhatsApp no válido'), backgroundColor: AppColors.rojo));
-        return;
-      }
-
-      final url = 'https://wa.me/$numero?text=${Uri.encodeComponent(mensaje)}';
-      final uri = Uri.parse(url);
-
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final url = 'https://wa.me/$numero?text=${Uri.encodeComponent(_mensaje)}';
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
       } else {
-        // Intentar con wa.me directo
-        final urlDirecto = Uri.parse('whatsapp://send?phone=$numero&text=${Uri.encodeComponent(mensaje)}');
-        if (await canLaunchUrl(urlDirecto)) {
-          await launchUrl(urlDirecto, mode: LaunchMode.externalApplication);
-        } else {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('❌ No se pudo abrir WhatsApp. Verifica que esté instalado.'),
-              backgroundColor: AppColors.rojo));
-        }
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('❌ No se pudo abrir WhatsApp'), backgroundColor: AppColors.rojo));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -278,7 +304,8 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
       await SupabaseService.marcarAlertaCompletada(widget.alerta.id!);
       widget.onCompletada();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')));
     }
   }
 }
