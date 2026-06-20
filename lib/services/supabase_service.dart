@@ -192,29 +192,31 @@ class SupabaseService {
     return Cotizacion.fromJson(resCot);
   }
 
+  static Future<void> eliminarCotizacion(String id) async {
+    await _db.from('cotizacion_items').delete().eq('cotizacion_id', id);
+    await _db.from('cotizaciones').delete().eq('id', id);
+  }
+
   static Future<List<Cotizacion>> getCotizaciones({
     String? estado,
     String? clienteId,
   }) async {
+    const sel = '*, clientes(nombre, empresa, whatsapp, telefono), cotizacion_items(*)';
     if (estado != null && clienteId != null) {
-      final res = await _db.from('cotizaciones')
-          .select('*, clientes(nombre, empresa, whatsapp)')
+      final res = await _db.from('cotizaciones').select(sel)
           .eq('estado', estado).eq('cliente_id', clienteId)
           .order('created_at', ascending: false);
       return (res as List).map((j) => Cotizacion.fromJson(j as Map<String, dynamic>)).toList();
     } else if (estado != null) {
-      final res = await _db.from('cotizaciones')
-          .select('*, clientes(nombre, empresa, whatsapp)')
+      final res = await _db.from('cotizaciones').select(sel)
           .eq('estado', estado).order('created_at', ascending: false);
       return (res as List).map((j) => Cotizacion.fromJson(j as Map<String, dynamic>)).toList();
     } else if (clienteId != null) {
-      final res = await _db.from('cotizaciones')
-          .select('*, clientes(nombre, empresa, whatsapp)')
+      final res = await _db.from('cotizaciones').select(sel)
           .eq('cliente_id', clienteId).order('created_at', ascending: false);
       return (res as List).map((j) => Cotizacion.fromJson(j as Map<String, dynamic>)).toList();
     } else {
-      final res = await _db.from('cotizaciones')
-          .select('*, clientes(nombre, empresa, whatsapp)')
+      final res = await _db.from('cotizaciones').select(sel)
           .order('created_at', ascending: false);
       return (res as List).map((j) => Cotizacion.fromJson(j as Map<String, dynamic>)).toList();
     }
