@@ -279,13 +279,17 @@ class Cotizacion {
     this.notas,
     this.pdfUrl,
     this.createdAt,
-  });
+    double? totalBd,
+  }) : _totalBd = totalBd;
 
   double get subtotal => items.fold(0, (s, i) => s + i.subtotal);
   double get montoDescuento => (subtotal * descuentoPct / 100) + descuentoFijo;
   double get baseIva => subtotal - montoDescuento;
   double get montoIva => baseIva * ivaPct / 100;
-  double get total => baseIva + montoIva + costoEnvio;
+  // Si hay items los calculamos; si no, usamos el total guardado en BD
+  double get total => items.isNotEmpty
+      ? baseIva + montoIva + costoEnvio
+      : (_totalBd ?? 0);
 
   factory Cotizacion.fromJson(Map<String, dynamic> json) {
     // Parsear cliente del join
@@ -328,6 +332,7 @@ class Cotizacion {
       items: itemsList,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) : null,
+      totalBd: (json['total'] as num?)?.toDouble(),
     );
   }
 }
