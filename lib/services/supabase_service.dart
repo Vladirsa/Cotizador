@@ -320,4 +320,72 @@ class SupabaseService {
       return {'solicitudes_elaboradas': 0, 'pedidos_entregados': 0, 'alertas_pendientes': 0, 'ventas_mes': 0};
     }
   }
+  // ═══════════════════════════════════════════
+  // GASTOS
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getGastos({String? periodo}) async {
+    try {
+      DateTime desde;
+      final ahora = DateTime.now();
+      switch (periodo) {
+        case 'Hoy':
+          desde = DateTime(ahora.year, ahora.month, ahora.day);
+          break;
+        case 'Esta semana':
+          desde = ahora.subtract(Duration(days: ahora.weekday - 1));
+          break;
+        case 'Mes anterior':
+          desde = DateTime(ahora.year, ahora.month - 1, 1);
+          break;
+        default: // Este mes
+          desde = DateTime(ahora.year, ahora.month, 1);
+      }
+      final res = await _db.from('gastos').select()
+          .gte('fecha', desde.toIso8601String())
+          .order('fecha', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> registrarGasto(Map<String, dynamic> gasto) async {
+    await _db.from('gastos').insert(gasto);
+  }
+
+  static Future<void> eliminarGasto(String id) async {
+    await _db.from('gastos').delete().eq('id', id);
+  }
+
+  // ═══════════════════════════════════════════
+  // INVENTARIO BODEGA
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getMateriales() async {
+    try {
+      final res = await _db.from('inventario_bodega').select()
+          .eq('activo', true).order('categoria').order('nombre');
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> registrarMovimiento({
+    required String materialId,
+    required String tipo,
+    required int cantidad,
+    String? motivo,
+  }) async {
+    await _db.from('movimientos_inventario').insert({
+      'material_id': materialId,
+      'tipo': tipo,
+      'cantidad': cantidad,
+      'motivo': motivo,
+      'fecha': DateTime.now().toIso8601String(),
+    });
+    final material = await _db.from('inventario_bodega').select('stock_actual').eq('id', materialId).single();
+    final stockActual = (material as Map<String, dynamic>)['stock_actual'] as int;
+    final nuevoStock = tipo == 'entrada' ? stockActual + cantidad : (stockActual - cantidad).clamp(0, 99999);
+    await _db.from('inventario_bodega').update({'stock_actual': nuevoStock, 'updated_at': DateTime.now().toIso8601String()}).eq('id', materialId);
+  }
+
+  static Future<void> agregarMaterial(Map<String, dynamic> material) async {
+    await _db.from('inventario_bodega').insert(material);
+  }
 }
