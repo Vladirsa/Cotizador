@@ -259,6 +259,7 @@ class Cotizacion {
   String? notas;
   String? pdfUrl;
   final DateTime? createdAt;
+  final double? totalBd; // total guardado en BD
 
   Cotizacion({
     this.id,
@@ -279,8 +280,8 @@ class Cotizacion {
     this.notas,
     this.pdfUrl,
     this.createdAt,
-    double? totalBd,
-  }) : _totalBd = totalBd;
+    this.totalBd,
+  });
 
   double get subtotal => items.fold(0, (s, i) => s + i.subtotal);
   double get montoDescuento => (subtotal * descuentoPct / 100) + descuentoFijo;
@@ -289,7 +290,7 @@ class Cotizacion {
   // Si hay items los calculamos; si no, usamos el total guardado en BD
   double get total => items.isNotEmpty
       ? baseIva + montoIva + costoEnvio
-      : (_totalBd ?? 0);
+      : (totalBd ?? 0);
 
   factory Cotizacion.fromJson(Map<String, dynamic> json) {
     // Parsear cliente del join
