@@ -166,7 +166,9 @@ class _TarjetaCliente extends StatelessWidget {
           if (cliente.whatsappNumero.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20),
-              onPressed: () => WhatsAppService.abrirChat(numero: cliente.whatsappNumero, nombre: cliente.nombre),
+              onPressed: () => WhatsAppService.abrirChat(
+  numero: cliente.whatsappNumero,
+  mensaje: '¡Hola ${cliente.nombre}! Te contacto de *HETNA CNC*. ¿En qué podemos ayudarte?'),
             ),
           IconButton(icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.textoSecundario), onPressed: onEditar),
         ]),
