@@ -1,6 +1,7 @@
 // lib/services/notificaciones_service.dart
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:typed_data';
 
 class NotificacionesService {
   static final _plugin = FlutterLocalNotificationsPlugin();
