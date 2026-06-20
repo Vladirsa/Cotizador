@@ -18,19 +18,15 @@ class WhatsAppService {
     final n = normalizarNumero(numero);
     if (n.isEmpty) return false;
     try {
-      // Intentar primero con wa.me
       final uri = Uri.parse('https://wa.me/$n?text=${Uri.encodeComponent(mensaje)}');
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       return true;
     } catch (_) {
       try {
-        // Fallback con intent directo
         final uri2 = Uri.parse('intent://send/$n#Intent;scheme=whatsapp;package=com.whatsapp;end');
         await launchUrl(uri2, mode: LaunchMode.externalApplication);
         return true;
-      } catch (_) {
-        return false;
-      }
+      } catch (_) { return false; }
     }
   }
 
@@ -62,30 +58,23 @@ class WhatsAppService {
     double? total,
   }) {
     switch (etapa) {
-      case 'Pago':
-        return '¡Hola $nombreCliente! ✅ Confirmamos tu pago del pedido *$folio*. Ya empezamos. — *HETNA CNC*';
-      case 'Produccion':
-        return '¡Hola $nombreCliente! 🔧 Tu pedido *$folio* está en producción. — *HETNA CNC*';
-      case 'Pruebas':
-        return '¡Hola $nombreCliente! 🔍 Tu pedido *$folio* está en control de calidad. ¡Casi listo! — *HETNA CNC*';
-      case 'Entrega':
-        return '¡Hola $nombreCliente! 📦 Tu pedido *$folio* está *LISTO*. ¿Cuándo coordinamos? — *HETNA CNC*';
-      case 'Entregado':
-        return '¡Hola $nombreCliente! 🎉 Tu pedido *$folio* fue entregado. ¡Gracias por confiar en *HETNA CNC*!';
-      default:
-        return '¡Hola $nombreCliente! Tu pedido *$folio* está en proceso. — *HETNA CNC*';
+      case 'Pago': return '¡Hola $nombreCliente! ✅ Confirmamos tu pago del pedido *$folio*. Ya empezamos. — *HETNA CNC*';
+      case 'Produccion': return '¡Hola $nombreCliente! 🔧 Tu pedido *$folio* está en producción. — *HETNA CNC*';
+      case 'Pruebas': return '¡Hola $nombreCliente! 🔍 Tu pedido *$folio* está en control de calidad. ¡Casi listo! — *HETNA CNC*';
+      case 'Entrega': return '¡Hola $nombreCliente! 📦 Tu pedido *$folio* está *LISTO*. ¿Cuándo coordinamos? — *HETNA CNC*';
+      case 'Entregado': return '¡Hola $nombreCliente! 🎉 Tu pedido *$folio* fue entregado. ¡Gracias por confiar en *HETNA CNC*!';
+      default: return '¡Hola $nombreCliente! Tu pedido *$folio* está en proceso. — *HETNA CNC*';
     }
   }
 
-  // Compatibilidad con código anterior
   static Future<void> enviarCotizacion({
     required dynamic cotizacion,
     required String nombreCliente,
     required String whatsapp,
     required String empresa,
   }) async {
-    final mensaje = '¡Hola $nombreCliente! Te compartimos tu cotización de *HETNA CNC*. Quedamos a tus órdenes.';
-    await abrirChat(numero: whatsapp, mensaje: mensaje);
+    final msg = '¡Hola $nombreCliente! Te compartimos tu cotización de *HETNA CNC*. Quedamos a tus órdenes.';
+    await abrirChat(numero: whatsapp, mensaje: msg);
   }
 
   static Future<void> enviarAvancePedido({
