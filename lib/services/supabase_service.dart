@@ -1,8 +1,3 @@
-// ============================================
-// lib/services/supabase_service.dart
-// CRUD completo - versión corregida
-// ============================================
-
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 
@@ -189,12 +184,10 @@ class SupabaseService {
       'vigencia_dias': cotizacion.vigenciaDias,
       'notas': cotizacion.notas,
     }).select().single();
-
     final cotId = (resCot as Map<String, dynamic>)['id'] as String;
     if (items.isNotEmpty) {
       await _db.from('cotizacion_items').insert(
-        items.map((i) => i.toJson(cotId)).toList(),
-      );
+        items.map((i) => i.toJson(cotId)).toList());
     }
     return Cotizacion.fromJson(resCot);
   }
@@ -232,6 +225,38 @@ class SupabaseService {
       'estado': nuevoEstado,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', id);
+  }
+
+  static Future<List<CotizacionItem>> getCotizacionItems(String cotizacionId) async {
+    try {
+      final res = await _db.from('cotizacion_items')
+          .select()
+          .eq('cotizacion_id', cotizacionId)
+          .order('created_at');
+      return (res as List).map((j) => CotizacionItem.fromJson(j as Map<String, dynamic>)).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> actualizarCotizacion(
+      Cotizacion cotizacion, List<CotizacionItem> items) async {
+    await _db.from('cotizaciones').update({
+      'estado': cotizacion.estado,
+      'descuento_pct': cotizacion.descuentoPct,
+      'iva_pct': cotizacion.ivaPct,
+      'iva_monto': cotizacion.montoIva,
+      'costo_envio': cotizacion.costoEnvio,
+      'subtotal': cotizacion.subtotal,
+      'total': cotizacion.total,
+      'metodo_pago': cotizacion.metodoPago,
+      'condicion_entrega': cotizacion.condicionEntrega,
+      'notas': cotizacion.notas,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', cotizacion.id!);
+    await _db.from('cotizacion_items').delete().eq('cotizacion_id', cotizacion.id!);
+    if (items.isNotEmpty) {
+      await _db.from('cotizacion_items').insert(
+        items.map((i) => i.toJson(cotizacion.id!)).toList());
+    }
   }
 
   static Future<Pedido> convertirEnPedido(Cotizacion cotizacion) async {
@@ -284,9 +309,7 @@ class SupabaseService {
       final res = await _db.from('v_alertas_pendientes').select();
       final list = res as List;
       return list.map((j) => Alerta.fromJson(j as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return [];
-    }
+    } catch (_) { return []; }
   }
 
   static Future<void> marcarAlertaCompletada(String alertaId) async {
@@ -302,9 +325,7 @@ class SupabaseService {
           .eq('completada', false)
           .lte('fecha_programada', DateTime.now().toIso8601String());
       return (res as List).length;
-    } catch (_) {
-      return 0;
-    }
+    } catch (_) { return 0; }
   }
 
   // ═══════════════════════════════════════════
@@ -320,6 +341,7 @@ class SupabaseService {
       return {'solicitudes_elaboradas': 0, 'pedidos_entregados': 0, 'alertas_pendientes': 0, 'ventas_mes': 0};
     }
   }
+
   // ═══════════════════════════════════════════
   // GASTOS
   // ═══════════════════════════════════════════
@@ -337,7 +359,7 @@ class SupabaseService {
         case 'Mes anterior':
           desde = DateTime(ahora.year, ahora.month - 1, 1);
           break;
-        default: // Este mes
+        default:
           desde = DateTime(ahora.year, ahora.month, 1);
       }
       final res = await _db.from('gastos').select()
@@ -379,53 +401,19 @@ class SupabaseService {
       'motivo': motivo,
       'fecha': DateTime.now().toIso8601String(),
     });
-    final material = await _db.from('inventario_bodega').select('stock_actual').eq('id', materialId).single();
+    final material = await _db.from('inventario_bodega')
+        .select('stock_actual').eq('id', materialId).single();
     final stockActual = (material as Map<String, dynamic>)['stock_actual'] as int;
-    final nuevoStock = tipo == 'entrada' ? stockActual + cantidad : (stockActual - cantidad).clamp(0, 99999);
-    await _db.from('inventario_bodega').update({'stock_actual': nuevoStock, 'updated_at': DateTime.now().toIso8601String()}).eq('id', materialId);
+    final nuevoStock = tipo == 'entrada'
+        ? stockActual + cantidad
+        : (stockActual - cantidad).clamp(0, 99999);
+    await _db.from('inventario_bodega').update({
+      'stock_actual': nuevoStock,
+      'updated_at': DateTime.now().toIso8601String()
+    }).eq('id', materialId);
   }
 
   static Future<void> agregarMaterial(Map<String, dynamic> material) async {
     await _db.from('inventario_bodega').insert(material);
-  }
-}
-// ═══════════════════════════════════════════
-  // OBTENER ITEMS DE UNA COTIZACIÓN
-  // ═══════════════════════════════════════════
-  static Future<List<CotizacionItem>> getCotizacionItems(String cotizacionId) async {
-    try {
-      final res = await _db.from('cotizacion_items')
-          .select()
-          .eq('cotizacion_id', cotizacionId)
-          .order('created_at');
-      return (res as List).map((j) => CotizacionItem.fromJson(j as Map<String, dynamic>)).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  // ═══════════════════════════════════════════
-  // ACTUALIZAR COTIZACIÓN EXISTENTE
-  // ═══════════════════════════════════════════
-  static Future<void> actualizarCotizacion(
-      Cotizacion cotizacion, List<CotizacionItem> items) async {
-    await _db.from('cotizaciones').update({
-      'estado': cotizacion.estado,
-      'descuento_pct': cotizacion.descuentoPct,
-      'iva_pct': cotizacion.ivaPct,
-      'iva_monto': cotizacion.montoIva,
-      'costo_envio': cotizacion.costoEnvio,
-      'subtotal': cotizacion.subtotal,
-      'total': cotizacion.total,
-      'metodo_pago': cotizacion.metodoPago,
-      'condicion_entrega': cotizacion.condicionEntrega,
-      'notas': cotizacion.notas,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', cotizacion.id!);
-    await _db.from('cotizacion_items').delete().eq('cotizacion_id', cotizacion.id!);
-    if (items.isNotEmpty) {
-      await _db.from('cotizacion_items').insert(
-        items.map((i) => i.toJson(cotizacion.id!)).toList());
-    }
   }
 }
