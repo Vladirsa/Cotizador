@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
+import '../services/pdf_service.dart';
 
 class AvancesScreen extends StatefulWidget {
   const AvancesScreen({super.key});
@@ -271,6 +272,20 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
                 ]))),
 
         const SizedBox(height: 6),
+        // Botón Ver PDF de cotización
+        if (widget.pedido.cotizacionId != null)
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: _generandoPdf ? null : _verPdfCotizacion,
+            icon: _generandoPdf
+              ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.picture_as_pdf_outlined, size: 14),
+            label: Text(_generandoPdf ? 'Generando...' : 'Ver pedido PDF',
+              style: const TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF1a3a5c),
+              side: const BorderSide(color: Color(0xFF1a3a5c)),
+              padding: const EdgeInsets.symmetric(vertical: 7)))),
+        const SizedBox(height: 6),
         Row(children: [
           if (tieneWA) Expanded(child: _enviandoWA
             ? ElevatedButton(
@@ -346,6 +361,40 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
       await WhatsAppService.abrirChat(numero: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
     } finally {
       if (mounted) setState(() => _enviandoWA = false);
+    }
+  }
+
+  Future<void> _verPdfCotizacion() async {
+    if (widget.pedido.cotizacionId == null) return;
+    setState(() => _generandoPdf = true);
+    try {
+      // Cargar cotización con items
+      final cotizaciones = await SupabaseService.getCotizaciones();
+      final cot = cotizaciones.firstWhere(
+        (c) => c.id == widget.pedido.cotizacionId,
+        orElse: () => throw Exception('Cotización no encontrada'));
+      // Si no tiene items, cargarlos
+      var cotFinal = cot;
+      if (cot.items.isEmpty) {
+        final items = await SupabaseService.getCotizacionItems(cot.id!);
+        cotFinal = Cotizacion(
+          id: cot.id, folio: cot.folio, cliente: cot.cliente, clienteId: cot.clienteId,
+          estado: cot.estado, items: items,
+          descuentoPct: cot.descuentoPct, descuentoFijo: cot.descuentoFijo,
+          ivaPct: cot.ivaPct, costoEnvio: cot.costoEnvio,
+          metodoPago: cot.metodoPago, condicionEntrega: cot.condicionEntrega,
+          fechaEntrega: cot.fechaEntrega, diasHabiles: cot.diasHabiles,
+          vigenciaDias: cot.vigenciaDias, notas: cot.notas,
+          pdfUrl: cot.pdfUrl, createdAt: cot.createdAt, totalBd: cot.totalBd);
+      }
+      final cfg = await SupabaseService.getConfiguracion();
+      final bytes = await PdfService.generarCotizacion(cotizacion: cotFinal, empresa: cfg);
+      await PdfService.verPdf(bytes);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al generar PDF: $e'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _generandoPdf = false);
     }
   }
 }
