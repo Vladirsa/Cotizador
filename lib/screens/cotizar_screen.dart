@@ -1,4 +1,7 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../models/models.dart';
@@ -264,7 +267,23 @@ class _TarjetaCotizacion extends StatelessWidget {
 
   Future<void> _convertirPedido(BuildContext context) async {
     try {
-      await SupabaseService.convertirEnPedido(cotizacion);
+      // Si la cotización no tiene items cargados, cargarlos primero
+      Cotizacion cotConItems = cotizacion;
+      if (cotizacion.items.isEmpty && cotizacion.id != null) {
+        final items = await SupabaseService.getCotizacionItems(cotizacion.id!);
+        cotConItems = Cotizacion(
+          id: cotizacion.id, folio: cotizacion.folio,
+          cliente: cotizacion.cliente, clienteId: cotizacion.clienteId,
+          estado: cotizacion.estado, items: items,
+          descuentoPct: cotizacion.descuentoPct, descuentoFijo: cotizacion.descuentoFijo,
+          ivaPct: cotizacion.ivaPct, costoEnvio: cotizacion.costoEnvio,
+          metodoPago: cotizacion.metodoPago, condicionEntrega: cotizacion.condicionEntrega,
+          fechaEntrega: cotizacion.fechaEntrega, diasHabiles: cotizacion.diasHabiles,
+          vigenciaDias: cotizacion.vigenciaDias, notas: cotizacion.notas,
+          pdfUrl: cotizacion.pdfUrl, createdAt: cotizacion.createdAt,
+          totalBd: cotizacion.totalBd);
+      }
+      await SupabaseService.convertirEnPedido(cotConItems);
       onActualizar();
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('✅ ¡Pedido creado! Visible en Avances'),
@@ -828,17 +847,35 @@ class _SelectorProducto extends StatefulWidget {
 
 class _SelectorProductoState extends State<_SelectorProducto> {
   String _busqueda = '';
-  List<Producto> get _filtrados => _busqueda.isEmpty ? widget.productos
-    : widget.productos.where((p) => p.nombre.toLowerCase().contains(_busqueda.toLowerCase())).toList();
+  String _catFiltro = 'Todas';
+
+  List<String> get _categorias {
+    final cats = widget.productos
+        .map((p) => p.categoriaNombre ?? 'Sin categoría')
+        .toSet().toList()..sort();
+    return ['Todas', ...cats];
+  }
+
+  List<Producto> get _filtrados {
+    var lista = widget.productos;
+    if (_catFiltro != 'Todas') {
+      lista = lista.where((p) => (p.categoriaNombre ?? 'Sin categoría') == _catFiltro).toList();
+    }
+    if (_busqueda.isNotEmpty) {
+      lista = lista.where((p) => p.nombre.toLowerCase().contains(_busqueda.toLowerCase())).toList();
+    }
+    return lista;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
+      height: MediaQuery.of(context).size.height * 0.85,
       decoration: const BoxDecoration(color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       child: Column(children: [
-        Padding(padding: const EdgeInsets.all(12), child: Column(children: [
+        Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 6), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Seleccionar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           TextField(autofocus: true,
@@ -847,6 +884,24 @@ class _SelectorProductoState extends State<_SelectorProducto> {
               filled: true, fillColor: AppColors.gris,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
             onChanged: (v) => setState(() => _busqueda = v)),
+          const SizedBox(height: 8),
+          // Filtro por categoría
+          SizedBox(height: 32,
+            child: ListView(scrollDirection: Axis.horizontal, children: _categorias.map((cat) {
+              final activo = _catFiltro == cat;
+              return GestureDetector(
+                onTap: () => setState(() => _catFiltro = cat),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: activo ? AppColors.azul : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: activo ? AppColors.azul : AppColors.grisBorde)),
+                  child: Text(cat, style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w600,
+                    color: activo ? Colors.white : AppColors.textoSecundario))));
+            }).toList())),
         ])),
         Expanded(child: _filtrados.isEmpty
           ? const Center(child: Text('No hay productos', style: TextStyle(color: AppColors.textoSecundario)))
@@ -856,7 +911,7 @@ class _SelectorProductoState extends State<_SelectorProducto> {
                 final p = _filtrados[i];
                 return ListTile(
                   title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  subtitle: Text(p.categoriaNombre ?? p.unidadMedida, style: const TextStyle(fontSize: 11)),
+                  subtitle: Text(p.categoriaNombre ?? p.unidadMedida, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                   trailing: Text('\$${p.precioVenta.toStringAsFixed(0)}',
                     style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul, fontSize: 15)),
                   onTap: () { widget.onSeleccionado(p); Navigator.pop(context); });
@@ -866,7 +921,7 @@ class _SelectorProductoState extends State<_SelectorProducto> {
 }
 
 // ═══════════════════════════════════════════
-// CATÁLOGO PDFs
+// CATÁLOGO PDFs + LISTAS
 // ═══════════════════════════════════════════
 class _CatalogoPDFs extends StatefulWidget {
   const _CatalogoPDFs();
@@ -874,48 +929,316 @@ class _CatalogoPDFs extends StatefulWidget {
   State<_CatalogoPDFs> createState() => _CatalogoPDFsState();
 }
 
-class _CatalogoPDFsState extends State<_CatalogoPDFs> {
+class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderStateMixin {
+  late TabController _tabCtrl;
   List<PdfCatalogo> _pdfs = [];
+  List<Map<String, dynamic>> _catalogos = [];
+  List<Producto> _productos = [];
   bool _cargando = true;
+  bool _subiendo = false;
+  final Set<String> _seleccionados = {};
+  final _fmt = NumberFormat('\$#,##0', 'es_MX');
 
   @override
-  void initState() { super.initState(); _cargar(); }
+  void initState() {
+    super.initState();
+    _tabCtrl = TabController(length: 2, vsync: this);
+    _cargar();
+  }
+
+  @override
+  void dispose() { _tabCtrl.dispose(); super.dispose(); }
 
   Future<void> _cargar() async {
+    setState(() => _cargando = true);
     try {
-      final pdfs = await SupabaseService.getPdfs();
-      if (mounted) setState(() { _pdfs = pdfs; _cargando = false; });
+      final results = await Future.wait([
+        SupabaseService.getPdfs(),
+        SupabaseService.getCatalogosPersonalizados(),
+        SupabaseService.getProductos(),
+      ]);
+      if (mounted) setState(() {
+        _pdfs = results[0] as List<PdfCatalogo>;
+        _catalogos = results[1] as List<Map<String, dynamic>>;
+        _productos = results[2] as List<Producto>;
+        _cargando = false;
+      });
     } catch (_) { if (mounted) setState(() => _cargando = false); }
+  }
+
+  Future<void> _subirPdf() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom, allowedExtensions: ['pdf'], withData: true);
+    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
+    final file = result.files.first;
+    final nombreCtrl = TextEditingController(text: file.name.replaceAll('.pdf', ''));
+    String? categoria;
+    final cats = ['Tablas de cortar','Llaveros','Servilleteros','Acrílico','Metal','Maquinaria','General'];
+    final info = await showDialog<Map<String,String>>(context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
+        title: const Text('Subir PDF', style: TextStyle(fontSize: 15)),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: nombreCtrl,
+            decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(value: categoria,
+            decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
+            hint: const Text('Seleccionar'),
+            items: cats.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+            onChanged: (v) => setS(() => categoria = v)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              if (nombreCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, {'nombre': nombreCtrl.text.trim(), 'categoria': categoria ?? 'General'});
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
+            child: const Text('Subir', style: TextStyle(color: Colors.white))),
+        ])));
+    if (info == null) return;
+    setState(() => _subiendo = true);
+    try {
+      await SupabaseService.subirPdfCatalogo(
+        nombre: info['nombre']!, bytes: Uint8List.fromList(file.bytes!), categoria: info['categoria']);
+      await _cargar();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('✅ PDF subido'), backgroundColor: AppColors.verde));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+    }
+    if (mounted) setState(() => _subiendo = false);
+  }
+
+  Future<void> _enviarPdfWA(PdfCatalogo pdf) async {
+    final msg = Uri.encodeComponent(
+      '📋 *Catálogo HETNA CNC*\n${pdf.nombre}\n\n${pdf.url}\n\n¡Aquí puedes ver nuestros productos y precios! 🪵✨');
+    launchUrl(Uri.parse('https://wa.me/?text=\$msg'), mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _crearCatalogo() async {
+    _seleccionados.clear();
+    final nombreCtrl = TextEditingController();
+    await showModalBottomSheet(context: context, isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) =>
+        DraggableScrollableSheet(initialChildSize: 0.9, maxChildSize: 0.95,
+          builder: (_, sc) => Container(
+            decoration: const BoxDecoration(color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+            child: Column(children: [
+              Container(padding: const EdgeInsets.fromLTRB(16,16,16,10),
+                decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
+                child: Column(children: [
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                    const Text('Nueva lista de productos', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx))]),
+                  const SizedBox(height: 8),
+                  TextField(controller: nombreCtrl,
+                    decoration: const InputDecoration(labelText: 'Nombre de la lista',
+                      hintText: 'Ej: Precios Junio 2026', border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+                    style: const TextStyle(fontSize: 13)),
+                  const SizedBox(height: 6),
+                  Text('\${_seleccionados.length} productos seleccionados',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+                ])),
+              Expanded(child: ListView.builder(
+                controller: sc,
+                itemCount: _productos.length,
+                itemBuilder: (_, i) {
+                  final p = _productos[i];
+                  final sel = _seleccionados.contains(p.id);
+                  return CheckboxListTile(
+                    value: sel,
+                    onChanged: (v) => setS(() {
+                      if (v == true) _seleccionados.add(p.id!);
+                      else _seleccionados.remove(p.id);
+                    }),
+                    title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    subtitle: Text('\${_fmt.format(p.precioVenta)} • \${p.categoriaNombre ?? ""}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                    activeColor: AppColors.azul, dense: true);
+                })),
+              Container(padding: const EdgeInsets.all(14),
+                decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFE5E7EB)))),
+                child: SizedBox(width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _seleccionados.isEmpty ? null : () async {
+                      if (nombreCtrl.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Ingresa un nombre')));
+                        return;
+                      }
+                      Navigator.pop(ctx);
+                      try {
+                        await SupabaseService.crearCatalogoPersonalizado(
+                          nombre: nombreCtrl.text.trim(), productoIds: _seleccionados.toList());
+                        await _cargar();
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('✅ Lista creada'), backgroundColor: AppColors.verde));
+                      } catch (e) {
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Error: \$e'), backgroundColor: AppColors.rojo));
+                      }
+                    },
+                    icon: const Icon(Icons.save_outlined, color: Colors.white),
+                    label: Text(_seleccionados.isEmpty ? 'Selecciona productos'
+                      : 'Guardar lista (\${_seleccionados.length})',
+                      style: const TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+                      disabledBackgroundColor: AppColors.grisBorde,
+                      padding: const EdgeInsets.symmetric(vertical: 12))))),
+            ])))));
+  }
+
+  Future<void> _enviarListaWA(Map<String, dynamic> cat) async {
+    final ids = List<String>.from(cat['producto_ids'] ?? []);
+    final prods = _productos.where((p) => ids.contains(p.id)).toList();
+    if (prods.isEmpty) return;
+    final sb = StringBuffer();
+    sb.writeln('📋 *\${cat['nombre']}* — HETNA CNC');
+    sb.writeln('━━━━━━━━━━━━━━━━━━');
+    for (final p in prods) {
+      sb.writeln('▪️ *\${p.nombre}*  💰 \${_fmt.format(p.precioVenta)}');
+    }
+    sb.writeln('━━━━━━━━━━━━━━━━━━');
+    sb.writeln('🪵 Contáctanos para más información');
+    launchUrl(Uri.parse('https://wa.me/?text=\${Uri.encodeComponent(sb.toString())}'),
+      mode: LaunchMode.externalApplication);
   }
 
   @override
   Widget build(BuildContext context) {
-    return _cargando ? const Center(child: CircularProgressIndicator())
-      : ListView(padding: const EdgeInsets.all(14), children: [
-          if (_pdfs.isEmpty)
-            Container(padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-              child: const Column(children: [
-                Icon(Icons.picture_as_pdf, size: 48, color: AppColors.textoSecundario),
-                SizedBox(height: 8),
-                Text('No hay catálogos subidos aún', style: TextStyle(color: AppColors.textoSecundario)),
-                SizedBox(height: 4),
-                Text('Aquí aparecerán los PDFs de catálogos y listas de precios\npara enviar por WhatsApp a tus clientes.',
-                  style: TextStyle(fontSize: 11, color: AppColors.textoSecundario), textAlign: TextAlign.center),
-              ]))
-          else
-            ..._pdfs.map((pdf) => Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-              child: ListTile(
-                leading: Container(width: 40, height: 40,
-                  decoration: BoxDecoration(color: AppColors.rojoClaro, borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo)),
-                title: Text(pdf.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                subtitle: Text(pdf.tamanoTexto),
-                trailing: const Icon(Icons.chat, color: Color(0xFF25D366))))),
-          const SizedBox(height: 20),
-        ]);
+    if (_cargando) return const Center(child: CircularProgressIndicator());
+    return Column(children: [
+      TabBar(controller: _tabCtrl,
+        labelColor: AppColors.azul, unselectedLabelColor: AppColors.textoSecundario,
+        indicatorColor: AppColors.azul, labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        tabs: const [Tab(text: 'PDFs'), Tab(text: 'Listas')]),
+      Expanded(child: TabBarView(controller: _tabCtrl, children: [
+        // ── TAB PDFs ──
+        Column(children: [
+          Padding(padding: const EdgeInsets.all(12),
+            child: SizedBox(width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _subiendo ? null : _subirPdf,
+                icon: _subiendo
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.upload_file, color: Colors.white),
+                label: Text(_subiendo ? 'Subiendo...' : 'Subir PDF de catálogo',
+                  style: const TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+                  padding: const EdgeInsets.symmetric(vertical: 11))))),
+          Expanded(child: RefreshIndicator(onRefresh: _cargar,
+            child: _pdfs.isEmpty
+              ? ListView(children: [Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                  child: const Column(children: [
+                    Icon(Icons.picture_as_pdf, size: 48, color: AppColors.textoSecundario),
+                    SizedBox(height: 8),
+                    Text('No hay PDFs subidos aún', style: TextStyle(color: AppColors.textoSecundario)),
+                    SizedBox(height: 4),
+                    Text('Sube PDFs de catálogos para enviar por WhatsApp',
+                      style: TextStyle(fontSize: 11, color: AppColors.textoSecundario), textAlign: TextAlign.center),
+                  ]))])
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  itemCount: _pdfs.length,
+                  itemBuilder: (_, i) {
+                    final pdf = _pdfs[i];
+                    return Container(margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                      child: Column(children: [
+                        ListTile(dense: true,
+                          leading: Container(width: 38, height: 38,
+                            decoration: BoxDecoration(color: AppColors.rojoClaro, borderRadius: BorderRadius.circular(8)),
+                            child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo, size: 20)),
+                          title: Text(pdf.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                          subtitle: Text('\${pdf.categoria ?? ""} \${pdf.tamanoTexto}',
+                            style: const TextStyle(fontSize: 10)),
+                          trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textoSecundario),
+                            onPressed: () async {
+                              await SupabaseService.eliminarPdf(pdf.id!, pdf.url);
+                              await _cargar();
+                            })),
+                        Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                          child: Row(children: [
+                            Expanded(child: OutlinedButton.icon(
+                              onPressed: () => launchUrl(Uri.parse(pdf.url), mode: LaunchMode.externalApplication),
+                              icon: const Icon(Icons.open_in_new, size: 13),
+                              label: const Text('Ver', style: TextStyle(fontSize: 12)),
+                              style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+                                side: const BorderSide(color: AppColors.azul),
+                                padding: const EdgeInsets.symmetric(vertical: 6)))),
+                            const SizedBox(width: 6),
+                            Expanded(child: ElevatedButton.icon(
+                              onPressed: () => _enviarPdfWA(pdf),
+                              icon: const Icon(Icons.chat, size: 13, color: Colors.white),
+                              label: const Text('Enviar WA', style: TextStyle(fontSize: 12, color: Colors.white)),
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
+                                padding: const EdgeInsets.symmetric(vertical: 6)))),
+                          ])),
+                      ]));
+                  }))),
+        ]),
+        // ── TAB LISTAS ──
+        Column(children: [
+          Padding(padding: const EdgeInsets.all(12),
+            child: SizedBox(width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _productos.isEmpty ? null : _crearCatalogo,
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text('Crear lista de productos', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+                  padding: const EdgeInsets.symmetric(vertical: 11))))),
+          Expanded(child: RefreshIndicator(onRefresh: _cargar,
+            child: _catalogos.isEmpty
+              ? ListView(children: [Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
+                  child: const Column(children: [
+                    Icon(Icons.list_alt_outlined, size: 48, color: AppColors.textoSecundario),
+                    SizedBox(height: 8),
+                    Text('No hay listas creadas', style: TextStyle(color: AppColors.textoSecundario)),
+                    SizedBox(height: 4),
+                    Text('Crea listas de productos con precios y envíalas por WhatsApp',
+                      style: TextStyle(fontSize: 11, color: AppColors.textoSecundario), textAlign: TextAlign.center),
+                  ]))])
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  itemCount: _catalogos.length,
+                  itemBuilder: (_, i) {
+                    final cat = _catalogos[i];
+                    final ids = List<String>.from(cat['producto_ids'] ?? []);
+                    return Container(margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                      child: Column(children: [
+                        ListTile(dense: true,
+                          leading: Container(width: 38, height: 38,
+                            decoration: BoxDecoration(color: AppColors.azul.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                            child: const Icon(Icons.list_alt, color: AppColors.azul, size: 20)),
+                          title: Text(cat['nombre'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                          subtitle: Text('\${ids.length} productos', style: const TextStyle(fontSize: 10)),
+                          trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textoSecundario),
+                            onPressed: () async {
+                              await SupabaseService.eliminarCatalogoPersonalizado(cat['id']);
+                              await _cargar();
+                            })),
+                        Padding(padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                          child: SizedBox(width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => _enviarListaWA(cat),
+                              icon: const Icon(Icons.chat, size: 13, color: Colors.white),
+                              label: const Text('Enviar por WhatsApp', style: TextStyle(fontSize: 12, color: Colors.white)),
+                              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
+                                padding: const EdgeInsets.symmetric(vertical: 8))))),
+                      ]));
+                  }))),
+        ]),
+      ])),
+    ]);
   }
 }
