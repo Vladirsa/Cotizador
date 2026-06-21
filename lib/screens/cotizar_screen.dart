@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../models/models.dart';
@@ -1017,6 +1018,12 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
     }
     if (mounted) setState(() => _subiendo = false);
   }
+  Future<void> _enviarPdfWA(PdfCatalogo pdf) async {
+    final msg = Uri.encodeComponent(
+      '📋 *Catálogo HETNA CNC*\n${pdf.nombre}\n\n${pdf.url}\n\n¡Mira nuestros productos y precios! 🪵✨');
+    await launchUrl(Uri.parse('https://wa.me/?text=$msg'), mode: LaunchMode.externalApplication);
+  }
+
   Future<void> _crearCatalogo() async {
     _seleccionados.clear();
     final nombreCtrl = TextEditingController();
