@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
 
@@ -450,7 +451,7 @@ class SupabaseService {
 
   static Future<PdfCatalogo> subirPdfCatalogo({
     required String nombre,
-    required List<int> bytes,
+    required Uint8List bytes,
     String? categoria,
   }) async {
     final fileName = '${DateTime.now().millisecondsSinceEpoch}_$nombre.pdf';
