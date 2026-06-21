@@ -1,7 +1,7 @@
 // ============================================
 // lib/screens/catalogo_screen.dart
 // ============================================
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -104,7 +104,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
     try {
       await SupabaseService.subirPdfCatalogo(
         nombre: info['nombre']!,
-        bytes: file.bytes!,
+        bytes: Uint8List.fromList(file.bytes!),
         categoria: info['categoria'],
       );
       await _cargarPdfs();
