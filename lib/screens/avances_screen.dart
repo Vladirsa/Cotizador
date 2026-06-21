@@ -303,28 +303,34 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     setState(() => _cambiando = true);
     try {
       await SupabaseService.actualizarEtapaPedido(widget.pedido.id!, nueva);
+      // Guardar referencia al navigator y context ANTES de llamar onActualizar
+      final tieneWA = mounted && (widget.pedido.cliente?.whatsappNumero ?? '').isNotEmpty;
+      final etiqueta = widget.etiquetas[nueva] ?? nueva;
+      final clienteNombre = widget.pedido.cliente?.nombre ?? '';
+      final etapaParaNotificar = nueva;
+      // Notificar al padre DESPUÉS de capturar referencias
       widget.onActualizar();
-      // Ofrecer notificar por WA
-      if (mounted && (widget.pedido.cliente?.whatsappNumero ?? '').isNotEmpty) {
-        final etiqueta = widget.etiquetas[nueva] ?? nueva;
-        final etapaParaNotificar = nueva;
-        final ctx = context;
-        showDialog(context: ctx, builder: (_) => AlertDialog(
-          title: Text('→ $etiqueta'),
-          content: Text('¿Notificar a ${widget.pedido.cliente?.nombre} por WhatsApp?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('No')),
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                Future.microtask(() => _notificarCliente(etapa: etapaParaNotificar));
-              },
-              icon: const Icon(Icons.chat, size: 14),
-              label: const Text('Sí, notificar'),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
-          ]));
+      // Mostrar dialog si tiene WA
+      if (tieneWA && mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogCtx) => AlertDialog(
+            title: Text('→ $etiqueta'),
+            content: Text('¿Notificar a $clienteNombre por WhatsApp?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogCtx).pop(),
+                child: const Text('No')),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.of(dialogCtx).pop();
+                  await _notificarCliente(etapa: etapaParaNotificar);
+                },
+                icon: const Icon(Icons.chat, size: 14, color: Colors.white),
+                label: const Text('Sí, notificar', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
+            ]));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
