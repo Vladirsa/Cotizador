@@ -418,4 +418,58 @@ class SupabaseService {
   static Future<void> agregarMaterial(Map<String, dynamic> material) async {
     await _db.from('inventario_bodega').insert(material);
   }
+
+  // ═══════════════════════════════════════════
+  // CATÁLOGOS PERSONALIZADOS
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getCatalogosPersonalizados() async {
+    try {
+      final res = await _db.from('catalogos_personalizados').select()
+          .eq('activo', true).order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<Map<String, dynamic>> crearCatalogoPersonalizado({
+    required String nombre,
+    String? descripcion,
+    required List<String> productoIds,
+  }) async {
+    final res = await _db.from('catalogos_personalizados').insert({
+      'nombre': nombre,
+      'descripcion': descripcion,
+      'producto_ids': productoIds,
+      'activo': true,
+    }).select().single();
+    return res as Map<String, dynamic>;
+  }
+
+  static Future<void> eliminarCatalogoPersonalizado(String id) async {
+    await _db.from('catalogos_personalizados').update({'activo': false}).eq('id', id);
+  }
+
+  static Future<PdfCatalogo> subirPdfCatalogo({
+    required String nombre,
+    required List<int> bytes,
+    String? categoria,
+  }) async {
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}_$nombre.pdf';
+    await _db.storage.from('catalogos').uploadBinary(fileName, bytes,
+        fileOptions: const FileOptions(contentType: 'application/pdf'));
+    final url = _db.storage.from('catalogos').getPublicUrl(fileName);
+    final tamanoMb = bytes.length / (1024 * 1024);
+    final res = await _db.from('pdfs_catalogo').insert({
+      'nombre': nombre, 'url': url, 'categoria': categoria,
+      'tamano_mb': tamanoMb, 'activo': true,
+    }).select().single();
+    return PdfCatalogo.fromJson(res as Map<String, dynamic>);
+  }
+
+  static Future<void> eliminarPdf(String id, String url) async {
+    try {
+      final fileName = Uri.parse(url).pathSegments.last;
+      await _db.storage.from('catalogos').remove([fileName]);
+    } catch (_) {}
+    await _db.from('pdfs_catalogo').update({'activo': false}).eq('id', id);
+  }
 }
