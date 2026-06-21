@@ -264,6 +264,20 @@ class SupabaseService {
 
   static Future<Pedido> convertirEnPedido(Cotizacion cotizacion) async {
     await cambiarEstadoCotizacion(cotizacion.id!, 'Pedido');
+    // Verificar si ya existe un pedido para esta cotizacion
+    final existente = await _db.from('pedidos')
+        .select().eq('cotizacion_id', cotizacion.id!).limit(1);
+    if ((existente as List).isNotEmpty) {
+      // Ya existe — solo actualizar el total y retornar
+      final pedidoId = (existente.first as Map<String, dynamic>)['id'];
+      await _db.from('pedidos').update({
+        'total': cotizacion.total,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', pedidoId);
+      final res = await _db.from('pedidos').select('*, clientes(nombre, empresa, whatsapp)')
+          .eq('id', pedidoId).single();
+      return Pedido.fromJson(res as Map<String, dynamic>);
+    }
     final folioPedido = 'PED-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
     final res = await _db.from('pedidos').insert({
       'folio': folioPedido,
