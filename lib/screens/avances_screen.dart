@@ -212,7 +212,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
                 (widget.pedido.estado == 'Pago50' || widget.pedido.estado == 'Produccion' ||
                  widget.pedido.estado == 'Pruebas'))
               Text('Resta: ${fmt.format(widget.pedido.total! / 2)}',
-                style: const TextStyle(fontSize: 10, color: AppColors.naranja, fontWeight: FontWeight.w600)),
+                style: const TextStyle(fontSize: 10, color: Color(0xFFD97706), fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: _colorActual.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
