@@ -18,6 +18,9 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   List<Map<String, dynamic>> _gastos = [];
   List<Map<String, dynamic>> _materiales = [];
   bool _cargando = true;
+  // Filtros inventario
+  String _filtroCategoria = 'Todas';
+  String _filtroStock = 'Todos';
 
   final _fmt = NumberFormat('\$#,##0', 'es_MX');
 
@@ -383,72 +386,155 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   // TAB 5 — INVENTARIO
   // ══════════════════════════════════════
   Widget _tabInventario() {
-    // Deduplicar por id para evitar duplicados si la query retorna filas repetidas
+    // Deduplicar
     final seen = <String>{};
-    final materiales = _materiales.where((m) {
+    final todosLosMateriales = _materiales.where((m) {
       final id = m['id']?.toString() ?? m['nombre']?.toString() ?? '';
       return seen.add(id);
     }).toList();
 
-    final bajos = materiales.where((m) => (m['stock_actual'] as int? ?? 0) <= (m['stock_minimo'] as int? ?? 1)).toList();
-    final categorias = materiales.map((m) => m['categoria'] as String? ?? '').toSet().toList()..sort();
+    // Categorías disponibles
+    final categorias = todosLosMateriales.map((m) => m['categoria'] as String? ?? '').toSet().toList()..sort();
 
-    final valorTotal = materiales.fold(0.0, (s, m) =>
+    // Aplicar filtros
+    var materiales = todosLosMateriales.where((m) {
+      final cat = m['categoria'] as String? ?? '';
+      final stock = m['stock_actual'] as int? ?? 0;
+      final minimo = m['stock_minimo'] as int? ?? 1;
+      final pasaCat = _filtroCategoria == 'Todas' || cat == _filtroCategoria;
+      final pasaStock = _filtroStock == 'Todos'
+        || (_filtroStock == 'Stock bajo' && stock <= minimo)
+        || (_filtroStock == 'Normal' && stock > minimo);
+      return pasaCat && pasaStock;
+    }).toList();
+
+    final bajos = todosLosMateriales.where((m) =>
+      (m['stock_actual'] as int? ?? 0) <= (m['stock_minimo'] as int? ?? 1)).toList();
+    final categoriasFiltradas = materiales.map((m) => m['categoria'] as String? ?? '').toSet().toList()..sort();
+
+    final valorTotal = todosLosMateriales.fold(0.0, (s, m) =>
       s + ((m['stock_actual'] as int? ?? 0) * ((m['costo_unitario'] as num?)?.toDouble() ?? 0)));
 
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
 
       // Resumen
       Row(children: [
-        Expanded(child: _statCard('Total materiales', '${materiales.length}', AppColors.azul, Icons.inventory_2_outlined)),
+        Expanded(child: _statCard('Total materiales', '${todosLosMateriales.length}', AppColors.azul, Icons.inventory_2_outlined)),
         const SizedBox(width: 8),
         Expanded(child: _statCard('Stock bajo', '${bajos.length}', bajos.isEmpty ? AppColors.verde : AppColors.rojo, Icons.warning_amber_outlined)),
       ]),
       const SizedBox(height: 8),
-      Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+      Container(padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Valor total en bodega:', style: TextStyle(fontSize: 13)),
           Text(_fmt.format(valorTotal), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.azul)),
         ])),
 
-      if (bajos.isNotEmpty) ...[
-        const SizedBox(height: 12),
-        _seccion('⚠️ STOCK BAJO — REQUIEREN REABASTECIMIENTO'),
-        ...bajos.map((m) => Container(
-          margin: const EdgeInsets.only(bottom: 6), padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.rojo.withOpacity(0.3))),
-          child: Row(children: [
-            const Icon(Icons.warning_amber, color: AppColors.rojo, size: 18),
+      // ── FILTROS ──
+      const SizedBox(height: 10),
+      Container(padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('FILTRAR', style: TextStyle(fontSize: 9, color: AppColors.textoSecundario, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          // Filtro stock
+          Row(children: [
+            const Icon(Icons.filter_list, size: 14, color: AppColors.textoSecundario),
+            const SizedBox(width: 6),
+            const Text('Stock:', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
             const SizedBox(width: 8),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-              Text('Stock: ${m['stock_actual']} / Mínimo: ${m['stock_minimo']} ${m['unidad']}',
-                style: const TextStyle(fontSize: 11, color: AppColors.rojo)),
-            ])),
-          ]))),
-      ],
+            ...['Todos', 'Stock bajo', 'Normal'].map((op) {
+              final activo = _filtroStock == op;
+              final color = op == 'Stock bajo' ? AppColors.rojo : op == 'Normal' ? AppColors.verde : AppColors.azul;
+              return GestureDetector(
+                onTap: () => setState(() => _filtroStock = op),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: activo ? color : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: activo ? color : AppColors.grisBorde)),
+                  child: Text(op, style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w600,
+                    color: activo ? Colors.white : AppColors.textoSecundario))));
+            }),
+          ]),
+          const SizedBox(height: 8),
+          // Filtro categoría
+          Row(children: [
+            const Icon(Icons.category_outlined, size: 14, color: AppColors.textoSecundario),
+            const SizedBox(width: 6),
+            const Text('Cat:', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+            const SizedBox(width: 8),
+            Expanded(child: SingleChildScrollView(scrollDirection: Axis.horizontal,
+              child: Row(children: ['Todas', ...categorias].map((cat) {
+                final activo = _filtroCategoria == cat;
+                return GestureDetector(
+                  onTap: () => setState(() => _filtroCategoria = cat),
+                  child: Container(
+                    margin: const EdgeInsets.only(right: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: activo ? AppColors.azul : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: activo ? AppColors.azul : AppColors.grisBorde)),
+                    child: Text(cat, style: TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w600,
+                      color: activo ? Colors.white : AppColors.textoSecundario))));
+              }).toList()))),
+          ]),
+        ])),
 
+      // Lista filtrada
       const SizedBox(height: 12),
-      _seccion('INVENTARIO POR CATEGORÍA'),
-      ...categorias.map((cat) {
-        final items = materiales.where((m) => m['categoria'] == cat).toList();
-        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(padding: const EdgeInsets.only(top: 8, bottom: 4),
-            child: Text(cat.toUpperCase(), style: const TextStyle(fontSize: 10, color: AppColors.azul, letterSpacing: 1, fontWeight: FontWeight.w600))),
-          ...items.map((m) {
-            final stockBajo = (m['stock_actual'] as int? ?? 0) <= (m['stock_minimo'] as int? ?? 1);
-            return Container(margin: const EdgeInsets.only(bottom: 4), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: stockBajo ? AppColors.rojo.withOpacity(0.3) : AppColors.grisBorde, width: 0.5)),
-              child: Row(children: [
-                Expanded(child: Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 12))),
-                Text('${m['stock_actual']} ${m['unidad']}',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: stockBajo ? AppColors.rojo : AppColors.verde)),
-              ]));
-          }),
-        ]);
-      }),
+      if (materiales.isEmpty)
+        Container(padding: const EdgeInsets.all(24), alignment: Alignment.center,
+          child: const Text('Sin materiales con estos filtros',
+            style: TextStyle(color: AppColors.textoSecundario, fontSize: 13)))
+      else ...[
+        Text('${materiales.length} resultado${materiales.length != 1 ? "s" : ""}',
+          style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+        const SizedBox(height: 6),
+        ...categoriasFiltradas.map((cat) {
+          final items = materiales.where((m) => m['categoria'] == cat).toList();
+          return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Padding(padding: const EdgeInsets.only(top: 10, bottom: 4),
+              child: Text(cat.toUpperCase(),
+                style: const TextStyle(fontSize: 10, color: AppColors.azul, letterSpacing: 1, fontWeight: FontWeight.w600))),
+            ...items.map((m) {
+              final stockActual = m['stock_actual'] as int? ?? 0;
+              final stockMinimo = m['stock_minimo'] as int? ?? 1;
+              final stockBajo = stockActual <= stockMinimo;
+              return Container(margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: stockBajo ? AppColors.rojo.withOpacity(0.35) : AppColors.grisBorde, width: 0.5)),
+                child: Row(children: [
+                  if (stockBajo) const Padding(padding: EdgeInsets.only(right: 6),
+                    child: Icon(Icons.warning_amber, color: AppColors.rojo, size: 14)),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    if (stockBajo)
+                      Text('Mínimo: $stockMinimo ${m['unidad']}',
+                        style: const TextStyle(fontSize: 10, color: AppColors.rojo)),
+                  ])),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    Text('$stockActual ${m['unidad']}',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                        color: stockBajo ? AppColors.rojo : AppColors.verde)),
+                    if ((m['costo_unitario'] as num?)?.toDouble() != null)
+                      Text(_fmt.format(stockActual * ((m['costo_unitario'] as num?)?.toDouble() ?? 0)),
+                        style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+                  ]),
+                ]));
+            }),
+          ]);
+        }),
+      ],
       const SizedBox(height: 20),
     ]));
   }
