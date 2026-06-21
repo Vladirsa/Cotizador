@@ -151,6 +151,7 @@ class _TarjetaPedido extends StatefulWidget {
 class _TarjetaPedidoState extends State<_TarjetaPedido> {
   bool _enviandoWA = false;
   bool _cambiando = false;
+  bool _generandoPdf = false;
 
   int get _idx => widget.etapas.indexOf(widget.pedido.estado).clamp(0, widget.etapas.length - 1);
   double get _progreso => (_idx + 1) / widget.etapas.length;
