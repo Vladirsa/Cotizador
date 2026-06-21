@@ -162,13 +162,18 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     final nombre = widget.pedido.cliente?.nombre ?? 'Cliente';
     final folio = widget.pedido.folio;
     final fmt = NumberFormat('\$#,##0', 'es_MX');
-    final monto = widget.pedido.total != null ? fmt.format(widget.pedido.total!) : '';
+    final total = widget.pedido.total ?? 0;
+    final anticipo = total / 2;
+    final restante = total - anticipo;
+    final montoTotal = total > 0 ? fmt.format(total) : '';
+    final montoAnticipo = total > 0 ? fmt.format(anticipo) : '';
+    final montoRestante = total > 0 ? fmt.format(restante) : '';
     switch (etapa) {
-      case 'Pago50': return '¡Hola $nombre! ✅ Recibimos tu anticipo del 50% del pedido *$folio*. Empezamos a producir. Recuerda que el saldo restante${monto.isNotEmpty ? " de $monto" : ""} se liquida antes de la entrega. — *HETNA CNC*';
+      case 'Pago50': return '¡Hola $nombre! ✅ Recibimos tu anticipo del 50%${montoAnticipo.isNotEmpty ? " ($montoAnticipo)" : ""} del pedido *$folio*. ¡Empezamos a producir! 🔧\n\nRecuerda que el saldo restante${montoRestante.isNotEmpty ? " de *$montoRestante*" : ""} se liquida antes de la entrega. — *HETNA CNC*';
       case 'Produccion': return '¡Hola $nombre! 🔧 Tu pedido *$folio* está en producción. Te avisamos cuando esté listo. — *HETNA CNC*';
       case 'Pruebas': return '¡Hola $nombre! 🔍 Tu pedido *$folio* está en control de calidad. ¡Casi listo! — *HETNA CNC*';
-      case 'PagoCompleto': return '¡Hola $nombre! 💳 Tu pedido *$folio* está aprobado. Para proceder con la entrega necesitamos el pago del saldo restante. ¿Cuándo puedes realizarlo? — *HETNA CNC*';
-      case 'Entrega': return '¡Hola $nombre! 📦 Tu pedido *$folio* está *LISTO*. ¿Cuándo coordinamos la entrega? — *HETNA CNC*';
+      case 'PagoCompleto': return '¡Hola $nombre! 💳 Tu pedido *$folio* está listo. Para entregarlo necesitamos el pago del saldo restante${montoRestante.isNotEmpty ? " de *$montoRestante*" : ""}. ¿Cuándo puedes realizarlo? — *HETNA CNC*';
+      case 'Entrega': return '¡Hola $nombre! 📦 Tu pedido *$folio* está *LISTO para entrega*. ¿Cuándo coordinamos? — *HETNA CNC*';
       case 'Entregado': return '¡Hola $nombre! 🎉 Tu pedido *$folio* fue entregado. ¡Gracias por confiar en *HETNA CNC*! Si necesitas algo más, con gusto te atendemos. 😊';
       default: return '¡Hola $nombre! Tu pedido *$folio* está en proceso. — *HETNA CNC*';
     }
@@ -202,7 +207,13 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(fmt.format(widget.pedido.total ?? 0),
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.azul)),
-            const SizedBox(height: 4),
+            // Mostrar restante si está en etapa de pago parcial
+            if (widget.pedido.total != null && widget.pedido.total! > 0 &&
+                (widget.pedido.estado == 'Pago50' || widget.pedido.estado == 'Produccion' ||
+                 widget.pedido.estado == 'Pruebas'))
+              Text('Resta: ${fmt.format(widget.pedido.total! / 2)}',
+                style: const TextStyle(fontSize: 10, color: AppColors.naranja, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 2),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: _colorActual.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
               child: Text(_etiquetaActual, style: TextStyle(fontSize: 10, color: _colorActual, fontWeight: FontWeight.w700))),

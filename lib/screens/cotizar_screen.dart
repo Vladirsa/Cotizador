@@ -665,14 +665,30 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     if (_cliente == null || _items.isEmpty) return;
     setState(() => _guardando = true);
     try {
-      final cot = _buildCotizacion(estado: 'Pedido');
-      final cotGuardada = await SupabaseService.crearCotizacion(cot, _items);
-      await SupabaseService.convertirEnPedido(cotGuardada);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ ¡Pedido creado! Visible en Avances'),
-          backgroundColor: AppColors.verde));
-        setState(() { _items = []; _cliente = null; _descuentoPct = 0; _costoEnvio = 0; _notas = ''; });
+      if (_esEdicion) {
+        // Actualizar la cotización existente con estado Pedido, luego convertir
+        final cotActualizada = _buildCotizacion(
+          id: widget.cotizacionEditar!.id,
+          folio: widget.cotizacionEditar!.folio,
+          estado: 'Pedido');
+        await SupabaseService.actualizarCotizacion(cotActualizada, _items);
+        await SupabaseService.convertirEnPedido(cotActualizada);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ ¡Pedido actualizado! Visible en Avances'),
+            backgroundColor: AppColors.verde));
+          widget.onGuardada?.call();
+        }
+      } else {
+        final cot = _buildCotizacion(estado: 'Pedido');
+        final cotGuardada = await SupabaseService.crearCotizacion(cot, _items);
+        await SupabaseService.convertirEnPedido(cotGuardada);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('✅ ¡Pedido creado! Visible en Avances'),
+            backgroundColor: AppColors.verde));
+          setState(() { _items = []; _cliente = null; _descuentoPct = 0; _costoEnvio = 0; _notas = ''; });
+        }
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
