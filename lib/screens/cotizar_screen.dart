@@ -1,7 +1,5 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../models/models.dart';
@@ -967,57 +965,58 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
   }
 
   Future<void> _subirPdf() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom, allowedExtensions: ['pdf'], withData: true);
-    if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
-    final file = result.files.first;
-    final nombreCtrl = TextEditingController(text: file.name.replaceAll('.pdf', ''));
-    String? categoria;
+    final nombreCtrl = TextEditingController();
+    final urlCtrl = TextEditingController();
     final cats = ['Tablas de cortar','Llaveros','Servilleteros','Acrílico','Metal','Maquinaria','General'];
+    String? categoria;
     final info = await showDialog<Map<String,String>>(context: context,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
-        title: const Text('Subir PDF', style: TextStyle(fontSize: 15)),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: nombreCtrl,
-            decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder())),
+        title: const Text('Agregar PDF al catálogo', style: TextStyle(fontSize: 15)),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: nombreCtrl, autofocus: true,
+            decoration: const InputDecoration(labelText: 'Nombre del catálogo *', border: OutlineInputBorder())),
+          const SizedBox(height: 8),
+          TextField(controller: urlCtrl,
+            decoration: const InputDecoration(
+              labelText: 'URL del PDF *',
+              hintText: 'https://drive.google.com/...',
+              border: OutlineInputBorder()),
+            keyboardType: TextInputType.url),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(value: categoria,
             decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
             hint: const Text('Seleccionar'),
             items: cats.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
             onChanged: (v) => setS(() => categoria = v)),
-        ]),
+        ])),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () {
-              if (nombreCtrl.text.trim().isEmpty) return;
-              Navigator.pop(ctx, {'nombre': nombreCtrl.text.trim(), 'categoria': categoria ?? 'General'});
+              if (nombreCtrl.text.trim().isEmpty || urlCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, {
+                'nombre': nombreCtrl.text.trim(),
+                'url': urlCtrl.text.trim(),
+                'categoria': categoria ?? 'General',
+              });
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-            child: const Text('Subir', style: TextStyle(color: Colors.white))),
+            child: const Text('Guardar', style: TextStyle(color: Colors.white))),
         ])));
     if (info == null) return;
     setState(() => _subiendo = true);
     try {
-      await SupabaseService.subirPdfCatalogo(
-        nombre: info['nombre']!, bytes: Uint8List.fromList(file.bytes!), categoria: info['categoria']);
+      await SupabaseService.subirPdf(
+        nombre: info['nombre']!, url: info['url']!, categoria: info['categoria']);
       await _cargar();
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ PDF subido'), backgroundColor: AppColors.verde));
+        content: Text('✅ PDF agregado al catálogo'), backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Error: $e'), backgroundColor: AppColors.rojo));
     }
     if (mounted) setState(() => _subiendo = false);
   }
-
-  Future<void> _enviarPdfWA(PdfCatalogo pdf) async {
-    final msg = Uri.encodeComponent(
-      '📋 *Catálogo HETNA CNC*\n${pdf.nombre}\n\n${pdf.url}\n\n¡Aquí puedes ver nuestros productos y precios! 🪵✨');
-    launchUrl(Uri.parse('https://wa.me/?text=\$msg'), mode: LaunchMode.externalApplication);
-  }
-
   Future<void> _crearCatalogo() async {
     _seleccionados.clear();
     final nombreCtrl = TextEditingController();
@@ -1097,16 +1096,17 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
     final ids = List<String>.from(cat['producto_ids'] ?? []);
     final prods = _productos.where((p) => ids.contains(p.id)).toList();
     if (prods.isEmpty) return;
+    final catNombre = cat['nombre'] as String? ?? '';
     final sb = StringBuffer();
-    sb.writeln('📋 *\${cat['nombre']}* — HETNA CNC');
+    sb.writeln('📋 *$catNombre* — HETNA CNC');
     sb.writeln('━━━━━━━━━━━━━━━━━━');
     for (final p in prods) {
-      sb.writeln('▪️ *\${p.nombre}*  💰 \${_fmt.format(p.precioVenta)}');
+      sb.writeln('▪️ *${p.nombre}*  💰 ${_fmt.format(p.precioVenta)}');
     }
     sb.writeln('━━━━━━━━━━━━━━━━━━');
     sb.writeln('🪵 Contáctanos para más información');
-    launchUrl(Uri.parse('https://wa.me/?text=\${Uri.encodeComponent(sb.toString())}'),
-      mode: LaunchMode.externalApplication);
+    final msg = Uri.encodeComponent(sb.toString());
+    launchUrl(Uri.parse('https://wa.me/?text=$msg'), mode: LaunchMode.externalApplication);
   }
 
   @override
