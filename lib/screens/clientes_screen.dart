@@ -302,3 +302,83 @@ class _FormClienteState extends State<_FormCliente> {
     }
   }
 }
+
+// ══════════════════════════════════════════════
+// Widget selector de etiquetas
+// ══════════════════════════════════════════════
+class SelectorEtiquetasCliente extends StatefulWidget {
+  final String? clienteId;
+  const SelectorEtiquetasCliente({super.key, this.clienteId});
+  @override
+  State<SelectorEtiquetasCliente> createState() => _SelectorEtiquetasClienteState();
+}
+
+class _SelectorEtiquetasClienteState extends State<SelectorEtiquetasCliente> {
+  List<Map<String, dynamic>> _todas = [];
+  List<String> _selIds = [];
+  bool _cargando = true;
+  bool _guardando = false;
+
+  @override
+  void initState() { super.initState(); _cargar(); }
+
+  Future<void> _cargar() async {
+    if (widget.clienteId == null) { setState(() => _cargando = false); return; }
+    try {
+      final results = await Future.wait([
+        SupabaseService.getEtiquetas(),
+        SupabaseService.getEtiquetasCliente(widget.clienteId!),
+      ]);
+      final todas = results[0] as List<Map<String, dynamic>>;
+      final nombres = results[1] as List<String>;
+      if (mounted) setState(() {
+        _todas = todas;
+        _selIds = todas.where((e) => nombres.contains(e['nombre'])).map((e) => e['id'] as String).toList();
+        _cargando = false;
+      });
+    } catch (_) { if (mounted) setState(() => _cargando = false); }
+  }
+
+  Future<void> _toggle(String id) async {
+    final nueva = List<String>.from(_selIds);
+    if (nueva.contains(id)) nueva.remove(id); else nueva.add(id);
+    setState(() { _selIds = nueva; _guardando = true; });
+    try {
+      await SupabaseService.setEtiquetasCliente(widget.clienteId!, nueva);
+    } catch (_) {}
+    if (mounted) setState(() => _guardando = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) return const SizedBox(height: 20, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+    if (_todas.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        const Text('Etiquetas', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        if (_guardando) ...[
+          const SizedBox(width: 8),
+          const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1.5)),
+        ],
+      ]),
+      const SizedBox(height: 6),
+      Wrap(spacing: 6, runSpacing: 6, children: _todas.map((et) {
+        final id = et['id'] as String;
+        final sel = _selIds.contains(id);
+        final hex = (et['color_hex'] as String? ?? '#1a3a5c').replaceAll('#', '');
+        final color = Color(int.parse('FF$hex', radix: 16));
+        return GestureDetector(
+          onTap: widget.clienteId != null ? () => _toggle(id) : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: sel ? color : Colors.transparent,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: sel ? color : AppColors.grisBorde)),
+            child: Text(et['nombre'] as String? ?? '',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                color: sel ? Colors.white : AppColors.textoSecundario))));
+      }).toList()),
+    ]);
+  }
+}
