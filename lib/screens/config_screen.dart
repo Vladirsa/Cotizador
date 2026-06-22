@@ -365,7 +365,7 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
-      final res = await SupabaseService.getCategorias();
+      final res = await SupabaseService.getCategoriasMap();
       if (mounted) setState(() { _cats = res; _cargando = false; });
     } catch (_) { if (mounted) setState(() => _cargando = false); }
   }
