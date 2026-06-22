@@ -487,4 +487,40 @@ class SupabaseService {
     } catch (_) {}
     await _db.from('pdfs_catalogo').update({'activo': false}).eq('id', id);
   }
+
+  // ═══════════════════════════════════════════
+  // FACTURACIÓN
+  // ═══════════════════════════════════════════
+  static Future<Map<String, dynamic>> getDatosFiscalesCliente(String clienteId) async {
+    try {
+      final res = await _db.from('clientes')
+        .select('rfc_fiscal, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal')
+        .eq('id', clienteId).single();
+      return res as Map<String, dynamic>;
+    } catch (_) { return {}; }
+  }
+
+  static Future<void> guardarDatosFiscalesCliente({
+    required String clienteId,
+    required Map<String, dynamic> datos,
+  }) async {
+    await _db.from('clientes').update(datos).eq('id', clienteId);
+  }
+
+  static Future<void> crearFacturaPendiente(Map<String, dynamic> datos) async {
+    await _db.from('facturas').insert({
+      ...datos,
+      'estado': 'pendiente',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getFacturasPedido(String pedidoId) async {
+    try {
+      final res = await _db.from('facturas')
+        .select().eq('pedido_id', pedidoId)
+        .order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
 }
