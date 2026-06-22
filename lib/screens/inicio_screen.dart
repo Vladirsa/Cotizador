@@ -36,7 +36,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _tabs = TabController(length: 7, vsync: this);
     _cargar();
   }
 
@@ -88,9 +88,11 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           tabs: const [
             Tab(text: '📊 General'),
             Tab(text: '💰 Finanzas'),
+            Tab(text: '📈 Ventas'),
             Tab(text: '📋 Cotizaciones'),
             Tab(text: '🏭 Producción'),
             Tab(text: '📦 Inventario'),
+            Tab(text: '🛒 Productos'),
           ],
         ),
       ),
@@ -99,9 +101,11 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         : TabBarView(controller: _tabs, children: [
             _tabGeneral(),
             _tabFinanzas(),
+            _tabVentas(),
             _tabCotizaciones(),
             _tabProduccion(),
             _tabInventario(),
+            _tabProductos(),
           ]),
     );
   }
@@ -385,6 +389,186 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   // ══════════════════════════════════════
   // TAB 5 — INVENTARIO
   // ══════════════════════════════════════
+  // ══════════════════════════════════════
+  // TAB VENTAS — desde datos reales
+  // ══════════════════════════════════════
+  Widget _tabVentas() {
+    // Pedidos entregados o con pago completo = ventas reales
+    final ventas = _pedidos.where((p) =>
+      p.estado == 'Entregado' || p.estado == 'PagoCompleto' || p.estado == 'Entrega').toList();
+    final totalVentas = ventas.fold(0.0, (s, p) => s + (p.total ?? 0));
+    final totalGastos = _gastos.fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
+    final utilidad = totalVentas - totalGastos;
+    final margen = totalVentas > 0 ? (utilidad / totalVentas * 100) : 0.0;
+
+    // Pedidos en proceso (anticipo recibido)
+    final enProceso = _pedidos.where((p) =>
+      p.estado == 'Pago50' || p.estado == 'Produccion' || p.estado == 'Pruebas').toList();
+    final porCobrar = enProceso.fold(0.0, (s, p) => s + ((p.total ?? 0) / 2));
+
+    return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
+      // Tarjeta resumen
+      Container(padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [AppColors.azul, Color(0xFF2a5298)]),
+          borderRadius: BorderRadius.circular(12)),
+        child: Column(children: [
+          const Text('VENTAS DEL PERIODO', style: TextStyle(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
+          const SizedBox(height: 4),
+          Text(_fmt.format(totalVentas), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, color: Colors.white)),
+          Text('Margen: ${margen.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          const SizedBox(height: 12),
+          Row(children: [
+            _miniStat('Utilidad', _fmt.format(utilidad), utilidad >= 0 ? Colors.greenAccent : Colors.redAccent),
+            const SizedBox(width: 8),
+            _miniStat('Gastos', _fmt.format(totalGastos), Colors.orange.shade200),
+            const SizedBox(width: 8),
+            _miniStat('Por cobrar', _fmt.format(porCobrar), Colors.yellow.shade200),
+          ]),
+        ])),
+      const SizedBox(height: 14),
+
+      // KPIs
+      Row(children: [
+        Expanded(child: _kpiCard2('Ventas cerradas', '${ventas.length}', AppColors.verde, Icons.check_circle_outline)),
+        const SizedBox(width: 8),
+        Expanded(child: _kpiCard2('En proceso', '${enProceso.length}', AppColors.ambar, Icons.pending_outlined)),
+        const SizedBox(width: 8),
+        Expanded(child: _kpiCard2('Ticket promedio', ventas.isEmpty ? '\$0' : _fmt.format(totalVentas / ventas.length), AppColors.azul, Icons.receipt_outlined)),
+      ]),
+      const SizedBox(height: 14),
+
+      // Lista de ventas reales
+      _seccionInicio('VENTAS RECIENTES'),
+      if (ventas.isEmpty)
+        Container(padding: const EdgeInsets.all(24), alignment: Alignment.center,
+          child: const Text('Sin ventas en este periodo', style: TextStyle(color: AppColors.textoSecundario)))
+      else
+        ...ventas.take(10).map((p) => Container(
+          margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+          child: Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(p.cliente?.nombre ?? '—', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(p.folio, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+              const SizedBox(height: 3),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(color: AppColors.verde.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                child: Text(p.estado, style: const TextStyle(fontSize: 10, color: AppColors.verde, fontWeight: FontWeight.w500))),
+            ])),
+            Text(_fmt.format(p.total ?? 0),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
+          ]))),
+
+      const SizedBox(height: 14),
+      // Gastos del periodo
+      _seccionInicio('GASTOS DEL PERIODO'),
+      if (_gastos.isEmpty)
+        Container(padding: const EdgeInsets.all(16), alignment: Alignment.center,
+          child: const Text('Sin gastos registrados', style: TextStyle(color: AppColors.textoSecundario)))
+      else
+        ..._gastos.take(8).map((g) => Container(
+          margin: const EdgeInsets.only(bottom: 6), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+          child: Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(g['concepto'] ?? g['descripcion'] ?? '—', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+              Text(g['tipo'] ?? '', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+            ])),
+            Text(_fmt.format((g['monto'] as num?)?.toDouble() ?? 0),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.rojo)),
+          ]))),
+      const SizedBox(height: 20),
+    ]));
+  }
+
+  // ══════════════════════════════════════
+  // TAB PRODUCTOS — top ventas
+  // ══════════════════════════════════════
+  Widget _tabProductos() {
+    // Agrupar items de cotizaciones en estado Pedido/Entregado por producto
+    final conteo = <String, Map<String, dynamic>>{};
+    for (final cot in _cotizaciones.where((c) => c.estado == 'Pedido' || c.estado == 'Entregado')) {
+      for (final item in cot.items) {
+        final key = item.nombreProducto;
+        if (!conteo.containsKey(key)) {
+          conteo[key] = {'nombre': key, 'cantidad': 0, 'total': 0.0};
+        }
+        conteo[key]!['cantidad'] = (conteo[key]!['cantidad'] as int) + item.cantidad;
+        conteo[key]!['total'] = (conteo[key]!['total'] as double) + item.subtotal;
+      }
+    }
+    final lista = conteo.values.toList()
+      ..sort((a, b) => (b['total'] as double).compareTo(a['total'] as double));
+
+    return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
+      if (lista.isEmpty)
+        Container(padding: const EdgeInsets.all(32), alignment: Alignment.center,
+          child: const Column(children: [
+            Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.grisBorde),
+            SizedBox(height: 8),
+            Text('Sin datos de productos vendidos', style: TextStyle(color: AppColors.textoSecundario)),
+          ]))
+      else ...[
+        _seccionInicio('TOP PRODUCTOS POR VENTAS'),
+        ...lista.asMap().entries.map((e) {
+          final i = e.key;
+          final p = e.value;
+          final maxTotal = (lista.first['total'] as double);
+          final pct = maxTotal > 0 ? (p['total'] as double) / maxTotal : 0.0;
+          return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+            child: Row(children: [
+              Container(width: 30, height: 30,
+                decoration: BoxDecoration(color: AppColors.azul, borderRadius: BorderRadius.circular(8)),
+                child: Center(child: Text('${i+1}',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)))),
+              const SizedBox(width: 10),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(p['nombre'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                ClipRRect(borderRadius: BorderRadius.circular(3), child: LinearProgressIndicator(
+                  value: pct, backgroundColor: AppColors.gris, minHeight: 5,
+                  valueColor: const AlwaysStoppedAnimation(AppColors.azul))),
+                Text('${p['cantidad']} unidades', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+              ])),
+              const SizedBox(width: 10),
+              Text(_fmt.format(p['total']),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
+            ]));
+        }),
+      ],
+      const SizedBox(height: 20),
+    ]));
+  }
+
+  Widget _miniStat(String label, String valor, Color color) => Expanded(
+    child: Container(padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+      child: Column(children: [
+        Text(valor, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        Text(label, style: const TextStyle(fontSize: 9, color: Colors.white70)),
+      ])));
+
+  Widget _kpiCard2(String label, String valor, Color color, IconData icon) => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: color, size: 18),
+      const SizedBox(height: 6),
+      Text(valor, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color)),
+      Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+    ]));
+
+  Widget _seccionInicio(String t) => Padding(padding: const EdgeInsets.only(bottom: 8, top: 4),
+    child: Text(t, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario,
+      letterSpacing: 1, fontWeight: FontWeight.w600)));
+
+
   Widget _tabInventario() {
     // Deduplicar
     final seen = <String>{};

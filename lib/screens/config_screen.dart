@@ -143,6 +143,13 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
               const SizedBox(height: 20),
 
+              // ── CATEGORÍAS DE PRODUCTOS ──
+              _seccion('🏷️ CATEGORÍAS DE PRODUCTOS'),
+              const SizedBox(height: 8),
+              _CategoriasWidget(),
+
+              const SizedBox(height: 20),
+
               // ── FACTURACIÓN ──
               _seccion('🧾 FACTURACIÓN ELECTRÓNICA'),
               const SizedBox(height: 8),
@@ -333,5 +340,189 @@ class _ConfigScreenState extends State<ConfigScreen> {
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
             borderSide: const BorderSide(color: AppColors.azul, width: 1.5)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12)))));
+  }
+}
+
+// ══════════════════════════════════════════════
+// Widget CRUD de Categorías de Productos
+// ══════════════════════════════════════════════
+class _CategoriasWidget extends StatefulWidget {
+  const _CategoriasWidget();
+  @override
+  State<_CategoriasWidget> createState() => _CategoriasWidgetState();
+}
+
+class _CategoriasWidgetState extends State<_CategoriasWidget> {
+  List<Map<String, dynamic>> _cats = [];
+  bool _cargando = true;
+
+  final _iconos = ['box','wood','metal','laser','cnc','tool','star','home','gift','custom'];
+  final _colores = ['#1a3a5c','#1d9e75','#e24b4a','#ef9f27','#7c3aed','#0ea5e9','#f59e0b','#10b981'];
+
+  @override
+  void initState() { super.initState(); _cargar(); }
+
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
+    try {
+      final res = await SupabaseService.getCategorias();
+      if (mounted) setState(() { _cats = res; _cargando = false; });
+    } catch (_) { if (mounted) setState(() => _cargando = false); }
+  }
+
+  Future<void> _agregar() async {
+    final nombreCtrl = TextEditingController();
+    String colorSel = _colores.first;
+    final result = await showDialog<String>(context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
+        title: const Text('Nueva categoría', style: TextStyle(fontSize: 15)),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: nombreCtrl, autofocus: true,
+            decoration: const InputDecoration(labelText: 'Nombre *', border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+          const Align(alignment: Alignment.centerLeft,
+            child: Text('Color', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
+          const SizedBox(height: 6),
+          Wrap(spacing: 8, runSpacing: 8, children: _colores.map((hex) {
+            final color = Color(int.parse('FF${hex.replaceAll('#','')}', radix: 16));
+            return GestureDetector(
+              onTap: () => setS(() => colorSel = hex),
+              child: Container(width: 28, height: 28,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colorSel == hex ? Colors.black : Colors.transparent, width: 2))));
+          }).toList()),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              if (nombreCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx, nombreCtrl.text.trim());
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
+            child: const Text('Agregar', style: TextStyle(color: Colors.white))),
+        ])));
+    if (result == null) return;
+    try {
+      await SupabaseService.crearCategoria({'nombre': result, 'color_hex': colorSel, 'icono': 'box'});
+      await _cargar();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _editar(Map<String, dynamic> cat) async {
+    final nombreCtrl = TextEditingController(text: cat['nombre']);
+    String colorSel = cat['color_hex'] ?? _colores.first;
+    final result = await showDialog<String>(context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
+        title: const Text('Editar categoría', style: TextStyle(fontSize: 15)),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: nombreCtrl,
+            decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+          const Align(alignment: Alignment.centerLeft,
+            child: Text('Color', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
+          const SizedBox(height: 6),
+          Wrap(spacing: 8, runSpacing: 8, children: _colores.map((hex) {
+            final color = Color(int.parse('FF${hex.replaceAll('#','')}', radix: 16));
+            return GestureDetector(
+              onTap: () => setS(() => colorSel = hex),
+              child: Container(width: 28, height: 28,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle,
+                  border: Border.all(
+                    color: colorSel == hex ? Colors.black : Colors.transparent, width: 2))));
+          }).toList()),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, nombreCtrl.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
+            child: const Text('Guardar', style: TextStyle(color: Colors.white))),
+        ])));
+    if (result == null || result.isEmpty) return;
+    try {
+      await SupabaseService.actualizarCategoria(cat['id'], {'nombre': result, 'color_hex': colorSel});
+      await _cargar();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _eliminar(Map<String, dynamic> cat) async {
+    final ok = await showDialog<bool>(context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar categoría'),
+        content: Text('¿Eliminar "${cat['nombre']}"? Los productos de esta categoría quedarán sin categoría.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+        ]));
+    if (ok != true) return;
+    try {
+      await SupabaseService.eliminarCategoria(cat['id']);
+      await _cargar();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      // Botón agregar
+      SizedBox(width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _agregar,
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('Agregar categoría', style: TextStyle(fontSize: 13)),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.azul,
+            side: const BorderSide(color: AppColors.azul),
+            padding: const EdgeInsets.symmetric(vertical: 10)))),
+      const SizedBox(height: 8),
+      // Lista de categorías
+      if (_cargando)
+        const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator())
+      else if (_cats.isEmpty)
+        Container(padding: const EdgeInsets.all(16), alignment: Alignment.center,
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+          child: const Text('No hay categorías. Agrega la primera.',
+            style: TextStyle(color: AppColors.textoSecundario, fontSize: 12)))
+      else
+        Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+          child: Column(children: _cats.asMap().entries.map((e) {
+            final cat = e.value;
+            final isLast = e.key == _cats.length - 1;
+            final hexColor = cat['color_hex'] ?? '#1a3a5c';
+            final color = Color(int.parse('FF${hexColor.replaceAll('#','')}', radix: 16));
+            return Column(children: [
+              ListTile(dense: true,
+                leading: Container(width: 32, height: 32,
+                  decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
+                  child: Icon(Icons.label_outline, color: color, size: 18)),
+                title: Text(cat['nombre'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textoSecundario),
+                    onPressed: () => _editar(cat),
+                    constraints: const BoxConstraints(), padding: const EdgeInsets.all(4)),
+                  IconButton(
+                    icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.rojo),
+                    onPressed: () => _eliminar(cat),
+                    constraints: const BoxConstraints(), padding: const EdgeInsets.all(4)),
+                ])),
+              if (!isLast) const Divider(height: 1, indent: 16, endIndent: 16),
+            ]);
+          }).toList())),
+    ]);
   }
 }

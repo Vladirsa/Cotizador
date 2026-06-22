@@ -9,7 +9,6 @@ import 'clientes_screen.dart';
 import 'productos_screen.dart';
 import 'inventario_screen.dart';
 import 'gastos_screen.dart';
-import 'reportes_screen.dart';
 import 'marketing_screen.dart';
 import 'config_screen.dart';
 
@@ -38,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 5: return const ProductosScreen();
       case 6: return const InventarioScreen();
       case 7: return const GastosScreen();
-      case 8: return const ReportesScreen();
+      case 8: return const GastosScreen(); // Reportes ahora en Inicio
       case 9: return const MarketingScreen();
       case 10: return const ConfigScreen();
       default: return const InicioScreen();
@@ -121,7 +120,6 @@ class _HomeScreenState extends State<HomeScreen> {
       _dItem(Icons.inventory_2_outlined, 'Productos y Catálogo', 5),
       _dItem(Icons.warehouse_outlined, 'Inventario Bodega', 6),
       _dItem(Icons.receipt_long_outlined, 'Gastos y Compras', 7),
-      _dItem(Icons.bar_chart_outlined, 'Reportes Financieros', 8),
       _dItem(Icons.campaign_outlined, 'Marketing', 9),
       const Divider(height: 1),
       _dItem(Icons.settings_outlined, 'Configuración', 10),
