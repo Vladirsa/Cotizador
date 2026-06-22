@@ -8,13 +8,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/notificaciones_service.dart';
 import 'screens/home_screen.dart';
-import 'package:intl/date_symbol_data_local.dart';
 
-// ─── CONFIGURAR SUPABASE ─────────────────────
-// Credenciales inyectadas automáticamente por GitHub Actions
-// NO cambies estos valores manualmente — usa GitHub Secrets:
-//   SUPABASE_URL = https://ldfmkfbhcbsbecfbzsny.supabase.co
-//   SUPABASE_ANON_KEY = tu publishable key (sb_publishable_...)
 const supabaseUrl = 'https://ldfmkfbhcbsbecfbzsny.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkZm1rZmJoY2JzYmVjZmJ6c255Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTU5NzEsImV4cCI6MjA5NzI5MTk3MX0.N6KsmCz_HeHdc921VQflXJywgU2ctAON7wLSZViCEc4';
 
@@ -22,13 +16,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await initializeDateFormatting('es_MX', null);
-
-  // Inicializar Supabase
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
-
-  // Inicializar notificaciones locales
   await NotificacionesService.inicializar();
-
   runApp(const HetnaCncApp());
 }
 
@@ -103,18 +91,21 @@ class HetnaCncApp extends StatelessWidget {
   }
 }
 
-// Colores globales de la app
+// ─── COLORES GLOBALES ────────────────────────
 class AppColors {
-  static const azul = Color(0xFF1a3a5c);
-  static const azulClaro = Color(0xFFe6f1fb);
-  static const verde = Color(0xFF1d9e75);
-  static const verdeClaro = Color(0xFFe1f5ee);
-  static const ambar = Color(0xFFef9f27);
-  static const ambarClaro = Color(0xFFfaeeda);
-  static const rojo = Color(0xFFe24b4a);
-  static const rojoClaro = Color(0xFFfcebeb);
-  static const gris = Color(0xFFf5f6fa);
-  static const grisBorde = Color(0xFFE5E7EB);
-  static const textoSecundario = Color(0xFF6B7280);
-  static const whatsapp = Color(0xFF25D366);
+  static const azul           = Color(0xFF1a3a5c);
+  static const azulClaro      = Color(0xFFe6f1fb);
+  static const verde          = Color(0xFF1d9e75);
+  static const verdeClaro     = Color(0xFFe1f5ee);
+  static const ambar          = Color(0xFFef9f27);
+  static const ambarClaro     = Color(0xFFfaeeda);
+  static const naranja        = Color(0xFFD97706);
+  static const naranjaClaro   = Color(0xFFFFF3CD);
+  static const rojo           = Color(0xFFe24b4a);
+  static const rojoClaro      = Color(0xFFfcebeb);
+  static const gris           = Color(0xFFf5f6fa);
+  static const grisBorde      = Color(0xFFE5E7EB);
+  static const textoSecundario= Color(0xFF6B7280);
+  static const textoPrincipal = Color(0xFF111827);
+  static const whatsapp       = Color(0xFF25D366);
 }
