@@ -548,4 +548,166 @@ class SupabaseService {
       return (res as List).map((j) => j as Map<String, dynamic>).toList();
     } catch (_) { return []; }
   }
+
+  // ═══════════════════════════════════════════
+  // MARKETING — PLANTILLAS WA
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getPlantillasWA() async {
+    try {
+      final res = await _db.from('plantillas_wa').select()
+          .eq('activo', true).order('categoria').order('titulo');
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> guardarPlantillaWA(Map<String, dynamic> datos) async {
+    if (datos['id'] != null) {
+      await _db.from('plantillas_wa')
+          .update({...datos, 'updated_at': DateTime.now().toIso8601String()})
+          .eq('id', datos['id']);
+    } else {
+      await _db.from('plantillas_wa').insert(datos);
+    }
+  }
+
+  static Future<void> eliminarPlantillaWA(String id) async {
+    await _db.from('plantillas_wa').update({'activo': false}).eq('id', id);
+  }
+
+  // ═══════════════════════════════════════════
+  // MARKETING — ETIQUETAS CLIENTES
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getEtiquetas() async {
+    try {
+      final res = await _db.from('etiquetas_cliente').select()
+          .order('nombre');
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<List<String>> getEtiquetasCliente(String clienteId) async {
+    try {
+      final res = await _db.from('cliente_etiquetas')
+          .select('etiqueta_id, etiquetas_cliente(nombre)')
+          .eq('cliente_id', clienteId);
+      return (res as List).map((j) {
+        final et = j['etiquetas_cliente'];
+        return et is Map ? (et['nombre'] as String? ?? '') : '';
+      }).where((s) => s.isNotEmpty).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> setEtiquetasCliente(String clienteId, List<String> etiquetaIds) async {
+    await _db.from('cliente_etiquetas').delete().eq('cliente_id', clienteId);
+    if (etiquetaIds.isNotEmpty) {
+      await _db.from('cliente_etiquetas').insert(
+        etiquetaIds.map((eid) => {'cliente_id': clienteId, 'etiqueta_id': eid}).toList());
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // MARKETING — COLA DE MENSAJES
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getColaMensajesHoy() async {
+    try {
+      final hoy = DateTime.now().toIso8601String().split('T')[0];
+      final res = await _db.from('cola_mensajes_wa')
+          .select('*, clientes(nombre, whatsapp, telefono)')
+          .eq('estado', 'pendiente')
+          .eq('fecha_programada', hoy)
+          .order('created_at');
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<List<Map<String, dynamic>>> getColaMensajesHistorial() async {
+    try {
+      final res = await _db.from('cola_mensajes_wa')
+          .select('*, clientes(nombre)')
+          .neq('estado', 'pendiente')
+          .order('created_at', ascending: false)
+          .limit(50);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> marcarMensajeEnviado(String id) async {
+    await _db.from('cola_mensajes_wa').update({
+      'estado': 'enviado',
+      'enviado_at': DateTime.now().toIso8601String(),
+    }).eq('id', id);
+  }
+
+  static Future<void> marcarMensajeOmitido(String id) async {
+    await _db.from('cola_mensajes_wa').update({'estado': 'omitido'}).eq('id', id);
+  }
+
+  static Future<int> countMensajesEnviadosHoy() async {
+    try {
+      final hoy = DateTime.now().toIso8601String().split('T')[0];
+      final res = await _db.from('cola_mensajes_wa')
+          .select().eq('estado', 'enviado').eq('fecha_programada', hoy);
+      return (res as List).length;
+    } catch (_) { return 0; }
+  }
+
+  static Future<void> agregarAColaMarketing({
+    required String clienteId,
+    required String mensajeFinal,
+    String? plantillaId,
+    String? campana,
+    DateTime? fechaProgramada,
+  }) async {
+    final fecha = (fechaProgramada ?? DateTime.now()).toIso8601String().split('T')[0];
+    await _db.from('cola_mensajes_wa').insert({
+      'cliente_id'       : clienteId,
+      'plantilla_id'     : plantillaId,
+      'mensaje_final'    : mensajeFinal,
+      'campana'          : campana,
+      'fecha_programada' : fecha,
+      'estado'           : 'pendiente',
+    });
+  }
+
+  // Segmentos automáticos
+  static Future<List<Cliente>> getClientesPorSegmento(String segmento) async {
+    try {
+      switch (segmento) {
+        case 'activos':
+          final res = await _db.from('clientes').select()
+              .eq('tipo_cliente', 'Cliente activo').order('nombre');
+          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+        case 'potenciales':
+          final res = await _db.from('clientes').select()
+              .eq('tipo_cliente', 'Cliente potencial').order('nombre');
+          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+        case 'frecuentes':
+          final res = await _db.from('clientes').select()
+              .eq('tipo_cliente', 'Cliente frecuente').order('nombre');
+          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+        case 'cotizaciones_pendientes':
+          // Clientes con cotizaciones enviadas sin respuesta
+          final res = await _db.from('cotizaciones')
+              .select('cliente_id, clientes(id, nombre, whatsapp, telefono, tipo_cliente)')
+              .eq('estado', 'Enviada').order('created_at');
+          final Set<String> seen = {};
+          final List<Cliente> lista = [];
+          for (final row in (res as List)) {
+            final cl = row['clientes'];
+            if (cl == null) continue;
+            final id = cl['id'] as String? ?? '';
+            if (seen.add(id)) {
+              lista.add(Cliente(id: id, nombre: cl['nombre'] ?? '',
+                whatsapp: cl['whatsapp'], telefono: cl['telefono'],
+                tipoCliente: cl['tipo_cliente'] ?? ''));
+            }
+          }
+          return lista;
+        default:
+          final res = await _db.from('clientes').select()
+              .not('whatsapp', 'is', null).order('nombre').limit(50);
+          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+      }
+    } catch (_) { return []; }
+  }
 }
