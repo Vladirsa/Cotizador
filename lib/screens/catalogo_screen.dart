@@ -285,18 +285,21 @@ class _CatalogoScreenState extends State<CatalogoScreen>
                           content: Text('Ingresa un nombre para el catálogo')));
                         return;
                       }
+                      final nombre = nombreCtrl.text.trim();
+                      final ids = _seleccionados.toList();
                       Navigator.pop(ctx);
                       try {
                         await SupabaseService.crearCatalogoPersonalizado(
-                          nombre: nombreCtrl.text.trim(),
-                          productoIds: _seleccionados.toList());
+                          nombre: nombre,
+                          productoIds: ids);
                         await _cargarCatalogos();
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                           content: Text('✅ Catálogo creado'),
                           backgroundColor: AppColors.verde));
                       } catch (e) {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+                          content: Text('Error al guardar: ${e.toString()}'),
+                          backgroundColor: AppColors.rojo));
                       }
                     },
                     icon: const Icon(Icons.save_outlined, color: Colors.white),
