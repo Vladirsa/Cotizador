@@ -113,7 +113,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       appBar: AppBar(
         title: const Text('Configuración', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
-        foregroundColor: AppColors.textoPrincipal,
+        foregroundColor: Colors.black87,
         elevation: 0,
         actions: [
           TextButton(

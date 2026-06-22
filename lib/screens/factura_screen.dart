@@ -153,7 +153,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
       appBar: AppBar(
         title: const Text('Generar factura', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
-        foregroundColor: AppColors.textoPrincipal,
+        foregroundColor: Colors.black87,
         elevation: 0),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
@@ -320,7 +320,13 @@ class _FacturaScreenState extends State<FacturaScreen> {
               if (!_facturaActivada)
                 SizedBox(width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/config'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      // Ir a Configuración — navegar desde home
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('Ve a Más → Configuración para activar la facturación'),
+                        duration: Duration(seconds: 3)));
+                    },
                     icon: const Icon(Icons.settings_outlined, size: 14),
                     label: const Text('Ir a Configuración', style: TextStyle(fontSize: 13)),
                     style: OutlinedButton.styleFrom(
