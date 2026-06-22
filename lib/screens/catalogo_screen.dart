@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../services/pdf_service.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_colors.dart';
@@ -309,6 +310,39 @@ class _CatalogoScreenState extends State<CatalogoScreen>
             ])))));
   }
 
+  // ─── GENERAR PDF DE LISTA ──────────────────
+  Future<void> _generarPdfLista(Map<String, dynamic> cat) async {
+    final productoIds = List<String>.from(cat['producto_ids'] ?? []);
+    if (productoIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Esta lista no tiene productos')));
+      return;
+    }
+    if (_productos.isEmpty) await _cargarProductos();
+    final prods = _productos.where((p) => productoIds.contains(p.id)).toList();
+    if (prods.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se encontraron los productos')));
+      return;
+    }
+    setState(() => _subiendo = true);
+    try {
+      final cfg = await SupabaseService.getConfiguracion();
+      final bytes = await PdfService.generarListadoProductos(
+        nombreLista: cat['nombre'] as String? ?? 'Lista HETNA CNC',
+        productos: prods,
+        empresa: cfg);
+      final nombre = (cat['nombre'] as String? ?? 'catalogo')
+          .replaceAll(' ', '_').toLowerCase();
+      await PdfService.compartirPdf(bytes, '$nombre.pdf');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al generar PDF: $e'),
+          backgroundColor: AppColors.rojo));
+    }
+    if (mounted) setState(() => _subiendo = false);
+  }
+
   // ─── ENVIAR CATÁLOGO POR WA ────────────────
   Future<void> _enviarCatalogoWA(Map<String, dynamic> cat) async {
     final productoIds = List<String>.from(cat['producto_ids'] ?? []);
@@ -563,14 +597,26 @@ class _CatalogoScreenState extends State<CatalogoScreen>
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
               maxLines: 2, overflow: TextOverflow.ellipsis)),
         const SizedBox(height: 10),
-        SizedBox(width: double.infinity,
-          child: ElevatedButton.icon(
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(
+            onPressed: _subiendo ? null : () => _generarPdfLista(cat),
+            icon: _subiendo
+              ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.picture_as_pdf_outlined, size: 14),
+            label: const Text('Generar PDF', style: TextStyle(fontSize: 11)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.rojo,
+              side: const BorderSide(color: AppColors.rojo),
+              padding: const EdgeInsets.symmetric(vertical: 8)))),
+          const SizedBox(width: 8),
+          Expanded(child: ElevatedButton.icon(
             onPressed: () => _enviarCatalogoWA(cat),
             icon: const Icon(Icons.chat, size: 14, color: Colors.white),
-            label: const Text('Enviar lista por WhatsApp', style: TextStyle(fontSize: 12, color: Colors.white)),
+            label: const Text('Enviar WA', style: TextStyle(fontSize: 11, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF25D366),
               padding: const EdgeInsets.symmetric(vertical: 8)))),
+        ]),
       ]));
   }
 }

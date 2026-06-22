@@ -280,9 +280,19 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     String _filtro = 'Todos';
 
     return StatefulBuilder(builder: (ctx, setS) {
+      final hoy = DateTime.now();
+      // Calcular vencidas: estado Enviada + createdAt + vigenciaDias < hoy
+      bool esVencida(Cotizacion cot) {
+        if (cot.estado != 'Enviada') return false;
+        if (cot.createdAt == null) return false;
+        final vence = cot.createdAt!.add(Duration(days: cot.vigenciaDias));
+        return hoy.isAfter(vence);
+      }
       final filtradas = _filtro == 'Todos'
         ? _cotizaciones
-        : _cotizaciones.where((c) => c.estado == _filtro).toList();
+        : _filtro == 'Vencida'
+          ? _cotizaciones.where(esVencida).toList()
+          : _cotizaciones.where((c) => c.estado == _filtro && !esVencida(c)).toList();
 
       return Column(children: [
         // ─── Filtros ───
@@ -290,9 +300,16 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children:
             estados.map((e) {
               final color = _coloresEstado[e] ?? AppColors.azul;
+              final hoy2 = DateTime.now();
+              bool esV(Cotizacion cot) {
+                if (cot.estado != 'Enviada' || cot.createdAt == null) return false;
+                return hoy2.isAfter(cot.createdAt!.add(Duration(days: cot.vigenciaDias)));
+              }
               final count = e == 'Todos'
                 ? _cotizaciones.length
-                : _cotizaciones.where((c) => c.estado == e).length;
+                : e == 'Vencida'
+                  ? _cotizaciones.where(esV).length
+                  : _cotizaciones.where((c) => c.estado == e && !esV(c)).length;
               final activo = _filtro == e;
               return GestureDetector(
                 onTap: () => setS(() => _filtro = e),
@@ -313,8 +330,17 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         Container(color: Colors.white, padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
           child: Row(children: estados.where((e) => e != 'Todos').map((e) {
             final color = _coloresEstado[e] ?? Colors.grey;
-            final count = _cotizaciones.where((c) => c.estado == e).length;
-            final monto = _cotizaciones.where((c) => c.estado == e).fold(0.0, (s, c) => s + c.total);
+            final hoy3 = DateTime.now();
+            bool esVen(Cotizacion cot) {
+              if (cot.estado != 'Enviada' || cot.createdAt == null) return false;
+              return hoy3.isAfter(cot.createdAt!.add(Duration(days: cot.vigenciaDias)));
+            }
+            final count = e == 'Vencida'
+              ? _cotizaciones.where(esVen).length
+              : _cotizaciones.where((c) => c.estado == e && !esVen(c)).length;
+            final monto = e == 'Vencida'
+              ? _cotizaciones.where(esVen).fold(0.0, (s, c) => s + c.total)
+              : _cotizaciones.where((c) => c.estado == e && !esVen(c)).fold(0.0, (s, c) => s + c.total);
             return Expanded(child: GestureDetector(
               onTap: () => setS(() => _filtro = e),
               child: Container(

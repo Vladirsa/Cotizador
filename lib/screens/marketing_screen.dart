@@ -603,28 +603,38 @@ class _PlantillasTabState extends State<_PlantillasTab> {
               const SizedBox(height: 12),
               SizedBox(width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, true),
+                  onPressed: () async {
+                    // Capturar valores ANTES de cerrar el sheet
+                    final titulo = tituloCtrl.text.trim();
+                    final cuerpo = cuerpoCtrl.text.trim();
+                    final categoria = cat;
+                    if (titulo.isEmpty || cuerpo.isEmpty) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                        content: Text('Completa el título y el mensaje')));
+                      return;
+                    }
+                    Navigator.pop(ctx, true);
+                    try {
+                      await SupabaseService.guardarPlantillaWA({
+                        if (plantilla != null) 'id': plantilla['id'],
+                        'titulo'   : titulo,
+                        'cuerpo'   : cuerpo,
+                        'categoria': categoria,
+                      });
+                      await _cargar();
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('✅ Plantilla guardada'), backgroundColor: AppColors.verde));
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+                    }
+                  },
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
                   child: const Text('Guardar', style: TextStyle(color: Colors.white)))),
             ])))));
 
     if (ok != true) return;
-    if (tituloCtrl.text.trim().isEmpty || cuerpoCtrl.text.trim().isEmpty) return;
-
-    try {
-      await SupabaseService.guardarPlantillaWA({
-        if (plantilla != null) 'id': plantilla['id'],
-        'titulo'   : tituloCtrl.text.trim(),
-        'cuerpo'   : cuerpoCtrl.text.trim(),
-        'categoria': cat,
-      });
-      await _cargar();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ Plantilla guardada'), backgroundColor: AppColors.verde));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
-    }
+    // Lógica ya ejecutada dentro del onPressed arriba
   }
 
   Future<void> _eliminar(Map<String, dynamic> p) async {
