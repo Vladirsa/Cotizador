@@ -3,6 +3,7 @@
 // ============================================
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
 
 class ConfigScreen extends StatefulWidget {
@@ -147,6 +148,43 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion('🏷️ CATEGORÍAS DE PRODUCTOS'),
               const SizedBox(height: 8),
               _CategoriasWidget(),
+
+              const SizedBox(height: 20),
+
+              // ── NOTIFICACIONES ──
+              _seccion('🔔 NOTIFICACIONES'),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white, borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                child: Column(children: [
+                  const Row(children: [
+                    Icon(Icons.notifications_active_outlined, size: 18, color: AppColors.azul),
+                    SizedBox(width: 10),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Alertas en tiempo real', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text('Supabase Realtime activo — recibes notificaciones de nuevos pedidos, alertas y seguimientos automáticamente',
+                        style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                    ])),
+                  ]),
+                  const SizedBox(height: 12),
+                  SizedBox(width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await NotificacionesService.probar();
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text('✅ Notificación de prueba enviada — revisa tu barra'),
+                          backgroundColor: AppColors.verde));
+                      },
+                      icon: const Icon(Icons.notifications_outlined, size: 16),
+                      label: const Text('Probar notificación', style: TextStyle(fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.azul,
+                        side: const BorderSide(color: AppColors.azul),
+                        padding: const EdgeInsets.symmetric(vertical: 10)))),
+                ])),
 
               const SizedBox(height: 20),
 
