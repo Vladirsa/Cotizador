@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
 import '../services/pdf_service.dart';
+import 'factura_screen.dart';
 
 class AvancesScreen extends StatefulWidget {
   const AvancesScreen({super.key});
@@ -286,6 +287,19 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
               foregroundColor: const Color(0xFF1a3a5c),
               side: const BorderSide(color: Color(0xFF1a3a5c)),
               padding: const EdgeInsets.symmetric(vertical: 7)))),
+        const SizedBox(height: 6),
+        // Botón Facturar — visible cuando ya pagaron
+        if (widget.pedido.estado == 'PagoCompleto' ||
+            widget.pedido.estado == 'Entrega' ||
+            widget.pedido.estado == 'Entregado')
+          SizedBox(width: double.infinity, child: ElevatedButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => FacturaScreen(pedido: widget.pedido))),
+            icon: const Icon(Icons.receipt_long_outlined, size: 14, color: Colors.white),
+            label: const Text('Generar factura', style: TextStyle(fontSize: 12, color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1a3a5c),
+              padding: const EdgeInsets.symmetric(vertical: 8)))),
         const SizedBox(height: 6),
         Row(children: [
           if (tieneWA) Expanded(child: _enviandoWA
