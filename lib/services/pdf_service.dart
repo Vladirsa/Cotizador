@@ -209,4 +209,141 @@ class PdfService {
         pw.SizedBox(width: 4),
         pw.Expanded(child: pw.Text(valor, style: pw.TextStyle(fontSize: 9, color: color))),
       ]));
+
+  // ══════════════════════════════════════════
+  // Generar PDF de lista de productos (catálogo)
+  // ══════════════════════════════════════════
+  static Future<Uint8List> generarListadoProductos({
+    required String nombreLista,
+    required List<Producto> productos,
+    required Map<String, dynamic> empresa,
+  }) async {
+    final pdf = pw.Document();
+    pw.MemoryImage? logoImage;
+    try {
+      final bytes = _logoBytes;
+      if (bytes.isNotEmpty) logoImage = pw.MemoryImage(bytes);
+    } catch (_) {}
+
+    const azul = PdfColor.fromInt(0xFF1a3a5c);
+    const azulClaro = PdfColor.fromInt(0xFFe6f1fb);
+    const grisClaro = PdfColor.fromInt(0xFFf5f6fa);
+    const grisTexto = PdfColor.fromInt(0xFF6B7280);
+    const verde = PdfColor.fromInt(0xFF1d9e75);
+
+    final nombreEmpresa = empresa['nombre_comercial'] ?? 'HETNA CNC';
+    final tel = empresa['telefono'] ?? '';
+    final correo = empresa['correo'] ?? '';
+    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final fecha = _fmtFecha.format(DateTime.now());
+
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      header: (ctx) => pw.Column(children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.all(16),
+          decoration: const pw.BoxDecoration(color: azul),
+          child: pw.Row(children: [
+            if (logoImage != null) ...[
+              pw.Container(
+                width: 50, height: 50,
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.white,
+                  borderRadius: pw.BorderRadius.circular(8)),
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Image(logoImage, fit: pw.BoxFit.contain)),
+              pw.SizedBox(width: 12),
+            ],
+            pw.Expanded(child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text(nombreEmpresa,
+                style: pw.TextStyle(color: PdfColors.white,
+                  fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Lista de Precios — $nombreLista',
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 11)),
+              pw.Text('Fecha: $fecha',
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+            ])),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+              if (tel.isNotEmpty) pw.Text(tel,
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+              if (correo.isNotEmpty) pw.Text(correo,
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+              pw.Text(web, style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+            ]),
+          ])),
+        pw.SizedBox(height: 8),
+      ]),
+      build: (ctx) => [
+        // Tabla de productos
+        pw.Table(
+          border: pw.TableBorder.all(color: const PdfColor.fromInt(0xFFE5E7EB), width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(3.5),
+            1: const pw.FlexColumnWidth(1.5),
+            2: const pw.FlexColumnWidth(1.5),
+            3: const pw.FlexColumnWidth(1.5),
+          },
+          children: [
+            // Header
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: azul),
+              children: [
+                _celdaHeader('PRODUCTO / DESCRIPCIÓN'),
+                _celdaHeader('CATEGORÍA'),
+                _celdaHeader('UNIDAD'),
+                _celdaHeader('PRECIO'),
+              ]),
+            // Filas de productos
+            ...productos.asMap().entries.map((e) {
+              final i = e.key;
+              final p = e.value;
+              final bgColor = i % 2 == 0 ? PdfColors.white : grisClaro;
+              return pw.TableRow(
+                decoration: pw.BoxDecoration(color: bgColor),
+                children: [
+                  pw.Padding(padding: const pw.EdgeInsets.all(8),
+                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      pw.Text(p.nombre,
+                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+                      if (p.descripcion != null && p.descripcion!.isNotEmpty)
+                        pw.Text(p.descripcion!,
+                          style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+                    ])),
+                  pw.Padding(padding: const pw.EdgeInsets.all(8),
+                    child: pw.Text(p.categoriaNombre ?? '—',
+                      style: const pw.TextStyle(fontSize: 9, color: grisTexto))),
+                  pw.Padding(padding: const pw.EdgeInsets.all(8),
+                    child: pw.Text(p.unidadMedida,
+                      style: const pw.TextStyle(fontSize: 9))),
+                  pw.Padding(padding: const pw.EdgeInsets.all(8),
+                    child: pw.Text('\$${_fmt.format(p.precioVenta)}',
+                      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: verde))),
+                ]);
+            }),
+          ]),
+        pw.SizedBox(height: 16),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(8)),
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Text('Total de productos: ${productos.length}',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+            pw.Text('Los precios no incluyen IVA',
+              style: const pw.TextStyle(fontSize: 9, color: grisTexto)),
+          ])),
+        pw.SizedBox(height: 8),
+        pw.Text('Para pedidos o más información: $tel • $correo • $web',
+          style: const pw.TextStyle(fontSize: 9, color: grisTexto),
+          textAlign: pw.TextAlign.center),
+      ]));
+
+    return pdf.save();
+  }
+
+  static pw.Widget _celdaHeader(String texto) => pw.Padding(
+    padding: const pw.EdgeInsets.all(8),
+    child: pw.Text(texto,
+      style: pw.TextStyle(color: PdfColors.white, fontSize: 9, fontWeight: pw.FontWeight.bold)));
 }

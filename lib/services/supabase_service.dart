@@ -193,6 +193,19 @@ class SupabaseService {
     return Cotizacion.fromJson(resCot);
   }
 
+  static Future<void> eliminarPedidoPorCotizacion(String cotizacionId) async {
+    try {
+      // Primero eliminar referencias en tablas hijas del pedido
+      final pedidos = await _db.from('pedidos').select('id').eq('cotizacion_id', cotizacionId);
+      for (final p in (pedidos as List)) {
+        final pid = p['id'] as String;
+        await _db.from('facturas').delete().eq('pedido_id', pid);
+        await _db.from('cola_mensajes_wa').delete().eq('cliente_id', pid);
+      }
+      await _db.from('pedidos').delete().eq('cotizacion_id', cotizacionId);
+    } catch (_) {}
+  }
+
   static Future<void> eliminarCotizacion(String id) async {
     await _db.from('cotizacion_items').delete().eq('cotizacion_id', id);
     await _db.from('cotizaciones').delete().eq('id', id);
