@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
-import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
 import 'inicio_screen.dart';
 import 'alertas_screen.dart';
@@ -46,25 +45,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void initState() {
-    super.initState();
-    _cargarAlertas();
-    // Iniciar escucha en tiempo real de Supabase
-    NotificacionesService.iniciarEscuchaRealtime();
-  }
-
-  @override
-  void dispose() {
-    NotificacionesService.detenerEscucha();
-    super.dispose();
-  }
+  void initState() { super.initState(); _cargarAlertas(); }
 
   Future<void> _cargarAlertas() async {
     try {
       final n = await SupabaseService.countAlertasPendientes();
       if (mounted) setState(() => _alertas = n);
-      // Actualizar badge del ícono
-      await NotificacionesService.actualizarBadge(n);
     } catch (_) {}
   }
 
