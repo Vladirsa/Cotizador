@@ -489,38 +489,27 @@ class SupabaseService {
   }
 
   // ═══════════════════════════════════════════
-  // FACTURACIÓN
+  // CATEGORÍAS DE PRODUCTOS
   // ═══════════════════════════════════════════
-  static Future<Map<String, dynamic>> getDatosFiscalesCliente(String clienteId) async {
+  static Future<List<Map<String, dynamic>>> getCategorias() async {
     try {
-      final res = await _db.from('clientes')
-        .select('rfc_fiscal, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal')
-        .eq('id', clienteId).single();
-      return res as Map<String, dynamic>;
-    } catch (_) { return {}; }
-  }
-
-  static Future<void> guardarDatosFiscalesCliente({
-    required String clienteId,
-    required Map<String, dynamic> datos,
-  }) async {
-    await _db.from('clientes').update(datos).eq('id', clienteId);
-  }
-
-  static Future<void> crearFacturaPendiente(Map<String, dynamic> datos) async {
-    await _db.from('facturas').insert({
-      ...datos,
-      'estado': 'pendiente',
-      'created_at': DateTime.now().toIso8601String(),
-    });
-  }
-
-  static Future<List<Map<String, dynamic>>> getFacturasPedido(String pedidoId) async {
-    try {
-      final res = await _db.from('facturas')
-        .select().eq('pedido_id', pedidoId)
-        .order('created_at', ascending: false);
+      final res = await _db.from('categorias_producto').select()
+          .order('nombre', ascending: true);
       return (res as List).map((j) => j as Map<String, dynamic>).toList();
     } catch (_) { return []; }
+  }
+
+  static Future<void> crearCategoria(Map<String, dynamic> datos) async {
+    await _db.from('categorias_producto').insert(datos);
+  }
+
+  static Future<void> actualizarCategoria(String id, Map<String, dynamic> datos) async {
+    await _db.from('categorias_producto').update(datos).eq('id', id);
+  }
+
+  static Future<void> eliminarCategoria(String id) async {
+    // Desasociar productos antes de eliminar
+    await _db.from('productos').update({'categoria_id': null}).eq('categoria_id', id);
+    await _db.from('categorias_producto').delete().eq('id', id);
   }
 }
