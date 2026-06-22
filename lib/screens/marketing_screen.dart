@@ -465,7 +465,8 @@ class _CampanasTabState extends State<_CampanasTab> {
 
       for (final cliente in clientesConWA) {
         final cuerpo = (plantillaSel!['cuerpo'] as String? ?? '')
-            .replaceAll('[Nombre]', cliente.nombre);
+            .replaceAll('*NOMBRE*', cliente.nombre)
+            .replaceAll('[Nombre]', cliente.nombre);  // compatibilidad
         await SupabaseService.agregarAColaMarketing(
           clienteId: cliente.id!,
           mensajeFinal: cuerpo,
@@ -594,10 +595,10 @@ class _PlantillasTabState extends State<_PlantillasTab> {
               TextField(controller: cuerpoCtrl, maxLines: 4,
                 decoration: const InputDecoration(
                   labelText: 'Mensaje',
-                  hintText: 'Usa [Nombre], [Folio], [Monto] como variables',
+                  hintText: 'Variables: escribe NOMBRE FOLIO MONTO FECHA en mayúsculas rodeadas de *',
                   border: OutlineInputBorder())),
               const SizedBox(height: 4),
-              const Text('Variables disponibles: [Nombre] [Folio] [Monto] [Fecha]',
+              const Text('Variables: *NOMBRE* *FOLIO* *MONTO* *FECHA* (en mayúsculas entre asteriscos)',
                 style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
               const SizedBox(height: 12),
               SizedBox(width: double.infinity,

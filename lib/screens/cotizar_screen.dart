@@ -225,18 +225,27 @@ class _TarjetaCotizacion extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                   child: const Text('→ Pedido', style: TextStyle(fontSize: 11, color: Colors.white)))),
             ]),
-            // Botón ELIMINAR solo para Borrador
+            // Botón ELIMINAR y PDF para Borrador
             if (cotizacion.estado == 'Borrador') ...[
               const SizedBox(height: 6),
-              SizedBox(width: double.infinity,
-                child: OutlinedButton.icon(
+              Row(children: [
+                Expanded(child: OutlinedButton.icon(
                   onPressed: () => _eliminarCotizacion(context),
-                  icon: const Icon(Icons.delete_outline, size: 15, color: AppColors.rojo),
-                  label: const Text('Eliminar borrador', style: TextStyle(fontSize: 12, color: AppColors.rojo)),
+                  icon: const Icon(Icons.delete_outline, size: 14, color: AppColors.rojo),
+                  label: const Text('Eliminar', style: TextStyle(fontSize: 11, color: AppColors.rojo)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.rojo,
                     side: const BorderSide(color: AppColors.rojo),
                     padding: const EdgeInsets.symmetric(vertical: 8)))),
+                const SizedBox(width: 6),
+                Expanded(child: _BtnPdfWA(cotizacion: cotizacion)),
+              ]),
+            ],
+            // Botón PDF WA para estados no-Borrador
+            if (cotizacion.estado != 'Borrador') ...[
+              const SizedBox(height: 6),
+              SizedBox(width: double.infinity,
+                child: _BtnPdfWA(cotizacion: cotizacion)),
             ],
           ])),
       ]));
@@ -293,11 +302,14 @@ class _TarjetaCotizacion extends StatelessWidget {
   }
 
   Future<void> _eliminarCotizacion(BuildContext context) async {
+    final tienePedido = cotizacion.estado == 'Pedido';
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar borrador'),
-        content: Text('¿Eliminar la cotización ${cotizacion.folio ?? ''}? Esta acción no se puede deshacer.'),
+        title: const Text('Eliminar cotización'),
+        content: Text(tienePedido
+          ? 'Esta cotización tiene un pedido vinculado. Al eliminarla también se eliminará el pedido. ¿Continuar?'
+          : '¿Eliminar la cotización ${cotizacion.folio ?? ""}? Esta acción no se puede deshacer.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
           ElevatedButton(
@@ -307,13 +319,18 @@ class _TarjetaCotizacion extends StatelessWidget {
         ]));
     if (confirmar == true) {
       try {
+        // Primero eliminar pedido vinculado si existe
+        if (tienePedido && cotizacion.id != null) {
+          await SupabaseService.eliminarPedidoPorCotizacion(cotizacion.id!);
+        }
         await SupabaseService.eliminarCotizacion(cotizacion.id!);
         onActualizar();
         if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('🗑️ Borrador eliminado'),
+          content: Text('🗑️ Cotización eliminada'),
           backgroundColor: AppColors.rojo));
       } catch (e) {
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al eliminar: $e')));
       }
     }
   }
@@ -1247,5 +1264,60 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
         ]),
       ])),
     ]);
+  }
+}
+
+// ══════════════════════════════════════════════
+// Botón PDF + compartir por WA
+// ══════════════════════════════════════════════
+class _BtnPdfWA extends StatefulWidget {
+  final Cotizacion cotizacion;
+  const _BtnPdfWA({required this.cotizacion});
+  @override
+  State<_BtnPdfWA> createState() => _BtnPdfWAState();
+}
+
+class _BtnPdfWAState extends State<_BtnPdfWA> {
+  bool _generando = false;
+
+  Future<void> _generar() async {
+    setState(() => _generando = true);
+    try {
+      Cotizacion cot = widget.cotizacion;
+      if (cot.items.isEmpty && cot.id != null) {
+        final items = await SupabaseService.getCotizacionItems(cot.id!);
+        cot = Cotizacion(
+          id: cot.id, folio: cot.folio, cliente: cot.cliente, clienteId: cot.clienteId,
+          estado: cot.estado, items: items,
+          descuentoPct: cot.descuentoPct, descuentoFijo: cot.descuentoFijo,
+          ivaPct: cot.ivaPct, costoEnvio: cot.costoEnvio,
+          metodoPago: cot.metodoPago, condicionEntrega: cot.condicionEntrega,
+          fechaEntrega: cot.fechaEntrega, diasHabiles: cot.diasHabiles,
+          vigenciaDias: cot.vigenciaDias, notas: cot.notas,
+          pdfUrl: cot.pdfUrl, createdAt: cot.createdAt, totalBd: cot.totalBd);
+      }
+      final cfg = await SupabaseService.getConfiguracion();
+      final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg);
+      final folio = cot.folio ?? 'cotizacion';
+      await PdfService.compartirPdf(bytes, '$folio.pdf');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al generar PDF: $e'), backgroundColor: AppColors.rojo));
+    }
+    if (mounted) setState(() => _generando = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton.icon(
+      onPressed: _generando ? null : _generar,
+      icon: _generando
+        ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+        : const Icon(Icons.share_outlined, size: 14, color: Colors.white),
+      label: Text(_generando ? 'Generando...' : 'PDF / WA',
+        style: const TextStyle(fontSize: 11, color: Colors.white)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF25D366),
+        padding: const EdgeInsets.symmetric(vertical: 8)));
   }
 }
