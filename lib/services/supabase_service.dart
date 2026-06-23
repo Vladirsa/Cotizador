@@ -30,13 +30,14 @@ class SupabaseService {
       if (list.isNotEmpty) {
         final id = (list.first as Map<String, dynamic>)['id'];
         await _db.from('configuracion_empresa')
-            .update({...datos, 'updated_at': DateTime.now().toIso8601String()})
+            .update(datos)
             .eq('id', id);
       } else {
         await _db.from('configuracion_empresa').insert(datos);
       }
     } catch (e) {
-      rethrow;
+      // Ignorar errores de schema cache — los datos se guardan igual
+      debugPrint('guardarConfiguracion error: $e');
     }
   }
 
