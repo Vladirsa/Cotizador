@@ -295,6 +295,43 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           : _cotizaciones.where((c) => c.estado == _filtro && !esVencida(c)).toList();
 
       return Column(children: [
+        // ─── Cabecera con refresh ───
+        Container(color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 0),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            const Text('Cotizaciones', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            TextButton.icon(
+              onPressed: () async {
+                final cots = await SupabaseService.getCotizaciones();
+                if (mounted) { setState(() => _cotizaciones = cots); setS((){}); }
+              },
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Actualizar', style: TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(foregroundColor: AppColors.azul)),
+          ])),
+
+        // ─── Cabecera con botón refresh ───
+        Padding(padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text('${_cotizaciones.length} cotizaciones',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textoSecundario)),
+            GestureDetector(
+              onTap: () async {
+                final cots = await SupabaseService.getCotizaciones();
+                if (mounted) { setState(() => _cotizaciones = cots); setS(() {}); }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.refresh, size: 13, color: AppColors.azul),
+                  SizedBox(width: 4),
+                  Text('Actualizar', style: TextStyle(fontSize: 11, color: AppColors.azul, fontWeight: FontWeight.w600)),
+                ]))),
+          ])),
+        const SizedBox(height: 6),
+
         // ─── Filtros ───
         Container(color: Colors.white, padding: const EdgeInsets.all(10),
           child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children:
