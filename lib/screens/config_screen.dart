@@ -66,6 +66,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   Future<void> _cargar() async {
     final cfg = await SupabaseService.getConfiguracion();
+    final cfgWA = await SupabaseService.getConfigWA();
     setState(() {
       _nombreCtrl.text    = cfg['nombre_comercial'] ?? 'HETNA CNC';
       _telefonoCtrl.text  = cfg['telefono'] ?? '';
@@ -82,7 +83,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _proveedor          = cfg['factura_proveedor'] ?? 'Facturapi';
       _regimenFiscal      = cfg['factura_regimen_fiscal'] ?? '612';
       // WhatsApp API
-      final cfgWA = await SupabaseService.getConfigWA();
       _waPhoneIdCtrl.text = cfgWA?['phone_number_id'] ?? '';
       _waTokenCtrl.text   = cfgWA?['wa_token'] ?? '';
       _waVerifyCtrl.text  = cfgWA?['verify_token'] ?? 'hetna_cnc_webhook_2026';
