@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -578,35 +579,75 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       backgroundColor: Colors.transparent,
       builder: (_) => _SelectorCliente(
         clientes: clientes,
-        onSeleccionado: (c) => setState(() => _cliente = c),
+        onSeleccionado: (c) { setState(() => _cliente = c); _guardarBorrador(); },
         onNuevo: _nuevoClienteRapido));
   }
 
   Future<void> _nuevoClienteRapido() async {
     final n = TextEditingController(), wa = TextEditingController();
-    await showModalBottomSheet(context: context, isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Container(padding: const EdgeInsets.all(16),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('Nuevo cliente rápido', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 12),
-            TextField(controller: n, decoration: const InputDecoration(labelText: 'Nombre *',
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
-            const SizedBox(height: 8),
-            TextField(controller: wa, keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: 'WhatsApp',
-                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: () async {
-              if (n.text.isEmpty) return;
-              final c = await SupabaseService.crearCliente(Cliente(
-                nombre: n.text.trim(),
-                whatsapp: wa.text.trim().isEmpty ? null : wa.text.trim(),
-                tipoCliente: 'Cliente potencial'));
-              if (mounted) { setState(() => _cliente = c); Navigator.pop(context); }
-            }, child: const Text('Guardar cliente')),
-          ]))));
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) =>
+        AnimatedPadding(
+          duration: const Duration(milliseconds: 150),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 36, height: 4, decoration: BoxDecoration(
+                color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+              const SizedBox(height: 14),
+              const Text('Nuevo cliente rápido',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: n,
+                autofocus: true,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: 'Nombre *',
+                  prefixIcon: const Icon(Icons.person_outline),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+              const SizedBox(height: 10),
+              TextField(
+                controller: wa,
+                keyboardType: TextInputType.phone,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: 'WhatsApp',
+                  hintText: '2461234567',
+                  prefixIcon: const Icon(Icons.phone_outlined),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
+              const SizedBox(height: 16),
+              SizedBox(width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (n.text.isEmpty) return;
+                    String waNum = wa.text.trim();
+                    if (waNum.isNotEmpty) {
+                      waNum = waNum.replaceAll(RegExp(r'[^0-9]'), '');
+                      if (waNum.length == 10) waNum = '521$waNum';
+                      else if (waNum.startsWith('52') && waNum.length == 12) waNum = '521${waNum.substring(2)}';
+                    }
+                    final cl = await SupabaseService.crearCliente(Cliente(
+                      nombre: n.text.trim(),
+                      whatsapp: waNum.isEmpty ? null : waNum,
+                      telefono: waNum.isEmpty ? null : waNum,
+                      tipoCliente: 'Cliente potencial'));
+                    if (mounted) { setState(() => _cliente = cl); Navigator.pop(ctx); }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.azul,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                  child: const Text('Guardar cliente',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
+            ])))));
   }
 
   Future<void> _agregarProducto() async {
