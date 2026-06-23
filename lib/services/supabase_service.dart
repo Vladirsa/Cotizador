@@ -69,9 +69,7 @@ class SupabaseService {
     return Cliente.fromJson(res as Map<String, dynamic>);
   }
 
-  static Future<void> eliminarCliente(String id) async {
-    await _db.from('clientes').update({'activo': false}).eq('id', id);
-  }
+
 
   // ═══════════════════════════════════════════
   // CATEGORÍAS
