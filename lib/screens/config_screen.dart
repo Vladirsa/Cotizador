@@ -73,7 +73,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _correoCtrl.text    = cfg['correo'] ?? '';
       _direccionCtrl.text = cfg['direccion'] ?? '';
       _rfcCtrl.text       = cfg['rfc'] ?? '';
-      _leyendaCtrl.text   = cfg['leyenda_pdf'] ?? '';
       // Facturación
       _apiKeyCtrl.text    = cfg['factura_api_key'] ?? '';
       _apiUrlCtrl.text    = cfg['factura_api_url'] ?? '';
@@ -101,7 +100,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'correo'                : _correoCtrl.text.trim(),
         'direccion'             : _direccionCtrl.text.trim(),
         'rfc'                   : _rfcCtrl.text.trim().toUpperCase(),
-        'leyenda_pdf'           : _leyendaCtrl.text.trim(),
         'factura_api_key'       : _apiKeyCtrl.text.trim(),
         'factura_api_url'       : _apiUrlCtrl.text.trim(),
         'factura_rfc_emisor'    : _rfcEmisorCtrl.text.trim().toUpperCase(),
