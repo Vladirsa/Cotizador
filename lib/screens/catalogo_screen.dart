@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/pdf_service.dart';
+import 'clientes_screen.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_colors.dart';
@@ -402,6 +403,26 @@ class _CatalogoScreenState extends State<CatalogoScreen>
     );
   }
 
+  // ─── NUEVO CLIENTE RÁPIDO ──────────────────
+  void _mostrarNuevoCliente() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        height: MediaQuery.of(context).size.height * 0.92,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        child: _FormCliente(
+          onGuardado: () {
+            Navigator.pop(context);
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('✅ Cliente agregado'),
+              backgroundColor: AppColors.verde));
+          })));
+  }
+
   // ─── TAB PDFs ──────────────────────────────
   Widget _tabPdfs() {
     return Column(children: [
@@ -510,15 +531,25 @@ class _CatalogoScreenState extends State<CatalogoScreen>
   // ─── TAB LISTAS ────────────────────────────
   Widget _tabListas() {
     return Column(children: [
-      Padding(padding: const EdgeInsets.all(14),
-        child: SizedBox(width: double.infinity,
-          child: ElevatedButton.icon(
+      Padding(padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+        child: Row(children: [
+          Expanded(child: ElevatedButton.icon(
             onPressed: _mostrarCrearCatalogo,
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Crear lista de productos', style: TextStyle(color: Colors.white)),
+            icon: const Icon(Icons.add, color: Colors.white, size: 16),
+            label: const Text('Crear lista', style: TextStyle(color: Colors.white, fontSize: 13)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azul,
-              padding: const EdgeInsets.symmetric(vertical: 12))))),
+              padding: const EdgeInsets.symmetric(vertical: 12)))),
+          const SizedBox(width: 10),
+          ElevatedButton.icon(
+            onPressed: _mostrarNuevoCliente,
+            icon: const Icon(Icons.person_add_outlined, color: Colors.white, size: 16),
+            label: const Text('+ Cliente', style: TextStyle(color: Colors.white, fontSize: 13)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.verde,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14))),
+        ])),
+      const SizedBox(height: 4),
 
       Expanded(child: _cargandoCatalogos
         ? const Center(child: CircularProgressIndicator())
