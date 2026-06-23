@@ -107,6 +107,7 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
                 itemBuilder: (_, i) => _TarjetaCliente(
                   cliente: _filtrados[i],
                   onEditar: () => _mostrarFormEditar(_filtrados[i]),
+                  onEliminar: () => _eliminarCliente(_filtrados[i]),
                 ),
               ),
         )),
@@ -131,12 +132,40 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
       ),
     );
   }
+
+  Future<void> _eliminarCliente(Cliente cliente) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar cliente'),
+        content: Text('¿Eliminar a "${cliente.nombre}"? Se borrarán también sus cotizaciones y datos relacionados.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+        ]));
+    if (confirmar == true && cliente.id != null) {
+      try {
+        await SupabaseService.eliminarCliente(cliente.id!);
+        await _cargar();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Cliente eliminado'),
+          backgroundColor: AppColors.rojo));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
 }
 
 class _TarjetaCliente extends StatelessWidget {
   final Cliente cliente;
   final VoidCallback onEditar;
-  const _TarjetaCliente({required this.cliente, required this.onEditar});
+  final VoidCallback onEliminar;
+  const _TarjetaCliente({required this.cliente, required this.onEditar, required this.onEliminar});
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +200,7 @@ class _TarjetaCliente extends StatelessWidget {
   mensaje: '¡Hola ${cliente.nombre}! Te contacto de *HETNA CNC*. ¿En qué podemos ayudarte?'),
             ),
           IconButton(icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.textoSecundario), onPressed: onEditar),
+          IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.rojo), onPressed: onEliminar),
         ]),
       ),
     );
