@@ -723,4 +723,82 @@ class SupabaseService {
       }
     } catch (_) { return []; }
   }
+
+  // ═══════════════════════════════════════════
+  // WHATSAPP BUSINESS API
+  // ═══════════════════════════════════════════
+
+  // Buscar cliente por número de WhatsApp
+  static Future<Cliente?> getClientePorWA(String numero) async {
+    try {
+      // Normalizar número
+      String n = numero.replaceAll(RegExp(r'[^0-9]'), '');
+      if (n.length == 10) n = '521$n';
+      else if (n.startsWith('52') && n.length == 12) n = '521${n.substring(2)}';
+
+      final res = await _db.from('clientes')
+          .select().eq('whatsapp', n).maybeSingle();
+      if (res == null) return null;
+      return Cliente.fromJson(res as Map<String, dynamic>);
+    } catch (_) { return null; }
+  }
+
+  // Crear cliente rápido desde WhatsApp
+  static Future<Cliente> crearClienteRapidoWA({
+    required String numero,
+    String? nombre,
+  }) async {
+    String n = numero.replaceAll(RegExp(r'[^0-9]'), '');
+    if (n.length == 10) n = '521$n';
+    else if (n.startsWith('52') && n.length == 12) n = '521${n.substring(2)}';
+
+    final res = await _db.from('clientes').insert({
+      'nombre'      : nombre ?? 'Contacto WA ${n.substring(n.length - 4)}',
+      'whatsapp'    : n,
+      'telefono'    : n,
+      'tipo_cliente': 'Cliente potencial',
+      'notas'       : 'Agregado desde WhatsApp',
+    }).select().single();
+    return Cliente.fromJson(res as Map<String, dynamic>);
+  }
+
+  // Obtener interacciones de WA de un cliente
+  static Future<List<Map<String, dynamic>>> getInteraccionesWA(String clienteId) async {
+    try {
+      final res = await _db.from('interacciones_wa')
+          .select().eq('cliente_id', clienteId)
+          .order('created_at', ascending: false).limit(20);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  // Alertas de nuevos contactos WA
+  static Future<List<Map<String, dynamic>>> getAlertasNuevosContactosWA() async {
+    try {
+      final res = await _db.from('alertas')
+          .select('*, clientes(nombre, whatsapp)')
+          .eq('tipo', 'nuevo_contacto_wa')
+          .eq('completada', false)
+          .order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  // Configuración de WhatsApp
+  static Future<Map<String, dynamic>?> getConfigWA() async {
+    try {
+      final res = await _db.from('config_whatsapp')
+          .select().eq('activo', true).maybeSingle();
+      return res as Map<String, dynamic>?;
+    } catch (_) { return null; }
+  }
+
+  static Future<void> guardarConfigWA(Map<String, dynamic> datos) async {
+    final existing = await _db.from('config_whatsapp').select().limit(1);
+    if ((existing as List).isEmpty) {
+      await _db.from('config_whatsapp').insert(datos);
+    } else {
+      await _db.from('config_whatsapp').update(datos).eq('activo', true);
+    }
+  }
 }
