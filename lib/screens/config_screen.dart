@@ -25,6 +25,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _rfcCtrl      = TextEditingController();
   final _leyendaCtrl  = TextEditingController();
 
+  // WhatsApp Business API
+  final _waPhoneIdCtrl  = TextEditingController();
+  final _waTokenCtrl    = TextEditingController();
+  final _waVerifyCtrl   = TextEditingController();
+  bool _waActivo        = false;
+
   // Facturación
   final _apiKeyCtrl   = TextEditingController();
   final _apiUrlCtrl   = TextEditingController();
@@ -75,6 +81,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _facturaActivo      = cfg['factura_activo'] ?? false;
       _proveedor          = cfg['factura_proveedor'] ?? 'Facturapi';
       _regimenFiscal      = cfg['factura_regimen_fiscal'] ?? '612';
+      // WhatsApp API
+      final cfgWA = await SupabaseService.getConfigWA();
+      _waPhoneIdCtrl.text = cfgWA?['phone_number_id'] ?? '';
+      _waTokenCtrl.text   = cfgWA?['wa_token'] ?? '';
+      _waVerifyCtrl.text  = cfgWA?['verify_token'] ?? 'hetna_cnc_webhook_2026';
+      _waActivo           = cfgWA?['activo'] ?? false;
       _cargando = false;
     });
   }
@@ -98,6 +110,15 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'factura_proveedor'     : _proveedor,
         'factura_regimen_fiscal': _regimenFiscal,
       });
+      // Guardar config WhatsApp API
+      if (_waPhoneIdCtrl.text.isNotEmpty || _waTokenCtrl.text.isNotEmpty) {
+        await SupabaseService.guardarConfigWA({
+          'phone_number_id': _waPhoneIdCtrl.text.trim(),
+          'wa_token'       : _waTokenCtrl.text.trim(),
+          'verify_token'   : _waVerifyCtrl.text.trim(),
+          'activo'         : _waActivo,
+        });
+      }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('✅ Configuración guardada'),
         backgroundColor: AppColors.verde));
@@ -148,6 +169,69 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion('🏷️ CATEGORÍAS DE PRODUCTOS'),
               const SizedBox(height: 8),
               _CategoriasWidget(),
+
+              const SizedBox(height: 20),
+
+              // ── WHATSAPP BUSINESS API ──
+              _seccion('📱 WHATSAPP BUSINESS API'),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white, borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                child: Column(children: [
+                  Row(children: [
+                    Container(width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF25D366).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8)),
+                      child: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Text('Detección automática de clientes',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      const Text('Cuando alguien te escriba por WA, se agrega automáticamente como cliente potencial',
+                        style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                    ])),
+                    Switch(
+                      value: _waActivo,
+                      activeColor: const Color(0xFF25D366),
+                      onChanged: (v) => setState(() => _waActivo = v)),
+                  ]),
+                  if (_waActivo) ...[
+                    const SizedBox(height: 12),
+                    const Divider(height: 1),
+                    const SizedBox(height: 12),
+                    _campoPassword(_waTokenCtrl, 'Access Token de Meta', Icons.key_outlined,
+                      hint: 'EAAxxxxxxxxxxxxxxxx'),
+                    _campo(_waPhoneIdCtrl, 'Phone Number ID', Icons.phone_outlined,
+                      hint: '1234567890123456'),
+                    _campo(_waVerifyCtrl, 'Verify Token (webhook)', Icons.verified_outlined,
+                      hint: 'hetna_cnc_webhook_2026'),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.azulClaro,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.azul.withOpacity(0.2))),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Row(children: [
+                          Icon(Icons.info_outline, size: 14, color: AppColors.azul),
+                          SizedBox(width: 6),
+                          Text('URL del Webhook para Meta',
+                            style: TextStyle(fontSize: 12, color: AppColors.azul, fontWeight: FontWeight.w600)),
+                        ]),
+                        const SizedBox(height: 6),
+                        SelectableText(
+                          'https://ldfmkfbhcbsbecfbzsny.supabase.co/functions/v1/whatsapp-webhook',
+                          style: const TextStyle(fontSize: 10, color: AppColors.azul, fontFamily: 'monospace')),
+                        const SizedBox(height: 4),
+                        const Text('Pega esta URL en Meta for Developers → WhatsApp → Configuración → Webhook',
+                          style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+                      ])),
+                  ],
+                ])),
 
               const SizedBox(height: 20),
 
