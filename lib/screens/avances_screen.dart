@@ -326,7 +326,56 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
           if (_esEntregado) const Expanded(child: Center(child: Text('✅ Pedido entregado',
             style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)))),
         ]),
+        if (_esEntregado) ...[
+          const SizedBox(height: 6),
+          SizedBox(width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _generarNotaCompra,
+              icon: const Icon(Icons.task_alt_outlined, size: 14, color: Colors.white),
+              label: const Text('Generar nota de compra', style: TextStyle(fontSize: 12, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.verde,
+                padding: const EdgeInsets.symmetric(vertical: 10)))),
+        ],
       ]));
+  }
+
+  Future<void> _generarNotaCompra() async {
+    try {
+      final pedido = widget.pedido;
+      // Construir cotizacion desde el pedido
+      Cotizacion? cot;
+      if (pedido.cotizacionId != null) {
+        final cots = await SupabaseService.getCotizaciones();
+        cot = cots.where((c) => c.id == pedido.cotizacionId).firstOrNull;
+        if (cot != null && cot.items.isEmpty) {
+          final items = await SupabaseService.getCotizacionItems(cot.id!);
+          cot = Cotizacion(
+            id: cot.id, folio: cot.folio, cliente: cot.cliente,
+            clienteId: cot.clienteId, estado: cot.estado, items: items,
+            descuentoPct: cot.descuentoPct, descuentoFijo: cot.descuentoFijo,
+            ivaPct: cot.ivaPct, costoEnvio: cot.costoEnvio,
+            metodoPago: cot.metodoPago, condicionEntrega: cot.condicionEntrega,
+            fechaEntrega: cot.fechaEntrega, diasHabiles: cot.diasHabiles,
+            vigenciaDias: cot.vigenciaDias, notas: cot.notas,
+            pdfUrl: cot.pdfUrl, createdAt: cot.createdAt, totalBd: cot.totalBd);
+        }
+      }
+      if (cot == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No se encontró la cotización del pedido')));
+        return;
+      }
+      final cfg = await SupabaseService.getConfiguracion();
+      final bytes = await PdfService.generarNotaCompra(
+        cotizacion: cot,
+        empresa: cfg,
+        folioPedido: pedido.folio);
+      await PdfService.compartirPdf(bytes, 'nota_compra_${pedido.folio ?? "nota"}.pdf');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+    }
   }
 
   Future<void> _cambiarEtapa(String nueva) async {
