@@ -193,6 +193,29 @@ class SupabaseService {
     return Cotizacion.fromJson(resCot);
   }
 
+  static Future<void> eliminarCliente(String id) async {
+    // Borrar en orden correcto por foreign keys
+    try { await _db.from('cola_mensajes_wa').delete().eq('cliente_id', id); } catch(_) {}
+    try { await _db.from('cliente_etiquetas').delete().eq('cliente_id', id); } catch(_) {}
+    try { await _db.from('interacciones_wa').delete().eq('cliente_id', id); } catch(_) {}
+    try { await _db.from('alertas').delete().eq('cliente_id', id); } catch(_) {}
+    try { await _db.from('facturas').delete().eq('cliente_id', id); } catch(_) {}
+    // Borrar pedidos y sus cotizaciones
+    final pedidos = await _db.from('pedidos').select('id').eq('cliente_id', id);
+    for (final p in (pedidos as List)) {
+      await _db.from('facturas').delete().eq('pedido_id', p['id']);
+    }
+    await _db.from('pedidos').delete().eq('cliente_id', id);
+    // Borrar cotizaciones
+    final cots = await _db.from('cotizaciones').select('id').eq('cliente_id', id);
+    for (final c in (cots as List)) {
+      await _db.from('cotizacion_items').delete().eq('cotizacion_id', c['id']);
+    }
+    await _db.from('cotizaciones').delete().eq('cliente_id', id);
+    // Finalmente borrar el cliente
+    await _db.from('clientes').delete().eq('id', id);
+  }
+
   static Future<void> eliminarPedidoPorCotizacion(String cotizacionId) async {
     try {
       // Primero eliminar referencias en tablas hijas del pedido
