@@ -37,7 +37,7 @@ class SupabaseService {
       }
     } catch (e) {
       // Ignorar errores de schema cache — los datos se guardan igual
-      debugPrint('guardarConfiguracion error: $e');
+      print('guardarConfiguracion: $e');
     }
   }
 
