@@ -575,21 +575,21 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _seleccionarCliente() async {
     if (!mounted) return;
-    // Mostrar opciones: desde Supabase o desde contactos del celular
-    showModalBottomSheet(context: context,
+    showModalBottomSheet(
+      context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 36, height: 4,
             decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 16),
-          const Text('Seleccionar cliente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const Text('Seleccionar cliente',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
-          // Desde base de datos HETNA
           SizedBox(width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () async {
@@ -604,12 +604,12 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                     onNuevo: _nuevoClienteRapido));
               },
               icon: const Icon(Icons.people_outline, color: Colors.white),
-              label: const Text('Clientes HETNA CNC', style: TextStyle(color: Colors.white)),
+              label: const Text('Clientes HETNA CNC',
+                style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.azul,
                 padding: const EdgeInsets.symmetric(vertical: 12)))),
           const SizedBox(height: 10),
-          // Desde contactos del celular
           SizedBox(width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () async {
@@ -617,17 +617,17 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                 await _seleccionarDesdeContactos();
               },
               icon: const Icon(Icons.contact_phone_outlined, color: Colors.white),
-              label: const Text('Agenda del celular', style: TextStyle(color: Colors.white)),
+              label: const Text('Agenda del celular',
+                style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF7c3aed),
                 padding: const EdgeInsets.symmetric(vertical: 12)))),
           const SizedBox(height: 10),
-          // Nuevo cliente rápido
           SizedBox(width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () { Navigator.pop(context); _nuevoClienteRapido(); },
               icon: const Icon(Icons.person_add_outlined),
-              label: const Text('Nuevo cliente rápido'),
+              label: const Text('Nuevo cliente rapido'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.azul,
                 side: const BorderSide(color: AppColors.azul),
@@ -637,7 +637,6 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _seleccionarDesdeContactos() async {
     try {
-      // Solicitar permiso
       final permiso = await FlutterContacts.requestPermission(readonly: true);
       if (!permiso) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -645,15 +644,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             backgroundColor: AppColors.rojo));
         return;
       }
-      // Obtener contactos con teléfono
       final contactos = await FlutterContacts.getContacts(
         withProperties: true, withPhoto: false);
       final conTelefono = contactos.where((c) => c.phones.isNotEmpty).toList();
       conTelefono.sort((a, b) => a.displayName.compareTo(b.displayName));
-
       if (!mounted) return;
-
-      // Mostrar lista de contactos
       await showModalBottomSheet(
         context: context,
         isScrollControlled: true,
@@ -667,67 +662,81 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
               color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
             child: Column(children: [
-              // Handle
               Padding(padding: const EdgeInsets.only(top: 12, bottom: 8),
                 child: Container(width: 36, height: 4,
-                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2)))),
               Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Row(children: [
-                  const Icon(Icons.contact_phone_outlined, color: AppColors.azul, size: 20),
+                  const Icon(Icons.contact_phone_outlined,
+                    color: AppColors.azul, size: 20),
                   const SizedBox(width: 8),
                   Text('Contactos (${conTelefono.length})',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                    style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
                 ])),
-              // Lista
               Expanded(child: ListView.builder(
                 controller: ctrl,
                 itemCount: conTelefono.length,
-                itemBuilder: (_, i) {
+                itemBuilder: (ctx2, i) {
                   final c = conTelefono[i];
-                  final tel = c.phones.first.number.replaceAll(RegExp(r'[^0-9]'), '');
+                  final tel = c.phones.first.number
+                    .replaceAll(RegExp(r'[^0-9]'), '');
                   String waNum = tel;
-                  if (tel.length == 10) waNum = '521\$tel';
-                  else if (tel.startsWith('52') && tel.length == 12) waNum = '521\${tel.substring(2)}';
+                  if (tel.length == 10) waNum = '521$tel';
+                  else if (tel.startsWith('52') && tel.length == 12) {
+                    waNum = '521${tel.substring(2)}';
+                  }
                   return ListTile(
                     leading: CircleAvatar(
                       backgroundColor: AppColors.azulClaro,
                       child: Text(
-                        c.displayName.isNotEmpty ? c.displayName[0].toUpperCase() : '?',
-                        style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
+                        c.displayName.isNotEmpty
+                          ? c.displayName[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                          color: AppColors.azul,
+                          fontWeight: FontWeight.w700))),
                     title: Text(c.displayName,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
                     subtitle: Text(c.phones.first.number,
-                      style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textoSecundario)),
                     onTap: () async {
-                      Navigator.pop(context);
-                      // Crear cliente temporal o buscar si ya existe
+                      Navigator.pop(ctx2);
                       try {
-                        final existentes = await SupabaseService.getClientes();
+                        final existentes =
+                          await SupabaseService.getClientes();
                         final yaExiste = existentes.where((cl) =>
-                          cl.whatsapp == waNum || cl.telefono == tel).toList();
+                          cl.whatsapp == waNum ||
+                          cl.telefono == tel).toList();
                         if (yaExiste.isNotEmpty) {
-                          setState(() => _cliente = yaExiste.first);
+                          if (mounted) setState(() => _cliente = yaExiste.first);
                         } else {
-                          // Crear nuevo cliente desde contacto
-                          final nuevo = await SupabaseService.crearCliente(Cliente(
-                            nombre: c.displayName,
-                            whatsapp: waNum.isNotEmpty ? waNum : null,
-                            telefono: tel.isNotEmpty ? tel : null,
-                            correo: c.emails.isNotEmpty ? c.emails.first.address : null,
-                          ));
+                          final nuevo = await SupabaseService.crearCliente(
+                            Cliente(
+                              nombre: c.displayName,
+                              whatsapp: waNum.isNotEmpty ? waNum : null,
+                              telefono: tel.isNotEmpty ? tel : null,
+                              correo: c.emails.isNotEmpty
+                                ? c.emails.first.address : null,
+                            ));
                           if (mounted) setState(() => _cliente = nuevo);
                         }
                       } catch (e) {
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: \$e'), backgroundColor: AppColors.rojo));
+                        if (mounted) ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: AppColors.rojo));
                       }
                     });
                 })),
-            ])));
-      });
+            ]))));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al acceder contactos: \$e'),
+        SnackBar(content: Text('Error al acceder contactos: $e'),
           backgroundColor: AppColors.rojo));
     }
   }
