@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import 'cupones_screen.dart';
+import 'citas_screen.dart';
 import '../services/supabase_service.dart';
 import 'inicio_screen.dart';
 import 'alertas_screen.dart';
@@ -40,6 +42,10 @@ class _HomeScreenState extends State<HomeScreen> {
       case 8: return const GastosScreen(); // Reportes ahora en Inicio
       case 9: return const MarketingScreen();
       case 10: return const ConfigScreen();
+      case 11: return const CuponesScreen();
+      case 12: return const CitasScreen();
+      case 11: return const CuponesScreen();
+      case 12: return const CitasScreen();
       default: return const InicioScreen();
     }
   }
@@ -123,6 +129,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _dItem(Icons.campaign_outlined, 'Marketing', 9),
       const Divider(height: 1),
       _dItem(Icons.settings_outlined, 'Configuración', 10),
+      _dItem(Icons.discount_outlined, 'Cupones', 11),
+      _dItem(Icons.event_outlined, 'Citas', 12),
     ]));
 
   Widget _dItem(IconData icon, String label, int idx) {
