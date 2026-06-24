@@ -230,7 +230,16 @@ class PdfService {
       .replaceAll('•', '*')
       .replaceAll('×', 'x')
       .replaceAll('✕', 'x')
-      .replaceAll('❌', '');
+      .replaceAll('❌', '')
+      .replaceAll('→', '->')
+      .replaceAll('←', '<-')
+      .replaceAll('✓', 'OK')
+      .replaceAll('✗', 'x')
+      .replaceAll('✘', 'x')
+      .replaceAll('©', '(c)')
+      .replaceAll('®', '(R)')
+      .replaceAll('™', 'TM')
+      .replaceAll('°', ' grados');
   }
 
   // ══════════════════════════════════════════
@@ -453,7 +462,7 @@ class PdfService {
           },
           children: [
             pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
-              _cH('PRODUCTO'), _cH('CANT.'), _cH('PRECIO'), _cH('SUBTOTAL'),
+              _cH('TÍTULO / DESCRIPCIÓN'), _cH('CANT.'), _cH('PRECIO'), _cH('SUBTOTAL'),
             ]),
             ...cotizacion.items.asMap().entries.map((e) {
               final item = e.value;
@@ -461,11 +470,16 @@ class PdfService {
                 decoration: pw.BoxDecoration(color: e.key.isEven ? PdfColors.white : grisClaro),
                 children: [
                   pw.Padding(padding: const pw.EdgeInsets.all(7),
-                    child: pw.Text(_limpiarTexto(item.nombreProducto),
-                      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
-                  _cD('\${item.cantidad}', center: true),
-                  _cD('\$\${_fmt.format(item.precioUnitario)}', right: true),
-                  _cD('\$\${_fmt.format(item.subtotal)}', right: true),
+                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      pw.Text(_limpiarTexto(item.nombreProducto),
+                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+                      if (item.sku != null && item.sku!.isNotEmpty)
+                        pw.Text('SKU: ${item.sku}',
+                          style: pw.TextStyle(fontSize: 7, color: grisTexto)),
+                    ])),
+                  _cD('${item.cantidad}', center: true),
+                  _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
+                  _cD('\$${_fmt.format(item.subtotal)}', right: true),
                 ]);
             }),
           ]),
@@ -477,12 +491,12 @@ class PdfService {
             decoration: pw.BoxDecoration(color: verdeClaro, borderRadius: pw.BorderRadius.circular(8),
               border: pw.Border.all(color: verde, width: 1)),
             child: pw.Column(children: [
-              if (cotizacion.descuentoPct > 0) _tR('Descuento', '-\$\${_fmt.format(cotizacion.montoDescuento)}', verde),
-              if (cotizacion.ivaPct > 0) _tR('IVA \${cotizacion.ivaPct.toInt()}%', '\$\${_fmt.format(cotizacion.montoIva)}', grisTexto),
+              if (cotizacion.descuentoPct > 0) _tR('Descuento', '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
+              if (cotizacion.ivaPct > 0) _tR('IVA ${cotizacion.ivaPct.toInt()}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
               pw.Divider(color: verde),
               pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                 pw.Text('TOTAL PAGADO', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: verde)),
-                pw.Text('\$\${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: verde)),
+                pw.Text('\$${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: verde)),
               ]),
             ])),
         ]),
@@ -513,7 +527,7 @@ class PdfService {
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text('Gracias por su preferencia', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text('\$tel1  \$correo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
+              pw.Text('$tel1  $correo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
             ]),
             pw.Text(web, style: pw.TextStyle(fontSize: 9, color: PdfColors.white)),
           ])),
