@@ -140,7 +140,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
                     alerta: _filtradas[i],
                     tipos: _tipos,
                     onCompletada: _cargar))),
-          ],
+          ]),
       floatingActionButton: FloatingActionButton(
         onPressed: _nuevaAlerta,
         backgroundColor: AppColors.azul,
@@ -322,7 +322,7 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
                 style: TextStyle(fontSize: 13,
                   color: _clienteNombre.isEmpty ? AppColors.textoSecundario : AppColors.textoPrincipal))),
               const Icon(Icons.chevron_right, size: 16, color: AppColors.textoSecundario),
-            ])));
+            ]))),
         const SizedBox(height: 12),
 
         // Fecha
