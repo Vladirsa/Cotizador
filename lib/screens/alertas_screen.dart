@@ -560,8 +560,8 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
               Text('Desliza ← para completar',
                 style: TextStyle(fontSize: 9, color: AppColors.grisBorde)),
             ])),
-        ]));
-  }
+        ])));
+  }  // fin build _TarjetaAlerta
 
   void _editarMensaje() {
     final ctrl = TextEditingController(text: _mensaje);
