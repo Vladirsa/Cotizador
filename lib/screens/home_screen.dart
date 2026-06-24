@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../services/notificaciones_service.dart';
 import 'cupones_screen.dart';
 import 'citas_screen.dart';
 import '../services/supabase_service.dart';
@@ -51,7 +52,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void initState() { super.initState(); _cargarAlertas(); }
+  @override
+  void initState() {
+    super.initState();
+    _cargarAlertas();
+    NotificacionesService.onBadgeUpdate = (count) {
+      if (mounted) setState(() => _alertas = count);
+    };
+    NotificacionesService.iniciarPolling();
+  }
+
+  @override
+  void dispose() {
+    NotificacionesService.detenerPolling();
+    NotificacionesService.onBadgeUpdate = null;
+    super.dispose();
+  }
 
   Future<void> _cargarAlertas() async {
     try {
