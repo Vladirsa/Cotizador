@@ -1,592 +1,922 @@
-import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../main.dart';
+import 'dart:typed_data';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/models.dart';
-import '../services/supabase_service.dart';
-import '../services/whatsapp_service.dart';
 
-class AlertasScreen extends StatefulWidget {
-  const AlertasScreen({super.key});
-  @override
-  State<AlertasScreen> createState() => _AlertasScreenState();
-}
+class SupabaseService {
+  static final _db = Supabase.instance.client;
 
-class _AlertasScreenState extends State<AlertasScreen> {
-  List<Alerta> _alertas = [];
-  bool _cargando = true;
-  String _filtro = 'Todos';
-
-  // ── Tipos de alerta con íconos y colores ──
-  static const _tipos = {
-    'todos':                  {'label': 'Todos',          'icon': Icons.notifications_outlined,   'color': AppColors.azul},
-    'seguimiento_dia3':       {'label': 'Día 3',          'icon': Icons.schedule_outlined,         'color': AppColors.ambar},
-    'seguimiento_dia5':       {'label': 'Día 5',          'icon': Icons.warning_amber_outlined,    'color': AppColors.ambar},
-    'seguimiento_dia7':       {'label': 'Día 7 🔴',       'icon': Icons.priority_high_outlined,    'color': AppColors.rojo},
-    'post_entrega':           {'label': 'Post entrega',   'icon': Icons.thumb_up_outlined,         'color': AppColors.verde},
-    'cliente_interesado':     {'label': 'Interesado',     'icon': Icons.star_outline,              'color': const Color(0xFF7c3aed)},
-    'recordatorio_cita':      {'label': 'Cita',           'icon': Icons.event_outlined,            'color': AppColors.azul},
-    'mensaje_wa':             {'label': 'Mensaje WA',     'icon': Icons.chat_outlined,             'color': const Color(0xFF25D366)},
-    'nuevo_contacto_wa':      {'label': 'Nuevo contacto', 'icon': Icons.person_add_outlined,       'color': AppColors.verde},
-  };
-
-  List<Alerta> get _filtradas {
-    if (_filtro == 'Todos') return _alertas;
-    return _alertas.where((a) => a.tipo == _filtro).toList();
+  // ═══════════════════════════════════════════
+  // CONFIGURACIÓN
+  // ═══════════════════════════════════════════
+  static Future<Map<String, dynamic>> getConfiguracion() async {
+    try {
+      final res = await _db.from('configuracion_empresa').select().limit(1);
+      final list = res as List;
+      if (list.isEmpty) {
+        await _db.from('configuracion_empresa').insert({'nombre_comercial': 'HETNA CNC'});
+        final res2 = await _db.from('configuracion_empresa').select().limit(1);
+        return (res2 as List).first as Map<String, dynamic>;
+      }
+      return list.first as Map<String, dynamic>;
+    } catch (e) {
+      return {'nombre_comercial': 'HETNA CNC'};
+    }
   }
 
-  @override
-  void initState() { super.initState(); _cargar(); }
-
-  Future<void> _cargar() async {
-    setState(() => _cargando = true);
+  static Future<void> guardarConfiguracion(Map<String, dynamic> datos) async {
     try {
-      final alertas = await SupabaseService.getAlertasPendientes();
-      if (mounted) setState(() { _alertas = alertas; _cargando = false; });
+      final res = await _db.from('configuracion_empresa').select('id').limit(1);
+      final list = res as List;
+      if (list.isNotEmpty) {
+        final id = (list.first as Map<String, dynamic>)['id'];
+        await _db.from('configuracion_empresa')
+            .update(datos)
+            .eq('id', id);
+      } else {
+        await _db.from('configuracion_empresa').insert(datos);
+      }
+    } catch (e) {
+      // Ignorar errores de schema cache — los datos se guardan igual
+      print('guardarConfiguracion: $e');
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // CLIENTES
+  // ═══════════════════════════════════════════
+  static Future<List<Cliente>> getClientes({String? busqueda}) async {
+    final res = await _db.from('clientes').select().eq('activo', true).order('nombre');
+    final list = res as List;
+    var clientes = list.map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+    if (busqueda != null && busqueda.isNotEmpty) {
+      final b = busqueda.toLowerCase();
+      clientes = clientes.where((c) =>
+        c.nombre.toLowerCase().contains(b) ||
+        (c.empresa?.toLowerCase().contains(b) ?? false) ||
+        (c.telefono?.contains(b) ?? false)).toList();
+    }
+    return clientes;
+  }
+
+  static Future<Cliente> crearCliente(Cliente cliente) async {
+    final res = await _db.from('clientes').insert(cliente.toJson()).select().single();
+    return Cliente.fromJson(res as Map<String, dynamic>);
+  }
+
+  static Future<Cliente> actualizarCliente(Cliente cliente) async {
+    final res = await _db.from('clientes')
+        .update({...cliente.toJson(), 'updated_at': DateTime.now().toIso8601String()})
+        .eq('id', cliente.id!).select().single();
+    return Cliente.fromJson(res as Map<String, dynamic>);
+  }
+
+
+
+  // ═══════════════════════════════════════════
+  // CATEGORÍAS
+  // ═══════════════════════════════════════════
+  static Future<List<CategoriaProducto>> getCategorias() async {
+    final res = await _db.from('categorias_producto').select().order('orden');
+    final list = res as List;
+    return list.map((j) => CategoriaProducto.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  // ═══════════════════════════════════════════
+  // PRODUCTOS
+  // ═══════════════════════════════════════════
+  static Future<List<Producto>> getProductos({
+    String? categoriaId,
+    String? busqueda,
+    bool soloActivos = true,
+  }) async {
+    var query = _db.from('productos').select('*, categorias_producto(nombre, color_hex)');
+    if (soloActivos) {
+      final res = await query.eq('activo', true).order('nombre');
+      final list = res as List;
+      var productos = list.map((j) => Producto.fromJson(j as Map<String, dynamic>)).toList();
+      if (categoriaId != null) {
+        productos = productos.where((p) => p.categoriaId == categoriaId).toList();
+      }
+      if (busqueda != null && busqueda.isNotEmpty) {
+        final b = busqueda.toLowerCase();
+        productos = productos.where((p) =>
+          p.nombre.toLowerCase().contains(b) ||
+          (p.sku?.toLowerCase().contains(b) ?? false)).toList();
+      }
+      return productos;
+    } else {
+      final res = await query.order('nombre');
+      final list = res as List;
+      return list.map((j) => Producto.fromJson(j as Map<String, dynamic>)).toList();
+    }
+  }
+
+  static Future<Producto> crearProducto(Producto producto) async {
+    final res = await _db.from('productos').insert(producto.toJson())
+        .select('*, categorias_producto(nombre, color_hex)').single();
+    return Producto.fromJson(res as Map<String, dynamic>);
+  }
+
+  static Future<Producto> actualizarProducto(Producto producto) async {
+    final res = await _db.from('productos')
+        .update({...producto.toJson(), 'updated_at': DateTime.now().toIso8601String()})
+        .eq('id', producto.id!)
+        .select('*, categorias_producto(nombre, color_hex)').single();
+    return Producto.fromJson(res as Map<String, dynamic>);
+  }
+
+  static Future<void> eliminarProducto(String id) async {
+    await _db.from('productos').update({'activo': false}).eq('id', id);
+  }
+
+  // ═══════════════════════════════════════════
+  // PDFS CATÁLOGO
+  // ═══════════════════════════════════════════
+  static Future<List<PdfCatalogo>> getPdfs() async {
+    final res = await _db.from('pdfs_catalogo').select().eq('activo', true)
+        .order('created_at', ascending: false);
+    final list = res as List;
+    return list.map((j) => PdfCatalogo.fromJson(j as Map<String, dynamic>)).toList();
+  }
+
+  static Future<PdfCatalogo> subirPdf({
+    required String nombre,
+    required String url,
+    String? categoria,
+    double? tamanoMb,
+  }) async {
+    final res = await _db.from('pdfs_catalogo').insert({
+      'nombre': nombre, 'url': url, 'categoria': categoria, 'tamano_mb': tamanoMb,
+    }).select().single();
+    return PdfCatalogo.fromJson(res as Map<String, dynamic>);
+  }
+
+  // ═══════════════════════════════════════════
+  // COTIZACIONES
+  // ═══════════════════════════════════════════
+  static Future<String> generarFolio() async {
+    try {
+      final res = await _db.rpc('generar_folio_cotizacion');
+      return res as String;
     } catch (_) {
-      if (mounted) setState(() => _cargando = false);
+      return 'COT-${DateTime.now().millisecondsSinceEpoch}';
     }
   }
 
-  // ── Nueva alerta manual ──
-  Future<void> _nuevaAlerta() async {
-    final tituloCtrl = TextEditingController();
-    final notasCtrl  = TextEditingController();
-    String tipo = 'recordatorio_cita';
-    DateTime fechaSeleccionada = DateTime.now().add(const Duration(days: 1));
-    String? clienteId;
-    String clienteNombre = '';
-
-    final tiposNuevo = {
-      'recordatorio_cita'   : 'Recordatorio de cita',
-      'cliente_interesado'  : 'Cliente interesado en producto',
-      'seguimiento_dia3'    : 'Seguimiento cotización',
-    };
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) =>
-        AnimatedPadding(
-          duration: const Duration(milliseconds: 150),
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-          child: Container(
-            height: MediaQuery.of(ctx).size.height * 0.85,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-            child: Column(children: [
-              // Header
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
-                child: Row(children: [
-                  const Expanded(child: Text('Nueva alerta / recordatorio',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
-                  IconButton(icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx)),
-                ])),
-              // Formulario
-              Expanded(child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // Tipo
-                  const Text('Tipo de alerta',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  ...tiposNuevo.entries.map((e) {
-                    final info = _tipos[e.key]!;
-                    final sel = tipo == e.key;
-                    final color = info['color'] as Color;
-                    return GestureDetector(
-                      onTap: () => setS(() => tipo = e.key),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 6),
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: sel ? color.withOpacity(0.08) : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: sel ? color : AppColors.grisBorde,
-                            width: sel ? 1.5 : 0.5)),
-                        child: Row(children: [
-                          Icon(info['icon'] as IconData, size: 18, color: sel ? color : AppColors.textoSecundario),
-                          const SizedBox(width: 10),
-                          Text(e.value,
-                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                              color: sel ? color : AppColors.textoPrincipal)),
-                        ])));
-                  }),
-                  const SizedBox(height: 14),
-                  // Título
-                  TextField(
-                    controller: tituloCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Título / descripción *',
-                      hintText: 'Ej: Llamar a Juan sobre la tabla de cocina',
-                      prefixIcon: const Icon(Icons.title_outlined),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
-                    textCapitalization: TextCapitalization.sentences),
-                  const SizedBox(height: 12),
-                  // Cliente (opcional)
-                  GestureDetector(
-                    onTap: () async {
-                      final clientes = await SupabaseService.getClientes();
-                      if (!mounted) return;
-                      final sel = await showModalBottomSheet<Cliente>(
-                        context: ctx,
-                        isScrollControlled: true,
-                        builder: (_) => Container(
-                          height: MediaQuery.of(ctx).size.height * 0.65,
-                          color: Colors.white,
-                          child: Column(children: [
-                            const Padding(padding: EdgeInsets.all(14),
-                              child: Text('Seleccionar cliente',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
-                            Expanded(child: ListView.builder(
-                              itemCount: clientes.length,
-                              itemBuilder: (_, i) => ListTile(
-                                title: Text(clientes[i].nombre),
-                                subtitle: Text(clientes[i].empresa ?? ''),
-                                onTap: () => Navigator.pop(_, clientes[i])))),
-                          ])));
-                      if (sel != null) {
-                        setS(() {
-                          clienteId = sel.id;
-                          clienteNombre = sel.nombre;
-                        });
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.gris,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.grisBorde)),
-                      child: Row(children: [
-                        const Icon(Icons.person_outline, size: 18, color: AppColors.textoSecundario),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(
-                          clienteNombre.isEmpty ? 'Vincular cliente (opcional)' : clienteNombre,
-                          style: TextStyle(fontSize: 13,
-                            color: clienteNombre.isEmpty ? AppColors.textoSecundario : AppColors.textoPrincipal))),
-                        const Icon(Icons.chevron_right, size: 16, color: AppColors.textoSecundario),
-                      ])));
-                  }),
-                  const SizedBox(height: 12),
-                  // Fecha
-                  GestureDetector(
-                    onTap: () async {
-                      final f = await showDatePicker(
-                        context: ctx,
-                        initialDate: fechaSeleccionada,
-                        firstDate: DateTime.now(),
-                        lastDate: DateTime.now().add(const Duration(days: 365)));
-                      if (f != null) {
-                        final t = await showTimePicker(
-                          context: ctx, initialTime: TimeOfDay.fromDateTime(fechaSeleccionada));
-                        setS(() => fechaSeleccionada = t != null
-                          ? DateTime(f.year, f.month, f.day, t.hour, t.minute)
-                          : f);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.gris,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.grisBorde)),
-                      child: Row(children: [
-                        const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.azul),
-                        const SizedBox(width: 10),
-                        Text(DateFormat('dd/MM/yyyy HH:mm').format(fechaSeleccionada),
-                          style: const TextStyle(fontSize: 13, color: AppColors.azul, fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        const Icon(Icons.edit_calendar_outlined, size: 14, color: AppColors.textoSecundario),
-                      ]))),
-                  const SizedBox(height: 12),
-                  // Notas
-                  TextField(
-                    controller: notasCtrl,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      labelText: 'Notas (opcional)',
-                      hintText: 'Detalles adicionales...',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
-                    textCapitalization: TextCapitalization.sentences),
-                ])),
-              // Botón guardar
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0xFFE5E7EB)))),
-                child: SizedBox(width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final titulo = tituloCtrl.text.trim();
-                      if (titulo.isEmpty) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                          content: Text('Escribe el título de la alerta')));
-                        return;
-                      }
-                      Navigator.pop(ctx);
-                      try {
-                        await SupabaseService.crearAlerta({
-                          'tipo'              : tipo,
-                          'titulo'            : titulo,
-                          'notas'             : notasCtrl.text.trim(),
-                          'cliente_id'        : clienteId,
-                          'fecha_programada'  : fechaSeleccionada.toIso8601String(),
-                          'completada'        : false,
-                        });
-                        await _cargar();
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('✅ Alerta creada'),
-                          backgroundColor: AppColors.verde));
-                      } catch (e) {
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.azul,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                    child: const Text('Crear alerta',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700))))),
-            ])))));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tiposConCount = _tipos.entries.map((e) {
-      final key = e.key;
-      final count = key == 'todos'
-        ? _alertas.length
-        : _alertas.where((a) => a.tipo == key).length;
-      return {'key': key, 'label': e.value['label'], 'count': count,
-        'icon': e.value['icon'], 'color': e.value['color']};
-    }).where((e) => e['key'] == 'todos' || (e['count'] as int) > 0).toList();
-
-    return Scaffold(
-      backgroundColor: AppColors.gris,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        title: Row(children: [
-          const Text('Alertas', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
-          if (_alertas.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(color: AppColors.rojo, borderRadius: BorderRadius.circular(20)),
-              child: Text('${_alertas.length}',
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700))),
-          ],
-        ]),
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh_outlined, color: AppColors.azul), onPressed: _cargar),
-          IconButton(
-            icon: const Icon(Icons.add_alert_outlined, color: AppColors.azul),
-            tooltip: 'Nueva alerta',
-            onPressed: _nuevaAlerta),
-        ]),
-      body: _cargando
-        ? const Center(child: CircularProgressIndicator())
-        : Column(children: [
-            // ── Filtros horizontales ──
-            if (tiposConCount.length > 1)
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(children: tiposConCount.map((t) {
-                    final key = t['key'] as String;
-                    final color = t['color'] as Color;
-                    final count = t['count'] as int;
-                    final activo = _filtro == key;
-                    return GestureDetector(
-                      onTap: () => setState(() => _filtro = key),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: activo ? color : Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: activo ? color : AppColors.grisBorde)),
-                        child: Row(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(t['icon'] as IconData, size: 13,
-                            color: activo ? Colors.white : color),
-                          const SizedBox(width: 5),
-                          Text('${t['label']} ($count)',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                              color: activo ? Colors.white : AppColors.textoSecundario)),
-                        ])));
-                  }).toList()))),
-
-            // ── Lista de alertas ──
-            Expanded(child: _filtradas.isEmpty
-              ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  const Icon(Icons.notifications_off_outlined, size: 48, color: AppColors.grisBorde),
-                  const SizedBox(height: 12),
-                  const Text('Sin alertas pendientes', style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
-                  const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    onPressed: _nuevaAlerta,
-                    icon: const Icon(Icons.add_alert_outlined, color: Colors.white),
-                    label: const Text('Crear recordatorio', style: TextStyle(color: Colors.white)),
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul)),
-                ]))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _filtradas.length,
-                  itemBuilder: (_, i) => _TarjetaAlerta(
-                    alerta: _filtradas[i],
-                    tipos: _tipos,
-                    onCompletada: () async {
-                      await _cargar();
-                    }))),
-          ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _nuevaAlerta,
-        backgroundColor: AppColors.azul,
-        child: const Icon(Icons.add_alert_outlined, color: Colors.white)),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════
-// TARJETA DE ALERTA
-// ══════════════════════════════════════════════════
-class _TarjetaAlerta extends StatefulWidget {
-  final Alerta alerta;
-  final Map<String, Map<String, dynamic>> tipos;
-  final VoidCallback onCompletada;
-  const _TarjetaAlerta({required this.alerta, required this.tipos, required this.onCompletada});
-  @override
-  State<_TarjetaAlerta> createState() => _TarjetaAlertaState();
-}
-
-class _TarjetaAlertaState extends State<_TarjetaAlerta> {
-  bool _enviando = false;
-  late String _mensaje;
-
-  @override
-  void initState() {
-    super.initState();
-    _mensaje = _buildMensaje();
-  }
-
-  String _buildMensaje() {
-    final a = widget.alerta;
-    final nombre = a.clienteNombre ?? 'Cliente';
-    final folio  = a.cotizacionFolio ?? '';
-    switch (a.tipo) {
-      case 'seguimiento_dia3':
-        return 'Hola *$nombre* 👋 Te contactamos de *HETNA CNC*. ¿Tuviste oportunidad de revisar la cotización $folio? Con gusto resolvemos tus dudas. 😊';
-      case 'seguimiento_dia5':
-        return 'Hola *$nombre*, somos *HETNA CNC*. La cotización $folio sigue disponible. ¿Te interesa continuar? Estamos para servirte. ✅';
-      case 'seguimiento_dia7':
-        return 'Hola *$nombre* 🔔 Último recordatorio sobre la cotización $folio. La oferta vence pronto. ¿Podemos ayudarte? — *HETNA CNC*';
-      case 'post_entrega':
-        return 'Hola *$nombre* ✅ Esperamos que estés disfrutando tu pedido de *HETNA CNC*. Tu opinión es muy importante para nosotros. ¡Gracias!';
-      case 'cliente_interesado':
-        return 'Hola *$nombre* 👋 Vi que te interesa alguno de nuestros productos. ¿Te puedo ayudar a cotizar? — *HETNA CNC*';
-      case 'recordatorio_cita':
-        return 'Hola *$nombre* 📅 Te recuerdo nuestra cita programada. ¿Todo bien para la reunión? — *HETNA CNC*';
-      case 'nuevo_contacto_wa':
-        return 'Hola *$nombre* 👋 Gracias por contactar a *HETNA CNC*. ¿En qué podemos ayudarte?';
-      default:
-        return 'Hola *$nombre*, somos *HETNA CNC*. ¿En qué podemos ayudarte? 😊';
+  static Future<Cotizacion> crearCotizacion(
+      Cotizacion cotizacion, List<CotizacionItem> items) async {
+    final folio = await generarFolio();
+    final resCot = await _db.from('cotizaciones').insert({
+      'folio': folio,
+      'cliente_id': cotizacion.clienteId ?? cotizacion.cliente?.id,
+      'estado': cotizacion.estado,
+      'subtotal': cotizacion.subtotal,
+      'descuento_pct': cotizacion.descuentoPct,
+      'descuento_fijo': cotizacion.descuentoFijo,
+      'iva_pct': cotizacion.ivaPct,
+      'iva_monto': cotizacion.montoIva,
+      'costo_envio': cotizacion.costoEnvio,
+      'total': cotizacion.total,
+      'metodo_pago': cotizacion.metodoPago,
+      'condicion_entrega': cotizacion.condicionEntrega,
+      'fecha_entrega': cotizacion.fechaEntrega?.toIso8601String().split('T')[0],
+      'dias_habiles': cotizacion.diasHabiles,
+      'vigencia_dias': cotizacion.vigenciaDias,
+      'notas': cotizacion.notas,
+    }).select().single();
+    final cotId = (resCot as Map<String, dynamic>)['id'] as String;
+    if (items.isNotEmpty) {
+      await _db.from('cotizacion_items').insert(
+        items.map((i) => i.toJson(cotId)).toList());
     }
+    return Cotizacion.fromJson(resCot);
   }
 
-  bool get _tieneWA => (widget.alerta.clienteWhatsapp ?? '').isNotEmpty;
-
-  @override
-  Widget build(BuildContext context) {
-    final a = widget.alerta;
-    final info = widget.tipos[a.tipo] ?? widget.tipos['seguimiento_dia3']!;
-    final color = info['color'] as Color;
-    final fmt = DateFormat('dd/MM/yy HH:mm');
-
-    // Si tiene fecha programada y ya venció, resaltar
-    final vencida = a.fechaProgramada != null && a.fechaProgramada!.isBefore(DateTime.now());
-
-    return Dismissible(
-      key: Key(a.id ?? UniqueKey().toString()),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: AppColors.verde, borderRadius: BorderRadius.circular(12)),
-        child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.check_circle_outline, color: Colors.white, size: 28),
-          SizedBox(height: 4),
-          Text('Completada', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
-        ])),
-      confirmDismiss: (_) async {
-        await SupabaseService.marcarAlertaCompletada(a.id!);
-        widget.onCompletada();
-        return true;
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: vencida ? AppColors.rojo.withOpacity(0.3) : AppColors.grisBorde,
-            width: vencida ? 1.5 : 0.5),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))]),
-        child: Column(children: [
-          // Header de la tarjeta
-          Container(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.06),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              border: Border(bottom: BorderSide(color: color.withOpacity(0.15)))),
-            child: Row(children: [
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-                child: Icon(info['icon'] as IconData, size: 18, color: color)),
-              const SizedBox(width: 10),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(a.titulo ?? (info['label'] as String),
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-                if (a.clienteNombre != null)
-                  Text(a.clienteNombre!,
-                    style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
-              ])),
-              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                if (a.fechaProgramada != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: vencida ? AppColors.rojo.withOpacity(0.1) : AppColors.azulClaro,
-                      borderRadius: BorderRadius.circular(6)),
-                    child: Text(fmt.format(a.fechaProgramada!),
-                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600,
-                        color: vencida ? AppColors.rojo : AppColors.azul))),
-                if (vencida)
-                  const Text('VENCIDA', style: TextStyle(fontSize: 9, color: AppColors.rojo, fontWeight: FontWeight.w700)),
-              ]),
-            ])),
-          // Mensaje WA preview
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: AppColors.gris,
-                borderRadius: BorderRadius.circular(8)),
-              child: Text(_mensaje,
-                style: const TextStyle(fontSize: 11, height: 1.5, color: AppColors.textoSecundario),
-                maxLines: 3, overflow: TextOverflow.ellipsis))),
-          // Acciones
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
-            child: Row(children: [
-              // Editar mensaje
-              OutlinedButton.icon(
-                onPressed: _editarMensaje,
-                icon: Icon(Icons.edit_outlined, size: 14, color: color),
-                label: Text('Editar', style: TextStyle(fontSize: 11, color: color)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: color.withOpacity(0.4)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6))),
-              const SizedBox(width: 6),
-              // Enviar WA
-              if (_tieneWA) Expanded(child: ElevatedButton.icon(
-                onPressed: _enviando ? null : _enviarWA,
-                icon: _enviando
-                  ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.chat, size: 14, color: Colors.white),
-                label: const Text('Enviar WA', style: TextStyle(fontSize: 11, color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366),
-                  padding: const EdgeInsets.symmetric(vertical: 7)))),
-              if (!_tieneWA) Expanded(child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8)),
-                child: const Text('Sin número WA', style: TextStyle(fontSize: 10, color: AppColors.ambar), textAlign: TextAlign.center))),
-              const SizedBox(width: 6),
-              // Completar
-              ElevatedButton(
-                onPressed: () async {
-                  await SupabaseService.marcarAlertaCompletada(a.id!);
-                  widget.onCompletada();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.azul,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7)),
-                child: const Icon(Icons.check, size: 16, color: Colors.white)),
-            ])),
-          // Tip: deslizar
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
-              Icon(Icons.swipe_left_outlined, size: 11, color: AppColors.grisBorde),
-              SizedBox(width: 4),
-              Text('Desliza ← para marcar completada',
-                style: TextStyle(fontSize: 9, color: AppColors.grisBorde)),
-            ])),
-        ])));
+  static Future<void> eliminarCliente(String id) async {
+    // Borrar en orden correcto por foreign keys
+    try { await _db.from('cola_mensajes_wa').delete().eq('cliente_id', id); } catch(_) {}
+    try { await _db.from('cliente_etiquetas').delete().eq('cliente_id', id); } catch(_) {}
+    try { await _db.from('interacciones_wa').delete().eq('cliente_id', id); } catch(_) {}
+    try { await _db.from('alertas').delete().eq('cliente_id', id); } catch(_) {}
+    try { await _db.from('facturas').delete().eq('cliente_id', id); } catch(_) {}
+    // Borrar pedidos y sus cotizaciones
+    final pedidos = await _db.from('pedidos').select('id').eq('cliente_id', id);
+    for (final p in (pedidos as List)) {
+      await _db.from('facturas').delete().eq('pedido_id', p['id']);
+    }
+    await _db.from('pedidos').delete().eq('cliente_id', id);
+    // Borrar cotizaciones
+    final cots = await _db.from('cotizaciones').select('id').eq('cliente_id', id);
+    for (final c in (cots as List)) {
+      await _db.from('cotizacion_items').delete().eq('cotizacion_id', c['id']);
+    }
+    await _db.from('cotizaciones').delete().eq('cliente_id', id);
+    // Finalmente borrar el cliente
+    await _db.from('clientes').delete().eq('id', id);
   }
 
-  void _editarMensaje() {
-    final ctrl = TextEditingController(text: _mensaje);
-    showModalBottomSheet(context: context, isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        height: MediaQuery.of(context).size.height * 0.72,
-        decoration: const BoxDecoration(color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        padding: EdgeInsets.only(left: 16, right: 16, top: 16,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16),
-        child: Column(children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Editar mensaje WA', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-          ]),
-          const SizedBox(height: 10),
-          Expanded(child: TextField(
-            controller: ctrl, maxLines: null, expands: true,
-            decoration: InputDecoration(filled: true, fillColor: AppColors.gris,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
-            style: const TextStyle(fontSize: 13))),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: OutlinedButton(
-              onPressed: () { setState(() => _mensaje = ctrl.text); Navigator.pop(context); },
-              child: const Text('Guardar'))),
-            const SizedBox(width: 8),
-            Expanded(child: ElevatedButton.icon(
-              onPressed: () {
-                setState(() => _mensaje = ctrl.text);
-                Navigator.pop(context);
-                _enviarWA();
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
-              icon: const Icon(Icons.chat, size: 16, color: Colors.white),
-              label: const Text('Enviar WA', style: TextStyle(color: Colors.white)))),
-          ]),
-        ])));
-  }
-
-  Future<void> _enviarWA() async {
-    if (!_tieneWA) return;
-    setState(() => _enviando = true);
+  static Future<void> eliminarPedidoPorCotizacion(String cotizacionId) async {
     try {
-      await WhatsAppService.abrirChat(numero: widget.alerta.clienteWhatsapp!, mensaje: _mensaje);
-    } finally {
-      if (mounted) setState(() => _enviando = false);
+      // Primero eliminar referencias en tablas hijas del pedido
+      final pedidos = await _db.from('pedidos').select('id').eq('cotizacion_id', cotizacionId);
+      for (final p in (pedidos as List)) {
+        final pid = p['id'] as String;
+        await _db.from('facturas').delete().eq('pedido_id', pid);
+        await _db.from('cola_mensajes_wa').delete().eq('cliente_id', pid);
+      }
+      await _db.from('pedidos').delete().eq('cotizacion_id', cotizacionId);
+    } catch (_) {}
+  }
+
+  static Future<void> eliminarCotizacion(String id) async {
+    await _db.from('cotizacion_items').delete().eq('cotizacion_id', id);
+    await _db.from('cotizaciones').delete().eq('id', id);
+  }
+
+  static Future<List<Cotizacion>> getCotizaciones({
+    String? estado,
+    String? clienteId,
+  }) async {
+    const sel = '*, clientes(nombre, empresa, whatsapp, telefono), cotizacion_items(*)';
+    if (estado != null && clienteId != null) {
+      final res = await _db.from('cotizaciones').select(sel)
+          .eq('estado', estado).eq('cliente_id', clienteId)
+          .order('created_at', ascending: false);
+      return (res as List).map((j) => Cotizacion.fromJson(j as Map<String, dynamic>)).toList();
+    } else if (estado != null) {
+      final res = await _db.from('cotizaciones').select(sel)
+          .eq('estado', estado).order('created_at', ascending: false);
+      return (res as List).map((j) => Cotizacion.fromJson(j as Map<String, dynamic>)).toList();
+    } else if (clienteId != null) {
+      final res = await _db.from('cotizaciones').select(sel)
+          .eq('cliente_id', clienteId).order('created_at', ascending: false);
+      return (res as List).map((j) => Cotizacion.fromJson(j as Map<String, dynamic>)).toList();
+    } else {
+      final res = await _db.from('cotizaciones').select(sel)
+          .order('created_at', ascending: false);
+      return (res as List).map((j) => Cotizacion.fromJson(j as Map<String, dynamic>)).toList();
+    }
+  }
+
+  static Future<void> cambiarEstadoCotizacion(String id, String nuevoEstado) async {
+    await _db.from('cotizaciones').update({
+      'estado': nuevoEstado,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', id);
+  }
+
+  static Future<List<CotizacionItem>> getCotizacionItems(String cotizacionId) async {
+    try {
+      final res = await _db.from('cotizacion_items')
+          .select()
+          .eq('cotizacion_id', cotizacionId)
+          .order('created_at');
+      return (res as List).map((j) => CotizacionItem.fromJson(j as Map<String, dynamic>)).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> actualizarCotizacion(
+      Cotizacion cotizacion, List<CotizacionItem> items) async {
+    await _db.from('cotizaciones').update({
+      'estado': cotizacion.estado,
+      'descuento_pct': cotizacion.descuentoPct,
+      'iva_pct': cotizacion.ivaPct,
+      'iva_monto': cotizacion.montoIva,
+      'costo_envio': cotizacion.costoEnvio,
+      'subtotal': cotizacion.subtotal,
+      'total': cotizacion.total,
+      'metodo_pago': cotizacion.metodoPago,
+      'condicion_entrega': cotizacion.condicionEntrega,
+      'notas': cotizacion.notas,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', cotizacion.id!);
+    await _db.from('cotizacion_items').delete().eq('cotizacion_id', cotizacion.id!);
+    if (items.isNotEmpty) {
+      await _db.from('cotizacion_items').insert(
+        items.map((i) => i.toJson(cotizacion.id!)).toList());
+    }
+  }
+
+  static Future<Pedido> convertirEnPedido(Cotizacion cotizacion) async {
+    await cambiarEstadoCotizacion(cotizacion.id!, 'Pedido');
+    // Verificar si ya existe un pedido para esta cotizacion
+    final existente = await _db.from('pedidos')
+        .select().eq('cotizacion_id', cotizacion.id!).limit(1);
+    if ((existente as List).isNotEmpty) {
+      // Ya existe — solo actualizar el total y retornar
+      final pedidoId = (existente.first as Map<String, dynamic>)['id'];
+      await _db.from('pedidos').update({
+        'total': cotizacion.total,
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', pedidoId);
+      final res = await _db.from('pedidos').select('*, clientes(nombre, empresa, whatsapp)')
+          .eq('id', pedidoId).single();
+      return Pedido.fromJson(res as Map<String, dynamic>);
+    }
+    final folioPedido = 'PED-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+    final res = await _db.from('pedidos').insert({
+      'folio': folioPedido,
+      'cotizacion_id': cotizacion.id,
+      'cliente_id': cotizacion.clienteId ?? cotizacion.cliente?.id,
+      'estado': 'Pedido',
+      'total': cotizacion.total,
+      'fecha_entrega_estimada': cotizacion.fechaEntrega?.toIso8601String().split('T')[0],
+    }).select().single();
+    return Pedido.fromJson(res as Map<String, dynamic>);
+  }
+
+  // ═══════════════════════════════════════════
+  // PEDIDOS
+  // ═══════════════════════════════════════════
+  static Future<List<Pedido>> getPedidos({String? estado}) async {
+    if (estado != null) {
+      final res = await _db.from('pedidos')
+          .select('*, clientes(nombre, empresa, whatsapp)')
+          .eq('estado', estado).order('created_at', ascending: false);
+      return (res as List).map((j) => Pedido.fromJson(j as Map<String, dynamic>)).toList();
+    } else {
+      final res = await _db.from('pedidos')
+          .select('*, clientes(nombre, empresa, whatsapp)')
+          .order('created_at', ascending: false);
+      return (res as List).map((j) => Pedido.fromJson(j as Map<String, dynamic>)).toList();
+    }
+  }
+
+  static Future<void> actualizarEtapaPedido(
+      String pedidoId, String nuevaEtapa, {String? descripcion}) async {
+    await _db.from('pedidos').update({
+      'estado': nuevaEtapa,
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', pedidoId);
+    await _db.from('pedido_avances').insert({
+      'pedido_id': pedidoId, 'etapa': nuevaEtapa, 'descripcion': descripcion,
+    });
+  }
+
+  // ═══════════════════════════════════════════
+  // ALERTAS
+  // ═══════════════════════════════════════════
+  static Future<List<Alerta>> getAlertasPendientes() async {
+    try {
+      final res = await _db.from('v_alertas_pendientes').select();
+      final list = res as List;
+      return list.map((j) => Alerta.fromJson(j as Map<String, dynamic>)).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> crearAlerta(Map<String, dynamic> datos) async {
+    await _db.from('alertas').insert(datos);
+  }
+
+  static Future<void> marcarAlertaCompletada(String alertaId) async {
+    await _db.from('alertas').update({
+      'completada': true,
+      'fecha_completada': DateTime.now().toIso8601String(),
+    }).eq('id', alertaId);
+  }
+
+  static Future<int> countAlertasPendientes() async {
+    try {
+      final res = await _db.from('alertas').select('id')
+          .eq('completada', false)
+          .lte('fecha_programada', DateTime.now().toIso8601String());
+      return (res as List).length;
+    } catch (_) { return 0; }
+  }
+
+  // ═══════════════════════════════════════════
+  // ESTADÍSTICAS
+  // ═══════════════════════════════════════════
+  static Future<Map<String, dynamic>> getEstadisticasMes() async {
+    try {
+      final res = await _db.from('v_estadisticas_mes').select().limit(1);
+      final list = res as List;
+      if (list.isNotEmpty) return list.first as Map<String, dynamic>;
+      return {'solicitudes_elaboradas': 0, 'pedidos_entregados': 0, 'alertas_pendientes': 0, 'ventas_mes': 0};
+    } catch (_) {
+      return {'solicitudes_elaboradas': 0, 'pedidos_entregados': 0, 'alertas_pendientes': 0, 'ventas_mes': 0};
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // GASTOS
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getGastos({String? periodo}) async {
+    try {
+      DateTime desde;
+      final ahora = DateTime.now();
+      switch (periodo) {
+        case 'Hoy':
+          desde = DateTime(ahora.year, ahora.month, ahora.day);
+          break;
+        case 'Esta semana':
+          desde = ahora.subtract(Duration(days: ahora.weekday - 1));
+          break;
+        case 'Mes anterior':
+          desde = DateTime(ahora.year, ahora.month - 1, 1);
+          break;
+        default:
+          desde = DateTime(ahora.year, ahora.month, 1);
+      }
+      final res = await _db.from('gastos').select()
+          .gte('fecha', desde.toIso8601String())
+          .order('fecha', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> registrarGasto(Map<String, dynamic> gasto) async {
+    await _db.from('gastos').insert(gasto);
+  }
+
+  static Future<void> eliminarGasto(String id) async {
+    await _db.from('gastos').delete().eq('id', id);
+  }
+
+  // ═══════════════════════════════════════════
+  // INVENTARIO BODEGA
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getMateriales() async {
+    try {
+      final res = await _db.from('inventario_bodega').select()
+          .eq('activo', true).order('categoria').order('nombre');
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> registrarMovimiento({
+    required String materialId,
+    required String tipo,
+    required int cantidad,
+    String? motivo,
+  }) async {
+    await _db.from('movimientos_inventario').insert({
+      'material_id': materialId,
+      'tipo': tipo,
+      'cantidad': cantidad,
+      'motivo': motivo,
+      'fecha': DateTime.now().toIso8601String(),
+    });
+    final material = await _db.from('inventario_bodega')
+        .select('stock_actual').eq('id', materialId).single();
+    final stockActual = (material as Map<String, dynamic>)['stock_actual'] as int;
+    final nuevoStock = tipo == 'entrada'
+        ? stockActual + cantidad
+        : (stockActual - cantidad).clamp(0, 99999);
+    await _db.from('inventario_bodega').update({
+      'stock_actual': nuevoStock,
+      'updated_at': DateTime.now().toIso8601String()
+    }).eq('id', materialId);
+  }
+
+  static Future<void> agregarMaterial(Map<String, dynamic> material) async {
+    await _db.from('inventario_bodega').insert(material);
+  }
+
+  // ═══════════════════════════════════════════
+  // CATÁLOGOS PERSONALIZADOS
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getCatalogosPersonalizados() async {
+    try {
+      final res = await _db.from('catalogos_personalizados').select()
+          .eq('activo', true).order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<Map<String, dynamic>> crearCatalogoPersonalizado({
+    required String nombre,
+    String? descripcion,
+    required List<String> productoIds,
+  }) async {
+    final res = await _db.from('catalogos_personalizados').insert({
+      'nombre': nombre,
+      'descripcion': descripcion,
+      'producto_ids': productoIds,
+      'activo': true,
+    }).select().single();
+    return res as Map<String, dynamic>;
+  }
+
+  static Future<void> eliminarCatalogoPersonalizado(String id) async {
+    await _db.from('catalogos_personalizados').update({'activo': false}).eq('id', id);
+  }
+
+  static Future<PdfCatalogo> subirPdfCatalogo({
+    required String nombre,
+    required Uint8List bytes,
+    String? categoria,
+  }) async {
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}_$nombre.pdf';
+    await _db.storage.from('catalogos').uploadBinary(fileName, bytes,
+        fileOptions: const FileOptions(contentType: 'application/pdf'));
+    final url = _db.storage.from('catalogos').getPublicUrl(fileName);
+    final tamanoMb = bytes.length / (1024 * 1024);
+    final res = await _db.from('pdfs_catalogo').insert({
+      'nombre': nombre, 'url': url, 'categoria': categoria,
+      'tamano_mb': tamanoMb, 'activo': true,
+    }).select().single();
+    return PdfCatalogo.fromJson(res as Map<String, dynamic>);
+  }
+
+  static Future<void> eliminarPdf(String id, String url) async {
+    try {
+      final fileName = Uri.parse(url).pathSegments.last;
+      await _db.storage.from('catalogos').remove([fileName]);
+    } catch (_) {}
+    await _db.from('pdfs_catalogo').update({'activo': false}).eq('id', id);
+  }
+
+  // ═══════════════════════════════════════════
+  // CATEGORÍAS DE PRODUCTOS
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getCategoriasMap() async {
+    try {
+      final res = await _db.from('categorias_producto').select()
+          .order('nombre', ascending: true);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> crearCategoria(Map<String, dynamic> datos) async {
+    await _db.from('categorias_producto').insert(datos);
+  }
+
+  static Future<void> actualizarCategoria(String id, Map<String, dynamic> datos) async {
+    await _db.from('categorias_producto').update(datos).eq('id', id);
+  }
+
+  static Future<void> eliminarCategoria(String id) async {
+    // Desasociar productos antes de eliminar
+    await _db.from('productos').update({'categoria_id': null}).eq('categoria_id', id);
+    await _db.from('categorias_producto').delete().eq('id', id);
+  }
+
+  // ═══════════════════════════════════════════
+  // FACTURACIÓN
+  // ═══════════════════════════════════════════
+  static Future<Map<String, dynamic>> getDatosFiscalesCliente(String clienteId) async {
+    try {
+      final res = await _db.from('clientes')
+        .select('rfc_fiscal, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal')
+        .eq('id', clienteId).single();
+      return res as Map<String, dynamic>;
+    } catch (_) { return {}; }
+  }
+
+  static Future<void> guardarDatosFiscalesCliente({
+    required String clienteId,
+    required Map<String, dynamic> datos,
+  }) async {
+    await _db.from('clientes').update(datos).eq('id', clienteId);
+  }
+
+  static Future<void> crearFacturaPendiente(Map<String, dynamic> datos) async {
+    await _db.from('facturas').insert({
+      ...datos,
+      'estado': 'pendiente',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  static Future<List<Map<String, dynamic>>> getFacturasPedido(String pedidoId) async {
+    try {
+      final res = await _db.from('facturas')
+        .select().eq('pedido_id', pedidoId)
+        .order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  // ═══════════════════════════════════════════
+  // MARKETING — PLANTILLAS WA
+  // ═══════════════════════════════════════════
+  // ══ CAMPAÑAS ══════════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getCampanas() async {
+    try {
+      final res = await _db.from('campanas_marketing').select().order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> guardarCampana(Map<String, dynamic> datos) async {
+    if (datos.containsKey('id')) {
+      final id = datos['id'];
+      final upd = Map<String, dynamic>.from(datos)..remove('id');
+      await _db.from('campanas_marketing').update(upd).eq('id', id);
+    } else {
+      await _db.from('campanas_marketing').insert(datos);
+    }
+  }
+
+  static Future<void> eliminarCampana(String id) async {
+    await _db.from('campanas_marketing').delete().eq('id', id);
+  }
+
+  // ══ SEGMENTOS — lógica automática ══════════════════════════
+  // Frecuente: 2+ pedidos entregados
+  // Activo: 1+ pedido en últimos 90 días
+  // Potencial: sin pedidos
+  static Future<List<Cliente>> getClientesPorSegmento(String segmento) async {
+    try {
+      if (segmento == 'cotizaciones_pendientes') {
+        // Clientes con cotizaciones enviadas hace 3+ días sin aprobar
+        final limite = DateTime.now().subtract(const Duration(days: 3)).toIso8601String();
+        final res = await _db.from('cotizaciones')
+          .select('cliente_id, clientes(id, nombre, whatsapp, telefono, empresa, tipo_cliente)')
+          .eq('estado', 'Enviada')
+          .lt('created_at', limite);
+        final vistos = <String>{};
+        final clientes = <Cliente>[];
+        for (final r in (res as List)) {
+          final cData = r['clientes'];
+          if (cData == null) continue;
+          final id = cData['id'] as String? ?? '';
+          if (vistos.contains(id)) continue;
+          vistos.add(id);
+          clientes.add(Cliente(
+            id: id,
+            nombre: cData['nombre'] as String? ?? '',
+            whatsapp: cData['whatsapp'] as String?,
+            telefono: cData['telefono'] as String?,
+            empresa: cData['empresa'] as String?,
+            tipoCliente: cData['tipo_cliente'] as String? ?? 'Potencial'));
+        }
+        return clientes;
+      }
+
+      // Para los demás segmentos, obtener todos los clientes y filtrar
+      final todos = await getClientes();
+      final pedidos = await _db.from('pedidos')
+        .select('cliente_id, estado, created_at').order('created_at');
+      final pedidosList = (pedidos as List);
+      final hace90 = DateTime.now().subtract(const Duration(days: 90));
+
+      Map<String, int> pedidosEntregados = {};
+      Map<String, DateTime> ultimoPedido = {};
+      for (final p in pedidosList) {
+        final cid = p['cliente_id'] as String? ?? '';
+        final estado = p['estado'] as String? ?? '';
+        final fecha = DateTime.tryParse(p['created_at'] as String? ?? '') ?? DateTime(2000);
+        if (estado == 'Entregado') {
+          pedidosEntregados[cid] = (pedidosEntregados[cid] ?? 0) + 1;
+        }
+        if (ultimoPedido[cid] == null || fecha.isAfter(ultimoPedido[cid]!)) {
+          ultimoPedido[cid] = fecha;
+        }
+      }
+
+      switch (segmento) {
+        case 'frecuentes':
+          return todos.where((c) => (pedidosEntregados[c.id] ?? 0) >= 2).toList();
+        case 'activos':
+          return todos.where((c) {
+            final ult = ultimoPedido[c.id];
+            return ult != null && ult.isAfter(hace90);
+          }).toList();
+        case 'potenciales':
+          return todos.where((c) => !ultimoPedido.containsKey(c.id)).toList();
+        case 'todos':
+        default:
+          return todos;
+      }
+    } catch (_) { return []; }
+  }
+
+  static Future<List<Map<String, dynamic>>> getPlantillasWA() async {
+    try {
+      final res = await _db.from('plantillas_wa').select()
+          .eq('activo', true).order('categoria').order('titulo');
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> guardarPlantillaWA(Map<String, dynamic> datos) async {
+    if (datos['id'] != null) {
+      await _db.from('plantillas_wa')
+          .update({...datos, 'updated_at': DateTime.now().toIso8601String()})
+          .eq('id', datos['id']);
+    } else {
+      await _db.from('plantillas_wa').insert(datos);
+    }
+  }
+
+  static Future<void> eliminarPlantillaWA(String id) async {
+    await _db.from('plantillas_wa').update({'activo': false}).eq('id', id);
+  }
+
+  // ═══════════════════════════════════════════
+  // MARKETING — ETIQUETAS CLIENTES
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getEtiquetas() async {
+    try {
+      final res = await _db.from('etiquetas_cliente').select()
+          .order('nombre');
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<List<String>> getEtiquetasCliente(String clienteId) async {
+    try {
+      final res = await _db.from('cliente_etiquetas')
+          .select('etiqueta_id, etiquetas_cliente(nombre)')
+          .eq('cliente_id', clienteId);
+      return (res as List).map((j) {
+        final et = j['etiquetas_cliente'];
+        return et is Map ? (et['nombre'] as String? ?? '') : '';
+      }).where((s) => s.isNotEmpty).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> setEtiquetasCliente(String clienteId, List<String> etiquetaIds) async {
+    await _db.from('cliente_etiquetas').delete().eq('cliente_id', clienteId);
+    if (etiquetaIds.isNotEmpty) {
+      await _db.from('cliente_etiquetas').insert(
+        etiquetaIds.map((eid) => {'cliente_id': clienteId, 'etiqueta_id': eid}).toList());
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // MARKETING — COLA DE MENSAJES
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getColaMensajesHoy() async {
+    try {
+      final hoy = DateTime.now().toIso8601String().split('T')[0];
+      final res = await _db.from('cola_mensajes_wa')
+          .select('*, clientes(nombre, whatsapp, telefono)')
+          .eq('estado', 'pendiente')
+          .eq('fecha_programada', hoy)
+          .order('created_at');
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<List<Map<String, dynamic>>> getColaMensajesHistorial() async {
+    try {
+      final res = await _db.from('cola_mensajes_wa')
+          .select('*, clientes(nombre)')
+          .neq('estado', 'pendiente')
+          .order('created_at', ascending: false)
+          .limit(50);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> marcarMensajeEnviado(String id) async {
+    await _db.from('cola_mensajes_wa').update({
+      'estado': 'enviado',
+      'enviado_at': DateTime.now().toIso8601String(),
+    }).eq('id', id);
+  }
+
+  static Future<void> marcarMensajeOmitido(String id) async {
+    await _db.from('cola_mensajes_wa').update({'estado': 'omitido'}).eq('id', id);
+  }
+
+  static Future<int> countMensajesEnviadosHoy() async {
+    try {
+      final hoy = DateTime.now().toIso8601String().split('T')[0];
+      final res = await _db.from('cola_mensajes_wa')
+          .select().eq('estado', 'enviado').eq('fecha_programada', hoy);
+      return (res as List).length;
+    } catch (_) { return 0; }
+  }
+
+  static Future<void> agregarAColaMarketing({
+    required String clienteId,
+    required String mensajeFinal,
+    String? plantillaId,
+    String? campana,
+    DateTime? fechaProgramada,
+  }) async {
+    final fecha = (fechaProgramada ?? DateTime.now()).toIso8601String().split('T')[0];
+    await _db.from('cola_mensajes_wa').insert({
+      'cliente_id'       : clienteId,
+      'plantilla_id'     : plantillaId,
+      'mensaje_final'    : mensajeFinal,
+      'campana'          : campana,
+      'fecha_programada' : fecha,
+      'estado'           : 'pendiente',
+    });
+  }
+
+  // Segmentos automáticos
+  static Future<List<Cliente>> getClientesPorSegmento(String segmento) async {
+    try {
+      switch (segmento) {
+        case 'activos':
+          final res = await _db.from('clientes').select()
+              .eq('tipo_cliente', 'Cliente activo').order('nombre');
+          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+        case 'potenciales':
+          final res = await _db.from('clientes').select()
+              .eq('tipo_cliente', 'Cliente potencial').order('nombre');
+          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+        case 'frecuentes':
+          final res = await _db.from('clientes').select()
+              .eq('tipo_cliente', 'Cliente frecuente').order('nombre');
+          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+        case 'cotizaciones_pendientes':
+          // Clientes con cotizaciones enviadas sin respuesta
+          final res = await _db.from('cotizaciones')
+              .select('cliente_id, clientes(id, nombre, whatsapp, telefono, tipo_cliente)')
+              .eq('estado', 'Enviada').order('created_at');
+          final Set<String> seen = {};
+          final List<Cliente> lista = [];
+          for (final row in (res as List)) {
+            final cl = row['clientes'];
+            if (cl == null) continue;
+            final id = cl['id'] as String? ?? '';
+            if (seen.add(id)) {
+              lista.add(Cliente(id: id, nombre: cl['nombre'] ?? '',
+                whatsapp: cl['whatsapp'], telefono: cl['telefono'],
+                tipoCliente: cl['tipo_cliente'] ?? ''));
+            }
+          }
+          return lista;
+        default:
+          final res = await _db.from('clientes').select()
+              .not('whatsapp', 'is', null).order('nombre').limit(50);
+          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
+      }
+    } catch (_) { return []; }
+  }
+
+  // ═══════════════════════════════════════════
+  // WHATSAPP BUSINESS API
+  // ═══════════════════════════════════════════
+
+  // Buscar cliente por número de WhatsApp
+  static Future<Cliente?> getClientePorWA(String numero) async {
+    try {
+      // Normalizar número
+      String n = numero.replaceAll(RegExp(r'[^0-9]'), '');
+      if (n.length == 10) n = '521$n';
+      else if (n.startsWith('52') && n.length == 12) n = '521${n.substring(2)}';
+
+      final res = await _db.from('clientes')
+          .select().eq('whatsapp', n).maybeSingle();
+      if (res == null) return null;
+      return Cliente.fromJson(res as Map<String, dynamic>);
+    } catch (_) { return null; }
+  }
+
+  // Crear cliente rápido desde WhatsApp
+  static Future<Cliente> crearClienteRapidoWA({
+    required String numero,
+    String? nombre,
+  }) async {
+    String n = numero.replaceAll(RegExp(r'[^0-9]'), '');
+    if (n.length == 10) n = '521$n';
+    else if (n.startsWith('52') && n.length == 12) n = '521${n.substring(2)}';
+
+    final res = await _db.from('clientes').insert({
+      'nombre'      : nombre ?? 'Contacto WA ${n.substring(n.length - 4)}',
+      'whatsapp'    : n,
+      'telefono'    : n,
+      'tipo_cliente': 'Cliente potencial',
+      'notas'       : 'Agregado desde WhatsApp',
+    }).select().single();
+    return Cliente.fromJson(res as Map<String, dynamic>);
+  }
+
+  // Obtener interacciones de WA de un cliente
+  static Future<List<Map<String, dynamic>>> getInteraccionesWA(String clienteId) async {
+    try {
+      final res = await _db.from('interacciones_wa')
+          .select().eq('cliente_id', clienteId)
+          .order('created_at', ascending: false).limit(20);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  // Alertas de nuevos contactos WA
+  static Future<List<Map<String, dynamic>>> getAlertasNuevosContactosWA() async {
+    try {
+      final res = await _db.from('alertas')
+          .select('*, clientes(nombre, whatsapp)')
+          .eq('tipo', 'nuevo_contacto_wa')
+          .eq('completada', false)
+          .order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  // Configuración de WhatsApp
+  static Future<Map<String, dynamic>?> getConfigWA() async {
+    try {
+      final res = await _db.from('config_whatsapp')
+          .select().eq('activo', true).maybeSingle();
+      return res as Map<String, dynamic>?;
+    } catch (_) { return null; }
+  }
+
+  static Future<void> guardarConfigWA(Map<String, dynamic> datos) async {
+    final existing = await _db.from('config_whatsapp').select().limit(1);
+    if ((existing as List).isEmpty) {
+      await _db.from('config_whatsapp').insert(datos);
+    } else {
+      await _db.from('config_whatsapp').update(datos).eq('activo', true);
     }
   }
 }
