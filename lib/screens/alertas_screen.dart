@@ -512,43 +512,52 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
           // Acciones
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
-            child: Row(children: [
-              OutlinedButton.icon(
-                onPressed: _editarMensaje,
-                icon: Icon(Icons.edit_outlined, size: 14, color: color),
-                label: Text('Editar', style: TextStyle(fontSize: 11, color: color)),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: color.withOpacity(0.4)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6))),
-              const SizedBox(width: 6),
-              if (_tieneWA) Expanded(child: ElevatedButton.icon(
-                onPressed: _enviando ? null : _enviarWA,
-                icon: _enviando
-                  ? const SizedBox(width: 12, height: 12,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.chat, size: 14, color: Colors.white),
-                label: const Text('Enviar WA', style: TextStyle(fontSize: 11, color: Colors.white)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366),
-                  padding: const EdgeInsets.symmetric(vertical: 7)))),
-              if (!_tieneWA) Expanded(child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: AppColors.ambarClaro,
-                  borderRadius: BorderRadius.circular(8)),
-                child: const Text('Sin número WA',
-                  style: TextStyle(fontSize: 10, color: AppColors.ambar),
-                  textAlign: TextAlign.center))),
-              const SizedBox(width: 6),
-              ElevatedButton(
-                onPressed: () async {
-                  await SupabaseService.marcarAlertaCompletada(a.id!);
-                  widget.onCompletada();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.azul,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7)),
-                child: const Icon(Icons.check, size: 16, color: Colors.white)),
+            child: Column(children: [
+              // Fila 1: Editar mensaje (ancho completo)
+              SizedBox(width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _editarMensaje,
+                  icon: Icon(Icons.edit_outlined, size: 14, color: color),
+                  label: Text('Editar mensaje WA',
+                    style: TextStyle(fontSize: 11, color: color)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: color.withOpacity(0.4)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
+              const SizedBox(height: 6),
+              // Fila 2: Enviar WA + Completar
+              Row(children: [
+                if (_tieneWA) Expanded(child: ElevatedButton.icon(
+                  onPressed: _enviando ? null : _enviarWA,
+                  icon: _enviando
+                    ? const SizedBox(width: 12, height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.chat, size: 14, color: Colors.white),
+                  label: const Text('Enviar WA',
+                    style: TextStyle(fontSize: 11, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF25D366),
+                    padding: const EdgeInsets.symmetric(vertical: 8)))),
+                if (!_tieneWA) Expanded(child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.ambarClaro,
+                    borderRadius: BorderRadius.circular(8)),
+                  child: const Text('Sin numero WA',
+                    style: TextStyle(fontSize: 10, color: AppColors.ambar),
+                    textAlign: TextAlign.center))),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await SupabaseService.marcarAlertaCompletada(a.id!);
+                    widget.onCompletada();
+                  },
+                  icon: const Icon(Icons.check, size: 14, color: Colors.white),
+                  label: const Text('Listo',
+                    style: TextStyle(fontSize: 11, color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.azul,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8))),
+              ]),
             ])),
 
           // Tip deslizar
