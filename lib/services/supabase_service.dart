@@ -886,4 +886,69 @@ class SupabaseService {
       await _db.from('config_whatsapp').update(datos).eq('activo', true);
     }
   }
+
+  // ═══════════════════════════════════════════
+  // CUPONES
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getCupones() async {
+    try {
+      final res = await _db.from('cupones').select().order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<Map<String, dynamic>?> getCuponPorCodigo(String codigo) async {
+    try {
+      final res = await _db.from('cupones')
+        .select().eq('codigo', codigo.toUpperCase()).eq('activo', true).maybeSingle();
+      return res as Map<String, dynamic>?;
+    } catch (_) { return null; }
+  }
+
+  static Future<void> crearCupon(Map<String, dynamic> datos) async {
+    await _db.from('cupones').insert(datos);
+  }
+
+  static Future<void> actualizarCupon(String id, Map<String, dynamic> datos) async {
+    await _db.from('cupones').update(datos).eq('id', id);
+  }
+
+  static Future<void> eliminarCupon(String id) async {
+    await _db.from('cupones').delete().eq('id', id);
+  }
+
+  static Future<void> incrementarUsoCupon(String id) async {
+    try {
+      await _db.rpc('incrementar_uso_cupon', params: {'cupon_id': id});
+    } catch (_) {
+      // Fallback manual
+      final cupon = await _db.from('cupones').select('usos_actuales').eq('id', id).single();
+      final usos = (cupon['usos_actuales'] as int?) ?? 0;
+      await _db.from('cupones').update({'usos_actuales': usos + 1}).eq('id', id);
+    }
+  }
+
+  // ═══════════════════════════════════════════
+  // CITAS
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getCitas() async {
+    try {
+      final res = await _db.from('citas')
+        .select('*, clientes(nombre, whatsapp)')
+        .order('fecha_hora', ascending: true);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> crearCita(Map<String, dynamic> datos) async {
+    await _db.from('citas').insert(datos);
+  }
+
+  static Future<void> actualizarCita(String id, Map<String, dynamic> datos) async {
+    await _db.from('citas').update(datos).eq('id', id);
+  }
+
+  static Future<void> eliminarCita(String id) async {
+    await _db.from('citas').delete().eq('id', id);
+  }
 }
