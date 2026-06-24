@@ -587,6 +587,98 @@ class SupabaseService {
   // ═══════════════════════════════════════════
   // MARKETING — PLANTILLAS WA
   // ═══════════════════════════════════════════
+  // ══ CAMPAÑAS ══════════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getCampanas() async {
+    try {
+      final res = await _db.from('campanas_marketing').select().order('created_at', ascending: false);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> guardarCampana(Map<String, dynamic> datos) async {
+    if (datos.containsKey('id')) {
+      final id = datos['id'];
+      final upd = Map<String, dynamic>.from(datos)..remove('id');
+      await _db.from('campanas_marketing').update(upd).eq('id', id);
+    } else {
+      await _db.from('campanas_marketing').insert(datos);
+    }
+  }
+
+  static Future<void> eliminarCampana(String id) async {
+    await _db.from('campanas_marketing').delete().eq('id', id);
+  }
+
+  // ══ SEGMENTOS — lógica automática ══════════════════════════
+  // Frecuente: 2+ pedidos entregados
+  // Activo: 1+ pedido en últimos 90 días
+  // Potencial: sin pedidos
+  static Future<List<Cliente>> getClientesPorSegmento(String segmento) async {
+    try {
+      if (segmento == 'cotizaciones_pendientes') {
+        // Clientes con cotizaciones enviadas hace 3+ días sin aprobar
+        final limite = DateTime.now().subtract(const Duration(days: 3)).toIso8601String();
+        final res = await _db.from('cotizaciones')
+          .select('cliente_id, clientes(id, nombre, whatsapp, telefono, empresa, tipo_cliente)')
+          .eq('estado', 'Enviada')
+          .lt('created_at', limite);
+        final vistos = <String>{};
+        final clientes = <Cliente>[];
+        for (final r in (res as List)) {
+          final cData = r['clientes'];
+          if (cData == null) continue;
+          final id = cData['id'] as String? ?? '';
+          if (vistos.contains(id)) continue;
+          vistos.add(id);
+          clientes.add(Cliente(
+            id: id,
+            nombre: cData['nombre'] as String? ?? '',
+            whatsapp: cData['whatsapp'] as String?,
+            telefono: cData['telefono'] as String?,
+            empresa: cData['empresa'] as String?,
+            tipoCliente: cData['tipo_cliente'] as String? ?? 'Potencial'));
+        }
+        return clientes;
+      }
+
+      // Para los demás segmentos, obtener todos los clientes y filtrar
+      final todos = await getClientes();
+      final pedidos = await _db.from('pedidos')
+        .select('cliente_id, estado, created_at').order('created_at');
+      final pedidosList = (pedidos as List);
+      final hace90 = DateTime.now().subtract(const Duration(days: 90));
+
+      Map<String, int> pedidosEntregados = {};
+      Map<String, DateTime> ultimoPedido = {};
+      for (final p in pedidosList) {
+        final cid = p['cliente_id'] as String? ?? '';
+        final estado = p['estado'] as String? ?? '';
+        final fecha = DateTime.tryParse(p['created_at'] as String? ?? '') ?? DateTime(2000);
+        if (estado == 'Entregado') {
+          pedidosEntregados[cid] = (pedidosEntregados[cid] ?? 0) + 1;
+        }
+        if (ultimoPedido[cid] == null || fecha.isAfter(ultimoPedido[cid]!)) {
+          ultimoPedido[cid] = fecha;
+        }
+      }
+
+      switch (segmento) {
+        case 'frecuentes':
+          return todos.where((c) => (pedidosEntregados[c.id] ?? 0) >= 2).toList();
+        case 'activos':
+          return todos.where((c) {
+            final ult = ultimoPedido[c.id];
+            return ult != null && ult.isAfter(hace90);
+          }).toList();
+        case 'potenciales':
+          return todos.where((c) => !ultimoPedido.containsKey(c.id)).toList();
+        case 'todos':
+        default:
+          return todos;
+      }
+    } catch (_) { return []; }
+  }
+
   static Future<List<Map<String, dynamic>>> getPlantillasWA() async {
     try {
       final res = await _db.from('plantillas_wa').select()
