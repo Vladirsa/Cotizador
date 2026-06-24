@@ -579,7 +579,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       backgroundColor: Colors.transparent,
       builder: (_) => _SelectorCliente(
         clientes: clientes,
-        onSeleccionado: (c) { setState(() => _cliente = c); _guardarBorrador(); },
+        onSeleccionado: (c) { setState(() => _cliente = c); },
         onNuevo: _nuevoClienteRapido));
   }
 
