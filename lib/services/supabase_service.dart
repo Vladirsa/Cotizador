@@ -364,6 +364,12 @@ class SupabaseService {
     } catch (_) { return []; }
   }
 
+  static Future<void> generarAlertasAutomaticas() async {
+    try {
+      await _db.rpc('generar_alertas_automaticas');
+    } catch (_) {}
+  }
+
   static Future<void> crearAlerta(Map<String, dynamic> datos) async {
     await _db.from('alertas').insert(datos);
   }
@@ -801,46 +807,7 @@ class SupabaseService {
   }
 
   // Segmentos automáticos
-  static Future<List<Cliente>> getClientesPorSegmento(String segmento) async {
-    try {
-      switch (segmento) {
-        case 'activos':
-          final res = await _db.from('clientes').select()
-              .eq('tipo_cliente', 'Cliente activo').order('nombre');
-          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
-        case 'potenciales':
-          final res = await _db.from('clientes').select()
-              .eq('tipo_cliente', 'Cliente potencial').order('nombre');
-          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
-        case 'frecuentes':
-          final res = await _db.from('clientes').select()
-              .eq('tipo_cliente', 'Cliente frecuente').order('nombre');
-          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
-        case 'cotizaciones_pendientes':
-          // Clientes con cotizaciones enviadas sin respuesta
-          final res = await _db.from('cotizaciones')
-              .select('cliente_id, clientes(id, nombre, whatsapp, telefono, tipo_cliente)')
-              .eq('estado', 'Enviada').order('created_at');
-          final Set<String> seen = {};
-          final List<Cliente> lista = [];
-          for (final row in (res as List)) {
-            final cl = row['clientes'];
-            if (cl == null) continue;
-            final id = cl['id'] as String? ?? '';
-            if (seen.add(id)) {
-              lista.add(Cliente(id: id, nombre: cl['nombre'] ?? '',
-                whatsapp: cl['whatsapp'], telefono: cl['telefono'],
-                tipoCliente: cl['tipo_cliente'] ?? ''));
-            }
-          }
-          return lista;
-        default:
-          final res = await _db.from('clientes').select()
-              .not('whatsapp', 'is', null).order('nombre').limit(50);
-          return (res as List).map((j) => Cliente.fromJson(j as Map<String, dynamic>)).toList();
-      }
-    } catch (_) { return []; }
-  }
+
 
   // ═══════════════════════════════════════════
   // WHATSAPP BUSINESS API
