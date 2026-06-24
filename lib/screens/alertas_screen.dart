@@ -18,15 +18,23 @@ class _AlertasScreenState extends State<AlertasScreen> {
 
   // ── Tipos de alerta con íconos y colores ──
   static const _tipos = {
-    'todos':                  {'label': 'Todos',          'icon': Icons.notifications_outlined,   'color': AppColors.azul},
-    'seguimiento_dia3':       {'label': 'Día 3',          'icon': Icons.schedule_outlined,         'color': AppColors.ambar},
-    'seguimiento_dia5':       {'label': 'Día 5',          'icon': Icons.warning_amber_outlined,    'color': AppColors.ambar},
-    'seguimiento_dia7':       {'label': 'Día 7 🔴',       'icon': Icons.priority_high_outlined,    'color': AppColors.rojo},
-    'post_entrega':           {'label': 'Post entrega',   'icon': Icons.thumb_up_outlined,         'color': AppColors.verde},
-    'cliente_interesado':     {'label': 'Interesado',     'icon': Icons.star_outline,              'color': const Color(0xFF7c3aed)},
-    'recordatorio_cita':      {'label': 'Cita',           'icon': Icons.event_outlined,            'color': AppColors.azul},
-    'mensaje_wa':             {'label': 'Mensaje WA',     'icon': Icons.chat_outlined,             'color': const Color(0xFF25D366)},
-    'nuevo_contacto_wa':      {'label': 'Nuevo contacto', 'icon': Icons.person_add_outlined,       'color': AppColors.verde},
+    'todos':                    {'label': 'Todos',              'icon': Icons.notifications_outlined,   'color': AppColors.azul},
+    // Seguimiento cotizaciones
+    'seguimiento_dia3':         {'label': 'Día 3',              'icon': Icons.schedule_outlined,         'color': AppColors.ambar},
+    'seguimiento_dia5':         {'label': 'Día 5',              'icon': Icons.warning_amber_outlined,    'color': AppColors.ambar},
+    'seguimiento_dia7':         {'label': 'Día 7 🔴',           'icon': Icons.priority_high_outlined,    'color': AppColors.rojo},
+    'post_entrega':             {'label': 'Post entrega',       'icon': Icons.thumb_up_outlined,         'color': AppColors.verde},
+    // Pagos
+    'pago_anticipo_pendiente':  {'label': '💰 Anticipo',        'icon': Icons.payments_outlined,         'color': AppColors.rojo},
+    'pago_final_pendiente':     {'label': '💰 Pago final',      'icon': Icons.price_check_outlined,      'color': AppColors.rojo},
+    // Producción
+    'produccion_sin_avance':    {'label': '🔧 Producción',      'icon': Icons.construction_outlined,     'color': AppColors.ambar},
+    'qc_pendiente':             {'label': '✅ Control calidad',  'icon': Icons.fact_check_outlined,       'color': AppColors.ambar},
+    // Clientes
+    'cliente_interesado':       {'label': 'Interesado',         'icon': Icons.star_outline,              'color': const Color(0xFF7c3aed)},
+    'recordatorio_cita':        {'label': 'Cita',               'icon': Icons.event_outlined,            'color': AppColors.azul},
+    'mensaje_wa':               {'label': 'Mensaje WA',         'icon': Icons.chat_outlined,             'color': const Color(0xFF25D366)},
+    'nuevo_contacto_wa':        {'label': 'Nuevo contacto',     'icon': Icons.person_add_outlined,       'color': AppColors.verde},
   };
 
   List<Alerta> get _filtradas {
@@ -399,6 +407,14 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
         return 'Hola *$nombre* 📅 Te recuerdo nuestra cita programada. ¿Todo bien para la reunión? — *HETNA CNC*';
       case 'nuevo_contacto_wa':
         return 'Hola *$nombre* 👋 Gracias por contactar a *HETNA CNC*. ¿En qué podemos ayudarte?';
+      case 'pago_anticipo_pendiente':
+        return 'Hola *$nombre* 👋 Te recordamos que el anticipo del 50% de tu pedido *$folio* está pendiente. Para iniciar la producción necesitamos confirmarlo. ¿Podemos ayudarte? — *HETNA CNC*';
+      case 'pago_final_pendiente':
+        return 'Hola *$nombre* ✅ Tu pedido *$folio* está listo. Para proceder con la entrega necesitamos el pago del saldo restante. ¿Cuándo podemos coordinarlo? — *HETNA CNC*';
+      case 'produccion_sin_avance':
+        return 'Hola *$nombre* 🔧 Te informamos que tu pedido *$folio* está en proceso de producción. Te notificaremos cuando esté listo para revisión. — *HETNA CNC*';
+      case 'qc_pendiente':
+        return 'Nota interna: Revisar control de calidad del pedido *$folio* antes de notificar al cliente.';
       default:
         return 'Hola *$nombre*, somos *HETNA CNC*. ¿En qué podemos ayudarte? 😊';
     }
