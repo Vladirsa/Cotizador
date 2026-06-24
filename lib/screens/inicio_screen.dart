@@ -370,7 +370,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                 maxY: maxDia > 0 ? maxDia * 1.25 : 100,
                 barTouchData: BarTouchData(
                   touchTooltipData: BarTouchTooltipData(
-                    tooltipBgColor: AppColors.azul.withOpacity(0.85),
+                    getTooltipColor: (group) => AppColors.azul.withOpacity(0.85),
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
                       return BarTooltipItem(
