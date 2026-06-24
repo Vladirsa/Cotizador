@@ -32,6 +32,8 @@ jobs:
         run: |
           MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
           grep -q "INTERNET" $MANIFEST || sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' $MANIFEST
+          # Agregar permiso de contactos si no existe
+          grep -q "READ_CONTACTS" $MANIFEST || sed -i 's/<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>/<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\'$'\n''    <uses-permission android:name="android.permission.READ_CONTACTS"\/>\'$'\n''    <uses-permission android:name="android.permission.WRITE_CONTACTS"\/>>/' $MANIFEST
           cat $MANIFEST
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
