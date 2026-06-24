@@ -396,7 +396,7 @@ class PdfService {
     final correo = empresa['correo']   ?? '';
     final web    = empresa['sitio_web'] ?? 'hetnacnc.com';
     final fecha  = _fmtFecha.format(DateTime.now());
-    final clienteNombre = _limpiarTexto(cotizacion.cliente ?? 'Cliente');
+    final clienteNombre = _limpiarTexto((cotizacion.cliente ?? 'Cliente').toString());
     final folio = folioPedido ?? cotizacion.folio ?? 'N/A';
 
     pdf.addPage(pw.Page(
@@ -513,7 +513,7 @@ class PdfService {
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text('Gracias por su preferencia', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text('\$tel1  \$correo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+              pw.Text('\$tel1  \$correo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
             ]),
             pw.Text(web, style: pw.TextStyle(fontSize: 9, color: PdfColors.white)),
           ])),
