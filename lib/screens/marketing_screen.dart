@@ -324,14 +324,46 @@ class _CampanasTab extends StatefulWidget {
 
 class _CampanasTabState extends State<_CampanasTab> {
   List<Map<String, dynamic>> _plantillas = [];
+  List<Map<String, dynamic>> _campanas   = [];
   bool _cargando = true;
 
+  // ── Segmentos con descripción ──
   final _segmentos = [
-    {'key': 'activos', 'nombre': 'Clientes activos', 'icon': Icons.person_outline, 'color': AppColors.verde},
-    {'key': 'potenciales', 'nombre': 'Clientes potenciales', 'icon': Icons.person_add_outlined, 'color': AppColors.ambar},
-    {'key': 'frecuentes', 'nombre': 'Clientes frecuentes', 'icon': Icons.star_outline, 'color': const Color(0xFF7c3aed)},
-    {'key': 'cotizaciones_pendientes', 'nombre': 'Cotizaciones sin respuesta', 'icon': Icons.pending_actions_outlined, 'color': AppColors.rojo},
-    {'key': 'todos', 'nombre': 'Todos los clientes', 'icon': Icons.people_outline, 'color': AppColors.azul},
+    {
+      'key': 'activos',
+      'nombre': 'Clientes activos',
+      'desc': 'Clientes con pedidos en los últimos 90 días',
+      'icon': Icons.person_outline,
+      'color': AppColors.verde,
+    },
+    {
+      'key': 'potenciales',
+      'nombre': 'Clientes potenciales',
+      'desc': 'Contactos que aún no han comprado',
+      'icon': Icons.person_add_outlined,
+      'color': AppColors.ambar,
+    },
+    {
+      'key': 'frecuentes',
+      'nombre': 'Clientes frecuentes',
+      'desc': 'Clientes con 2+ pedidos entregados',
+      'icon': Icons.star_outline,
+      'color': const Color(0xFF7c3aed),
+    },
+    {
+      'key': 'cotizaciones_pendientes',
+      'nombre': 'Cotizaciones sin respuesta',
+      'desc': 'Enviadas hace más de 3 días sin aprobación',
+      'icon': Icons.pending_actions_outlined,
+      'color': AppColors.rojo,
+    },
+    {
+      'key': 'todos',
+      'nombre': 'Todos los clientes',
+      'desc': 'Enviar a toda tu base de contactos',
+      'icon': Icons.people_outline,
+      'color': AppColors.azul,
+    },
   ];
 
   @override
@@ -341,142 +373,358 @@ class _CampanasTabState extends State<_CampanasTab> {
     setState(() => _cargando = true);
     try {
       final plantillas = await SupabaseService.getPlantillasWA();
-      if (mounted) setState(() { _plantillas = plantillas; _cargando = false; });
+      final campanas   = await SupabaseService.getCampanas();
+      if (mounted) setState(() {
+        _plantillas = plantillas;
+        _campanas   = campanas;
+        _cargando   = false;
+      });
     } catch (_) { if (mounted) setState(() => _cargando = false); }
   }
 
-  Future<void> _lanzarCampana(Map<String, dynamic> seg) async {
-    if (_plantillas.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay plantillas disponibles. Crea una en la pestaña Plantillas.')));
-      return;
-    }
+  // ── Crear / Editar campaña ──
+  Future<void> _editarCampana([Map<String, dynamic>? campana]) async {
+    final nombreCtrl = TextEditingController(text: campana?['nombre'] ?? '');
+    String? segKey     = campana?['segmento_key'];
+    String? plantId    = campana?['plantilla_id'];
+    int limite         = campana?['limite_diario'] ?? 20;
+    Map<String, dynamic>? segSel = segKey != null
+      ? _segmentos.firstWhere((s) => s['key'] == segKey, orElse: () => _segmentos[0])
+      : null;
+    Map<String, dynamic>? plantSel = plantId != null
+      ? _plantillas.firstWhere((p) => p['id'] == plantId, orElse: () => _plantillas[0])
+      : null;
 
-    Map<String, dynamic>? plantillaSel;
-    int limite = 5;
-
-    final ok = await showModalBottomSheet<bool>(context: context,
-      isScrollControlled: true, backgroundColor: Colors.transparent,
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setS) =>
-        Container(
-          height: MediaQuery.of(ctx).size.height * 0.75,
-          decoration: const BoxDecoration(color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-          child: Column(children: [
-            Container(padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Campaña: ${seg['nombre']}',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+        AnimatedPadding(
+          duration: const Duration(milliseconds: 150),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          child: Container(
+            height: MediaQuery.of(ctx).size.height * 0.88,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+            child: Column(children: [
+              // Header
+              Container(padding: const EdgeInsets.fromLTRB(16, 16, 8, 12),
+                decoration: const BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
+                child: Row(children: [
+                  Expanded(child: Text(
+                    campana == null ? 'Nueva campaña' : 'Editar campaña',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx, false)),
-                ]),
+                ])),
+              // Contenido
+              Expanded(child: ListView(padding: const EdgeInsets.all(16), children: [
+                // Nombre
+                TextField(
+                  controller: nombreCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre de la campaña *',
+                    hintText: 'Ej: Reactivación de clientes dormidos',
+                    prefixIcon: const Icon(Icons.campaign_outlined),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
+                  textCapitalization: TextCapitalization.sentences),
+                const SizedBox(height: 16),
+                // Segmento
+                const Text('Segmento objetivo',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                const Text('1. Selecciona una plantilla de mensaje:',
-                  style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-              ])),
-            Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [
-              ..._plantillas.map((p) {
-                final sel = plantillaSel?['id'] == p['id'];
-                return GestureDetector(
-                  onTap: () => setS(() => plantillaSel = p),
-                  child: Container(margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: sel ? AppColors.azulClaro : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde,
-                        width: sel ? 1.5 : 0.5)),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
+                ..._segmentos.map((s) {
+                  final sel = segSel?['key'] == s['key'];
+                  final color = s['color'] as Color;
+                  return GestureDetector(
+                    onTap: () => setS(() { segSel = s; segKey = s['key'] as String; }),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: sel ? color.withOpacity(0.08) : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: sel ? color : AppColors.grisBorde,
+                          width: sel ? 1.5 : 0.5)),
+                      child: Row(children: [
                         Icon(sel ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                          size: 16, color: sel ? AppColors.azul : AppColors.textoSecundario),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(p['titulo'] as String? ?? '',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                            color: sel ? AppColors.azul : AppColors.textoPrincipal))),
-                        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.azul.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20)),
-                          child: Text(p['categoria'] as String? ?? '',
-                            style: const TextStyle(fontSize: 9, color: AppColors.azul))),
-                      ]),
-                      if (sel) ...[
-                        const SizedBox(height: 8),
-                        Container(padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(color: AppColors.gris,
-                            borderRadius: BorderRadius.circular(6)),
-                          child: Text(p['cuerpo'] as String? ?? '',
-                            style: const TextStyle(fontSize: 11, height: 1.5))),
-                      ],
-                    ])));
-              }),
-              const SizedBox(height: 12),
-              const Text('2. Límite de mensajes a agregar hoy:',
-                style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-              const SizedBox(height: 8),
-              Row(mainAxisAlignment: MainAxisAlignment.center, children:
-                [2, 3, 4, 5].map((n) {
+                          size: 16, color: sel ? color : AppColors.textoSecundario),
+                        const SizedBox(width: 10),
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(s['nombre'] as String,
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                              color: sel ? color : AppColors.textoPrincipal)),
+                          Text(s['desc'] as String,
+                            style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                        ])),
+                      ])));
+                }),
+                const SizedBox(height: 16),
+                // Plantilla
+                const Text('Mensaje a enviar',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                if (_plantillas.isEmpty)
+                  Container(padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(color: const Color(0xFFFEF3E2),
+                      borderRadius: BorderRadius.circular(8)),
+                    child: const Text('No hay plantillas. Crea una en la pestaña Plantillas.',
+                      style: TextStyle(fontSize: 12, color: AppColors.ambar))),
+                ..._plantillas.map((p) {
+                  final sel = plantSel?['id'] == p['id'];
+                  return GestureDetector(
+                    onTap: () => setS(() { plantSel = p; plantId = p['id'] as String; }),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: sel ? AppColors.azulClaro : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: sel ? AppColors.azul : AppColors.grisBorde,
+                          width: sel ? 1.5 : 0.5)),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Icon(sel ? Icons.check_circle : Icons.radio_button_unchecked,
+                            size: 16, color: sel ? AppColors.azul : AppColors.textoSecundario),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(p['titulo'] as String? ?? '',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                              color: sel ? AppColors.azul : AppColors.textoPrincipal))),
+                        ]),
+                        if (sel && (p['cuerpo'] as String? ?? '').isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Container(padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: AppColors.gris,
+                              borderRadius: BorderRadius.circular(6)),
+                            child: Text(p['cuerpo'] as String? ?? '',
+                              style: const TextStyle(fontSize: 11, height: 1.5))),
+                        ],
+                      ])));
+                }),
+                const SizedBox(height: 16),
+                // Límite diario
+                const Text('Mensajes por día',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                const Text('¿Cuántos mensajes enviar diariamente de esta campaña?',
+                  style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                const SizedBox(height: 8),
+                Wrap(spacing: 8, children: [5, 10, 20, 30, 50, 100].map((n) {
                   final sel = limite == n;
                   return GestureDetector(
                     onTap: () => setS(() => limite = n),
-                    child: Container(margin: const EdgeInsets.only(right: 8),
-                      width: 44, height: 44,
+                    child: Container(
+                      width: 56, height: 40,
                       decoration: BoxDecoration(
                         color: sel ? AppColors.azul : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
                       child: Center(child: Text('$n',
                         style: TextStyle(fontWeight: FontWeight.w700,
                           color: sel ? Colors.white : AppColors.textoSecundario)))));
                 }).toList()),
-            ])),
-            Container(padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Color(0xFFE5E7EB)))),
-              child: SizedBox(width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: plantillaSel == null ? null : () => Navigator.pop(ctx, true),
-                  icon: const Icon(Icons.add_task, color: Colors.white),
-                  label: Text(plantillaSel == null
-                    ? 'Selecciona una plantilla'
-                    : 'Agregar $limite mensajes a la cola',
-                    style: const TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.azul,
-                    disabledBackgroundColor: AppColors.grisBorde,
-                    padding: const EdgeInsets.symmetric(vertical: 12))))),
-          ]))));
+              ])),
+              // Botón guardar
+              Container(padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Color(0xFFE5E7EB)))),
+                child: SizedBox(width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final nombre = nombreCtrl.text.trim();
+                      if (nombre.isEmpty || segKey == null || plantId == null) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                          content: Text('Completa nombre, segmento y mensaje')));
+                        return;
+                      }
+                      final datos = {
+                        if (campana?['id'] != null) 'id': campana!['id'],
+                        'nombre'         : nombre,
+                        'segmento_key'   : segKey,
+                        'plantilla_id'   : plantId,
+                        'limite_diario'  : limite,
+                        'activa'         : true,
+                      };
+                      Navigator.pop(ctx, true);
+                      try {
+                        await SupabaseService.guardarCampana(datos);
+                        await _cargar();
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(campana == null ? '✅ Campaña creada' : '✅ Campaña actualizada'),
+                          backgroundColor: AppColors.verde));
+                      } catch (e) {
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.azul,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                    child: Text(campana == null ? 'Crear campaña' : 'Guardar cambios',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  )))
+            ])))));
+    if (ok == true) await _cargar();
+  }
 
-    if (ok != true || plantillaSel == null) return;
+  // ── Eliminar campaña ──
+  Future<void> _eliminarCampana(Map<String, dynamic> campana) async {
+    final ok = await showDialog<bool>(context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar campaña'),
+        content: Text('¿Eliminar "${campana['nombre']}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+        ]));
+    if (ok == true) {
+      await SupabaseService.eliminarCampana(campana['id'] as String);
+      await _cargar();
+    }
+  }
 
-    // Cargar clientes del segmento y agregar a la cola
+  // ── Lanzar campaña guardada ──
+  Future<void> _lanzarCampanaGuardada(Map<String, dynamic> campana) async {
     try {
-      final clientes = await SupabaseService.getClientesPorSegmento(seg['key'] as String);
-      final clientesConWA = clientes.where((c) => c.whatsappNumero.isNotEmpty).take(limite).toList();
-
-      if (clientesConWA.isEmpty) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No hay clientes con WhatsApp en "${seg['nombre']}"')));
+      final plantilla = _plantillas.firstWhere(
+        (p) => p['id'] == campana['plantilla_id'],
+        orElse: () => <String, dynamic>{});
+      if (plantilla.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('La plantilla de esta campaña ya no existe')));
         return;
       }
-
-      for (final cliente in clientesConWA) {
-        final cuerpo = (plantillaSel!['cuerpo'] as String? ?? '')
-            .replaceAll('*NOMBRE*', cliente.nombre)
-            .replaceAll('[Nombre]', cliente.nombre);  // compatibilidad
+      final segKey = campana['segmento_key'] as String? ?? 'todos';
+      final limite = campana['limite_diario'] as int? ?? 20;
+      final clientes = await SupabaseService.getClientesPorSegmento(segKey);
+      final conWA = clientes.where((c) => c.whatsappNumero.isNotEmpty).take(limite).toList();
+      if (conWA.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No hay clientes con WhatsApp en este segmento')));
+        return;
+      }
+      for (final cliente in conWA) {
+        final msg = (plantilla['cuerpo'] as String? ?? '')
+          .replaceAll('*NOMBRE*', cliente.nombre)
+          .replaceAll('[Nombre]', cliente.nombre);
         await SupabaseService.agregarAColaMarketing(
           clienteId: cliente.id!,
-          mensajeFinal: cuerpo,
-          plantillaId: plantillaSel!['id'] as String?,
-          campana: '${seg['nombre']} — ${plantillaSel!['titulo']}',
+          mensajeFinal: msg,
+          plantillaId: plantilla['id'] as String?,
+          campana: campana['nombre'] as String? ?? '',
         );
       }
-
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('✅ ${clientesConWA.length} mensajes agregados a la cola de hoy'),
+        content: Text('✅ ${conWA.length} mensajes de "${campana['nombre']}" agregados a la cola'),
+        backgroundColor: AppColors.verde));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+    }
+  }
+
+  Future<void> _lanzarRapido(Map<String, dynamic> seg) async {
+    if (_plantillas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Crea una plantilla primero en la pestaña Plantillas')));
+      return;
+    }
+    Map<String, dynamic>? plantillaSel;
+    int limite = 20;
+    final ok = await showModalBottomSheet<bool>(context: context,
+      isScrollControlled: true, backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.65,
+        decoration: const BoxDecoration(color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        child: Column(children: [
+          Container(padding: const EdgeInsets.fromLTRB(16,16,8,12),
+            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
+            child: Row(children: [
+              Expanded(child: Text('Lanzar: ${seg['nombre']}',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx, false)),
+            ])),
+          Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [
+            const Text('Selecciona plantilla:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            ..._plantillas.map((p) {
+              final sel = plantillaSel?['id'] == p['id'];
+              return GestureDetector(
+                onTap: () => setS(() => plantillaSel = p),
+                child: Container(margin: const EdgeInsets.only(bottom: 6),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: sel ? AppColors.azulClaro : Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde, width: sel ? 1.5 : 0.5)),
+                  child: Row(children: [
+                    Icon(sel ? Icons.check_circle : Icons.radio_button_unchecked,
+                      size: 16, color: sel ? AppColors.azul : AppColors.textoSecundario),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(p['titulo'] as String? ?? '',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                        color: sel ? AppColors.azul : AppColors.textoPrincipal))),
+                  ])));
+            }),
+            const SizedBox(height: 12),
+            const Text('Mensajes a enviar hoy:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, children: [5, 10, 20, 30, 50].map((n) {
+              final sel = limite == n;
+              return GestureDetector(
+                onTap: () => setS(() => limite = n),
+                child: Container(width: 52, height: 38,
+                  decoration: BoxDecoration(
+                    color: sel ? AppColors.azul : Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+                  child: Center(child: Text('$n',
+                    style: TextStyle(fontWeight: FontWeight.w700,
+                      color: sel ? Colors.white : AppColors.textoSecundario)))));
+            }).toList()),
+          ])),
+          Container(padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFE5E7EB)))),
+            child: SizedBox(width: double.infinity,
+              child: ElevatedButton(
+                onPressed: plantillaSel == null ? null : () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.azul,
+                  disabledBackgroundColor: AppColors.grisBorde,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+                child: Text(plantillaSel == null ? 'Selecciona plantilla' : 'Agregar $limite a la cola',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))))),
+        ]))));
+    if (ok != true || plantillaSel == null) return;
+    try {
+      final clientes = await SupabaseService.getClientesPorSegmento(seg['key'] as String);
+      final conWA = clientes.where((c) => c.whatsappNumero.isNotEmpty).take(limite).toList();
+      if (conWA.isEmpty) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sin clientes con WA en "${seg['nombre']}"')));
+        return;
+      }
+      for (final cliente in conWA) {
+        final msg = (plantillaSel!['cuerpo'] as String? ?? '')
+          .replaceAll('*NOMBRE*', cliente.nombre)
+          .replaceAll('[Nombre]', cliente.nombre);
+        await SupabaseService.agregarAColaMarketing(
+          clienteId: cliente.id!, mensajeFinal: msg,
+          plantillaId: plantillaSel!['id'] as String?,
+          campana: '${seg['nombre']} — ${plantillaSel!['titulo']}');
+      }
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✅ ${conWA.length} mensajes agregados a la cola'),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -488,45 +736,116 @@ class _CampanasTabState extends State<_CampanasTab> {
   Widget build(BuildContext context) {
     return _cargando
       ? const Center(child: CircularProgressIndicator())
-      : ListView(padding: const EdgeInsets.all(14), children: [
-          Container(padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.azul.withOpacity(0.2))),
-            child: const Row(children: [
-              Icon(Icons.info_outline, color: AppColors.azul, size: 16),
-              SizedBox(width: 8),
-              Expanded(child: Text(
-                'Selecciona un segmento, elige el mensaje y agrégalo a la cola del día. Máximo 5 mensajes diarios para evitar bloqueos.',
-                style: TextStyle(fontSize: 11, color: AppColors.azul))),
-            ])),
-          const SizedBox(height: 14),
-          const Text('SEGMENTOS', style: TextStyle(fontSize: 10,
-            color: AppColors.textoSecundario, letterSpacing: 1, fontWeight: FontWeight.w600)),
+      : Column(children: [
+          // ── Botón nueva campaña ──
+          Padding(padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            child: SizedBox(width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _editarCampana(),
+                icon: const Icon(Icons.add, color: Colors.white),
+                label: const Text('+ Nueva campaña', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.azul,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))))),
           const SizedBox(height: 8),
-          ..._segmentos.map((seg) {
-            final color = seg['color'] as Color;
-            return Container(margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                leading: Container(width: 40, height: 40,
-                  decoration: BoxDecoration(color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10)),
-                  child: Icon(seg['icon'] as IconData, color: color, size: 20)),
-                title: Text(seg['nombre'] as String,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                subtitle: const Text('Toca para crear campaña',
-                  style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20)),
-                  child: Text('Lanzar',
-                    style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700))),
-                onTap: () => _lanzarCampana(seg)));
-          }),
-          const SizedBox(height: 20),
+
+          // ── Lista de campañas guardadas ──
+          Expanded(child: ListView(padding: const EdgeInsets.all(14), children: [
+            if (_campanas.isNotEmpty) ...[
+              const Text('MIS CAMPAÑAS', style: TextStyle(fontSize: 10,
+                color: AppColors.textoSecundario, letterSpacing: 1, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              ..._campanas.map((camp) {
+                final segKey = camp['segmento_key'] as String? ?? '';
+                final seg = _segmentos.firstWhere(
+                  (s) => s['key'] == segKey, orElse: () => _segmentos.last);
+                final color = seg['color'] as Color;
+                final plantilla = _plantillas.firstWhere(
+                  (p) => p['id'] == camp['plantilla_id'],
+                  orElse: () => <String, dynamic>{});
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white, borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                  child: Column(children: [
+                    ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                      leading: Container(width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10)),
+                        child: Icon(seg['icon'] as IconData, color: color, size: 20)),
+                      title: Text(camp['nombre'] as String? ?? '',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(seg['nombre'] as String,
+                          style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                        if (plantilla.isNotEmpty)
+                          Text('📝 ${plantilla['titulo'] ?? ''}',
+                            style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                        Text('📬 ${camp['limite_diario'] ?? 20} mensajes/día',
+                          style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                      ]),
+                      trailing: PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 20),
+                        onSelected: (v) async {
+                          if (v == 'editar') _editarCampana(camp);
+                          if (v == 'eliminar') _eliminarCampana(camp);
+                          if (v == 'lanzar') _lanzarCampanaGuardada(camp);
+                        },
+                        itemBuilder: (_) => [
+                          const PopupMenuItem(value: 'lanzar',
+                            child: Row(children: [Icon(Icons.send, size: 16, color: AppColors.verde), SizedBox(width: 8), Text('Lanzar ahora')])),
+                          const PopupMenuItem(value: 'editar',
+                            child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: AppColors.azul), SizedBox(width: 8), Text('Editar')])),
+                          const PopupMenuItem(value: 'eliminar',
+                            child: Row(children: [Icon(Icons.delete_outline, size: 16, color: AppColors.rojo), SizedBox(width: 8), Text('Eliminar', style: TextStyle(color: AppColors.rojo))])),
+                        ]),
+                    ),
+                  ]));
+              }),
+              const SizedBox(height: 14),
+            ],
+
+            // ── Segmentos rápidos ──
+            const Text('LANZAMIENTO RÁPIDO', style: TextStyle(fontSize: 10,
+              color: AppColors.textoSecundario, letterSpacing: 1, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Container(padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.azul.withOpacity(0.2))),
+              child: const Row(children: [
+                Icon(Icons.info_outline, color: AppColors.azul, size: 14),
+                SizedBox(width: 6),
+                Expanded(child: Text('Lanza una campaña directa sin guardarla.',
+                  style: TextStyle(fontSize: 11, color: AppColors.azul))),
+              ])),
+            const SizedBox(height: 8),
+            ..._segmentos.map((seg) {
+              final color = seg['color'] as Color;
+              return Container(margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  leading: Container(width: 36, height: 36,
+                    decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Icon(seg['icon'] as IconData, color: color, size: 18)),
+                  title: Text(seg['nombre'] as String,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  subtitle: Text(seg['desc'] as String,
+                    style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+                  trailing: GestureDetector(
+                    onTap: () => _lanzarRapido(seg),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                      child: Text('Lanzar', style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700))))));
+            }),
+            const SizedBox(height: 20),
+          ])),
         ]);
   }
 }
