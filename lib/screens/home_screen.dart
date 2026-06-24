@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import '../services/auth_service.dart';
+import 'login_screen.dart';
 import '../main.dart';
-import '../services/notificaciones_service.dart';
 import 'cupones_screen.dart';
 import 'citas_screen.dart';
 import '../services/supabase_service.dart';
@@ -52,22 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  @override
-  void initState() {
-    super.initState();
-    _cargarAlertas();
-    NotificacionesService.onBadgeUpdate = (count) {
-      if (mounted) setState(() => _alertas = count);
-    };
-    NotificacionesService.iniciarPolling();
-  }
-
-  @override
-  void dispose() {
-    NotificacionesService.detenerPolling();
-    NotificacionesService.onBadgeUpdate = null;
-    super.dispose();
-  }
+  void initState() { super.initState(); _cargarAlertas(); }
 
   Future<void> _cargarAlertas() async {
     try {
@@ -136,7 +122,8 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: Column(mainAxisAlignment: MainAxisAlignment.end, crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('HETNA CNC', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-          const Text('Sistema de gestión', style: TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(AuthService.nombreUsuario ?? 'Usuario', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(AuthService.rol ?? '', style: const TextStyle(color: Colors.white60, fontSize: 11)),
         ])),
       _dItem(Icons.people_outline, 'CRM Clientes', 4),
       _dItem(Icons.inventory_2_outlined, 'Productos y Catálogo', 5),
@@ -147,6 +134,16 @@ class _HomeScreenState extends State<HomeScreen> {
       _dItem(Icons.settings_outlined, 'Configuración', 10),
       _dItem(Icons.discount_outlined, 'Cupones', 11),
       _dItem(Icons.event_outlined, 'Citas', 12),
+      const Divider(height: 1),
+      ListTile(
+        leading: const Icon(Icons.logout_outlined, color: AppColors.rojo, size: 22),
+        title: const Text('Cerrar sesión', style: TextStyle(fontSize: 14, color: AppColors.rojo)),
+        onTap: () async {
+          Navigator.pop(context);
+          await AuthService.logout();
+          if (mounted) Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
+        }),
     ]));
 
   Widget _dItem(IconData icon, String label, int idx) {
