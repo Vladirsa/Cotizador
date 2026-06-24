@@ -130,7 +130,6 @@ class PdfService {
             ...cotizacion.items.asMap().entries.map((e) {
               final item = e.value;
               final nombreLimpio = _limpiarTexto(item.nombreProducto);
-              final descLimpia = item.descripcion != null ? _limpiarTexto(item.descripcion!) : null;
               return pw.TableRow(
                 decoration: pw.BoxDecoration(color: e.key.isEven ? PdfColors.white : grisClaro),
                 children: [
@@ -138,11 +137,6 @@ class PdfService {
                     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                       pw.Text(nombreLimpio,
                         style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
-                      if (descLimpia != null && descLimpia.isNotEmpty)
-                        pw.SizedBox(height: 2),
-                      if (descLimpia != null && descLimpia.isNotEmpty)
-                        pw.Text(descLimpia,
-                          style: pw.TextStyle(fontSize: 8, color: grisTexto)),
                       if (item.sku != null && item.sku!.isNotEmpty)
                         pw.Text('SKU: ${item.sku}',
                           style: pw.TextStyle(fontSize: 7, color: grisTexto)),
@@ -201,17 +195,331 @@ class PdfService {
     return pdf.save();
   }
 
-  // Fix 3: Limpiar caracteres que aparecen como "tachas" en el PDF
+  static pw.Widget _cH(String t) => pw.Padding(padding: const pw.EdgeInsets.all(7),
+    child: pw.Text(t, style: pw.TextStyle(fontSize: 9, color: PdfColors.white, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center));
+
+  static pw.Widget _cD(String t, {bool center = false, bool right = false}) =>
+    pw.Padding(padding: const pw.EdgeInsets.all(7),
+      child: pw.Text(t, style: const pw.TextStyle(fontSize: 10),
+        textAlign: right ? pw.TextAlign.right : (center ? pw.TextAlign.center : pw.TextAlign.left)));
+
+  static pw.Widget _tR(String label, String valor, PdfColor color) =>
+    pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+        pw.Text(label, style: pw.TextStyle(fontSize: 10, color: color)),
+        pw.Text(valor, style: pw.TextStyle(fontSize: 10, color: color, fontWeight: pw.FontWeight.bold)),
+      ]));
+
+  static pw.Widget _cond(String label, String valor, PdfColor color) =>
+    pw.Padding(padding: const pw.EdgeInsets.only(bottom: 3),
+      child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(label, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: const PdfColor.fromInt(0xFF1a3a5c))),
+        pw.SizedBox(width: 4),
+        pw.Expanded(child: pw.Text(valor, style: pw.TextStyle(fontSize: 9, color: color))),
+      ]));
+
+  // Fix 3: Limpiar caracteres especiales que aparecen como "tachas" en el PDF
   static String _limpiarTexto(String texto) {
     return texto
-      .replaceAll('–', '-')   // en dash
-      .replaceAll('—', '-')   // em dash  
-      .replaceAll('‘', "'")   // comilla izquierda
-      .replaceAll('’', "'")   // comilla derecha
-      .replaceAll('“', '"')   // comilla doble izq
-      .replaceAll('”', '"')   // comilla doble der
-      .replaceAll('•', '*')   // bullet
-      .replaceAll('×', 'x')   // multiplication sign (la "tacha")
-      .replaceAll('✕', 'x')   // X mark
-      .replaceAll('❌', '')    // red X emoji
-      .replaceAll(RegExp(r'[^
+      .replaceAll('–', '-')
+      .replaceAll('—', '-')
+      .replaceAll('‘', "'")
+      .replaceAll('’', "'")
+      .replaceAll('“', '"')
+      .replaceAll('”', '"')
+      .replaceAll('•', '*')
+      .replaceAll('×', 'x')
+      .replaceAll('✕', 'x')
+      .replaceAll('❌', '');
+  }
+
+  // ══════════════════════════════════════════
+  // Generar PDF de lista de productos (catálogo)
+  // ══════════════════════════════════════════
+  static Future<Uint8List> generarListadoProductos({
+    required String nombreLista,
+    required List<Producto> productos,
+    required Map<String, dynamic> empresa,
+  }) async {
+    final pdf = pw.Document();
+    pw.MemoryImage? logoImage;
+    try {
+      final bytes = _logoBytes;
+      if (bytes.isNotEmpty) logoImage = pw.MemoryImage(bytes);
+    } catch (_) {}
+
+    const azul = PdfColor.fromInt(0xFF1a3a5c);
+    const azulClaro = PdfColor.fromInt(0xFFe6f1fb);
+    const grisClaro = PdfColor.fromInt(0xFFf5f6fa);
+    const grisTexto = PdfColor.fromInt(0xFF6B7280);
+    const verde = PdfColor.fromInt(0xFF1d9e75);
+
+    final nombreEmpresa = empresa['nombre_comercial'] ?? 'HETNA CNC';
+    final tel = empresa['telefono'] ?? '';
+    final correo = empresa['correo'] ?? '';
+    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final fecha = _fmtFecha.format(DateTime.now());
+
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      header: (ctx) => pw.Column(children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.all(16),
+          decoration: const pw.BoxDecoration(color: azul),
+          child: pw.Row(children: [
+            if (logoImage != null) ...[
+              pw.Container(
+                width: 50, height: 50,
+                decoration: pw.BoxDecoration(
+                  color: PdfColors.white,
+                  borderRadius: pw.BorderRadius.circular(8)),
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Image(logoImage, fit: pw.BoxFit.contain)),
+              pw.SizedBox(width: 12),
+            ],
+            pw.Expanded(child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text(nombreEmpresa,
+                style: pw.TextStyle(color: PdfColors.white,
+                  fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Lista de Precios — $nombreLista',
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 11)),
+              pw.Text('Fecha: $fecha',
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+            ])),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+              if (tel.isNotEmpty) pw.Text(tel,
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+              if (correo.isNotEmpty) pw.Text(correo,
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+              pw.Text(web, style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
+            ]),
+          ])),
+        pw.SizedBox(height: 8),
+      ]),
+      build: (ctx) => [
+        // Tabla de productos
+        pw.Table(
+          border: pw.TableBorder.all(color: const PdfColor.fromInt(0xFFE5E7EB), width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(3.5),
+            1: const pw.FlexColumnWidth(1.5),
+            2: const pw.FlexColumnWidth(1.5),
+            3: const pw.FlexColumnWidth(1.5),
+          },
+          children: [
+            // Header
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: azul),
+              children: [
+                _celdaHeader('PRODUCTO / DESCRIPCIÓN'),
+                _celdaHeader('CATEGORÍA'),
+                _celdaHeader('UNIDAD'),
+                _celdaHeader('PRECIO'),
+              ]),
+            // Filas de productos
+            ...productos.asMap().entries.map((e) {
+              final i = e.key;
+              final p = e.value;
+              final bgColor = i % 2 == 0 ? PdfColors.white : grisClaro;
+              return pw.TableRow(
+                decoration: pw.BoxDecoration(color: bgColor),
+                children: [
+                  pw.Padding(padding: const pw.EdgeInsets.all(8),
+                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      pw.Text(p.nombre,
+                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+                      if (p.descripcion != null && p.descripcion!.isNotEmpty)
+                        pw.Text(p.descripcion!,
+                          style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+                    ])),
+                  pw.Padding(padding: const pw.EdgeInsets.all(8),
+                    child: pw.Text(p.categoriaNombre ?? '—',
+                      style: const pw.TextStyle(fontSize: 9, color: grisTexto))),
+                  pw.Padding(padding: const pw.EdgeInsets.all(8),
+                    child: pw.Text(p.unidadMedida,
+                      style: const pw.TextStyle(fontSize: 9))),
+                  pw.Padding(padding: const pw.EdgeInsets.all(8),
+                    child: pw.Text('\$${_fmt.format(p.precioVenta)}',
+                      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: verde))),
+                ]);
+            }),
+          ]),
+        pw.SizedBox(height: 16),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(8)),
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Text('Total de productos: ${productos.length}',
+              style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+            pw.Text('Los precios no incluyen IVA',
+              style: const pw.TextStyle(fontSize: 9, color: grisTexto)),
+          ])),
+        pw.SizedBox(height: 8),
+        pw.Text('Para pedidos o más información: $tel • $correo • $web',
+          style: const pw.TextStyle(fontSize: 9, color: grisTexto),
+          textAlign: pw.TextAlign.center),
+      ]));
+
+    return pdf.save();
+  }
+
+  static pw.Widget _celdaHeader(String texto) => pw.Padding(
+    padding: const pw.EdgeInsets.all(8),
+    child: pw.Text(texto,
+      style: pw.TextStyle(color: PdfColors.white, fontSize: 9, fontWeight: pw.FontWeight.bold)));
+  // ══════════════════════════════════════════════════════
+  // NOTA DE COMPRA
+  // ══════════════════════════════════════════════════════
+  static Future<Uint8List> generarNotaCompra({
+    required Cotizacion cotizacion,
+    required Map<String, dynamic> empresa,
+    String? folioPedido,
+  }) async {
+    final pdf = pw.Document();
+    pw.MemoryImage? logoImage;
+    try {
+      final bytes = _logoBytes;
+      if (bytes.isNotEmpty) logoImage = pw.MemoryImage(bytes);
+    } catch (_) {}
+
+    const azul       = PdfColor.fromInt(0xFF1a3a5c);
+    const azulClaro  = PdfColor.fromInt(0xFFe6f1fb);
+    const grisClaro  = PdfColor.fromInt(0xFFf5f6fa);
+    const grisTexto  = PdfColor.fromInt(0xFF6B7280);
+    const verde      = PdfColor.fromInt(0xFF1d9e75);
+    const verdeClaro = PdfColor.fromInt(0xFFe6f7f0);
+
+    final nombreEmpresa = empresa['nombre_comercial'] ?? 'HETNA CNC';
+    final tel1   = empresa['telefono'] ?? '';
+    final correo = empresa['correo']   ?? '';
+    final web    = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final fecha  = _fmtFecha.format(DateTime.now());
+    final clienteNombre = _limpiarTexto(cotizacion.cliente ?? 'Cliente');
+    final folio = folioPedido ?? cotizacion.folio ?? 'N/A';
+
+    pdf.addPage(pw.Page(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(32),
+      build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        // Header
+        pw.Container(
+          padding: const pw.EdgeInsets.all(16),
+          decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(8)),
+          child: pw.Row(children: [
+            if (logoImage != null) ...[
+              pw.Container(width: 48, height: 48,
+                decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(6)),
+                padding: const pw.EdgeInsets.all(4),
+                child: pw.Image(logoImage, fit: pw.BoxFit.contain)),
+              pw.SizedBox(width: 12),
+            ],
+            pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.Text('NOTA DE COMPRA', style: pw.TextStyle(fontSize: 11, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Fecha: $fecha', style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+            ])),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+              pw.Container(
+                padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: pw.BoxDecoration(color: verde, borderRadius: pw.BorderRadius.circular(6)),
+                child: pw.Text('ENTREGADO', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold))),
+              pw.SizedBox(height: 4),
+              pw.Text('Folio: $folio', style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+            ]),
+          ])),
+        pw.SizedBox(height: 14),
+        // Cliente
+        pw.Container(
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(6)),
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('CLIENTE', style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+              pw.Text(clienteNombre, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
+            ]),
+            pw.Text('Nota de entrega', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+          ])),
+        pw.SizedBox(height: 12),
+        // Tabla
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(3.5),
+            1: const pw.FixedColumnWidth(40),
+            2: const pw.FixedColumnWidth(75),
+            3: const pw.FixedColumnWidth(75),
+          },
+          children: [
+            pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
+              _cH('PRODUCTO'), _cH('CANT.'), _cH('PRECIO'), _cH('SUBTOTAL'),
+            ]),
+            ...cotizacion.items.asMap().entries.map((e) {
+              final item = e.value;
+              return pw.TableRow(
+                decoration: pw.BoxDecoration(color: e.key.isEven ? PdfColors.white : grisClaro),
+                children: [
+                  pw.Padding(padding: const pw.EdgeInsets.all(7),
+                    child: pw.Text(_limpiarTexto(item.nombreProducto),
+                      style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold))),
+                  _cD('\${item.cantidad}', center: true),
+                  _cD('\$\${_fmt.format(item.precioUnitario)}', right: true),
+                  _cD('\$\${_fmt.format(item.subtotal)}', right: true),
+                ]);
+            }),
+          ]),
+        pw.SizedBox(height: 10),
+        // Total
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+          pw.Container(width: 230,
+            padding: const pw.EdgeInsets.all(12),
+            decoration: pw.BoxDecoration(color: verdeClaro, borderRadius: pw.BorderRadius.circular(8),
+              border: pw.Border.all(color: verde, width: 1)),
+            child: pw.Column(children: [
+              if (cotizacion.descuentoPct > 0) _tR('Descuento', '-\$\${_fmt.format(cotizacion.montoDescuento)}', verde),
+              if (cotizacion.ivaPct > 0) _tR('IVA \${cotizacion.ivaPct.toInt()}%', '\$\${_fmt.format(cotizacion.montoIva)}', grisTexto),
+              pw.Divider(color: verde),
+              pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+                pw.Text('TOTAL PAGADO', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: verde)),
+                pw.Text('\$\${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: verde)),
+              ]),
+            ])),
+        ]),
+        pw.SizedBox(height: 16),
+        // Firmas
+        pw.Row(children: [
+          pw.Expanded(child: pw.Column(children: [
+            pw.Container(height: 40, decoration: const pw.BoxDecoration(
+              border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey400)))),
+            pw.SizedBox(height: 4),
+            pw.Text('Firma del cliente', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+            pw.Text(clienteNombre, style: pw.TextStyle(fontSize: 9, color: grisTexto)),
+          ])),
+          pw.SizedBox(width: 40),
+          pw.Expanded(child: pw.Column(children: [
+            pw.Container(height: 40, decoration: const pw.BoxDecoration(
+              border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey400)))),
+            pw.SizedBox(height: 4),
+            pw.Text('Firma de entrega', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+            pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 9, color: grisTexto)),
+          ])),
+        ]),
+        pw.SizedBox(height: 12),
+        // Pie
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(6)),
+          child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('Gracias por su preferencia', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text('\$tel1  \$correo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+            ]),
+            pw.Text(web, style: pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+          ])),
+      ])));
+
+    return pdf.save();
+  }
+
+}
