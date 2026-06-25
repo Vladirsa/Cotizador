@@ -9,9 +9,11 @@ import '../services/supabase_service.dart';
 import '../services/pdf_service.dart';
 import '../services/whatsapp_service.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'simulador_screen.dart';
 
 class CotizarScreen extends StatefulWidget {
-  const CotizarScreen({super.key});
+  final ItemSimulador? itemInicial;
+  const CotizarScreen({super.key, this.itemInicial});
   @override
   State<CotizarScreen> createState() => _CotizarScreenState();
 }
@@ -260,6 +262,7 @@ class _TarjetaCotizacion extends StatelessWidget {
           title: Text('Editar — ${cotizacion.folio ?? "cotización"}'),
           backgroundColor: Colors.white),
         body: _NuevaCotizacion(
+          itemInicial: widget.itemInicial,
           cotizacionEditar: cotizacion,
           onGuardada: () { Navigator.pop(context); onActualizar(); }))));
   }
@@ -344,7 +347,8 @@ class _TarjetaCotizacion extends StatelessWidget {
 class _NuevaCotizacion extends StatefulWidget {
   final VoidCallback? onGuardada;
   final Cotizacion? cotizacionEditar;
-  const _NuevaCotizacion({this.onGuardada, this.cotizacionEditar});
+  final ItemSimulador? itemInicial;
+  const _NuevaCotizacion({this.onGuardada, this.cotizacionEditar, this.itemInicial});
   @override
   State<_NuevaCotizacion> createState() => _NuevaCotizacionState();
 }
@@ -378,6 +382,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   @override
   void initState() {
     super.initState();
+    if (widget.itemInicial != null) {
+      final item = widget.itemInicial!;
+      _items.add(CotizacionItem(
+        nombreProducto: item.nombre,
+        cantidad: 1,
+        precioUnitario: item.precioUnitario,
+        sku: null,
+      ));
+    }
     if (_esEdicion) {
       final c = widget.cotizacionEditar!;
       _cliente = c.cliente;

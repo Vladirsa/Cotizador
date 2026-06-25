@@ -15,6 +15,7 @@ import 'inventario_screen.dart';
 import 'gastos_screen.dart';
 import 'marketing_screen.dart';
 import 'config_screen.dart';
+import 'simulador_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,20 +33,18 @@ class _HomeScreenState extends State<HomeScreen> {
     AlertasScreen(),
     CotizarScreen(),
     AvancesScreen(),
+    SimuladorScreen(),
   ];
 
   // Pantallas del menú "Más"
   Widget _pantallaExtra(int tab) {
     switch (tab) {
-      case 4: return const ClientesScreen();
-      case 5: return const ProductosScreen();
-      case 6: return const InventarioScreen();
-      case 7: return const GastosScreen();
-      case 8: return const GastosScreen(); // Reportes ahora en Inicio
+      case 5: return const ClientesScreen();
+      case 6: return const ProductosScreen();
+      case 7: return const InventarioScreen();
+      case 8: return const GastosScreen();
       case 9: return const MarketingScreen();
       case 10: return const ConfigScreen();
-      case 11: return const CuponesScreen();
-      case 12: return const CitasScreen();
       case 11: return const CuponesScreen();
       case 12: return const CitasScreen();
       default: return const InicioScreen();
@@ -65,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _tab < 4
+      body: _tab < 5
         ? IndexedStack(index: _tab, children: _principales)
         : _pantallaExtra(_tab),
       drawer: _drawer(),
@@ -81,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _btn(1, Icons.notifications_outlined, 'Alertas', badge: _alertas),
       _btn(2, Icons.description_outlined, 'Cotizar'),
       _btn(3, Icons.local_shipping_outlined, 'Avances'),
+      _btn(4, Icons.calculate_outlined, 'Simular'),
       // Botón Más
       Expanded(child: Builder(builder: (ctx) => GestureDetector(
         onTap: () => Scaffold.of(ctx).openDrawer(),
@@ -125,10 +125,10 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(AuthService.nombreUsuario ?? 'Usuario', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
           Text(AuthService.rol ?? '', style: const TextStyle(color: Colors.white60, fontSize: 11)),
         ])),
-      _dItem(Icons.people_outline, 'CRM Clientes', 4),
-      _dItem(Icons.inventory_2_outlined, 'Productos y Catálogo', 5),
-      _dItem(Icons.warehouse_outlined, 'Inventario Bodega', 6),
-      _dItem(Icons.receipt_long_outlined, 'Gastos y Compras', 7),
+      _dItem(Icons.people_outline, 'CRM Clientes', 5),
+      _dItem(Icons.inventory_2_outlined, 'Productos y Catálogo', 6),
+      _dItem(Icons.warehouse_outlined, 'Inventario Bodega', 7),
+      _dItem(Icons.receipt_long_outlined, 'Gastos y Compras', 8),
       _dItem(Icons.campaign_outlined, 'Marketing', 9),
       const Divider(height: 1),
       _dItem(Icons.settings_outlined, 'Configuración', 10),
