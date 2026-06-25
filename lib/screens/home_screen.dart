@@ -18,6 +18,7 @@ import 'config_screen.dart';
 import 'simulador_screen.dart';
 import 'agenda_screen.dart';
 import 'equipo_screen.dart';
+import 'reportes_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -48,9 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
       case 9: return const GastosScreen();
       case 10: return const MarketingScreen();
       case 11: return const EquipoScreen();
-      case 12: return const ConfigScreen();
-      case 13: return const CuponesScreen();
-      case 14: return const CitasScreen();
+      case 12: return const ReportesScreen();
+      case 13: return const ConfigScreen();
+      case 14: return const CuponesScreen();
+      case 15: return const CitasScreen();
       default: return const InicioScreen();
     }
   }
@@ -137,9 +139,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _dItem(Icons.campaign_outlined, 'Marketing', 10),
       _dItem(Icons.group_outlined, 'Mi equipo', 11),
       const Divider(height: 1),
-      _dItem(Icons.settings_outlined, 'Configuración', 12),
-      _dItem(Icons.discount_outlined, 'Cupones', 13),
-      _dItem(Icons.event_outlined, 'Citas', 14),
+      _dItem(Icons.bar_chart_outlined, 'Reportes Excel', 12),
+      _dItem(Icons.settings_outlined, 'Configuración', 13),
+      _dItem(Icons.discount_outlined, 'Cupones', 14),
+      _dItem(Icons.event_outlined, 'Citas', 15),
       const Divider(height: 1),
       ListTile(
         leading: const Icon(Icons.logout_outlined, color: AppColors.rojo, size: 22),
