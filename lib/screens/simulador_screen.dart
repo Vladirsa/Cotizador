@@ -428,6 +428,21 @@ class _PantallaPlasmaState extends State<_PantallaPlasma> {
         descripcion: _specs.entries.map((e) => '${e.key}: ${e.value}').join(' | '),
         especificaciones: _specs)),
       children: [
+        _TarifasInline(
+          maquina: 'plasma',
+          tarifas: widget.tarifas,
+          campos: const [
+            {'clave': 'tarifa_m2_cal12',      'label': 'Celosía cal 12+ (\$/m²)'},
+            {'clave': 'tarifa_m2_cal10',      'label': 'Celosía cal 10-8 (\$/m²)'},
+            {'clave': 'tarifa_pieza_limpia',  'label': 'Trabajo limpio (\$/pza)'},
+            {'clave': 'costo_lamina_cal8',    'label': 'Lámina cal 8 (\$/hoja)'},
+            {'clave': 'costo_lamina_cal10',   'label': 'Lámina cal 10 (\$/hoja)'},
+            {'clave': 'costo_lamina_cal12',   'label': 'Lámina cal 12 (\$/hoja)'},
+            {'clave': 'costo_lamina_cal14',   'label': 'Lámina cal 14 (\$/hoja)'},
+            {'clave': 'costo_lamina_cal16',   'label': 'Lámina cal 16 (\$/hoja)'},
+          ],
+          onGuardado: (_) => setState(() {})),
+        const SizedBox(height: 4),
         // Modo de cobro
         _SeccionParam('Modo de cobro'),
         Row(children: [
@@ -663,6 +678,21 @@ class _PantallaRouterState extends State<_PantallaRouter> {
         descripcion: _specs.entries.map((e) => '${e.key}: ${e.value}').join(' | '),
         especificaciones: _specs)),
       children: [
+        _TarifasInline(
+          maquina: 'router',
+          tarifas: widget.tarifas,
+          campos: const [
+            {'clave': 'tarifa_min',           'label': 'Por minuto (\$/min)'},
+            {'clave': 'tarifa_hoja_normal',   'label': 'Hoja normal (\$/hoja)'},
+            {'clave': 'tarifa_hoja_saturada', 'label': 'Hoja saturada (\$/hoja)'},
+            {'clave': 'costo_mdf_3mm',        'label': 'MDF 3mm (\$/hoja)'},
+            {'clave': 'costo_mdf_9mm',        'label': 'MDF 9mm (\$/hoja)'},
+            {'clave': 'costo_mdf_15mm',       'label': 'MDF 15mm (\$/hoja)'},
+            {'clave': 'costo_mdf_18mm',       'label': 'MDF 18mm (\$/hoja)'},
+            {'clave': 'costo_acrilico_3mm',   'label': 'Acrílico 3mm (\$/hoja)'},
+            {'clave': 'costo_acrilico_6mm',   'label': 'Acrílico 6mm (\$/hoja)'},
+          ],
+          onGuardado: (_) => setState(() {})),
         _SeccionParam('Modo de cobro'),
         Row(children: [
           _ChipSel('Por minuto', _modo == 'min', () => setState(() => _modo = 'min'), _color),
@@ -772,6 +802,16 @@ class _PantallaDisenoState extends State<_PantallaDiseno> {
         descripcion: _specs.entries.map((e) => '${e.key}: ${e.value}').join(' | '),
         especificaciones: _specs)),
       children: [
+        _TarifasInline(
+          maquina: 'diseno',
+          tarifas: widget.tarifas,
+          campos: const [
+            {'clave': 'tarifa_2d_min', 'label': 'Diseño 2D mínimo (\$)'},
+            {'clave': 'tarifa_2d_max', 'label': 'Diseño 2D máximo (\$)'},
+            {'clave': 'tarifa_3d_min', 'label': 'Diseño 3D mínimo (\$)'},
+            {'clave': 'tarifa_3d_max', 'label': 'Diseño 3D máximo (\$)'},
+          ],
+          onGuardado: (_) => setState(() {})),
         _SeccionParam('Tipo de diseño'),
         Row(children: [
           _ChipSel('2D / Vectorización', _tipo == '2d', () => setState(() => _tipo = '2d'), _color),
@@ -858,6 +898,18 @@ class _PantallaImpresion3DState extends State<_PantallaImpresion3D> {
         descripcion: _specs.entries.map((e) => '${e.key}: ${e.value}').join(' | '),
         especificaciones: _specs)),
       children: [
+        _TarifasInline(
+          maquina: 'impresion_3d',
+          tarifas: widget.tarifas,
+          campos: const [
+            {'clave': 'costo_pla_g',       'label': 'PLA (\$/gramo)'},
+            {'clave': 'costo_abs_g',       'label': 'ABS (\$/gramo)'},
+            {'clave': 'costo_petg_g',      'label': 'PETG (\$/gramo)'},
+            {'clave': 'costo_tpu_g',       'label': 'TPU (\$/gramo)'},
+            {'clave': 'tarifa_hr',         'label': 'Hora de impresión (\$/hr)'},
+            {'clave': 'tarifa_min_cobro',  'label': 'Cobro mínimo (\$)'},
+          ],
+          onGuardado: (_) => setState(() {})),
         _SeccionParam('Material de filamento'),
         Wrap(spacing: 6, runSpacing: 6, children: _materiales.entries.map((e) =>
           _ChipSel(e.value, _material == e.key, () => setState(() => _material = e.key), _color)).toList()),
@@ -1003,6 +1055,16 @@ class _PantallaHerreriaState extends State<_PantallaHerreria> {
         descripcion: _specs.entries.map((e) => '${e.key}: ${e.value}').join(' | '),
         especificaciones: _specs)),
       children: [
+        _TarifasInline(
+          maquina: 'herreria',
+          tarifas: widget.tarifas,
+          campos: const [
+            {'clave': 'tarifa_hr',           'label': 'Mano de obra (\$/hr)'},
+            {'clave': 'costo_kg_acero',      'label': 'Acero negro (\$/kg)'},
+            {'clave': 'costo_kg_inox',       'label': 'Acero inox (\$/kg)'},
+            {'clave': 'tarifa_soldadura_hr', 'label': 'Soldadura (\$/hr)'},
+          ],
+          onGuardado: (_) => setState(() {})),
         _SeccionParam('Tipo de acero'),
         Row(children: [
           _ChipSel('Acero negro — ${widget.fmt.format(widget.tarifas["costo_kg_acero"] ?? 28)}/kg',
@@ -1304,4 +1366,123 @@ class _CampoNumeroInt extends StatelessWidget {
       labelText: label, isDense: true, filled: true, fillColor: Colors.white,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
     onChanged: (v) { final i = int.tryParse(v); if (i != null) onChange(i); });
+}
+
+// ── Widget de tarifas editables inline ──────────────────
+class _TarifasInline extends StatefulWidget {
+  final String maquina;
+  final Map<String, double> tarifas;
+  final List<Map<String, String>> campos; // {clave, label}
+  final void Function(Map<String, double>) onGuardado;
+  const _TarifasInline({
+    required this.maquina,
+    required this.tarifas,
+    required this.campos,
+    required this.onGuardado});
+  @override
+  State<_TarifasInline> createState() => _TarifasInlineState();
+}
+
+class _TarifasInlineState extends State<_TarifasInline> {
+  bool _expandido = false;
+  bool _guardando = false;
+  late Map<String, TextEditingController> _ctrls;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrls = {};
+    for (final c in widget.campos) {
+      final val = widget.tarifas[c['clave']!] ?? 0;
+      _ctrls[c['clave']!] = TextEditingController(
+        text: val % 1 == 0 ? val.toInt().toString() : val.toString());
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _ctrls.values) c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _guardar() async {
+    setState(() => _guardando = true);
+    final nuevas = <String, double>{};
+    for (final c in widget.campos) {
+      final val = double.tryParse(_ctrls[c['clave']!]!.text);
+      if (val != null) {
+        nuevas[c['clave']!] = val;
+        await TarifasService.guardarTarifa(widget.maquina, c['clave']!, val);
+      }
+    }
+    TarifasService.limpiarCache();
+    if (mounted) {
+      setState(() { _guardando = false; _expandido = false; });
+      widget.onGuardado({...widget.tarifas, ...nuevas});
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('✅ Tarifas guardadas'),
+        backgroundColor: AppColors.verde,
+        duration: Duration(seconds: 2)));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.azulClaro,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.azul.withOpacity(0.2))),
+      child: Column(children: [
+        // Header colapsable
+        GestureDetector(
+          onTap: () => setState(() => _expandido = !_expandido),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(children: [
+              const Icon(Icons.tune_outlined, size: 16, color: AppColors.azul),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Mis tarifas (toca para editar)',
+                style: TextStyle(fontSize: 12, color: AppColors.azul,
+                  fontWeight: FontWeight.w600))),
+              Icon(_expandido ? Icons.expand_less : Icons.expand_more,
+                size: 18, color: AppColors.azul),
+            ]))),
+        // Campos expandibles
+        if (_expandido) ...[
+          const Divider(height: 1, color: AppColors.grisBorde),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+            child: Column(children: [
+              ...widget.campos.map((c) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextFormField(
+                  controller: _ctrls[c['clave']!],
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                  decoration: InputDecoration(
+                    labelText: c['label']!,
+                    isDense: true,
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8)))))),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _guardando ? null : _guardar,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.azul,
+                    padding: const EdgeInsets.symmetric(vertical: 8)),
+                  child: _guardando
+                    ? const SizedBox(width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('Guardar tarifas',
+                        style: TextStyle(color: Colors.white, fontSize: 13)))),
+              const SizedBox(height: 8),
+            ])),
+        ],
+      ]));
+  }
 }
