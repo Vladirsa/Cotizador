@@ -305,7 +305,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   // Tarifas configurables (en producción vendrían de Supabase)
   double _tarifaMaquina = 150.0;   // $/hora
   double _tarifaManoObra = 80.0;   // $/hora
-  double _tarifaDiseño = 200.0;    // $/hora base
+  double _tarifaDiseno = 200.0;    // $/hora base
   double _margenPct = 30.0;        // %
   double _precioMaterialBase = 350.0; // $/m² base
 
@@ -791,7 +791,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   void _editarTarifas() {
     final maqCtrl = TextEditingController(text: _tarifaMaquina.toString());
     final moCtrl  = TextEditingController(text: _tarifaManoObra.toString());
-    final disCtrl = TextEditingController(text: _tarifaDiseño.toString());
+    final disCtrl = TextEditingController(text: _tarifaDiseno.toString());
     final marCtrl = TextEditingController(text: _margenPct.toString());
     final matCtrl = TextEditingController(text: _precioMaterialBase.toString());
 
@@ -815,10 +815,10 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
           const Text('Ajusta según los costos reales de tu taller',
             style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
           const SizedBox(height: 16),
-          _campoTarifa(maqCtrl, '💰 Tarifa máquina ($/hora)', '150'),
-          _campoTarifa(moCtrl,  '👷 Tarifa mano de obra ($/hora)', '80'),
-          _campoTarifa(disCtrl, '✏️ Tarifa diseño ($/hora)', '200'),
-          _campoTarifa(matCtrl, '📦 Precio material base ($/m²)', '350'),
+          _campoTarifa(maqCtrl, '💰 Tarifa maquina (\$/hora)', '150'),
+          _campoTarifa(moCtrl,  '👷 Mano de obra (\$/hora)', '80'),
+          _campoTarifa(disCtrl, '✏️ Tarifa diseno (\$/hora)', '200'),
+          _campoTarifa(matCtrl, '📦 Material base (\$/m2)', '350'),
           _campoTarifa(marCtrl, '📈 Margen de ganancia (%)', '30'),
           const SizedBox(height: 16),
           SizedBox(width: double.infinity,
@@ -827,7 +827,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                 setState(() {
                   _tarifaMaquina     = double.tryParse(maqCtrl.text) ?? _tarifaMaquina;
                   _tarifaManoObra    = double.tryParse(moCtrl.text)  ?? _tarifaManoObra;
-                  _tarifaDiseño      = double.tryParse(disCtrl.text) ?? _tarifaDiseño;
+                  _tarifaDiseno      = double.tryParse(disCtrl.text) ?? _tarifaDiseno;
                   _precioMaterialBase= double.tryParse(matCtrl.text) ?? _precioMaterialBase;
                   _margenPct         = double.tryParse(marCtrl.text) ?? _margenPct;
                 });
