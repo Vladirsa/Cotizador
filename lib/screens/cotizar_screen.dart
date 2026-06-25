@@ -666,109 +666,30 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
-        builder: (_) => DraggableScrollableSheet(
-          initialChildSize: 0.85,
-          maxChildSize: 0.95,
-          minChildSize: 0.5,
-          builder: (_, ctrl) => Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-            child: Column(children: [
-              Padding(padding: const EdgeInsets.only(top: 12, bottom: 8),
-                child: Container(width: 36, height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2)))),
-              Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Row(children: [
-                  const Icon(Icons.contact_phone_outlined,
-                    color: AppColors.azul, size: 20),
-                  const SizedBox(width: 8),
-                  Text('Contactos (${conTelefono.length})',
-                    style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
-                ])),
-              Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: StatefulBuilder(builder: (ctx3, setQ) {
-                  // La búsqueda se maneja en el ListView.builder abajo
-                  return TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Buscar contacto...',
-                      prefixIcon: const Icon(Icons.search, color: AppColors.textoSecundario),
-                      isDense: true,
-                      filled: true,
-                      fillColor: AppColors.gris,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none)),
-                    onChanged: (q) => setQ(() => _busquedaContacto = q.toLowerCase()));
-                })),
-              Expanded(child: StatefulBuilder(builder: (ctx4, setL) {
-                final filtrados = _busquedaContacto.isEmpty
-                  ? conTelefono
-                  : conTelefono.where((c) =>
-                      c.displayName.toLowerCase().contains(_busquedaContacto) ||
-                      c.phones.first.number.contains(_busquedaContacto)).toList();
-                return ListView.builder(
-                controller: ctrl,
-                itemCount: filtrados.length,
-                itemBuilder: (ctx2, i) {
-                  final c = filtrados[i];
-                  final tel = c.phones.first.number
-                    .replaceAll(RegExp(r'[^0-9]'), '');
-                  String waNum = tel;
-                  if (tel.length == 10) waNum = '521$tel';
-                  else if (tel.startsWith('52') && tel.length == 12) {
-                    waNum = '521${tel.substring(2)}';
-                  }
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.azulClaro,
-                      child: Text(
-                        c.displayName.isNotEmpty
-                          ? c.displayName[0].toUpperCase() : '?',
-                        style: const TextStyle(
-                          color: AppColors.azul,
-                          fontWeight: FontWeight.w700))),
-                    title: Text(c.displayName,
-                      style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
-                    subtitle: Text(c.phones.first.number,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textoSecundario)),
-                    onTap: () async {
-                      Navigator.pop(ctx2);
-                      try {
-                        final existentes =
-                          await SupabaseService.getClientes();
-                        final yaExiste = existentes.where((cl) =>
-                          cl.whatsapp == waNum ||
-                          cl.telefono == tel).toList();
-                        if (yaExiste.isNotEmpty) {
-                          if (mounted) setState(() => _cliente = yaExiste.first);
-                        } else {
-                          final nuevo = await SupabaseService.crearCliente(
-                            Cliente(
-                              nombre: c.displayName,
-                              whatsapp: waNum.isNotEmpty ? waNum : null,
-                              telefono: tel.isNotEmpty ? tel : null,
-                              correo: c.emails.isNotEmpty
-                                ? c.emails.first.address : null,
-                            ));
-                          if (mounted) setState(() => _cliente = nuevo);
-                        }
-                      } catch (e) {
-                        if (mounted) ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(
-                            content: Text('Error: $e'),
-                            backgroundColor: AppColors.rojo));
-                      }
-                    });
-                }));
-              })),
-            ]))));
+        builder: (_) => _ContactosPicker(
+          contactos: conTelefono,
+          onSeleccionado: (c, tel, waNum) async {
+            try {
+              final existentes = await SupabaseService.getClientes();
+              final yaExiste = existentes.where((cl) =>
+                cl.whatsapp == waNum || cl.telefono == tel).toList();
+              if (yaExiste.isNotEmpty) {
+                if (mounted) setState(() => _cliente = yaExiste.first);
+              } else {
+                final nuevo = await SupabaseService.crearCliente(Cliente(
+                  nombre: c.displayName,
+                  whatsapp: waNum.isNotEmpty ? waNum : null,
+                  telefono: tel.isNotEmpty ? tel : null,
+                  correo: c.emails.isNotEmpty ? c.emails.first.address : null,
+                ));
+                if (mounted) setState(() => _cliente = nuevo);
+              }
+            } catch (e) {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error: $e'),
+                  backgroundColor: AppColors.rojo));
+            }
+          }));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al acceder contactos: $e'),
@@ -1554,4 +1475,87 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
         backgroundColor: const Color(0xFF25D366),
         padding: const EdgeInsets.symmetric(vertical: 8)));
   }
+
+// ── Widget separado para picker de contactos (evita scope anidado) ──
+class _ContactosPicker extends StatefulWidget {
+  final List<dynamic> contactos;
+  final void Function(dynamic contacto, String tel, String waNum) onSeleccionado;
+  const _ContactosPicker({required this.contactos, required this.onSeleccionado});
+  @override
+  State<_ContactosPicker> createState() => _ContactosPickerState();
+}
+
+class _ContactosPickerState extends State<_ContactosPicker> {
+  String _busqueda = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtrados = _busqueda.isEmpty
+      ? widget.contactos
+      : widget.contactos.where((c) =>
+          c.displayName.toLowerCase().contains(_busqueda) ||
+          c.phones.first.number.contains(_busqueda)).toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      builder: (_, ctrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        child: Column(children: [
+          Padding(padding: const EdgeInsets.only(top: 12, bottom: 8),
+            child: Container(width: 36, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2)))),
+          Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(children: [
+              const Icon(Icons.contact_phone_outlined, color: AppColors.azul, size: 20),
+              const SizedBox(width: 8),
+              Text('Contactos (${filtrados.length})',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            ])),
+          Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Buscar contacto...',
+                prefixIcon: const Icon(Icons.search, color: AppColors.textoSecundario),
+                isDense: true,
+                filled: true,
+                fillColor: AppColors.gris,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none)),
+              onChanged: (q) => setState(() => _busqueda = q.toLowerCase()))),
+          Expanded(child: ListView.builder(
+            controller: ctrl,
+            itemCount: filtrados.length,
+            itemBuilder: (ctx, i) {
+              final c = filtrados[i];
+              final tel = c.phones.first.number.replaceAll(RegExp(r'[^0-9]'), '');
+              String waNum = tel;
+              if (tel.length == 10) waNum = '521$tel';
+              else if (tel.startsWith('52') && tel.length == 12) {
+                waNum = '521${tel.substring(2)}';
+              }
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.azulClaro,
+                  child: Text(
+                    c.displayName.isNotEmpty ? c.displayName[0].toUpperCase() : '?',
+                    style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
+                title: Text(c.displayName,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                subtitle: Text(c.phones.first.number,
+                  style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  widget.onSeleccionado(c, tel, waNum);
+                });
+            })),
+        ])));
+  }
+}
+
 }
