@@ -12,7 +12,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'simulador_screen.dart';
 
 class CotizarScreen extends StatefulWidget {
-  final ItemSimulador? itemInicial;
+  final dynamic itemInicial;
   final List<dynamic>? carritoSimulador;
   const CotizarScreen({super.key, this.itemInicial, this.carritoSimulador});
   @override
@@ -347,7 +347,7 @@ class _TarjetaCotizacion extends StatelessWidget {
 class _NuevaCotizacion extends StatefulWidget {
   final VoidCallback? onGuardada;
   final Cotizacion? cotizacionEditar;
-  final ItemSimulador? itemInicial;
+  final dynamic itemInicial;
   final List<dynamic>? carritoSimulador;
   const _NuevaCotizacion({this.onGuardada, this.cotizacionEditar, this.itemInicial, this.carritoSimulador});
   @override
@@ -385,13 +385,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   void initState() {
     super.initState();
     if (widget.itemInicial != null) {
-      final item = widget.itemInicial!;
-      _items.add(CotizacionItem(
-        nombreProducto: item.nombre,
-        cantidad: 1,
-        precioUnitario: item.precioUnitario,
-        sku: null,
-      ));
+      try {
+        final item = widget.itemInicial!;
+        _items.add(CotizacionItem(
+          nombreProducto: (item.trabajo ?? item.nombre ?? 'Servicio').toString(),
+          cantidad: 1,
+          precioUnitario: ((item.precio ?? item.precioUnitario ?? 0) as num).toDouble(),
+          sku: null,
+        ));
+      } catch (_) {}
     }
     if (widget.carritoSimulador != null) {
       for (final sv in widget.carritoSimulador!) {
