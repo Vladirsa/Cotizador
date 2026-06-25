@@ -1476,6 +1476,8 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
         padding: const EdgeInsets.symmetric(vertical: 8)));
   }
 
+}
+
 // ── Widget separado para picker de contactos (evita scope anidado) ──
 class _ContactosPicker extends StatefulWidget {
   final List<dynamic> contactos;
@@ -1556,6 +1558,4 @@ class _ContactosPickerState extends State<_ContactosPicker> {
             })),
         ])));
   }
-}
-
 }
