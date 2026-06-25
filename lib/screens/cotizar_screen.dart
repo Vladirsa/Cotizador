@@ -364,6 +364,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   String _notas = '';
   bool _generando = false;
   bool _guardando = false;
+  String _busquedaContacto = '';
 
   bool get _esEdicion => widget.cotizacionEditar != null;
   double get _subtotal => _items.fold(0, (s, i) => s + i.subtotal);
@@ -688,11 +689,32 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                     style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w700)),
                 ])),
-              Expanded(child: ListView.builder(
+              Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: StatefulBuilder(builder: (ctx3, setQ) {
+                  // La búsqueda se maneja en el ListView.builder abajo
+                  return TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Buscar contacto...',
+                      prefixIcon: const Icon(Icons.search, color: AppColors.textoSecundario),
+                      isDense: true,
+                      filled: true,
+                      fillColor: AppColors.gris,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide.none)),
+                    onChanged: (q) => setQ(() => _busquedaContacto = q.toLowerCase()));
+                })),
+              Expanded(child: StatefulBuilder(builder: (ctx4, setL) {
+                final filtrados = _busquedaContacto.isEmpty
+                  ? conTelefono
+                  : conTelefono.where((c) =>
+                      c.displayName.toLowerCase().contains(_busquedaContacto) ||
+                      c.phones.first.number.contains(_busquedaContacto)).toList();
+                return ListView.builder(
                 controller: ctrl,
-                itemCount: conTelefono.length,
+                itemCount: filtrados.length,
                 itemBuilder: (ctx2, i) {
-                  final c = conTelefono[i];
+                  final c = filtrados[i];
                   final tel = c.phones.first.number
                     .replaceAll(RegExp(r'[^0-9]'), '');
                   String waNum = tel;
@@ -745,6 +767,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                       }
                     });
                 })),
+              ]));  }));
             ]))));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
