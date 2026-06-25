@@ -33,6 +33,19 @@ jobs:
           MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
           grep -q "INTERNET" $MANIFEST || sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' $MANIFEST
           cat $MANIFEST
+      - name: Inject Firebase google-services.json
+        run: |
+          echo "ewogICJwcm9qZWN0X2luZm8iOiB7CiAgICAicHJvamVjdF9udW1iZXIiOiAiNzEyODMxNTEwNzQyIiwKICAgICJwcm9qZWN0X2lkIjogImhldG5hLWNuYyIsCiAgICAic3RvcmFnZV9idWNrZXQiOiAiaGV0bmEtY25jLmZpcmViYXNlc3RvcmFnZS5hcHAiCiAgfSwKICAiY2xpZW50IjogWwogICAgewogICAgICAiY2xpZW50X2luZm8iOiB7CiAgICAgICAgIm1vYmlsZXNka19hcHBfaWQiOiAiMTo3MTI4MzE1MTA3NDI6YW5kcm9pZDpkNzVmYzYxYzQ4MWRjMzIxOGJjMTc3IiwKICAgICAgICAiYW5kcm9pZF9jbGllbnRfaW5mbyI6IHsKICAgICAgICAgICJwYWNrYWdlX25hbWUiOiAiY29tLmhldG5hY25jLmFwcCIKICAgICAgICB9CiAgICAgIH0sCiAgICAgICJvYXV0aF9jbGllbnQiOiBbXSwKICAgICAgImFwaV9rZXkiOiBbCiAgICAgICAgewogICAgICAgICAgImN1cnJlbnRfa2V5IjogIkFJemFTeURGMU4wbV90SE9BTHFfSGhoRXc1S1R3UXNNeVM5LTRPYyIKICAgICAgICB9CiAgICAgIF0sCiAgICAgICJzZXJ2aWNlcyI6IHsKICAgICAgICAiYXBwaW52aXRlX3NlcnZpY2UiOiB7CiAgICAgICAgICAib3RoZXJfcGxhdGZvcm1fb2F1dGhfY2xpZW50IjogW10KICAgICAgICB9CiAgICAgIH0KICAgIH0KICBdLAogICJjb25maWd1cmF0aW9uX3ZlcnNpb24iOiAiMSIKfQ==" | base64 -d > tmp_app/android/app/google-services.json
+          echo "google-services.json inyectado"
+      - name: Configure Firebase in build.gradle
+        run: |
+          # Agregar google-services plugin si no existe
+          BUILDGRADLE=tmp_app/android/build.gradle
+          grep -q "google-services" $BUILDGRADLE || sed -i "s/classpath 'com.android.tools.build:gradle:/classpath 'com.google.gms:google-services:4.4.0'\n        classpath 'com.android.tools.build:gradle:/" $BUILDGRADLE
+          # Aplicar plugin en app/build.gradle
+          APPGRADLE=tmp_app/android/app/build.gradle
+          grep -q "apply plugin.*google-services" $APPGRADLE || echo "apply plugin: 'com.google.gms.google-services'" >> $APPGRADLE
+          echo "Firebase Gradle configurado"
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
         working-directory: tmp_app
