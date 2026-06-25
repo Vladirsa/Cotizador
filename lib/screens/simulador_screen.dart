@@ -338,9 +338,8 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   }
 
   // ── PASO 1: Seleccionar tipo de taller ──────────────
-  Widget _pantallaSeleccionTaller() => ListView(
-    padding: const EdgeInsets.all(16),
-    children: [
+  Widget _pantallaSeleccionTaller() {
+    final items = <Widget>[
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -351,16 +350,23 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
           Text('Simulador de costos', style: TextStyle(
             fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
           SizedBox(height: 4),
-          Text('Selecciona el tipo de taller para calcular el costo estimado de tu trabajo',
+          Text('Selecciona el tipo de taller para calcular el costo',
             style: TextStyle(fontSize: 12, color: Colors.white70)),
         ])),
       const SizedBox(height: 16),
-      const Text('¿QUÉ TIPO DE TALLER?',
+      const Text('TIPO DE TALLER',
         style: TextStyle(fontSize: 10, color: AppColors.textoSecundario,
           letterSpacing: 1.5, fontWeight: FontWeight.w600)),
       const SizedBox(height: 10),
-      ...talleresCatalogo.map((t) => GestureDetector(
-        onTap: () => setState(() { _tallerSel = t; _trabajoSel = null; _valores.clear(); _resultado = null; }),
+    ];
+    for (final t in talleresCatalogo) {
+      items.add(GestureDetector(
+        onTap: () => setState(() {
+          _tallerSel = t;
+          _trabajoSel = null;
+          _valores.clear();
+          _resultado = null;
+        }),
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(16),
@@ -384,18 +390,58 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
               Text(t.descripcion, style: const TextStyle(
                 fontSize: 12, color: AppColors.textoSecundario)),
               const SizedBox(height: 4),
-              Text('${t.trabajos.length} tipo${t.trabajos.length > 1 ? "s" : ""} de trabajo',
+              Text('''${t.trabajos.length} tipo${t.trabajos.length > 1 ? "s" : ""} de trabajo''',
                 style: TextStyle(fontSize: 10, color: t.color)),
             ])),
             Icon(Icons.arrow_forward_ios, size: 14, color: t.color),
-          ]))),
-    ]);
+          ]))));
+    }
+    return ListView(padding: const EdgeInsets.all(16), children: items);
+  }
+
 
   // ── PASO 2: Seleccionar tipo de trabajo ─────────────
   Widget _pantallaSeleccionTrabajo() {
     final t = _tallerSel!;
+    final items = <Widget>[];
+    for (final tr in t.trabajos) {
+      items.add(GestureDetector(
+        onTap: () {
+          setState(() {
+            _trabajoSel = tr;
+            _valores.clear();
+            _resultado = null;
+            for (final p in tr.parametros) {
+              if (p.tipo == TipoParametro.numero) {
+                _valores[p.id] = p.valorDefault ?? 1.0;
+              } else if (p.tipo == TipoParametro.selector) {
+                _valores[p.id] = 0;
+              } else if (p.tipo == TipoParametro.toggle) {
+                _valores[p.id] = false;
+              }
+            }
+          });
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+          child: Row(children: [
+            Text(tr.emoji, style: const TextStyle(fontSize: 28)),
+            const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(tr.nombre, style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w700, color: t.color)),
+              Text('''${tr.parametros.length} parametros a configurar''',
+                style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            ])),
+            Icon(Icons.arrow_forward_ios, size: 14, color: t.color),
+          ]))));
+    }
     return Column(children: [
-      // Header
       Container(color: Colors.white,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
         child: Row(children: [
@@ -404,56 +450,22 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
             child: Row(children: [
               const Icon(Icons.arrow_back_ios, size: 14, color: AppColors.azul),
               const SizedBox(width: 4),
-              Text(t.emoji + ' ' + t.nombre,
+              Text('''${t.emoji} ${t.nombre}''',
                 style: TextStyle(fontSize: 14, color: t.color, fontWeight: FontWeight.w600)),
             ])),
         ])),
       Expanded(child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('¿QUÉ TIPO DE TRABAJO?',
+          const Text('TIPO DE TRABAJO',
             style: TextStyle(fontSize: 10, color: AppColors.textoSecundario,
               letterSpacing: 1.5, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
-          ...t.trabajos.map((tr) => GestureDetector(
-            onTap: () {
-              setState(() {
-                _trabajoSel = tr;
-                _valores.clear();
-                _resultado = null;
-                // Inicializar valores default
-                for (final p in tr.parametros) {
-                  if (p.tipo == TipoParametro.numero) {
-                    _valores[p.id] = p.valorDefault ?? 1.0;
-                  } else if (p.tipo == TipoParametro.selector) {
-                    _valores[p.id] = 0;
-                  } else if (p.tipo == TipoParametro.toggle) {
-                    _valores[p.id] = false;
-                  }
-                }
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-              child: Row(children: [
-                Text(tr.emoji, style: const TextStyle(fontSize: 28)),
-                const SizedBox(width: 14),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tr.nombre, style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: t.color)),
-                  Text('${tr.parametros.length} parámetros a configurar',
-                    style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                ])),
-                Icon(Icons.arrow_forward_ios, size: 14, color: t.color),
-              ]))),
+          ...items,
         ])),
     ]);
   }
+
 
   // ── PASO 3: Parámetros y resultado ──────────────────
   Widget _pantallaParametros() {
