@@ -46,7 +46,7 @@ class _CotizarScreenState extends State<CotizarScreen> with SingleTickerProvider
         ),
       ),
       body: TabBarView(controller: _tabs, children: [
-        _NuevaCotizacion(onGuardada: () => _tabs.animateTo(1)),
+        _NuevaCotizacion(itemInicial: widget.itemInicial, onGuardada: () => _tabs.animateTo(1)),
         _ListaCotizaciones(),
         const _CatalogoPDFs(),
       ]),
@@ -262,7 +262,6 @@ class _TarjetaCotizacion extends StatelessWidget {
           title: Text('Editar — ${cotizacion.folio ?? "cotización"}'),
           backgroundColor: Colors.white),
         body: _NuevaCotizacion(
-          itemInicial: widget.itemInicial,
           cotizacionEditar: cotizacion,
           onGuardada: () { Navigator.pop(context); onActualizar(); }))));
   }
