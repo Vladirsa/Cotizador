@@ -127,11 +127,11 @@ class PdfService {
             pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
               _cH('TÍTULO / DESCRIPCIÓN'), _cH('CANT.'), _cH('PRECIO'), _cH('SUBTOTAL'),
             ]),
-            ...cotizacion.items.asMap().entries.map((e) {
-              final item = e.value;
+            ...List.generate(cotizacion.items.length, (i) {
+              final item = cotizacion.items[i];
               final nombreLimpio = _limpiarTexto(item.nombreProducto);
               return pw.TableRow(
-                decoration: pw.BoxDecoration(color: e.key.isEven ? PdfColors.white : grisClaro),
+                decoration: pw.BoxDecoration(color: i.isEven ? PdfColors.white : grisClaro),
                 children: [
                   pw.Padding(padding: const pw.EdgeInsets.all(7),
                     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
@@ -328,9 +328,8 @@ class PdfService {
                 _celdaHeader('PRECIO'),
               ]),
             // Filas de productos
-            ...productos.asMap().entries.map((e) {
-              final i = e.key;
-              final p = e.value;
+            ...List.generate(productos.length, (i) {
+              final p = productos[i];
               final bgColor = i % 2 == 0 ? PdfColors.white : grisClaro;
               return pw.TableRow(
                 decoration: pw.BoxDecoration(color: bgColor),
@@ -405,7 +404,7 @@ class PdfService {
     final correo = empresa['correo']   ?? '';
     final web    = empresa['sitio_web'] ?? 'hetnacnc.com';
     final fecha  = _fmtFecha.format(DateTime.now());
-    final clienteNombre = _limpiarTexto((cotizacion.cliente ?? 'Cliente').toString());
+    final clienteNombre = _limpiarTexto(cotizacion.cliente?.nombreCompleto ?? cotizacion.cliente?.nombre ?? 'Cliente');
     final folio = folioPedido ?? cotizacion.folio ?? 'N/A';
 
     pdf.addPage(pw.Page(
@@ -417,13 +416,14 @@ class PdfService {
           padding: const pw.EdgeInsets.all(16),
           decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(8)),
           child: pw.Row(children: [
-            if (logoImage != null) ...[
-              pw.Container(width: 48, height: 48,
-                decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(6)),
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Image(logoImage, fit: pw.BoxFit.contain)),
-              pw.SizedBox(width: 12),
-            ],
+            logoImage != null
+              ? pw.Container(
+                  width: 48, height: 48,
+                  decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(6)),
+                  padding: const pw.EdgeInsets.all(4),
+                  margin: const pw.EdgeInsets.only(right: 12),
+                  child: pw.Image(logoImage, fit: pw.BoxFit.contain))
+              : pw.SizedBox(width: 0),
             pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
               pw.Text('NOTA DE COMPRA', style: pw.TextStyle(fontSize: 11, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
@@ -464,10 +464,10 @@ class PdfService {
             pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
               _cH('TÍTULO / DESCRIPCIÓN'), _cH('CANT.'), _cH('PRECIO'), _cH('SUBTOTAL'),
             ]),
-            ...cotizacion.items.asMap().entries.map((e) {
-              final item = e.value;
+            ...List.generate(cotizacion.items.length, (i) {
+              final item = cotizacion.items[i];
               return pw.TableRow(
-                decoration: pw.BoxDecoration(color: e.key.isEven ? PdfColors.white : grisClaro),
+                decoration: pw.BoxDecoration(color: i.isEven ? PdfColors.white : grisClaro),
                 children: [
                   pw.Padding(padding: const pw.EdgeInsets.all(7),
                     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
