@@ -13,7 +13,8 @@ import 'simulador_screen.dart';
 
 class CotizarScreen extends StatefulWidget {
   final ItemSimulador? itemInicial;
-  const CotizarScreen({super.key, this.itemInicial});
+  final List<dynamic>? carritoSimulador;
+  const CotizarScreen({super.key, this.itemInicial, this.carritoSimulador});
   @override
   State<CotizarScreen> createState() => _CotizarScreenState();
 }
@@ -46,7 +47,7 @@ class _CotizarScreenState extends State<CotizarScreen> with SingleTickerProvider
         ),
       ),
       body: TabBarView(controller: _tabs, children: [
-        _NuevaCotizacion(itemInicial: widget.itemInicial, onGuardada: () => _tabs.animateTo(1)),
+        _NuevaCotizacion(itemInicial: widget.itemInicial, carritoSimulador: widget.carritoSimulador, onGuardada: () => _tabs.animateTo(1)),
         _ListaCotizaciones(),
         const _CatalogoPDFs(),
       ]),
@@ -347,7 +348,8 @@ class _NuevaCotizacion extends StatefulWidget {
   final VoidCallback? onGuardada;
   final Cotizacion? cotizacionEditar;
   final ItemSimulador? itemInicial;
-  const _NuevaCotizacion({this.onGuardada, this.cotizacionEditar, this.itemInicial});
+  final List<dynamic>? carritoSimulador;
+  const _NuevaCotizacion({this.onGuardada, this.cotizacionEditar, this.itemInicial, this.carritoSimulador});
   @override
   State<_NuevaCotizacion> createState() => _NuevaCotizacionState();
 }
@@ -390,6 +392,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         precioUnitario: item.precioUnitario,
         sku: null,
       ));
+    }
+    if (widget.carritoSimulador != null) {
+      for (final sv in widget.carritoSimulador!) {
+        _items.add(CotizacionItem(
+          nombreProducto: sv.trabajo,
+          cantidad: 1,
+          precioUnitario: sv.precio,
+          sku: sv.maquina,
+        ));
+      }
     }
     if (_esEdicion) {
       final c = widget.cotizacionEditar!;
