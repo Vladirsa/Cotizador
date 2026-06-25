@@ -39,13 +39,23 @@ jobs:
           echo "google-services.json inyectado"
       - name: Configure Firebase in build.gradle
         run: |
-          # Agregar google-services plugin si no existe
           BUILDGRADLE=tmp_app/android/build.gradle
-          grep -q "google-services" $BUILDGRADLE || sed -i "s/classpath 'com.android.tools.build:gradle:/classpath 'com.google.gms:google-services:4.4.0'\n        classpath 'com.android.tools.build:gradle:/" $BUILDGRADLE
-          # Aplicar plugin en app/build.gradle
           APPGRADLE=tmp_app/android/app/build.gradle
-          grep -q "apply plugin.*google-services" $APPGRADLE || echo "apply plugin: 'com.google.gms.google-services'" >> $APPGRADLE
-          echo "Firebase Gradle configurado"
+
+          # Agregar classpath google-services en build.gradle raiz
+          if ! grep -q "google-services" $BUILDGRADLE; then
+            sed -i "s|classpath 'com.android.tools.build:gradle:|classpath 'com.google.gms:google-services:4.4.0'\n        classpath 'com.android.tools.build:gradle:|" $BUILDGRADLE
+            echo "Classpath google-services agregado"
+          fi
+
+          # Aplicar plugin en app/build.gradle
+          if ! grep -q "com.google.gms.google-services" $APPGRADLE; then
+            sed -i "s|apply plugin: 'com.android.application'|apply plugin: 'com.android.application'\napply plugin: 'com.google.gms.google-services'|" $APPGRADLE
+            echo "Plugin google-services aplicado"
+          fi
+
+          echo "=== Verificacion ==="
+          grep -n "google-services\|android.application" $APPGRADLE | head -5
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
       - run: flutter pub get
         working-directory: tmp_app
