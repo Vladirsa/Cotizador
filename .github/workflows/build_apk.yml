@@ -55,6 +55,22 @@ jobs:
         working-directory: tmp_app
       - run: flutter build apk --release --split-per-abi
         working-directory: tmp_app
+      - name: Sign APK
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/hetna_cnc.keystore
+          for apk in tmp_app/build/app/outputs/flutter-apk/app-*-release.apk; do
+            aligned="${apk%.apk}-aligned.apk"
+            signed="${apk%.apk}-signed.apk"
+            $ANDROID_SDK_ROOT/build-tools/34.0.0/zipalign -v 4 "$apk" "$aligned"
+            $ANDROID_SDK_ROOT/build-tools/34.0.0/apksigner sign \
+              --ks /tmp/hetna_cnc.keystore \
+              --ks-key-alias hetna_cnc \
+              --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+              --key-pass pass:${{ secrets.KEYSTORE_PASSWORD }} \
+              --out "$signed" "$aligned"
+            mv "$signed" "$apk"
+            rm -f "$aligned"
+          done
       - name: Collect APKs
         run: |
           mkdir -p apk_output
