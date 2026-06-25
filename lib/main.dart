@@ -6,29 +6,34 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'services/notificaciones_service.dart';
-import 'services/auth_service.dart';
+import 'services/fcm_service.dart';
+import 'firebase_options.dart';
 import 'screens/home_screen.dart';
-import 'screens/login_screen.dart';
 
 const supabaseUrl = 'https://ldfmkfbhcbsbecfbzsny.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkZm1rZmJoY2JzYmVjZmJ6c255Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTU5NzEsImV4cCI6MjA5NzI5MTk3MX0.N6KsmCz_HeHdc921VQflXJywgU2ctAON7wLSZViCEc4';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Supabase
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await initializeDateFormatting('es_MX', null);
+
+  // Firebase + FCM
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await FcmService.inicializar();
+
+  // Notificaciones locales (polling)
   await NotificacionesService.inicializar();
 
-  // Intentar restaurar sesión existente
-  final tieneSesion = await AuthService.restaurarSesion();
-
-  runApp(HetnaCncApp(tieneSesion: tieneSesion));
+  runApp(const HetnaCncApp());
 }
 
 class HetnaCncApp extends StatelessWidget {
-  final bool tieneSesion;
-  const HetnaCncApp({super.key, required this.tieneSesion});
+  const HetnaCncApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -93,8 +98,7 @@ class HetnaCncApp extends StatelessWidget {
           labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
         ),
       ),
-      // Si hay sesión activa → HomeScreen, si no → LoginScreen
-      home: tieneSesion ? const HomeScreen() : const LoginScreen(),
+      home: const HomeScreen(),
     );
   }
 }
