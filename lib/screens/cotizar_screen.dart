@@ -766,8 +766,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                             backgroundColor: AppColors.rojo));
                       }
                     });
-                })),
-              ]));  }));
+                }));
+              })),
             ]))));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
