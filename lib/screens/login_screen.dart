@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import 'registro_taller_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -194,6 +195,27 @@ class _LoginScreenState extends State<LoginScreen> {
                     ])),
 
                   const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
+                  const SizedBox(height: 16),
+                  const Text('Nuevo taller',
+                    style: TextStyle(fontSize: 13, color: AppColors.textoSecundario),
+                    textAlign: TextAlign.center),
+                  const SizedBox(height: 8),
+                  SizedBox(width: double.infinity, height: 44,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const RegistroTallerScreen())),
+                      icon: const Icon(Icons.store_outlined, color: AppColors.azul, size: 18),
+                      label: const Text('Registrar mi taller',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                          color: AppColors.azul)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.azul),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10))))),
+                  const SizedBox(height: 24),
+
                   const Text('Acceso restringido - Solo personal autorizado',
                     style: TextStyle(fontSize: 11, color: Colors.white38),
                     textAlign: TextAlign.center),
