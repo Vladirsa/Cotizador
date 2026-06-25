@@ -277,16 +277,16 @@ class PdfService {
           padding: const pw.EdgeInsets.all(16),
           decoration: const pw.BoxDecoration(color: azul),
           child: pw.Row(children: [
-            if (logoImage != null) ...[
-              pw.Container(
-                width: 50, height: 50,
-                decoration: pw.BoxDecoration(
-                  color: PdfColors.white,
-                  borderRadius: pw.BorderRadius.circular(8)),
-                padding: const pw.EdgeInsets.all(4),
-                child: pw.Image(logoImage, fit: pw.BoxFit.contain)),
-              pw.SizedBox(width: 12),
-            ],
+            logoImage != null
+              ? pw.Container(
+                  width: 50, height: 50,
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.white,
+                    borderRadius: pw.BorderRadius.circular(8)),
+                  padding: const pw.EdgeInsets.all(4),
+                  margin: const pw.EdgeInsets.only(right: 12),
+                  child: pw.Image(logoImage, fit: pw.BoxFit.contain))
+              : pw.SizedBox(width: 0),
             pw.Expanded(child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text(nombreEmpresa,
@@ -336,10 +336,10 @@ class PdfService {
                 children: [
                   pw.Padding(padding: const pw.EdgeInsets.all(8),
                     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                      pw.Text(p.nombre,
+                      pw.Text(_limpiarTexto(p.nombre),
                         style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
                       if (p.descripcion != null && p.descripcion!.isNotEmpty)
-                        pw.Text(p.descripcion!,
+                        pw.Text(_limpiarTexto(p.descripcion!),
                           style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
                     ])),
                   pw.Padding(padding: const pw.EdgeInsets.all(8),
