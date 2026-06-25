@@ -362,11 +362,10 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
   Future<void> _entrarAlApp() async {
     setState(() => _cargando = true);
     try {
-      // La sesión ya está activa desde el signUp
-      // Solo inicializamos el AuthService
       final session = _sb.auth.currentSession;
       if (session != null) {
-        await AuthService.cargarPerfil();
+        // Cargar datos del usuario en AuthService
+        // El HomeScreen carga el perfil automáticamente al iniciar
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -374,7 +373,7 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         }
       }
     } catch (e) {
-      // Si falla, regresar a login
+      print('Error entrando al app: $e');
       if (mounted) Navigator.pop(context);
     } finally {
       if (mounted) setState(() => _cargando = false);
