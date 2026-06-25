@@ -1,0 +1,660 @@
+// lib/screens/equipo_screen.dart
+// HETNA CNC — Gestión de equipo y roles
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../main.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/auth_service.dart';
+
+// ══════════════════════════════════════════════════════
+// MODELO
+// ══════════════════════════════════════════════════════
+class UsuarioNegocio {
+  final String id;
+  final String userId;
+  final String negocioId;
+  final String rol;
+  final String? nombre;
+  final String? correo;
+  final bool activo;
+  final DateTime? createdAt;
+
+  UsuarioNegocio({
+    required this.id, required this.userId, required this.negocioId,
+    required this.rol, this.nombre, this.correo,
+    this.activo = true, this.createdAt,
+  });
+
+  factory UsuarioNegocio.fromJson(Map<String, dynamic> j) => UsuarioNegocio(
+    id: j['id'] as String,
+    userId: j['user_id'] as String,
+    negocioId: j['negocio_id'] as String,
+    rol: j['rol'] as String,
+    nombre: j['nombre'] as String?,
+    correo: j['correo'] as String?,
+    activo: j['activo'] as bool? ?? true,
+    createdAt: j['created_at'] != null ? DateTime.parse(j['created_at']) : null,
+  );
+
+  String get rolLabel {
+    switch (rol) {
+      case 'super_admin':   return 'Super Admin';
+      case 'administrador': return 'Administrador';
+      case 'vendedor':      return 'Vendedor';
+      case 'operador_cnc':  return 'Operador CNC';
+      case 'almacenista':   return 'Almacenista';
+      case 'contador':      return 'Contador';
+      default:              return rol;
+    }
+  }
+
+  String get rolEmoji {
+    switch (rol) {
+      case 'super_admin':   return '👑';
+      case 'administrador': return '🔑';
+      case 'vendedor':      return '💼';
+      case 'operador_cnc':  return '⚙️';
+      case 'almacenista':   return '📦';
+      case 'contador':      return '💰';
+      default:              return '👤';
+    }
+  }
+
+  Color rolColor(BuildContext context) {
+    switch (rol) {
+      case 'super_admin':   return const Color(0xFF7c3aed);
+      case 'administrador': return AppColors.azul;
+      case 'vendedor':      return AppColors.verde;
+      case 'operador_cnc':  return AppColors.ambar;
+      case 'almacenista':   return const Color(0xFF92400e);
+      case 'contador':      return AppColors.rojo;
+      default:              return AppColors.textoSecundario;
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// PERMISOS POR ROL
+// ══════════════════════════════════════════════════════
+const _permisosRol = {
+  'administrador': [
+    '✅ Todo el sistema',
+    '✅ Crear y editar usuarios',
+    '✅ Ver finanzas y gastos',
+    '✅ Configuración del negocio',
+    '✅ Eliminar registros',
+  ],
+  'vendedor': [
+    '✅ Cotizaciones (crear/editar/enviar)',
+    '✅ Clientes y CRM',
+    '✅ Ver pedidos',
+    '✅ Alertas y seguimiento',
+    '✅ Marketing y campañas',
+    '❌ Finanzas y gastos',
+    '❌ Configuración',
+  ],
+  'operador_cnc': [
+    '✅ Ver pedidos asignados',
+    '✅ Actualizar etapas de producción',
+    '✅ Ver inventario de materiales',
+    '❌ Cotizaciones',
+    '❌ Clientes',
+    '❌ Finanzas',
+  ],
+  'almacenista': [
+    '✅ Inventario completo',
+    '✅ Entradas y salidas de material',
+    '✅ Ver pedidos (solo materiales)',
+    '❌ Cotizaciones',
+    '❌ Clientes',
+    '❌ Finanzas',
+  ],
+  'contador': [
+    '✅ Gastos e ingresos',
+    '✅ Dashboard financiero',
+    '✅ Exportar reportes',
+    '✅ Ver cotizaciones (solo montos)',
+    '❌ Editar cotizaciones',
+    '❌ Clientes',
+  ],
+};
+
+// ══════════════════════════════════════════════════════
+// PANTALLA PRINCIPAL
+// ══════════════════════════════════════════════════════
+class EquipoScreen extends StatefulWidget {
+  const EquipoScreen({super.key});
+  @override
+  State<EquipoScreen> createState() => _EquipoScreenState();
+}
+
+class _EquipoScreenState extends State<EquipoScreen> {
+  List<UsuarioNegocio> _usuarios = [];
+  bool _cargando = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
+    try {
+      final data = await AuthService.getUsuariosNegocio();
+      if (mounted) setState(() {
+        _usuarios = data.map((j) => UsuarioNegocio.fromJson(j)).toList();
+        _cargando = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final esAdmin = AuthService.esAdmin;
+
+    return Scaffold(
+      backgroundColor: AppColors.gris,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        title: const Text('Mi equipo',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
+        actions: [
+          if (esAdmin)
+            TextButton.icon(
+              onPressed: _invitarUsuario,
+              icon: const Icon(Icons.person_add_outlined, color: AppColors.azul, size: 18),
+              label: const Text('Invitar', style: TextStyle(color: AppColors.azul, fontWeight: FontWeight.w600))),
+        ]),
+      body: _cargando
+        ? const Center(child: CircularProgressIndicator())
+        : RefreshIndicator(
+            onRefresh: _cargar,
+            child: ListView(padding: const EdgeInsets.all(14), children: [
+
+              // ── Mi perfil ──
+              _seccion('MI PERFIL'),
+              _cardMiPerfil(),
+              const SizedBox(height: 16),
+
+              // ── Equipo ──
+              _seccion('EQUIPO DEL TALLER (${_usuarios.length})'),
+              if (_usuarios.isEmpty)
+                _cardVacio()
+              else
+                ..._usuarios.map((u) => _cardUsuario(u, esAdmin)),
+
+              const SizedBox(height: 16),
+
+              // ── Roles y permisos (info) ──
+              _seccion('ROLES Y PERMISOS'),
+              _cardRolesInfo(),
+
+              const SizedBox(height: 20),
+            ])));
+  }
+
+  // ── Mi perfil ──────────────────────────────────────
+  Widget _cardMiPerfil() {
+    final nombre = AuthService.nombreUsuario ?? 'Usuario';
+    final rol = AuthService.rol ?? '';
+    final correo = AuthService.usuarioActual?.email ?? '';
+    final usu = UsuarioNegocio(
+      id: '', userId: '', negocioId: '',
+      rol: rol, nombre: nombre, correo: correo);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.azul, Color(0xFF2d5a8e)]),
+        borderRadius: BorderRadius.circular(14)),
+      child: Row(children: [
+        _avatar(nombre, usu.rolColor(context), size: 50),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(nombre, style: const TextStyle(
+            fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white)),
+          Text(correo, style: const TextStyle(
+            fontSize: 12, color: Colors.white70)),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20)),
+            child: Text('${usu.rolEmoji} ${usu.rolLabel}',
+              style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600))),
+        ])),
+        IconButton(
+          icon: const Icon(Icons.edit_outlined, color: Colors.white70, size: 20),
+          onPressed: () => _editarPerfil(nombre)),
+      ]));
+  }
+
+  // ── Card usuario ────────────────────────────────────
+  Widget _cardUsuario(UsuarioNegocio u, bool esAdmin) {
+    final esMismoUsuario = u.userId == AuthService.usuarioActual?.id;
+    final color = u.rolColor(context);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: u.activo ? Colors.white : AppColors.gris,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: u.activo ? AppColors.grisBorde : AppColors.grisBorde,
+          width: 0.5),
+        boxShadow: u.activo ? [BoxShadow(
+          color: Colors.black.withOpacity(0.03),
+          blurRadius: 6, offset: const Offset(0, 2))] : null),
+      child: Row(children: [
+        Stack(children: [
+          _avatar(u.nombre ?? u.correo ?? '?', color),
+          if (!u.activo)
+            Positioned(bottom: 0, right: 0,
+              child: Container(
+                width: 14, height: 14,
+                decoration: BoxDecoration(
+                  color: AppColors.rojo, shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5)),
+                child: const Icon(Icons.close, size: 8, color: Colors.white))),
+        ]),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(u.nombre ?? 'Sin nombre', style: TextStyle(
+              fontSize: 14, fontWeight: FontWeight.w700,
+              color: u.activo ? AppColors.textoPrincipal : AppColors.textoSecundario)),
+            if (esMismoUsuario) ...[
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: AppColors.azulClaro,
+                  borderRadius: BorderRadius.circular(10)),
+                child: const Text('Tú', style: TextStyle(fontSize: 9, color: AppColors.azul, fontWeight: FontWeight.w700))),
+            ],
+          ]),
+          if (u.correo != null)
+            Text(u.correo!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20)),
+            child: Text('${u.rolEmoji} ${u.rolLabel}',
+              style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600))),
+        ])),
+        if (esAdmin && !esMismoUsuario)
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: AppColors.textoSecundario, size: 20),
+            onSelected: (accion) => _accionUsuario(accion, u),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'cambiar_rol', child: Row(children: [
+                Icon(Icons.manage_accounts_outlined, size: 16), SizedBox(width: 8),
+                Text('Cambiar rol', style: TextStyle(fontSize: 13)),
+              ])),
+              PopupMenuItem(value: u.activo ? 'desactivar' : 'activar',
+                child: Row(children: [
+                  Icon(u.activo ? Icons.block_outlined : Icons.check_circle_outline, size: 16,
+                    color: u.activo ? AppColors.rojo : AppColors.verde),
+                  const SizedBox(width: 8),
+                  Text(u.activo ? 'Desactivar' : 'Activar',
+                    style: TextStyle(fontSize: 13, color: u.activo ? AppColors.rojo : AppColors.verde)),
+                ])),
+            ]),
+      ]));
+  }
+
+  Widget _cardVacio() => Container(
+    padding: const EdgeInsets.all(24),
+    decoration: BoxDecoration(
+      color: Colors.white, borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+    child: Column(children: [
+      const Icon(Icons.group_outlined, size: 48, color: AppColors.grisBorde),
+      const SizedBox(height: 12),
+      const Text('No hay usuarios registrados',
+        style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
+      const SizedBox(height: 8),
+      TextButton.icon(
+        onPressed: _invitarUsuario,
+        icon: const Icon(Icons.person_add_outlined, size: 16),
+        label: const Text('Invitar primer usuario')),
+    ]));
+
+  // ── Roles info ──────────────────────────────────────
+  Widget _cardRolesInfo() {
+    final roles = ['administrador', 'vendedor', 'operador_cnc', 'almacenista', 'contador'];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white, borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+      child: ExpansionTile(
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        title: const Text('Ver permisos por rol',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.azul)),
+        leading: const Icon(Icons.shield_outlined, color: AppColors.azul),
+        children: roles.map((rol) {
+          final uTmp = UsuarioNegocio(id:'', userId:'', negocioId:'', rol: rol);
+          final color = uTmp.rolColor(context);
+          final permisos = _permisosRol[rol] ?? [];
+          return Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: color.withOpacity(0.15))),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+              const SizedBox(height: 8),
+              ...permisos.map((p) => Padding(
+                padding: const EdgeInsets.only(bottom: 3),
+                child: Text(p, style: const TextStyle(fontSize: 12, color: AppColors.textoPrincipal)))),
+            ]));
+        }).toList()));
+  }
+
+  // ── INVITAR USUARIO ─────────────────────────────────
+  void _invitarUsuario() {
+    String rolSel = 'vendedor';
+    final nombreCtrl = TextEditingController();
+    final correoCtrl = TextEditingController();
+    final uidCtrl = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(builder: (ctx, setS) =>
+        Container(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            left: 16, right: 16, top: 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+          child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 36, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            const Text('Agregar usuario al taller',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            const Text('El usuario debe existir en Supabase Auth.\nCrea la cuenta primero desde el Dashboard de Supabase.',
+              style: TextStyle(fontSize: 12, color: AppColors.textoSecundario),
+              textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+
+            // Instrucciones
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.azulClaro,
+                borderRadius: BorderRadius.circular(10)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('📋 Pasos para agregar un usuario:',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
+                const SizedBox(height: 6),
+                const Text('1. Ve a supabase.com → tu proyecto\n2. Authentication → Users → Add user\n3. Crea la cuenta con correo y contraseña\n4. Copia el UID que aparece\n5. Pégalo aquí abajo',
+                  style: TextStyle(fontSize: 11, color: AppColors.azul)),
+              ])),
+            const SizedBox(height: 14),
+
+            // UID
+            TextField(
+              controller: uidCtrl,
+              decoration: InputDecoration(
+                labelText: 'UID del usuario (de Supabase Auth)',
+                hintText: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
+                prefixIcon: const Icon(Icons.key_outlined, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                isDense: true),
+              style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
+            const SizedBox(height: 10),
+
+            // Nombre
+            TextField(
+              controller: nombreCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: InputDecoration(
+                labelText: 'Nombre completo',
+                prefixIcon: const Icon(Icons.person_outline, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                isDense: true)),
+            const SizedBox(height: 10),
+
+            // Correo
+            TextField(
+              controller: correoCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Correo electrónico',
+                prefixIcon: const Icon(Icons.email_outlined, size: 18),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                isDense: true)),
+            const SizedBox(height: 12),
+
+            // Rol
+            const Align(alignment: Alignment.centerLeft,
+              child: Text('Rol asignado:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, runSpacing: 6,
+              children: ['vendedor','operador_cnc','almacenista','contador','administrador'].map((r) {
+                final uTmp = UsuarioNegocio(id:'', userId:'', negocioId:'', rol: r);
+                final sel = rolSel == r;
+                final color = uTmp.rolColor(context);
+                return GestureDetector(
+                  onTap: () => setS(() => rolSel = r),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: sel ? color : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: sel ? color : AppColors.grisBorde)),
+                    child: Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
+                      style: TextStyle(fontSize: 11,
+                        color: sel ? Colors.white : AppColors.textoSecundario,
+                        fontWeight: sel ? FontWeight.w600 : FontWeight.normal))));
+              }).toList()),
+            const SizedBox(height: 16),
+
+            SizedBox(width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  final uid = uidCtrl.text.trim();
+                  final nombre = nombreCtrl.text.trim();
+                  final correo = correoCtrl.text.trim();
+                  if (uid.isEmpty || nombre.isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                      content: Text('UID y nombre son obligatorios'),
+                      backgroundColor: AppColors.rojo));
+                    return;
+                  }
+                  Navigator.pop(ctx);
+                  final error = await AuthService.registrarUsuarioEnNegocio(
+                    userId: uid, nombre: nombre,
+                    correo: correo, rol: rolSel);
+                  if (error != null) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $error'),
+                        backgroundColor: AppColors.rojo));
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('✅ Usuario agregado al taller'),
+                        backgroundColor: AppColors.verde));
+                      _cargar();
+                    }
+                  }
+                },
+                icon: const Icon(Icons.person_add_outlined, color: Colors.white, size: 18),
+                label: const Text('Agregar al taller',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.azul,
+                  padding: const EdgeInsets.symmetric(vertical: 12)))),
+          ])))));
+  }
+
+  // ── EDITAR PERFIL ───────────────────────────────────
+  void _editarPerfil(String nombreActual) {
+    final ctrl = TextEditingController(text: nombreActual);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Editar mi nombre'),
+        content: TextField(
+          controller: ctrl,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(labelText: 'Nombre completo')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // Actualizar en usuarios_negocio
+              try {
+                final sb = await AuthService.getUsuariosNegocio();
+                final mio = sb.firstWhere((u) => u['user_id'] == AuthService.usuarioActual?.id);
+                await AuthService.registrarUsuarioEnNegocio(
+                  userId: mio['user_id'],
+                  nombre: ctrl.text.trim(),
+                  correo: mio['correo'] ?? '',
+                  rol: mio['rol']);
+                _cargar();
+              } catch (_) {}
+            },
+            child: const Text('Guardar')),
+        ]));
+  }
+
+  // ── ACCIONES SOBRE USUARIO ──────────────────────────
+  void _accionUsuario(String accion, UsuarioNegocio u) async {
+    if (accion == 'cambiar_rol') {
+      _cambiarRol(u);
+    } else if (accion == 'desactivar') {
+      final conf = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Desactivar usuario'),
+          content: Text('¿Desactivar a ${u.nombre ?? u.correo}? Ya no podrá acceder a la app.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
+              child: const Text('Desactivar', style: TextStyle(color: Colors.white))),
+          ]));
+      if (conf == true) {
+        await AuthService.desactivarUsuario(u.id);
+        _cargar();
+      }
+    } else if (accion == 'activar') {
+      await _activarUsuario(u.id);
+      _cargar();
+    }
+  }
+
+  Future<void> _activarUsuario(String id) async {
+    try {
+      await Supabase.instance.client
+        .from('usuarios_negocio')
+        .update({'activo': true})
+        .eq('id', id);
+    } catch (_) {}
+  }
+
+  // ── CAMBIAR ROL ─────────────────────────────────────
+  void _cambiarRol(UsuarioNegocio u) {
+    String rolSel = u.rol;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(builder: (ctx, setS) =>
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 36, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 16),
+            Text('Cambiar rol de ${u.nombre ?? "usuario"}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 16),
+            Wrap(spacing: 8, runSpacing: 8,
+              children: ['administrador','vendedor','operador_cnc','almacenista','contador'].map((r) {
+                final uTmp = UsuarioNegocio(id:'', userId:'', negocioId:'', rol: r);
+                final sel = rolSel == r;
+                final color = uTmp.rolColor(context);
+                return GestureDetector(
+                  onTap: () => setS(() => rolSel = r),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: sel ? color : Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: sel ? color : AppColors.grisBorde)),
+                    child: Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
+                      style: TextStyle(fontSize: 12,
+                        color: sel ? Colors.white : AppColors.textoSecundario,
+                        fontWeight: sel ? FontWeight.w700 : FontWeight.normal))));
+              }).toList()),
+            const SizedBox(height: 16),
+            SizedBox(width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await AuthService.registrarUsuarioEnNegocio(
+                      userId: u.userId,
+                      nombre: u.nombre ?? '',
+                      correo: u.correo ?? '',
+                      rol: rolSel);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('✅ Rol actualizado'),
+                        backgroundColor: AppColors.verde));
+                      _cargar();
+                    }
+                  } catch (e) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error: $e'),
+                        backgroundColor: AppColors.rojo));
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.azul,
+                  padding: const EdgeInsets.symmetric(vertical: 12)),
+                child: const Text('Guardar cambio',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
+          ]))));
+  }
+
+  // ── HELPERS ─────────────────────────────────────────
+  Widget _avatar(String nombre, Color color, {double size = 40}) {
+    final inicial = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
+    return Container(
+      width: size, height: size,
+      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(size / 4)),
+      child: Center(child: Text(inicial,
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700,
+          fontSize: size * 0.4))));
+  }
+
+  Widget _seccion(String titulo) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Text(titulo, style: const TextStyle(
+      fontSize: 10, fontWeight: FontWeight.w700,
+      color: AppColors.textoSecundario, letterSpacing: 1.5)));
+}

@@ -16,6 +16,8 @@ import 'gastos_screen.dart';
 import 'marketing_screen.dart';
 import 'config_screen.dart';
 import 'simulador_screen.dart';
+import 'agenda_screen.dart';
+import 'equipo_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,19 +36,21 @@ class _HomeScreenState extends State<HomeScreen> {
     CotizarScreen(),
     AvancesScreen(),
     SimuladorScreen(),
+    AgendaScreen(),
   ];
 
   // Pantallas del menú "Más"
   Widget _pantallaExtra(int tab) {
     switch (tab) {
-      case 5: return const ClientesScreen();
-      case 6: return const ProductosScreen();
-      case 7: return const InventarioScreen();
-      case 8: return const GastosScreen();
-      case 9: return const MarketingScreen();
-      case 10: return const ConfigScreen();
-      case 11: return const CuponesScreen();
-      case 12: return const CitasScreen();
+      case 6: return const ClientesScreen();
+      case 7: return const ProductosScreen();
+      case 8: return const InventarioScreen();
+      case 9: return const GastosScreen();
+      case 10: return const MarketingScreen();
+      case 11: return const EquipoScreen();
+      case 12: return const ConfigScreen();
+      case 13: return const CuponesScreen();
+      case 14: return const CitasScreen();
       default: return const InicioScreen();
     }
   }
@@ -64,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _tab < 5
+      body: _tab < 6
         ? IndexedStack(index: _tab, children: _principales)
         : _pantallaExtra(_tab),
       drawer: _drawer(),
@@ -81,6 +85,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _btn(2, Icons.description_outlined, 'Cotizar'),
       _btn(3, Icons.local_shipping_outlined, 'Avances'),
       _btn(4, Icons.calculate_outlined, 'Simular'),
+      _btn(5, Icons.calendar_month_outlined, 'Agenda'),
       // Botón Más
       Expanded(child: Builder(builder: (ctx) => GestureDetector(
         onTap: () => Scaffold.of(ctx).openDrawer(),
@@ -125,15 +130,16 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(AuthService.nombreUsuario ?? 'Usuario', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
           Text(AuthService.rol ?? '', style: const TextStyle(color: Colors.white60, fontSize: 11)),
         ])),
-      _dItem(Icons.people_outline, 'CRM Clientes', 5),
-      _dItem(Icons.inventory_2_outlined, 'Productos y Catálogo', 6),
-      _dItem(Icons.warehouse_outlined, 'Inventario Bodega', 7),
-      _dItem(Icons.receipt_long_outlined, 'Gastos y Compras', 8),
-      _dItem(Icons.campaign_outlined, 'Marketing', 9),
+      _dItem(Icons.people_outline, 'CRM Clientes', 6),
+      _dItem(Icons.inventory_2_outlined, 'Productos y Catálogo', 7),
+      _dItem(Icons.warehouse_outlined, 'Inventario Bodega', 8),
+      _dItem(Icons.receipt_long_outlined, 'Gastos y Compras', 9),
+      _dItem(Icons.campaign_outlined, 'Marketing', 10),
+      _dItem(Icons.group_outlined, 'Mi equipo', 11),
       const Divider(height: 1),
-      _dItem(Icons.settings_outlined, 'Configuración', 10),
-      _dItem(Icons.discount_outlined, 'Cupones', 11),
-      _dItem(Icons.event_outlined, 'Citas', 12),
+      _dItem(Icons.settings_outlined, 'Configuración', 12),
+      _dItem(Icons.discount_outlined, 'Cupones', 13),
+      _dItem(Icons.event_outlined, 'Citas', 14),
       const Divider(height: 1),
       ListTile(
         leading: const Icon(Icons.logout_outlined, color: AppColors.rojo, size: 22),
