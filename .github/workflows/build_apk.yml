@@ -32,6 +32,7 @@ jobs:
         run: |
           MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
           grep -q "INTERNET" $MANIFEST || sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' $MANIFEST
+          grep -q "READ_CONTACTS" $MANIFEST || sed -i 's|</manifest>|    <uses-permission android:name="android.permission.READ_CONTACTS"/>\n    <uses-permission android:name="android.permission.WRITE_CONTACTS"/>\n</manifest>|' $MANIFEST
           cat $MANIFEST
       - name: Inject HETNA CNC App Icon
         run: |
