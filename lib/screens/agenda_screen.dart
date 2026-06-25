@@ -591,7 +591,7 @@ class _AgendaScreenState extends State<AgendaScreen>
                     child: const Icon(Icons.check, size: 14, color: Colors.white))),
                 if (e.completado) const Icon(Icons.check_circle, size: 18, color: AppColors.verde),
               ]),
-            ]))));
+            ])))));
   }
 
   // ── DETALLE EVENTO ──────────────────────────────────
