@@ -13,10 +13,6 @@ dependencies:
   # Backend
   supabase_flutter: 1.10.25
 
-  # Firebase / FCM
-  firebase_core: ^2.27.1
-  firebase_messaging: ^14.7.19
-
   # PDF y compartir
   pdf: ^3.10.8
   printing: ^5.12.0
