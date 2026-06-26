@@ -173,17 +173,22 @@ class ResultadoSimulador {
   final double extras;
   final double acabado;
   final double subtotal;
+  final double iva;
   final double total;
   final String descripcion;
   final Map<String, String> desglose;
+  final bool incluyeIva;
 
   ResultadoSimulador({
     required this.servicio, required this.emoji,
     required this.maquila, required this.extras,
     required this.acabado, required this.subtotal,
-    required this.total, required this.descripcion,
-    required this.desglose,
+    this.iva = 0, required this.total,
+    required this.descripcion, required this.desglose,
+    this.incluyeIva = false,
   });
+
+  double get totalConIva => incluyeIva ? subtotal + iva : subtotal;
 }
 
 // ══════════════════════════════════════════════════════
@@ -395,6 +400,8 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   SimConfig? _config;
   bool _cargando = true;
   ResultadoSimulador? _resultado;
+  bool _aplicarIva = true;
+  static const double _ivaPct = 16.0;
 
   // Campos del formulario
   SimMaterial? _matSel;
@@ -440,12 +447,24 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       final areaMin = cfg.getTarifa('area_minima_m2');
       final pedMin = cfg.getTarifa('pedido_minimo');
 
-      // Determinar tarifa según material
+      // Determinar tarifa según material + calibre
       String claveTarifa = 'tarifa_m2_acero';
       if (_matSel?.nombre.toLowerCase().contains('inox') == true) {
         claveTarifa = 'tarifa_m2_inox';
       } else if (_matSel?.nombre.toLowerCase().contains('aluminio') == true) {
         claveTarifa = 'tarifa_m2_aluminio';
+      }
+      // Calibres gruesos (8, 10) cobran más
+      if (_espSel != null) {
+        final esp = _espSel!.nombre.toLowerCase();
+        if (esp.contains('cal 8') || esp.contains('cal 10')) {
+          // Calibre grueso: usar tarifa mayor
+          final tarifaGruesa = cfg.getTarifa('tarifa_m2_cal10');
+          if (tarifaGruesa > 0) claveTarifa = 'tarifa_m2_cal10';
+        } else if (esp.contains('cal 12') || esp.contains('cal 14') || esp.contains('cal 16')) {
+          final tarifaDelgada = cfg.getTarifa('tarifa_m2_cal12');
+          if (tarifaDelgada > 0) claveTarifa = 'tarifa_m2_cal12';
+        }
       }
 
       final tarifaM2 = cfg.getTarifa(claveTarifa);
@@ -480,16 +499,35 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       desglose['Tarifa'] = '${_fmt.format(tarMin)}/min';
 
     } else if (clave == 'router') {
-      final volumen = _largo * _ancho * _alto;
       final factor = _tipoSel?.factor ?? 1.0;
-      final indice = volumen * factor;
-      maquila = cfg.calcularPrecioRango(indice) * _cantidad;
       final pedMin = cfg.getTarifa('pedido_minimo');
-      if (maquila < pedMin) maquila = pedMin;
-      desglose['Pieza'] = '${_largo}×${_ancho}×${_alto} cm';
-      desglose['Tipo'] = _tipoSel?.nombre ?? '';
-      desglose['Factor'] = '×${factor}';
-      desglose['Indice'] = '${indice.toStringAsFixed(0)}';
+      final esCorte2D = _tipoSel?.nombre.contains('Corte 2D') == true;
+
+      if (esCorte2D) {
+        // Corte 2D: cobrar por área (m²) como plasma
+        final areaM2 = (_largo / 100) * (_ancho / 100);
+        final tarifaM2 = cfg.getTarifa('tarifa_m2_corte') > 0
+          ? cfg.getTarifa('tarifa_m2_corte')
+          : (cfg.getTarifa('tarifa_hoja_normal') / (1.22 * 2.44));
+        maquila = tarifaM2 * areaM2 * _cantidad;
+        desglose['Área'] = '${_largo}×${_ancho} cm = ${areaM2.toStringAsFixed(3)} m²';
+        desglose['Tarifa corte'] = '${_fmt.format(tarifaM2)}/m²';
+      } else {
+        // Talla 3D / Relieve: cobrar por índice de volumen
+        final volumen = _largo * _ancho * _alto;
+        final indice = volumen * factor;
+        maquila = cfg.calcularPrecioRango(indice) * _cantidad;
+        desglose['Pieza'] = '${_largo}×${_ancho}×${_alto} cm';
+        desglose['Tipo'] = _tipoSel?.nombre ?? '';
+        desglose['Factor complejidad'] = '×${factor}';
+        desglose['Índice'] = '${indice.toStringAsFixed(0)}';
+        desglose['Rango aplicado'] = _fmt.format(cfg.calcularPrecioRango(indice));
+      }
+
+      if (maquila < pedMin) {
+        desglose['Pedido mínimo aplicado'] = _fmt.format(pedMin);
+        maquila = pedMin;
+      }
 
     } else if (clave == 'impresion_3d') {
       final tarGramo = cfg.getTarifa('tarifa_gramo');
@@ -555,10 +593,16 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     if (_cantidad > 1) desglose['Cantidad'] = '${_cantidad.toInt()} piezas';
 
     final subtotal = maquila + extrasTotal + acabadoTotal;
+    final iva = _aplicarIva ? subtotal * _ivaPct / 100 : 0.0;
+    final total = subtotal + iva;
 
     // Descripción para cotización
     final desc = '${_matSel?.nombre ?? ""} ${_largo}×${_ancho}cm'
       '${_tipoSel != null ? " — ${_tipoSel!.nombre}" : ""}';
+
+    if (_aplicarIva) {
+      desglose['IVA 16%'] = _fmt.format(iva);
+    }
 
     setState(() => _resultado = ResultadoSimulador(
       servicio: widget.servicio.nombre,
@@ -567,9 +611,11 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       extras: extrasTotal,
       acabado: acabadoTotal,
       subtotal: subtotal,
-      total: subtotal,
+      iva: iva,
+      total: total,
       descripcion: desc,
       desglose: desglose,
+      incluyeIva: _aplicarIva,
     ));
   }
 
@@ -734,6 +780,17 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     // ── Cantidad ──
     campos.add(_seccion('Cantidad'));
     campos.add(_campo('Piezas', _cantidad, (v) => setState(() => _cantidad = v)));
+    campos.add(const SizedBox(height: 4));
+
+    // ── IVA ──
+    campos.add(Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      const Text('Incluir IVA 16% en el precio',
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      Switch(
+        value: _aplicarIva,
+        onChanged: (v) => setState(() => _aplicarIva = v),
+        activeColor: AppColors.azul),
+    ]));
 
     return campos;
   }
@@ -750,11 +807,19 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           color: AppColors.azul,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(12))),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text('PRECIO ESTIMADO',
-            style: TextStyle(fontSize: 11, color: Colors.white70, letterSpacing: 1)),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('PRECIO ESTIMADO',
+              style: TextStyle(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
+            if (r.incluyeIva)
+              Text('Sin IVA: ${_fmt.format(r.subtotal)}',
+                style: const TextStyle(fontSize: 11, color: Colors.white60)),
+          ]),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(_fmt.format(r.total),
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white)),
+            if (r.incluyeIva)
+              Text('IVA 16%: +${_fmt.format(r.iva)}',
+                style: const TextStyle(fontSize: 11, color: Colors.white70)),
             if (_cantidad > 1)
               Text('${_fmt.format(r.total / _cantidad)} por pieza',
                 style: const TextStyle(fontSize: 11, color: Colors.white60)),
@@ -791,7 +856,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           child: ElevatedButton.icon(
             onPressed: () => widget.onAgregar(r),
             icon: const Icon(Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
-            label: const Text('Agregar al carrito  (+otro servicio)',
+            label: const Text('Agregar al carrito',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.verde,
@@ -806,107 +871,16 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
       ]));
 
-  Widget _btnCalcular() => Column(children: [
-    // Botón editar tarifas
-    SizedBox(width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: _editarTarifas,
-        icon: const Icon(Icons.tune_outlined, size: 16, color: AppColors.azul),
-        label: const Text('Ver / editar mis tarifas',
-          style: TextStyle(fontSize: 12, color: AppColors.azul)),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.azul),
-          padding: const EdgeInsets.symmetric(vertical: 8)))),
-    const SizedBox(height: 8),
-    // Botón calcular
-    SizedBox(width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _calcular,
-        icon: const Icon(Icons.calculate_outlined, color: Colors.white, size: 18),
-        label: const Text('Calcular precio estimado',
-          style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.azul,
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))),
-  ]);
-
-  // ── EDITAR TARIFAS INLINE ──────────────────────────
-  void _editarTarifas() {
-    if (_config == null) return;
-    final sb = Supabase.instance.client;
-    final ctrls = <String, TextEditingController>{};
-    for (final t in _config!.tarifas.values) {
-      ctrls[t.id] = TextEditingController(
-        text: t.valor % 1 == 0 ? t.valor.toInt().toString() : t.valor.toStringAsFixed(2));
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-          left: 16, right: 16, top: 16),
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('Tarifas — ${widget.servicio.nombre}',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
-            TextButton(
-              onPressed: () async {
-                // Guardar todas las tarifas modificadas
-                for (final t in _config!.tarifas.values) {
-                  final val = double.tryParse(ctrls[t.id]?.text ?? '');
-                  if (val != null && val != t.valor) {
-                    await sb.from('sim_tarifas').update({'valor': val}).eq('id', t.id);
-                    t.valor = val;
-                  }
-                }
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('✅ Tarifas guardadas'),
-                    backgroundColor: AppColors.verde));
-                }
-              },
-              child: const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w700))),
-          ]),
-          const Divider(height: 16),
-          Flexible(child: ListView(shrinkWrap: true,
-            children: _config!.tarifas.values.map((t) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(t.nombre, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  if (t.unidad != null) Text(t.unidad!,
-                    style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-                ])),
-                const SizedBox(width: 10),
-                SizedBox(width: 100,
-                  child: TextFormField(
-                    controller: ctrls[t.id],
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-                    textAlign: TextAlign.right,
-                    decoration: InputDecoration(
-                      isDense: true, filled: true, fillColor: AppColors.gris,
-                      prefixText: '\$',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))))),
-              ]))).toList())),
-        ])));
-
-    // Limpiar controllers al cerrar
-    Future.delayed(const Duration(seconds: 1), () {
-      for (final c in ctrls.values) c.dispose();
-    });
-  }
+  Widget _btnCalcular() => SizedBox(width: double.infinity,
+    child: ElevatedButton.icon(
+      onPressed: _calcular,
+      icon: const Icon(Icons.calculate_outlined, color: Colors.white, size: 18),
+      label: const Text('Calcular precio estimado',
+        style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.azul,
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))));
 
   // ── WIDGETS REUTILIZABLES ───────────────────────────
   Widget _chipSelector<T>(List<T> items, T? sel, String Function(T) label,
