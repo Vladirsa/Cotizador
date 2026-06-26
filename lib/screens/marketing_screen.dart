@@ -2,6 +2,8 @@
 // lib/screens/marketing_screen.dart
 // ============================================
 import 'package:flutter/material.dart';
+import 'cupones_screen.dart';
+import 'plantillas_wa_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../models/models.dart';
@@ -20,7 +22,7 @@ class _MarketingScreenState extends State<MarketingScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -43,13 +45,17 @@ class _MarketingScreenState extends State<MarketingScreen>
           tabs: const [
             Tab(icon: Icon(Icons.inbox_outlined, size: 16), text: 'Cola de hoy'),
             Tab(icon: Icon(Icons.people_outline, size: 16), text: 'Campañas'),
-            Tab(icon: Icon(Icons.message_outlined, size: 16), text: 'Plantillas'),
+            Tab(icon: Icon(Icons.message_outlined, size: 16), text: 'Plantillas WA'),
+            Tab(icon: Icon(Icons.discount_outlined, size: 16), text: 'Cupones'),
+            Tab(icon: Icon(Icons.settings_outlined, size: 16), text: 'Config WA'),
           ]),
       ),
       body: TabBarView(controller: _tabs, children: [
         const _ColaTab(),
         const _CampanasTab(),
         const _PlantillasTab(),
+        const CuponesScreen(),
+        const _ConfigWaTab(),
       ]));
   }
 }
@@ -1032,5 +1038,14 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                       ])));
                   }))),
     ]);
+  }
+}
+
+// ── Tab configuración WhatsApp (plantillas editables) ──
+class _ConfigWaTab extends StatelessWidget {
+  const _ConfigWaTab();
+  @override
+  Widget build(BuildContext context) {
+    return const PlantillasWaScreen();
   }
 }
