@@ -19,8 +19,11 @@ class PlantillaWa {
     required this.mensaje, this.activo = true});
 
   factory PlantillaWa.fromJson(Map<String, dynamic> j) => PlantillaWa(
-    id: j['id'], tipo: j['tipo'], nombre: j['nombre'],
-    mensaje: j['mensaje'], activo: j['activo'] ?? true);
+    id: j['id'],
+    tipo: j['tipo'] ?? j['categoria'] ?? 'general',
+    nombre: j['nombre'] ?? j['titulo'] ?? '',
+    mensaje: j['mensaje'] ?? j['cuerpo'] ?? '',
+    activo: j['activo'] ?? true);
 
   // Variables disponibles para usar en los mensajes
   static const variables = [
@@ -103,7 +106,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
     setState(() => _cargando = true);
     try {
       final results = await Future.wait([
-        _sb.from('plantillas_wa').select().eq('activo', true).order('tipo'),
+        _sb.from('plantillas_wa').select('id, tipo, titulo, cuerpo, nombre, mensaje, activo').eq('activo', true).order('titulo'),
         _sb.from('configuracion_empresa').select(
           'whatsapp_numero, whatsapp_token, whatsapp_modo').maybeSingle(),
       ]);
@@ -507,13 +510,19 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
     try {
       if (p.id != null) {
         await _sb.from('plantillas_wa')
-          .update({'mensaje': nuevoMensaje})
+          .update({
+            'mensaje': nuevoMensaje,
+            'cuerpo': nuevoMensaje, // columna original
+          })
           .eq('id', p.id!);
       } else {
         await _sb.from('plantillas_wa').insert({
           'tipo': p.tipo,
           'nombre': p.nombre,
+          'titulo': p.nombre, // columna original
           'mensaje': nuevoMensaje,
+          'cuerpo': nuevoMensaje, // columna original
+          'categoria': p.tipo,
         });
       }
       setState(() {
@@ -576,7 +585,12 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
 
     for (final d in defaults) {
       try {
-        await _sb.from('plantillas_wa').upsert(d, onConflict: 'negocio_id,tipo');
+        await _sb.from('plantillas_wa').insert({
+          ...d,
+          'titulo': d['nombre'],
+          'cuerpo': d['mensaje'],
+          'categoria': d['tipo'],
+        });
       } catch (_) {}
     }
     _cargar();
