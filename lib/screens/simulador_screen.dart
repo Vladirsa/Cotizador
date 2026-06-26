@@ -132,6 +132,18 @@ class SimuladorDataService {
     return (data as List).map((j) => SimServicio.fromJson(j)).toList();
   }
 
+  // Obtener materiales del inventario para vincular precios
+  static Future<List<Map<String, dynamic>>> getMaterialesInventario() async {
+    try {
+      final data = await _sb
+        .from('inventario_bodega')
+        .select('id, nombre, costo_unitario, unidad, categoria, stock_actual')
+        .eq('activo', true)
+        .order('nombre');
+      return (data as List).cast<Map<String, dynamic>>();
+    } catch (_) { return []; }
+  }
+
   static Future<SimConfig> getConfig(String servicioId) async {
     final results = await Future.wait([
       _sb.from('sim_servicios').select().eq('id', servicioId).single(),
@@ -402,6 +414,8 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   ResultadoSimulador? _resultado;
   bool _aplicarIva = true;
   static const double _ivaPct = 16.0;
+  List<Map<String, dynamic>> _materialesInv = [];
+  Map<String, dynamic>? _materialInvSel; // material del inventario seleccionado
 
   // Campos del formulario
   SimMaterial? _matSel;
@@ -421,9 +435,15 @@ class _PantallaServicioState extends State<_PantallaServicio> {
 
   Future<void> _cargar() async {
     try {
-      final cfg = await SimuladorDataService.getConfig(widget.servicio.id);
+      final results = await Future.wait([
+        SimuladorDataService.getConfig(widget.servicio.id),
+        SimuladorDataService.getMaterialesInventario(),
+      ]);
+      final cfg = results[0] as SimConfig;
+      final inv = results[1] as List<Map<String, dynamic>>;
       if (mounted) setState(() {
         _config = cfg;
+        _materialesInv = inv;
         _cargando = false;
         if (cfg.materiales.isNotEmpty) _matSel = cfg.materiales.first;
         if (cfg.espesores.isNotEmpty) _espSel = cfg.espesores.first;
@@ -592,7 +612,16 @@ class _PantallaServicioState extends State<_PantallaServicio> {
 
     if (_cantidad > 1) desglose['Cantidad'] = '${_cantidad.toInt()} piezas';
 
-    final subtotal = maquila + extrasTotal + acabadoTotal;
+    // Agregar costo de material del inventario si está seleccionado
+    double costoMaterialInv = 0;
+    if (_materialInvSel != null && !_clienteTreMaterial) {
+      costoMaterialInv = ((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0) * _cantidad;
+      if (costoMaterialInv > 0) {
+        desglose['Material (${_materialInvSel!['nombre']})'] = _fmt.format(costoMaterialInv);
+      }
+    }
+
+    final subtotal = maquila + extrasTotal + acabadoTotal + costoMaterialInv;
     final iva = _aplicarIva ? subtotal * _ivaPct / 100 : 0.0;
     final total = subtotal + iva;
 
@@ -651,10 +680,70 @@ class _PantallaServicioState extends State<_PantallaServicio> {
 
     // ── Material ──
     if (cfg.materiales.isNotEmpty) {
-      campos.add(_seccion('Material'));
+      campos.add(_seccion('Tipo de material'));
       campos.add(_chipSelector<SimMaterial>(
         cfg.materiales, _matSel, (m) => m.nombre,
         (m) => setState(() => _matSel = m)));
+      campos.add(const SizedBox(height: 8));
+    }
+
+    // ── Material del inventario (con precio real) ──
+    if (_materialesInv.isNotEmpty) {
+      campos.add(Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('Material del inventario',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(_materialInvSel != null
+          ? '${_fmt.format((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0)}'
+          : 'Sin vincular',
+          style: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w600,
+            color: _materialInvSel != null ? AppColors.verde : AppColors.textoSecundario)),
+      ]));
+      campos.add(const SizedBox(height: 6));
+      campos.add(Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.grisBorde),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.white),
+        child: DropdownButton<String>(
+          value: _materialInvSel?['id'] as String?,
+          isExpanded: true,
+          underline: const SizedBox(),
+          hint: const Text('Seleccionar material del inventario (opcional)',
+            style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+          items: [
+            const DropdownMenuItem<String>(value: null,
+              child: Text('Sin vincular', style: TextStyle(fontSize: 12))),
+            ..._materialesInv.map((m) => DropdownMenuItem<String>(
+              value: m['id'] as String,
+              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Expanded(child: Text(m['nombre'] ?? '',
+                  style: const TextStyle(fontSize: 12),
+                  overflow: TextOverflow.ellipsis)),
+                Text(_fmt.format((m['costo_unitario'] as num?)?.toDouble() ?? 0),
+                  style: const TextStyle(fontSize: 11, color: AppColors.verde,
+                    fontWeight: FontWeight.w600)),
+              ]))),
+          ],
+          onChanged: (id) => setState(() {
+            _materialInvSel = id == null ? null
+              : _materialesInv.firstWhere((m) => m['id'] == id);
+          }))));
+      // Mostrar stock disponible
+      if (_materialInvSel != null) {
+        final stock = _materialInvSel!['stock_actual'] ?? 0;
+        campos.add(Padding(padding: const EdgeInsets.only(top: 4),
+          child: Row(children: [
+            Icon(stock > 0 ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+              size: 14,
+              color: stock > 0 ? AppColors.verde : AppColors.rojo),
+            const SizedBox(width: 4),
+            Text('Stock disponible: $stock ${_materialInvSel!['unidad'] ?? 'pzas'}',
+              style: TextStyle(fontSize: 11,
+                color: stock > 0 ? AppColors.verde : AppColors.rojo)),
+          ])));
+      }
       campos.add(const SizedBox(height: 12));
     }
 
