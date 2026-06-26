@@ -397,12 +397,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     }
     if (widget.carritoSimulador != null) {
       for (final sv in widget.carritoSimulador!) {
-        _items.add(CotizacionItem(
-          nombreProducto: sv.trabajo,
-          cantidad: 1,
-          precioUnitario: sv.precio,
-          sku: sv.maquina,
-        ));
+        try {
+          _items.add(CotizacionItem(
+            nombreProducto: (sv.servicio ?? sv.trabajo ?? 'Servicio').toString(),
+            cantidad: 1,
+            precioUnitario: ((sv.total ?? sv.precio ?? 0) as num).toDouble(),
+            sku: (sv.maquina ?? '').toString(),
+          ));
+        } catch (e) {
+          print('Error agregando item del simulador: $e');
+        }
       }
     }
     if (_esEdicion) {

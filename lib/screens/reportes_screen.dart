@@ -548,6 +548,8 @@ class _ReportesScreenState extends State<ReportesScreen> {
     final bytes = excel.save();
     if (bytes == null) throw Exception('Error al generar el archivo');
     final dir = await getTemporaryDirectory();
+    // Crear directorio si no existe
+    if (!await dir.exists()) await dir.create(recursive: true);
     final archivo = File('${dir.path}/$nombre.xlsx');
     await archivo.writeAsBytes(bytes);
     if (mounted) {
