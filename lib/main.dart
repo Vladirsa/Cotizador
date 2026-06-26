@@ -22,9 +22,15 @@ void main() async {
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await initializeDateFormatting('es_MX', null);
 
-  // Firebase + FCM
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await FcmService.inicializar();
+  // Firebase + FCM (con proteccion contra crash)
+  try {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await FcmService.inicializar();
+    print('Firebase inicializado correctamente');
+  } catch (e) {
+    print('Firebase no disponible: \$e');
+    // La app continua sin FCM si Firebase falla
+  }
 
   // Notificaciones locales (polling)
   await NotificacionesService.inicializar();
