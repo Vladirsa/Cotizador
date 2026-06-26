@@ -1,6 +1,19 @@
+// lib/services/whatsapp_service.dart
+// HETNA CNC — Servicio WhatsApp
+// Usa WhatsApp Business API para enviar desde el número correcto
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WhatsAppService {
+
+  // ── Número Business HETNA CNC ───────────────────────
+  // Solo este número está vinculado con Meta Business API
+  static const String _phoneNumberId = '110027521820458';
+  static const String _businessNumero = '522461217072';
+
+  // ── Normalizar número del CLIENTE ───────────────────
   static String normalizarNumero(String numero) {
     var n = numero.replaceAll(RegExp(r'[^0-9]'), '');
     if (n.isEmpty) return '';
@@ -11,6 +24,9 @@ class WhatsAppService {
     return n;
   }
 
+  // ── ABRIR CHAT (abre WhatsApp del cliente) ───────────
+  // Esto siempre abre la app de WhatsApp en el celular
+  // El usuario debe seleccionar manualmente el número Business
   static Future<bool> abrirChat({
     required String numero,
     required String mensaje,
@@ -18,65 +34,232 @@ class WhatsAppService {
     final n = normalizarNumero(numero);
     if (n.isEmpty) return false;
     try {
-      final uri = Uri.parse('https://wa.me/$n?text=${Uri.encodeComponent(mensaje)}');
+      final uri = Uri.parse(
+        'https://wa.me/$n?text=${Uri.encodeComponent(mensaje)}');
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       return true;
     } catch (_) {
       try {
-        final uri2 = Uri.parse('intent://send/$n#Intent;scheme=whatsapp;package=com.whatsapp;end');
+        final uri2 = Uri.parse(
+          'intent://send/$n#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end');
         await launchUrl(uri2, mode: LaunchMode.externalApplication);
         return true;
       } catch (_) { return false; }
     }
   }
 
+  // ── ENVIAR VÍA API (siempre del número Business) ────
+  // Usa WhatsApp Business API de Meta
+  // Token se guarda en Supabase en configuracion_empresa
+  static Future<bool> enviarViaApi({
+    required String numeroDestino,
+    required String mensaje,
+  }) async {
+    try {
+      final n = normalizarNumero(numeroDestino);
+      if (n.isEmpty) return false;
+
+      // Obtener token de Supabase
+      final config = await Supabase.instance.client
+        .from('configuracion_empresa')
+        .select('whatsapp_token')
+        .maybeSingle();
+
+      final token = config?['whatsapp_token'] as String?;
+      if (token == null || token.isEmpty) {
+        // Si no hay token, abrir app normalmente
+        return abrirChat(numero: numeroDestino, mensaje: mensaje);
+      }
+
+      final res = await http.post(
+        Uri.parse('https://graph.facebook.com/v17.0/$_phoneNumberId/messages'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'messaging_product': 'whatsapp',
+          'to': n,
+          'type': 'text',
+          'text': {'body': mensaje},
+        }));
+
+      return res.statusCode == 200;
+    } catch (_) {
+      // Fallback: abrir app
+      return abrirChat(numero: numeroDestino, mensaje: mensaje);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════
+  // MENSAJES DE SEGUIMIENTO
+  // Editables desde la app en: Más → Config → Plantillas WA
+  // ══════════════════════════════════════════════════════
+
   static String mensajeSeguimiento({
     required String nombreCliente,
     required String tipo,
     String? folio,
     double? total,
+    String? empresa,    // nombre del negocio (configurable)
+    String? telefono,   // teléfono del negocio
   }) {
-    final folioTexto = folio != null && folio.isNotEmpty ? 'cotización *$folio*' : 'tu cotización';
+    final biz = empresa ?? 'HETNA CNC';
+    final tel = telefono ?? '2461217072';
+    final folioTexto = folio != null && folio.isNotEmpty
+      ? 'cotización *$folio*' : 'tu cotización';
+
     switch (tipo) {
+      // ── Día 3: recordatorio suave ──
       case 'seguimiento_dia3':
-        return '¡Hola $nombreCliente! 😊 Te escribo de *HETNA CNC* para saber si pudiste revisar la $folioTexto. ¿Tienes alguna duda? Estamos para ayudarte.';
+        return '''¡Hola *$nombreCliente*! 😊
+
+Te escribo de *$biz* para saber si pudiste revisar la $folioTexto que te enviamos.
+
+¿Tienes alguna duda sobre los materiales, tiempos de entrega o el precio? Estamos aquí para resolverlas.
+
+Escríbeme cuando quieras 👇
+📱 *$tel*''';
+
+      // ── Día 5: seguimiento con propuesta ──
       case 'seguimiento_dia5':
-        return '¡Hola $nombreCliente! Te contacto de *HETNA CNC* sobre la $folioTexto. ¿Podemos platicar para ver si hay algo que ajustar?';
+        return '''¡Hola *$nombreCliente*! 👋
+
+Te contacto de nuevo de *$biz* sobre la $folioTexto.
+
+Entiendo que a veces hay dudas antes de tomar una decisión. Si quieres podemos:
+
+✅ Ajustar el diseño
+✅ Modificar materiales
+✅ Revisar los tiempos de entrega
+
+¿Cuándo tienes 5 minutos para platicar?
+📱 *$tel*''';
+
+      // ── Día 7: urgencia + oferta ──
       case 'seguimiento_dia7':
-        return '¡Hola $nombreCliente! La $folioTexto vence pronto. Si te interesa, podemos hacer un ajuste especial esta semana. 🎯 — *HETNA CNC*';
+        return '''¡Hola *$nombreCliente*! ⏰
+
+La $folioTexto está por vencer. No quiero que pierdas la oportunidad.
+
+Esta semana puedo hacer un ajuste especial si te decides. ¿Le entramos? 🎯
+
+Escríbeme hoy mismo:
+📱 *$tel* — *$biz*''';
+
+      // ── Post entrega: reseña y seguidor ──
       case 'post_entrega':
-        return '¡Hola $nombreCliente! Esperamos que estés disfrutando tu pedido de *HETNA CNC*. ¿Cómo te fue? 😊\n\nSíguenos en @hetna_cnc.';
+        return '''¡Hola *$nombreCliente*! 🎉
+
+Esperamos que estés disfrutando tu pedido de *$biz*. 
+
+Nos encantaría saber cómo te fue y si quedaste satisfecho/a con el resultado.
+
+Si tienes un momento, comparte tu experiencia. ¡Tu opinión nos ayuda a mejorar! 🙏
+
+Síguenos en redes para ver más trabajos:
+📲 @hetna_cnc
+
+¡Gracias por confiar en nosotros! 💙''';
+
+      // ── Recordatorio de pago ──
+      case 'pago_anticipo_pendiente':
+        return '''¡Hola *$nombreCliente*! 💰
+
+Te recuerdo que el anticipo del pedido *${folio ?? ''}* está pendiente para poder iniciar la producción.
+
+Una vez recibido el anticipo, comenzamos de inmediato. 🔧
+
+¿Tienes alguna duda sobre la forma de pago?
+📱 *$tel* — *$biz*''';
+
+      // ── Recordatorio pago final ──
+      case 'pago_final_pendiente':
+        return '''¡Hola *$nombreCliente*! 📦
+
+Tu pedido *${folio ?? ''}* está *LISTO* para entrega.
+
+Para coordinar la entrega necesitamos el pago final.
+
+📱 *$tel* — *$biz*
+
+¡Ya casi es tuyo! 🎉''';
+
+      // ── Cliente interesado ──
+      case 'cliente_interesado':
+        return '''¡Hola *$nombreCliente*! 😊
+
+Vi que estás interesado/a en nuestros productos. En *$biz* hacemos trabajos a medida en:
+
+🔧 Router CNC (madera, MDF)
+🔥 Plasma CNC (acero)
+🔴 Láser (grabado y corte)
+✏️ Diseño digital
+
+¿Tienes algún proyecto en mente? Con gusto te hago una cotización sin compromiso.
+
+📱 *$tel*''';
+
+      // ── Producción sin avance ──
+      case 'produccion_sin_avance':
+        return '''¡Hola *$nombreCliente*! 🔧
+
+Tu pedido *${folio ?? ''}* sigue en producción en *$biz*.
+
+Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunta, estamos disponibles.
+
+📱 *$tel*''';
+
       default:
-        return '¡Hola $nombreCliente! Te escribo de *HETNA CNC*. ¿Podemos ayudarte con algo?';
+        return '¡Hola *$nombreCliente*! Te escribo de *$biz*. ¿Podemos ayudarte con algo?\n📱 $tel';
     }
   }
 
+  // ── Mensajes de avance de pedido ─────────────────────
   static String mensajeAvance({
     required String nombreCliente,
     required String folio,
     required String etapa,
     double? total,
+    String? empresa,
   }) {
+    final biz = empresa ?? 'HETNA CNC';
     switch (etapa) {
-      case 'Pago': return '¡Hola $nombreCliente! ✅ Confirmamos tu pago del pedido *$folio*. Ya empezamos. — *HETNA CNC*';
-      case 'Produccion': return '¡Hola $nombreCliente! 🔧 Tu pedido *$folio* está en producción. — *HETNA CNC*';
-      case 'Pruebas': return '¡Hola $nombreCliente! 🔍 Tu pedido *$folio* está en control de calidad. ¡Casi listo! — *HETNA CNC*';
-      case 'Entrega': return '¡Hola $nombreCliente! 📦 Tu pedido *$folio* está *LISTO*. ¿Cuándo coordinamos? — *HETNA CNC*';
-      case 'Entregado': return '¡Hola $nombreCliente! 🎉 Tu pedido *$folio* fue entregado. ¡Gracias por confiar en *HETNA CNC*!';
-      default: return '¡Hola $nombreCliente! Tu pedido *$folio* está en proceso. — *HETNA CNC*';
+      case 'Pago':
+        return '¡Hola *$nombreCliente*! ✅ Confirmamos tu pago del pedido *$folio*. Ya estamos listos para comenzar. 🔧 — *$biz*';
+      case 'Produccion':
+        return '¡Hola *$nombreCliente*! 🔧 Tu pedido *$folio* ya está en producción. Te avisamos cuando esté listo. — *$biz*';
+      case 'Pruebas':
+        return '¡Hola *$nombreCliente*! 🔍 Tu pedido *$folio* está en control de calidad. ¡Ya casi está listo! — *$biz*';
+      case 'Entrega':
+        return '¡Hola *$nombreCliente*! 📦 Tu pedido *$folio* está *LISTO*. ¿Cuándo coordinamos la entrega? — *$biz*';
+      case 'Entregado':
+        return '¡Hola *$nombreCliente*! 🎉 Tu pedido *$folio* fue entregado exitosamente. ¡Gracias por confiar en *$biz*! Esperamos verte pronto.';
+      default:
+        return '¡Hola *$nombreCliente*! Tu pedido *$folio* sigue en proceso. — *$biz*';
     }
   }
 
+  // ── Enviar cotización por WhatsApp ───────────────────
   static Future<void> enviarCotizacion({
     required dynamic cotizacion,
     required String nombreCliente,
     required String whatsapp,
     required String empresa,
   }) async {
-    final msg = '¡Hola $nombreCliente! Te compartimos tu cotización de *HETNA CNC*. Quedamos a tus órdenes.';
+    final folio = cotizacion?.folio ?? '';
+    final msg = '''¡Hola *$nombreCliente*! 😊
+
+Te comparto la cotización *$folio* de *HETNA CNC*.
+
+Incluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.
+
+¡Quedamos a tus órdenes! 💙
+📱 2461217072''';
     await abrirChat(numero: whatsapp, mensaje: msg);
   }
 
+  // ── Enviar avance de pedido ──────────────────────────
   static Future<void> enviarAvancePedido({
     required String whatsapp,
     required String nombreCliente,
@@ -84,7 +267,29 @@ class WhatsAppService {
     required String etapa,
     DateTime? fechaEstimada,
   }) async {
-    final msg = mensajeAvance(nombreCliente: nombreCliente, folio: folio, etapa: etapa);
+    final msg = mensajeAvance(
+      nombreCliente: nombreCliente,
+      folio: folio,
+      etapa: etapa);
     await abrirChat(numero: whatsapp, mensaje: msg);
   }
+
+  // ══════════════════════════════════════════════════════
+  // DÓNDE EDITAR LOS MENSAJES
+  // ══════════════════════════════════════════════════════
+  // Los mensajes se pueden personalizar de 3 formas:
+  //
+  // 1. DESDE LA APP:
+  //    Más → Marketing → Plantillas WA
+  //    (si tienes plantillas guardadas en Supabase,
+  //     se usan en lugar de los mensajes de aquí)
+  //
+  // 2. DIRECTAMENTE EN SUPABASE:
+  //    Tabla: plantillas_wa
+  //    Columnas: tipo, mensaje, activo
+  //
+  // 3. EN ESTE ARCHIVO (cambio permanente):
+  //    Editar los textos en mensajeSeguimiento()
+  //    y volver a compilar la app
+  // ══════════════════════════════════════════════════════
 }
