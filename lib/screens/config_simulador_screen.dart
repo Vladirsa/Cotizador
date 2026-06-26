@@ -1,6 +1,7 @@
 // lib/screens/config_simulador_screen.dart
 // HETNA CNC — Configuración del simulador (solo admin)
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
@@ -504,7 +505,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
             border: OutlineInputBorder())),
         const SizedBox(height: 10),
         TextField(controller: unidadCtrl,
-          decoration: const InputDecoration(labelText: 'Unidad ($/m2, $/min...)',
+          decoration: const InputDecoration(labelText: 'Unidad (\$/m2, \$/min...)',
             isDense: true, border: OutlineInputBorder())),
       ], onGuardar: () async {
         await _sb.from('sim_tarifas').insert({
