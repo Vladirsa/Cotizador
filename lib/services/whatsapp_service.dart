@@ -96,6 +96,74 @@ class WhatsAppService {
   // Editables desde la app en: Más → Config → Plantillas WA
   // ══════════════════════════════════════════════════════
 
+  // ── LEER PLANTILLA DESDE SUPABASE ──────────────────
+  // Lee el mensaje personalizado del taller desde la BD
+  // Si no hay plantilla, usa el mensaje por defecto del código
+  static Future<String> getPlantilla({
+    required String tipo,
+    required String nombreCliente,
+    String? folio,
+    double? monto,
+    String? empresa,
+    String? telefono,
+  }) async {
+    try {
+      final data = await Supabase.instance.client
+        .from('plantillas_wa')
+        .select('mensaje')
+        .eq('tipo', tipo)
+        .eq('activo', true)
+        .maybeSingle();
+
+      if (data != null && data['mensaje'] != null) {
+        // Reemplazar variables en el mensaje personalizado
+        var msg = data['mensaje'] as String;
+        msg = msg.replaceAll('*NOMBRE*', nombreCliente);
+        msg = msg.replaceAll('*FOLIO*', folio ?? '');
+        msg = msg.replaceAll('*MONTO*', monto != null
+          ? '\$${monto.toStringAsFixed(2)}' : '');
+        msg = msg.replaceAll('*EMPRESA*', empresa ?? 'HETNA CNC');
+        msg = msg.replaceAll('*TELEFONO*', telefono ?? '2461217072');
+        msg = msg.replaceAll('*FECHA*',
+          DateTime.now().toString().substring(0, 10));
+        return msg;
+      }
+    } catch (_) {}
+
+    // Fallback: mensaje por defecto
+    return mensajeSeguimiento(
+      nombreCliente: nombreCliente,
+      tipo: tipo,
+      folio: folio,
+      empresa: empresa,
+      telefono: telefono,
+    );
+  }
+
+  // ── LEER NÚMERO DEL TALLER DESDE SUPABASE ───────────
+  static Future<String> getNumeroTaller() async {
+    try {
+      final data = await Supabase.instance.client
+        .from('configuracion_empresa')
+        .select('whatsapp_numero, whatsapp_modo')
+        .maybeSingle();
+      if (data != null && data['whatsapp_numero'] != null) {
+        return data['whatsapp_numero'] as String;
+      }
+    } catch (_) {}
+    return '2461217072'; // default HETNA CNC
+  }
+
+  static Future<String> getModoEnvio() async {
+    try {
+      final data = await Supabase.instance.client
+        .from('configuracion_empresa')
+        .select('whatsapp_modo')
+        .maybeSingle();
+      return data?['whatsapp_modo'] as String? ?? 'app';
+    } catch (_) { return 'app'; }
+  }
+
   static String mensajeSeguimiento({
     required String nombreCliente,
     required String tipo,
