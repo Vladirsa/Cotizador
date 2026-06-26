@@ -706,6 +706,7 @@ class _AlertasBodyState extends State<AlertasBody> {
                 itemCount: _filtradas.length,
                 itemBuilder: (_, i) => _TarjetaAlerta(
                   alerta: _filtradas[i],
+                  tipos: _tiposB,
                   onCompletada: _cargar)))),
     ]);
   }

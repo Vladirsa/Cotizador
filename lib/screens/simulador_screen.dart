@@ -795,7 +795,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.verde,
-              padding: const EdgeInsets.symmetric(vertical: 12)))),
+              padding: const EdgeInsets.symmetric(vertical: 12))))),
     ]));
 
   Widget _lineaDesglose(String label, double valor) =>
@@ -949,5 +949,5 @@ class _PantallaServicioState extends State<_PantallaServicio> {
 
   Widget _seccion(String t) => Padding(padding: const EdgeInsets.only(bottom: 8),
     child: Text(t, style: const TextStyle(
-      fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textoPrincipal))));
+      fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textoPrincipal)));
 }
