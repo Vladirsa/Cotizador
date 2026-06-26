@@ -608,3 +608,105 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
     }
   }
 }
+
+// ── AlertasBody: versión sin Scaffold para usar en TabBarView ──
+class AlertasBody extends StatefulWidget {
+  const AlertasBody({super.key});
+  @override
+  State<AlertasBody> createState() => _AlertasBodyState();
+}
+
+class _AlertasBodyState extends State<AlertasBody> {
+  List<Alerta> _alertas = [];
+  bool _cargando = true;
+  String _filtro = 'todos';
+
+  static const Map<String, Map<String, dynamic>> _tiposB = {
+    'todos':                   {'label': 'Todos',          'color': Color(0xFF1a3a5c)},
+    'seguimiento_dia3':        {'label': 'Dia 3',          'color': Color(0xFFef9f27)},
+    'seguimiento_dia5':        {'label': 'Dia 5',          'color': Color(0xFFef9f27)},
+    'seguimiento_dia7':        {'label': 'Dia 7',          'color': Color(0xFFe24b4a)},
+    'post_entrega':            {'label': 'Post entrega',   'color': Color(0xFF1d9e75)},
+    'pago_anticipo_pendiente': {'label': 'Anticipo',       'color': Color(0xFFe24b4a)},
+    'pago_final_pendiente':    {'label': 'Pago final',     'color': Color(0xFFe24b4a)},
+    'produccion_sin_avance':   {'label': 'Produccion',     'color': Color(0xFFef9f27)},
+    'cliente_interesado':      {'label': 'Interesado',     'color': Color(0xFF7c3aed)},
+    'recordatorio_cita':       {'label': 'Cita',           'color': Color(0xFF1a3a5c)},
+  };
+
+  List<Alerta> get _filtradas => _filtro == 'todos'
+    ? _alertas : _alertas.where((a) => a.tipo == _filtro).toList();
+
+  @override
+  void initState() { super.initState(); _cargar(); }
+
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
+    try {
+      try { await SupabaseService.generarAlertasAutomaticas(); } catch (_) {}
+      final alertas = await SupabaseService.getAlertasPendientes();
+      if (mounted) setState(() { _alertas = alertas; _cargando = false; });
+    } catch (_) {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tiposActivos = _tiposB.entries
+      .where((e) => e.key == 'todos' || _alertas.any((a) => a.tipo == e.key))
+      .toList();
+
+    return Column(children: [
+      // Barra de acciones
+      Container(
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+        child: Row(children: [
+          Expanded(child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: tiposActivos.map((e) {
+              final sel = _filtro == e.key;
+              final color = e.value['color'] as Color;
+              return GestureDetector(
+                onTap: () => setState(() => _filtro = e.key),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: sel ? color : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: sel ? color : AppColors.grisBorde)),
+                  child: Text(e.value['label'] as String,
+                    style: TextStyle(fontSize: 11,
+                      color: sel ? Colors.white : AppColors.textoSecundario,
+                      fontWeight: sel ? FontWeight.w600 : FontWeight.normal))));
+            }).toList()))),
+          IconButton(
+            icon: const Icon(Icons.add, color: AppColors.azul),
+            onPressed: () => Navigator.push(context,
+              MaterialPageRoute(builder: (_) => _NuevaAlertaScreen(onGuardada: _cargar)))),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.azul, size: 18),
+            onPressed: _cargar),
+        ])),
+      // Lista
+      Expanded(child: _cargando
+        ? const Center(child: CircularProgressIndicator())
+        : _filtradas.isEmpty
+          ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text('🎉', style: TextStyle(fontSize: 40)),
+              SizedBox(height: 8),
+              Text('Sin alertas pendientes', style: TextStyle(color: AppColors.textoSecundario)),
+            ]))
+          : RefreshIndicator(
+              onRefresh: _cargar,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: _filtradas.length,
+                itemBuilder: (_, i) => _TarjetaAlerta(
+                  alerta: _filtradas[i],
+                  onCompletada: _cargar)))),
+    ]);
+  }
+}

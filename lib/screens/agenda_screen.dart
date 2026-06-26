@@ -776,3 +776,309 @@ class _AgendaScreenState extends State<AgendaScreen>
         fontSize: 10, fontWeight: FontWeight.w700,
         color: color, letterSpacing: 1)));
 }
+
+// ── AgendaBody: version sin Scaffold para usar en TabBarView ──
+class AgendaBody extends StatefulWidget {
+  const AgendaBody({super.key});
+  @override
+  State<AgendaBody> createState() => _AgendaBodyState();
+}
+
+class _AgendaBodyState extends State<AgendaBody>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabs;
+  DateTime _mesActual = DateTime.now();
+  DateTime _diaSeleccionado = DateTime.now();
+  List<AgendaEvento> _todosEventos = [];
+  List<AgendaEvento> _eventosDia = [];
+  List<AgendaEvento> _pendientes = [];
+  bool _cargando = true;
+
+  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
+  final _fmtMes   = DateFormat('MMMM yyyy',  'es_MX');
+  final _fmt       = NumberFormat(r'$#,##0',  'es_MX');
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 3, vsync: this);
+    _cargar();
+  }
+
+  @override
+  void dispose() { _tabs.dispose(); super.dispose(); }
+
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
+    final inicio = DateTime(_mesActual.year, _mesActual.month, 1);
+    final fin    = DateTime(_mesActual.year, _mesActual.month + 1, 0);
+    final results = await Future.wait([
+      AgendaService.getEventos(desde: inicio, hasta: fin, soloActivos: false),
+      AgendaService.getEventosDelDia(_diaSeleccionado),
+      AgendaService.getPendientes(),
+    ]);
+    if (mounted) setState(() {
+      _todosEventos = results[0];
+      _eventosDia   = results[1];
+      _pendientes   = results[2];
+      _cargando     = false;
+    });
+  }
+
+  Future<void> _seleccionarDia(DateTime dia) async {
+    setState(() => _diaSeleccionado = dia);
+    final eventos = await AgendaService.getEventosDelDia(dia);
+    if (mounted) setState(() => _eventosDia = eventos);
+  }
+
+  Map<int, List<AgendaEvento>> get _eventosPorDia {
+    final map = <int, List<AgendaEvento>>{};
+    for (final e in _todosEventos) {
+      map.putIfAbsent(e.fechaInicio.day, () => []).add(e);
+    }
+    return map;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) return const Center(child: CircularProgressIndicator());
+    return Column(children: [
+      // Mini tabs internos
+      Container(
+        color: Colors.white,
+        child: Row(children: [
+          Expanded(child: TabBar(
+            controller: _tabs,
+            labelColor: AppColors.azul,
+            unselectedLabelColor: AppColors.textoSecundario,
+            indicatorColor: AppColors.azul,
+            labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+            tabs: [
+              Tab(text: '📅 Mes'),
+              Tab(text: '☀️ Hoy (${_eventosDia.where((e) => !e.completado).length})'),
+              Tab(text: '⏳ (${_pendientes.length})'),
+            ])),
+          IconButton(
+            icon: const Icon(Icons.add, color: AppColors.azul, size: 20),
+            onPressed: _nuevoEvento),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: AppColors.azul, size: 18),
+            onPressed: _cargar),
+        ])),
+      Expanded(child: TabBarView(controller: _tabs, children: [
+        _tabCalendario(),
+        _tabHoy(),
+        _tabPendientes(),
+      ])),
+    ]);
+  }
+
+  Widget _tabCalendario() => Column(children: [
+    // Nav mes
+    Container(color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        IconButton(icon: const Icon(Icons.chevron_left, color: AppColors.azul),
+          onPressed: () { setState(() => _mesActual = DateTime(_mesActual.year, _mesActual.month - 1)); _cargar(); }),
+        GestureDetector(
+          onTap: () { setState(() { _mesActual = DateTime.now(); _diaSeleccionado = DateTime.now(); }); _cargar(); },
+          child: Text(_fmtMes.format(_mesActual).toUpperCase(),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul))),
+        IconButton(icon: const Icon(Icons.chevron_right, color: AppColors.azul),
+          onPressed: () { setState(() => _mesActual = DateTime(_mesActual.year, _mesActual.month + 1)); _cargar(); }),
+      ])),
+    // Días semana
+    Container(color: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Row(children: ['L','M','X','J','V','S','D'].map((d) =>
+        Expanded(child: Center(child: Text(d, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+          color: d=='D'||d=='S' ? AppColors.rojo.withOpacity(0.6) : AppColors.textoSecundario))))).toList())),
+    Container(color: Colors.white, child: _buildGrilla()),
+    Expanded(child: _eventosDelDia()),
+  ]);
+
+  Widget _buildGrilla() {
+    final primer = DateTime(_mesActual.year, _mesActual.month, 1);
+    final offset = primer.weekday - 1;
+    final diasEnMes = DateTime(_mesActual.year, _mesActual.month + 1, 0).day;
+    final filas = ((offset + diasEnMes) / 7).ceil();
+    final porDia = _eventosPorDia;
+    final hoy = DateTime.now();
+    return GridView.builder(
+      shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 1.1),
+      itemCount: filas * 7,
+      itemBuilder: (_, idx) {
+        final diaNum = idx - offset + 1;
+        if (diaNum < 1 || diaNum > diasEnMes) return const SizedBox();
+        final fecha = DateTime(_mesActual.year, _mesActual.month, diaNum);
+        final esHoy = fecha.day==hoy.day && fecha.month==hoy.month && fecha.year==hoy.year;
+        final esSel = fecha.day==_diaSeleccionado.day && fecha.month==_diaSeleccionado.month && fecha.year==_diaSeleccionado.year;
+        final eventos = porDia[diaNum] ?? [];
+        final tieneVencidos = eventos.any((e) => !e.completado && e.fechaInicio.isBefore(DateTime.now()));
+        return GestureDetector(
+          onTap: () => _seleccionarDia(fecha),
+          child: Container(
+            margin: const EdgeInsets.all(1),
+            decoration: BoxDecoration(
+              color: esSel ? AppColors.azul : esHoy ? AppColors.azulClaro : Colors.transparent,
+              borderRadius: BorderRadius.circular(6)),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text('$diaNum', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                color: esSel ? Colors.white : esHoy ? AppColors.azul : AppColors.textoPrincipal)),
+              if (eventos.isNotEmpty) Container(width: 4, height: 4,
+                decoration: BoxDecoration(
+                  color: tieneVencidos ? (esSel ? Colors.white : AppColors.rojo) : (esSel ? Colors.white70 : AppColors.naranja),
+                  shape: BoxShape.circle)),
+            ])));
+      });
+  }
+
+  Widget _eventosDelDia() {
+    final esTitulo = _fmtFecha.format(_diaSeleccionado);
+    return Container(color: AppColors.gris, child: Column(children: [
+      Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text(esTitulo, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.azul)),
+          Text('${_eventosDia.length} evento(s)', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+        ])),
+      Expanded(child: _eventosDia.isEmpty
+        ? const Center(child: Text('Sin eventos', style: TextStyle(color: AppColors.textoSecundario, fontSize: 12)))
+        : ListView(padding: const EdgeInsets.symmetric(horizontal: 10),
+            children: _eventosDia.map((e) => _cardEvento(e)).toList())),
+    ]));
+  }
+
+  Widget _tabHoy() {
+    final hoy = DateTime.now();
+    final vencidos = _pendientes.where((e) => e.fechaInicio.isBefore(hoy)).toList();
+    final eventosHoy = _pendientes.where((e) { final f=e.fechaInicio; return f.day==hoy.day&&f.month==hoy.month&&f.year==hoy.year; }).toList();
+    final proximos = _pendientes.where((e) { final d=e.fechaInicio.difference(hoy).inDays; return d>0&&d<=7; }).toList();
+    return RefreshIndicator(onRefresh: _cargar,
+      child: ListView(padding: const EdgeInsets.all(12), children: [
+        Row(children: [
+          _kpi('Vencidos', '${vencidos.length}', AppColors.rojo),
+          const SizedBox(width: 8),
+          _kpi('Hoy', '${eventosHoy.length}', AppColors.ambar),
+          const SizedBox(width: 8),
+          _kpi('7 días', '${proximos.length}', AppColors.azul),
+        ]),
+        const SizedBox(height: 12),
+        if (vencidos.isNotEmpty) ...[_slab('🔴 VENCIDOS', AppColors.rojo), ...vencidos.map(_cardEvento)],
+        if (eventosHoy.isNotEmpty) ...[_slab('☀️ HOY', AppColors.ambar), ...eventosHoy.map(_cardEvento)],
+        if (proximos.isNotEmpty) ...[_slab('📆 PRÓXIMOS 7 DÍAS', AppColors.azul), ...proximos.map(_cardEvento)],
+        if (vencidos.isEmpty && eventosHoy.isEmpty && proximos.isEmpty)
+          const Padding(padding: EdgeInsets.only(top: 40),
+            child: Center(child: Column(children: [
+              Text('🎉', style: TextStyle(fontSize: 40)),
+              SizedBox(height: 8),
+              Text('Sin pendientes', style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
+            ]))),
+      ]));
+  }
+
+  Widget _tabPendientes() => RefreshIndicator(onRefresh: _cargar,
+    child: _pendientes.isEmpty
+      ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text('✅', style: TextStyle(fontSize: 40)),
+          SizedBox(height: 8),
+          Text('Todo al día', style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
+        ]))
+      : ListView(padding: const EdgeInsets.all(12),
+          children: _pendientes.map((e) => _cardEvento(e)).toList()));
+
+  Widget _cardEvento(AgendaEvento e) {
+    final sem = e.semaforo;
+    return Dismissible(key: Key(e.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 16),
+        decoration: BoxDecoration(color: AppColors.verde, borderRadius: BorderRadius.circular(10)),
+        child: const Icon(Icons.check_circle_outline, color: Colors.white)),
+      confirmDismiss: (_) async { await AgendaService.completarEvento(e.id); _cargar(); return true; },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+          border: Border(left: BorderSide(color: e.completado ? AppColors.grisBorde : sem, width: 3),
+            top: BorderSide(color: AppColors.grisBorde, width: 0.5),
+            right: BorderSide(color: AppColors.grisBorde, width: 0.5),
+            bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+        child: Padding(padding: const EdgeInsets.all(10),
+          child: Row(children: [
+            Text(e.tipoEmoji, style: const TextStyle(fontSize: 18)),
+            const SizedBox(width: 8),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(e.titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                color: e.completado ? AppColors.textoSecundario : AppColors.textoPrincipal,
+                decoration: e.completado ? TextDecoration.lineThrough : null),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (e.clienteNombre != null)
+                Text(e.clienteNombre!, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+              Container(margin: const EdgeInsets.only(top: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(color: sem.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                child: Text(e.semaforoLabel, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: sem))),
+            ])),
+            if (e.monto > 0) Text(_fmt.format(e.monto),
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.azul)),
+            if (!e.completado) GestureDetector(
+              onTap: () async { await AgendaService.completarEvento(e.id); _cargar(); },
+              child: Container(width: 28, height: 28, margin: const EdgeInsets.only(left: 6),
+                decoration: BoxDecoration(color: AppColors.verde, borderRadius: BorderRadius.circular(7)),
+                child: const Icon(Icons.check, size: 14, color: Colors.white))),
+          ]))));
+  }
+
+  void _nuevoEvento() {
+    final tituloCtrl = TextEditingController();
+    DateTime fechaSel = DateTime.now().add(const Duration(days: 1));
+    String tipoSel = 'personalizado';
+    showModalBottomSheet(context: context, isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => StatefulBuilder(builder: (ctx, setS) => Container(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 16, left: 16, right: 16, top: 16),
+        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Nuevo evento', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          TextField(controller: tituloCtrl,
+            decoration: const InputDecoration(labelText: 'Título', isDense: true,
+              border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          GestureDetector(onTap: () async {
+            final f = await showDatePicker(context: ctx, initialDate: fechaSel,
+              firstDate: DateTime.now(), lastDate: DateTime.now().add(const Duration(days: 365)));
+            if (f != null) setS(() => fechaSel = f);
+          }, child: Container(padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(border: Border.all(color: AppColors.grisBorde), borderRadius: BorderRadius.circular(8)),
+            child: Row(children: [
+              const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.azul),
+              const SizedBox(width: 8),
+              Text(DateFormat('dd/MM/yyyy').format(fechaSel), style: const TextStyle(fontSize: 13)),
+            ]))),
+          const SizedBox(height: 12),
+          SizedBox(width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () async {
+                if (tituloCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx);
+                await AgendaService.crearEvento(tipo: tipoSel, titulo: tituloCtrl.text.trim(), fechaInicio: fechaSel);
+                _cargar();
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul, padding: const EdgeInsets.symmetric(vertical: 10)),
+              child: const Text('Crear', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
+        ]))));
+  }
+
+  Widget _kpi(String label, String val, Color color) => Expanded(child: Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+    child: Column(children: [
+      Text(val, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
+      Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+    ])));
+
+  Widget _slab(String t, Color c) => Padding(padding: const EdgeInsets.only(bottom: 6, top: 4),
+    child: Text(t, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c, letterSpacing: 1)));
+}

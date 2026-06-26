@@ -791,11 +791,11 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           child: ElevatedButton.icon(
             onPressed: () => widget.onAgregar(r),
             icon: const Icon(Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
-            label: const Text('Agregar al carrito',
+            label: const Text('Agregar al carrito  (+otro servicio)',
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.verde,
-              padding: const EdgeInsets.symmetric(vertical: 12))))),
+              padding: const EdgeInsets.symmetric(vertical: 12)))),
     ]));
 
   Widget _lineaDesglose(String label, double valor) =>
@@ -806,16 +806,107 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
       ]));
 
-  Widget _btnCalcular() => SizedBox(width: double.infinity,
-    child: ElevatedButton.icon(
-      onPressed: _calcular,
-      icon: const Icon(Icons.calculate_outlined, color: Colors.white, size: 18),
-      label: const Text('Calcular precio estimado',
-        style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.azul,
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))));
+  Widget _btnCalcular() => Column(children: [
+    // Botón editar tarifas
+    SizedBox(width: double.infinity,
+      child: OutlinedButton.icon(
+        onPressed: _editarTarifas,
+        icon: const Icon(Icons.tune_outlined, size: 16, color: AppColors.azul),
+        label: const Text('Ver / editar mis tarifas',
+          style: TextStyle(fontSize: 12, color: AppColors.azul)),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: AppColors.azul),
+          padding: const EdgeInsets.symmetric(vertical: 8)))),
+    const SizedBox(height: 8),
+    // Botón calcular
+    SizedBox(width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: _calcular,
+        icon: const Icon(Icons.calculate_outlined, color: Colors.white, size: 18),
+        label: const Text('Calcular precio estimado',
+          style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.w700)),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.azul,
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))),
+  ]);
+
+  // ── EDITAR TARIFAS INLINE ──────────────────────────
+  void _editarTarifas() {
+    if (_config == null) return;
+    final sb = Supabase.instance.client;
+    final ctrls = <String, TextEditingController>{};
+    for (final t in _config!.tarifas.values) {
+      ctrls[t.id] = TextEditingController(
+        text: t.valor % 1 == 0 ? t.valor.toInt().toString() : t.valor.toStringAsFixed(2));
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          left: 16, right: 16, top: 16),
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text('Tarifas — ${widget.servicio.nombre}',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
+            TextButton(
+              onPressed: () async {
+                // Guardar todas las tarifas modificadas
+                for (final t in _config!.tarifas.values) {
+                  final val = double.tryParse(ctrls[t.id]?.text ?? '');
+                  if (val != null && val != t.valor) {
+                    await sb.from('sim_tarifas').update({'valor': val}).eq('id', t.id);
+                    t.valor = val;
+                  }
+                }
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('✅ Tarifas guardadas'),
+                    backgroundColor: AppColors.verde));
+                }
+              },
+              child: const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w700))),
+          ]),
+          const Divider(height: 16),
+          Flexible(child: ListView(shrinkWrap: true,
+            children: _config!.tarifas.values.map((t) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(t.nombre, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  if (t.unidad != null) Text(t.unidad!,
+                    style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+                ])),
+                const SizedBox(width: 10),
+                SizedBox(width: 100,
+                  child: TextFormField(
+                    controller: ctrls[t.id],
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                    textAlign: TextAlign.right,
+                    decoration: InputDecoration(
+                      isDense: true, filled: true, fillColor: AppColors.gris,
+                      prefixText: '\$',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))))),
+              ]))).toList())),
+        ])));
+
+    // Limpiar controllers al cerrar
+    Future.delayed(const Duration(seconds: 1), () {
+      for (final c in ctrls.values) c.dispose();
+    });
+  }
 
   // ── WIDGETS REUTILIZABLES ───────────────────────────
   Widget _chipSelector<T>(List<T> items, T? sel, String Function(T) label,
@@ -858,5 +949,5 @@ class _PantallaServicioState extends State<_PantallaServicio> {
 
   Widget _seccion(String t) => Padding(padding: const EdgeInsets.only(bottom: 8),
     child: Text(t, style: const TextStyle(
-      fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textoPrincipal)));
+      fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textoPrincipal))));
 }
