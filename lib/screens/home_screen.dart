@@ -9,9 +9,6 @@ import 'plantillas_wa_screen.dart';
 import '../services/supabase_service.dart';
 import 'inicio_screen.dart';
 import 'alertas_screen.dart';
-import 'citas_screen.dart';
-import 'config_simulador_screen.dart';
-import 'plantillas_wa_screen.dart';
 import 'cotizar_screen.dart';
 import 'avances_screen.dart';
 import 'clientes_screen.dart';
@@ -36,29 +33,26 @@ class _HomeScreenState extends State<HomeScreen> {
   int _alertas = 0;
 
   // Pantallas principales (barra inferior)
+  // Tab 1 = _AlertasAgendaScreen (unifica Alertas + Agenda + Citas)
   final _principales = const [
     InicioScreen(),
-    AlertasScreen(),
+    _AlertasAgendaScreen(),
     CotizarScreen(),
     AvancesScreen(),
     SimuladorScreen(),
-    AgendaScreen(),
   ];
 
-  // Pantallas del menú "Más"
   Widget _pantallaExtra(int tab) {
     switch (tab) {
-      case 6: return const ClientesScreen();
-      case 7: return const ProductosScreen();
-      case 8: return const InventarioScreen();
-      case 9: return const GastosScreen();
-      case 10: return const MarketingScreen();
-      case 11: return const EquipoScreen();
-      case 12: return const ReportesScreen();
-      case 13: return const ConfigScreen();
-      case 14: return const CuponesScreen();
-      case 15: return const CitasScreen();
-      case 16: return const ConfigSimuladorScreen();
+      case 5:  return const ClientesScreen();
+      case 6:  return const ProductosScreen();
+      case 7:  return const InventarioScreen();
+      case 8:  return const GastosScreen();
+      case 9:  return const MarketingScreen();
+      case 10: return const EquipoScreen();
+      case 11: return const ReportesScreen();
+      case 12: return const ConfigScreen();
+      case 13: return const ConfigSimuladorScreen();
       default: return const InicioScreen();
     }
   }
@@ -76,7 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _tab < 6
+      body: _tab < 5
         ? IndexedStack(index: _tab, children: _principales)
         : _pantallaExtra(_tab),
       drawer: _drawer(),
@@ -93,18 +87,17 @@ class _HomeScreenState extends State<HomeScreen> {
       _btn(2, Icons.description_outlined, 'Cotizar'),
       _btn(3, Icons.local_shipping_outlined, 'Avances'),
       _btn(4, Icons.calculate_outlined, 'Simular'),
-      _btn(5, Icons.calendar_month_outlined, 'Agenda'),
       // Botón Más
       Expanded(child: Builder(builder: (ctx) => GestureDetector(
         onTap: () => Scaffold.of(ctx).openDrawer(),
         behavior: HitTestBehavior.opaque,
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(Icons.grid_view_outlined, size: 22,
-            color: _tab >= 4 ? AppColors.azul : AppColors.textoSecundario),
+            color: _tab >= 5 ? AppColors.azul : AppColors.textoSecundario),
           const SizedBox(height: 2),
           Text('Más', style: TextStyle(fontSize: 9,
-            color: _tab >= 4 ? AppColors.azul : AppColors.textoSecundario,
-            fontWeight: _tab >= 4 ? FontWeight.w600 : FontWeight.normal)),
+            color: _tab >= 5 ? AppColors.azul : AppColors.textoSecundario,
+            fontWeight: _tab >= 5 ? FontWeight.w600 : FontWeight.normal)),
         ])))),
     ]))),
   );
@@ -120,7 +113,8 @@ class _HomeScreenState extends State<HomeScreen> {
           if (badge > 0) Positioned(top: -4, right: -6,
             child: Container(width: 16, height: 16,
               decoration: const BoxDecoration(color: AppColors.rojo, shape: BoxShape.circle),
-              child: Center(child: Text('$badge', style: const TextStyle(color: Colors.white, fontSize: 9))))),
+              child: Center(child: Text('$badge',
+                style: const TextStyle(color: Colors.white, fontSize: 9))))),
         ]),
         const SizedBox(height: 2),
         Text(label, style: TextStyle(fontSize: 9,
@@ -133,26 +127,30 @@ class _HomeScreenState extends State<HomeScreen> {
     child: ListView(padding: EdgeInsets.zero, children: [
       Container(height: 110, decoration: const BoxDecoration(color: AppColors.azul),
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(mainAxisAlignment: MainAxisAlignment.end, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('HETNA CNC', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-          Text(AuthService.nombreUsuario ?? 'Usuario', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-          Text(AuthService.rol ?? '', style: const TextStyle(color: Colors.white60, fontSize: 11)),
+        child: Column(mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('HETNA CNC',
+            style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+          Text(AuthService.nombreUsuario ?? 'Usuario',
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(AuthService.rol ?? '',
+            style: const TextStyle(color: Colors.white60, fontSize: 11)),
         ])),
-      _dItem(Icons.people_outline, 'CRM Clientes', 6),
-      _dItem(Icons.inventory_2_outlined, 'Productos y Catálogo', 7),
-      _dItem(Icons.warehouse_outlined, 'Inventario Bodega', 8),
-      _dItem(Icons.receipt_long_outlined, 'Gastos y Compras', 9),
-      _dItem(Icons.campaign_outlined, 'Marketing', 10),
-      _dItem(Icons.group_outlined, 'Mi equipo', 11),
+      _dItem(Icons.people_outline,         'CRM Clientes',        5),
+      _dItem(Icons.inventory_2_outlined,   'Productos y Catálogo',6),
+      _dItem(Icons.warehouse_outlined,     'Inventario Bodega',   7),
+      _dItem(Icons.receipt_long_outlined,  'Gastos y Compras',    8),
+      _dItem(Icons.campaign_outlined,      'Marketing',           9),
+      _dItem(Icons.group_outlined,         'Mi equipo',          10),
       const Divider(height: 1),
-      _dItem(Icons.bar_chart_outlined, 'Reportes Excel', 12),
-      _dItem(Icons.settings_outlined, 'Configuración', 13),
-      _dItem(Icons.discount_outlined, 'Cupones', 14),
-      _dItem(Icons.event_outlined, 'Citas', 15),
+      _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11),
+      _dItem(Icons.settings_outlined,      'Configuración',      12),
+      _dItem(Icons.tune_outlined,          'Config Simulador',   13),
       const Divider(height: 1),
       ListTile(
         leading: const Icon(Icons.logout_outlined, color: AppColors.rojo, size: 22),
-        title: const Text('Cerrar sesión', style: TextStyle(fontSize: 14, color: AppColors.rojo)),
+        title: const Text('Cerrar sesión',
+          style: TextStyle(fontSize: 14, color: AppColors.rojo)),
         onTap: () async {
           Navigator.pop(context);
           await AuthService.logout();
@@ -164,7 +162,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _dItem(IconData icon, String label, int idx) {
     final active = _tab == idx;
     return ListTile(
-      leading: Icon(icon, color: active ? AppColors.azul : AppColors.textoSecundario, size: 22),
+      leading: Icon(icon,
+        color: active ? AppColors.azul : AppColors.textoSecundario, size: 22),
       title: Text(label, style: TextStyle(fontSize: 14,
         color: active ? AppColors.azul : Colors.black,
         fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
@@ -174,12 +173,54 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ── CitasBody: version sin Scaffold para usar en TabBarView ──
-class CitasBody extends StatelessWidget {
-  const CitasBody({super.key});
+// ══════════════════════════════════════════════════════
+// Alertas + Agenda + Citas unidas en una sola pestaña
+// ══════════════════════════════════════════════════════
+class _AlertasAgendaScreen extends StatefulWidget {
+  const _AlertasAgendaScreen();
+  @override
+  State<_AlertasAgendaScreen> createState() => _AlertasAgendaScreenState();
+}
+
+class _AlertasAgendaScreenState extends State<_AlertasAgendaScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() { _tabs.dispose(); super.dispose(); }
+
   @override
   Widget build(BuildContext context) {
-    // Reutiliza CitasScreen pero sin el AppBar
-    return const CitasScreen();
+    return Scaffold(
+      backgroundColor: AppColors.gris,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        title: const Text('Alertas y Agenda',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+            color: AppColors.azul)),
+        bottom: TabBar(
+          controller: _tabs,
+          labelColor: AppColors.azul,
+          unselectedLabelColor: AppColors.textoSecundario,
+          indicatorColor: AppColors.azul,
+          tabs: const [
+            Tab(icon: Icon(Icons.calendar_month_outlined, size: 18), text: 'Agenda'),
+            Tab(icon: Icon(Icons.notifications_outlined, size: 18), text: 'Alertas'),
+            Tab(icon: Icon(Icons.event_outlined, size: 18), text: 'Citas'),
+          ])),
+      body: TabBarView(
+        controller: _tabs,
+        children: const [
+          AgendaBody(),
+          AlertasBody(),
+          CitasScreen(),
+        ]));
   }
 }
