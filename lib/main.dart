@@ -6,10 +6,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'services/notificaciones_service.dart';
-import 'services/fcm_service.dart';
-import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 
 const supabaseUrl = 'https://ldfmkfbhcbsbecfbzsny.supabase.co';
@@ -25,8 +22,7 @@ void main() async {
   // Firebase + FCM (con proteccion contra crash)
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    await FcmService.inicializar();
-    print('Firebase inicializado correctamente');
+      print('Firebase inicializado correctamente');
   } catch (e) {
     print('Firebase no disponible: \$e');
     // La app continua sin FCM si Firebase falla
