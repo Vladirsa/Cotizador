@@ -110,14 +110,17 @@ class WhatsAppService {
     try {
       final data = await Supabase.instance.client
         .from('plantillas_wa')
-        .select('mensaje')
-        .eq('tipo', tipo)
+        .select('mensaje, cuerpo, tipo, categoria')
         .eq('activo', true)
+        .or('tipo.eq.$tipo,categoria.eq.$tipo')
         .maybeSingle();
 
-      if (data != null && data['mensaje'] != null) {
-        // Reemplazar variables en el mensaje personalizado
-        var msg = data['mensaje'] as String;
+      if (data != null) {
+        // usar mensaje (nuevo) o cuerpo (columna original)
+        final rawMsg = data['mensaje'] as String?
+          ?? data['cuerpo'] as String? ?? '';
+        if (rawMsg.isEmpty) throw Exception('sin plantilla');
+        var msg = rawMsg;
         msg = msg.replaceAll('*NOMBRE*', nombreCliente);
         msg = msg.replaceAll('*FOLIO*', folio ?? '');
         msg = msg.replaceAll('*MONTO*', monto != null
