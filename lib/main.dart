@@ -14,23 +14,9 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Supabase
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await initializeDateFormatting('es_MX', null);
-
-  // Firebase + FCM (con proteccion contra crash)
-  try {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-      print('Firebase inicializado correctamente');
-  } catch (e) {
-    print('Firebase no disponible: \$e');
-    // La app continua sin FCM si Firebase falla
-  }
-
-  // Notificaciones locales (polling)
   await NotificacionesService.inicializar();
-
   runApp(const HetnaCncApp());
 }
 
