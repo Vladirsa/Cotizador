@@ -167,8 +167,9 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
     final categoriasList = ['Madera', 'MDF', 'Acrílico', 'Consumibles', 'Acabados', 'Metal', 'Otro'];
 
     await showModalBottomSheet(context: context, isScrollControlled: true,
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: StatefulBuilder(builder: (ctx, setS) => Container(
           padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -235,8 +236,10 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
         child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-          const Text('Registrar movimiento', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            decoration: BoxDecoration(color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2))),
+          const Text('Registrar movimiento',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               value: materialId, isDense: true,
@@ -278,19 +281,23 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
             ]),
             const SizedBox(height: 12),
-            ElevatedButton(onPressed: () async {
-              if (materialId == null) return;
-              await SupabaseService.registrarMovimiento(
-                materialId: materialId!, tipo: tipo,
-                cantidad: int.tryParse(cant.text) ?? 1, motivo: motivo.text.trim());
-              if (mounted) { Navigator.pop(context); _cargar(); }
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.azul,
-                minimumSize: const Size(double.infinity, 44)),
-              child: const Text('Registrar',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
+            SizedBox(width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () async {
+                  if (materialId == null) return;
+                  await SupabaseService.registrarMovimiento(
+                    materialId: materialId!, tipo: tipo,
+                    cantidad: int.tryParse(cant.text) ?? 1,
+                    motivo: motivo.text.trim());
+                  if (mounted) { Navigator.pop(context); _cargar(); }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+                  minimumSize: const Size(double.infinity, 44)),
+                child: const Text('Registrar',
+                  style: TextStyle(color: Colors.white,
+                    fontWeight: FontWeight.w600)))),
           const SizedBox(height: 8),
-        ]))))));
+        ])))));
   }
 }
 
@@ -385,12 +392,7 @@ class _TarjetaMaterial extends StatelessWidget {
               materialId: material['id'], tipo: tipo,
               cantidad: int.tryParse(cant.text) ?? 1);
             if (ctx.mounted) { Navigator.pop(ctx); onMovimiento(); }
-          style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.azul,
-                minimumSize: const Size(double.infinity, 44)),
-              child: const Text('Registrar movimiento',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
-          const SizedBox(height: 8),
-        ])));
+          }, child: const Text('Registrar movimiento')),
+        ]))));
   }
 }
