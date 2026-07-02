@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/supabase_service.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
@@ -161,6 +164,268 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
   }
 }
 
+
+// ══════════════════════════════════════════════════════
+// PANTALLA DE HISTORIAL DEL CLIENTE
+// ══════════════════════════════════════════════════════
+class HistorialClienteScreen extends StatefulWidget {
+  final Cliente cliente;
+  const HistorialClienteScreen({super.key, required this.cliente});
+  @override
+  State<HistorialClienteScreen> createState() => _HistorialClienteScreenState();
+}
+
+class _HistorialClienteScreenState extends State<HistorialClienteScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabs;
+  List<Cotizacion> _cotizaciones = [];
+  List<Pedido> _pedidos = [];
+  bool _cargando = true;
+
+  final _fmt = NumberFormat(r'$#,##0', 'es_MX');
+  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+    _cargar();
+  }
+
+  @override
+  void dispose() { _tabs.dispose(); super.dispose(); }
+
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
+    try {
+      final cots = await SupabaseService.getCotizacionesByCliente(widget.cliente.id!);
+      final peds = await SupabaseService.getPedidosByCliente(widget.cliente.id!);
+      if (mounted) setState(() {
+        _cotizaciones = cots;
+        _pedidos = peds;
+        _cargando = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _cargando = false);
+    }
+  }
+
+  double get _totalHistorico =>
+    _pedidos.where((p) => p.estado == 'Entregado')
+      .fold(0, (s, p) => s + (p.total ?? 0));
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.gris,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(widget.cliente.nombre,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+              color: AppColors.azul)),
+          if (widget.cliente.empresa != null)
+            Text(widget.cliente.empresa!,
+              style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        ]),
+        actions: [
+          // Botón WhatsApp
+          if ((widget.cliente.whatsapp ?? widget.cliente.telefono) != null)
+            IconButton(
+              icon: const Icon(Icons.chat_outlined, color: AppColors.verde),
+              onPressed: () {
+                final n = widget.cliente.whatsappNumero;
+                if (n.isNotEmpty) {
+                  final num = n.length == 10 ? '521$n' : n;
+                  launchUrl(Uri.parse('https://wa.me/$num'),
+                    mode: LaunchMode.externalApplication);
+                }
+              }),
+        ],
+        bottom: TabBar(
+          controller: _tabs,
+          labelColor: AppColors.azul,
+          unselectedLabelColor: AppColors.textoSecundario,
+          indicatorColor: AppColors.azul,
+          tabs: [
+            Tab(text: 'Cotizaciones (${_cotizaciones.length})'),
+            Tab(text: 'Pedidos (${_pedidos.length})'),
+          ])),
+      body: _cargando
+        ? const Center(child: CircularProgressIndicator())
+        : Column(children: [
+            // KPIs del cliente
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              child: Row(children: [
+                _kpi('Cotizaciones', '${_cotizaciones.length}', AppColors.azul),
+                _kpi('Pedidos', '${_pedidos.length}', AppColors.naranja),
+                _kpi('Total histórico', _fmt.format(_totalHistorico), AppColors.verde),
+              ])),
+            Expanded(child: TabBarView(controller: _tabs, children: [
+              _tabCotizaciones(),
+              _tabPedidos(),
+            ])),
+          ]));
+  }
+
+  Widget _tabCotizaciones() => _cotizaciones.isEmpty
+    ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.description_outlined, size: 48, color: AppColors.grisBorde),
+          SizedBox(height: 8),
+          Text('Sin cotizaciones', style: TextStyle(color: AppColors.textoSecundario)),
+        ]))
+    : ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _cotizaciones.length,
+        itemBuilder: (_, i) => _cardCotizacion(_cotizaciones[i]));
+
+  Widget _tabPedidos() => _pedidos.isEmpty
+    ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.local_shipping_outlined, size: 48, color: AppColors.grisBorde),
+          SizedBox(height: 8),
+          Text('Sin pedidos', style: TextStyle(color: AppColors.textoSecundario)),
+        ]))
+    : ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _pedidos.length,
+        itemBuilder: (_, i) => _cardPedido(_pedidos[i]));
+
+  Widget _cardCotizacion(Cotizacion c) {
+    final color = _colorEstado(c.estado);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: color, width: 3),
+          top: BorderSide(color: AppColors.grisBorde, width: 0.5),
+          right: BorderSide(color: AppColors.grisBorde, width: 0.5),
+          bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text(c.folio ?? 'Sin folio',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                color: AppColors.azul)),
+            const SizedBox(height: 2),
+            Text(c.createdAt != null ? _fmtFecha.format(c.createdAt!) : '',
+              style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20)),
+              child: Text(c.estado,
+                style: TextStyle(fontSize: 10, color: color,
+                  fontWeight: FontWeight.w600))),
+          ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(_fmt.format(c.total),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                color: AppColors.azul)),
+            const SizedBox(height: 4),
+            if (c.pdfUrl != null)
+              GestureDetector(
+                onTap: () => launchUrl(Uri.parse(c.pdfUrl!),
+                  mode: LaunchMode.externalApplication),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.rojo.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8)),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.picture_as_pdf_outlined,
+                      size: 14, color: AppColors.rojo),
+                    SizedBox(width: 4),
+                    Text('Ver PDF', style: TextStyle(
+                      fontSize: 10, color: AppColors.rojo,
+                      fontWeight: FontWeight.w600)),
+                  ]))),
+          ]),
+        ])));
+  }
+
+  Widget _cardPedido(Pedido p) {
+    const etapas = ['Pedido','Pago','Produccion','Pruebas','Entrega','Entregado'];
+    final idx = etapas.indexOf(p.estado);
+    final pct = idx < 0 ? 0.0 : (idx + 1) / etapas.length;
+    final color = p.estado == 'Entregado' ? AppColors.verde
+      : p.estado == 'Produccion' ? AppColors.naranja : AppColors.azul;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+      child: Column(children: [
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+            Text(p.folio, style: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
+            Text(p.createdAt != null ? _fmtFecha.format(p.createdAt!) : '',
+              style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+          ])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(_fmt.format(p.total ?? 0),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                color: AppColors.azul)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20)),
+              child: Text(p.estado,
+                style: TextStyle(fontSize: 10, color: color,
+                  fontWeight: FontWeight.w600))),
+          ]),
+        ]),
+        const SizedBox(height: 8),
+        LinearProgressIndicator(
+          value: pct,
+          backgroundColor: AppColors.grisBorde,
+          valueColor: AlwaysStoppedAnimation<Color>(color),
+          minHeight: 4,
+          borderRadius: BorderRadius.circular(2)),
+        const SizedBox(height: 4),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: etapas.map((e) => Text(e.substring(0, 3),
+            style: TextStyle(fontSize: 8,
+              color: etapas.indexOf(e) <= idx ? color : AppColors.grisBorde,
+              fontWeight: etapas.indexOf(e) == idx
+                ? FontWeight.w700 : FontWeight.normal))).toList()),
+      ]));
+  }
+
+  Color _colorEstado(String e) {
+    switch (e) {
+      case 'Aprobada': return AppColors.verde;
+      case 'Pedido': return AppColors.azul;
+      case 'Enviada': return AppColors.naranja;
+      case 'Rechazada': case 'Vencida': return AppColors.rojo;
+      default: return AppColors.textoSecundario;
+    }
+  }
+
+  Widget _kpi(String label, String val, Color color) =>
+    Expanded(child: Column(children: [
+      Text(val, style: TextStyle(
+        fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+      Text(label, style: const TextStyle(
+        fontSize: 9, color: AppColors.textoSecundario)),
+    ]));
+}
+
 class _TarjetaCliente extends StatelessWidget {
   final Cliente cliente;
   final VoidCallback onEditar;
@@ -180,6 +445,9 @@ class _TarjetaCliente extends StatelessWidget {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        onTap: cliente.id != null ? () => Navigator.push(context,
+          MaterialPageRoute(builder: (_) =>
+            HistorialClienteScreen(cliente: cliente))) : null,
         leading: CircleAvatar(
           backgroundColor: color.withOpacity(0.1),
           child: Text(cliente.nombre.substring(0, 1).toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.w600)),
