@@ -528,7 +528,7 @@ class PdfService {
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text('Gracias por su preferencia', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text('$tel1  $correo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
+              pw.Text('$telEmpresa  $correo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
             ]),
             pw.Text(web, style: pw.TextStyle(fontSize: 9, color: PdfColors.white)),
           ])),
