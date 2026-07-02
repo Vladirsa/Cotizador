@@ -25,7 +25,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _rfcCtrl      = TextEditingController();
   final _leyendaCtrl  = TextEditingController();
 
-  // WhatsApp Business API
+  // WhatsApp
+  final _waNumeroPrincipalCtrl = TextEditingController(); // número del taller
   final _waPhoneIdCtrl  = TextEditingController();
   final _waTokenCtrl    = TextEditingController();
   final _waVerifyCtrl   = TextEditingController();
@@ -58,6 +59,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   @override
   void dispose() {
     _nombreCtrl.dispose(); _telefonoCtrl.dispose(); _correoCtrl.dispose();
+    _waNumeroPrincipalCtrl.dispose();
     _direccionCtrl.dispose(); _rfcCtrl.dispose(); _leyendaCtrl.dispose();
     _apiKeyCtrl.dispose(); _apiUrlCtrl.dispose();
     _rfcEmisorCtrl.dispose(); _serieCtrl.dispose();
@@ -82,7 +84,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _proveedor          = cfg['factura_proveedor'] ?? 'Facturapi';
       _regimenFiscal      = cfg['factura_regimen_fiscal'] ?? '612';
       // WhatsApp API
-      _waPhoneIdCtrl.text = cfgWA?['phone_number_id'] ?? '';
+          _waNumeroPrincipalCtrl.text = config['whatsapp_numero'] ?? config['telefono'] ?? '';
+    _waPhoneIdCtrl.text = cfgWA?['phone_number_id'] ?? '';
       _waTokenCtrl.text   = cfgWA?['wa_token'] ?? '';
       _waVerifyCtrl.text  = cfgWA?['verify_token'] ?? 'hetna_cnc_webhook_2026';
       _waActivo           = cfgWA?['activo'] ?? false;
@@ -197,6 +200,39 @@ class _ConfigScreenState extends State<ConfigScreen> {
                       activeColor: const Color(0xFF25D366),
                       onChanged: (v) => setState(() => _waActivo = v)),
                   ]),
+                  const SizedBox(height: 12),
+                  // NÚMERO DE WHATSAPP DEL TALLER (para enviar todos los mensajes)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFe7f8ee),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF25D366).withOpacity(0.3))),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      const Row(children: [
+                        Icon(Icons.chat_outlined, size: 16, color: Color(0xFF25D366)),
+                        SizedBox(width: 6),
+                        Text('Número de WhatsApp del taller',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                            color: Color(0xFF128C7E))),
+                      ]),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Este número se usa para enviar cotizaciones, alertas y mensajes de seguimiento.',
+                        style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: _waNumeroPrincipalCtrl,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: 'Número (10 dígitos, sin +52)',
+                          hintText: '2461217072',
+                          prefixText: '+52 ',
+                          prefixIcon: Icon(Icons.phone_outlined, size: 18),
+                          border: OutlineInputBorder(),
+                          isDense: true)),
+                    ])),
+                  const SizedBox(height: 12),
                   if (_waActivo) ...[
                     const SizedBox(height: 12),
                     const Divider(height: 1),

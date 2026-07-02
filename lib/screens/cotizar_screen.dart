@@ -233,6 +233,17 @@ class _TarjetaCotizacion extends StatelessWidget {
             // Botón ELIMINAR y PDF para Borrador
             if (cotizacion.estado == 'Borrador') ...[
               const SizedBox(height: 6),
+              // Botón Editar prominente para Borrador
+              SizedBox(width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => _editarCotizacion(context),
+                  icon: const Icon(Icons.edit_outlined, size: 15, color: Colors.white),
+                  label: const Text('Editar cotización',
+                    style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.azul,
+                    padding: const EdgeInsets.symmetric(vertical: 10)))),
+              const SizedBox(height: 6),
               Row(children: [
                 Expanded(child: OutlinedButton.icon(
                   onPressed: () => _eliminarCotizacion(context),
@@ -398,13 +409,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     if (widget.carritoSimulador != null) {
       for (final sv in widget.carritoSimulador!) {
         try {
-          // ResultadoSimulador tiene: servicio, emoji, descripcion, total
-          final nombre = '${sv.emoji} ${sv.servicio} — ${sv.descripcion}';
           _items.add(CotizacionItem(
-            nombreProducto: nombre,
+            nombreProducto: (sv.servicio ?? sv.trabajo ?? 'Servicio').toString(),
             cantidad: 1,
-            precioUnitario: (sv.total as num).toDouble(),
-            sku: sv.servicio,
+            precioUnitario: ((sv.total ?? sv.precio ?? 0) as num).toDouble(),
+            sku: (sv.maquina ?? '').toString(),
           ));
         } catch (e) {
           print('Error agregando item del simulador: $e');
