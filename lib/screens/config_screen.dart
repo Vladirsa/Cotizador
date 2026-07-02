@@ -84,7 +84,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _proveedor          = cfg['factura_proveedor'] ?? 'Facturapi';
       _regimenFiscal      = cfg['factura_regimen_fiscal'] ?? '612';
       // WhatsApp API
-          _waNumeroPrincipalCtrl.text = config['whatsapp_numero'] ?? config['telefono'] ?? '';
+          _waNumeroPrincipalCtrl.text = cfg['whatsapp_numero'] ?? cfg['telefono'] ?? '';
     _waPhoneIdCtrl.text = cfgWA?['phone_number_id'] ?? '';
       _waTokenCtrl.text   = cfgWA?['wa_token'] ?? '';
       _waVerifyCtrl.text  = cfgWA?['verify_token'] ?? 'hetna_cnc_webhook_2026';
