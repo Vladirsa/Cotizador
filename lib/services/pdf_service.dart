@@ -435,11 +435,11 @@ class PdfService {
                   style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
               pw.SizedBox(height: 6),
               if (telEmpresa.isNotEmpty)
-                pw.Text(telEmpresa, style: const pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+                pw.Text(telEmpresa, style: const pw.TextStyle(fontSize: 8, color: const PdfColor(1, 1, 1, 0.7))),
               if (correo.isNotEmpty)
-                pw.Text(correo, style: const pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+                pw.Text(correo, style: const pw.TextStyle(fontSize: 8, color: const PdfColor(1, 1, 1, 0.7))),
               if (web.isNotEmpty)
-                pw.Text(web, style: const pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+                pw.Text(web, style: const pw.TextStyle(fontSize: 8, color: const PdfColor(1, 1, 1, 0.7))),
             ]),
             // DERECHA: tipo doc + folio + fecha + sello
             pw.Container(
