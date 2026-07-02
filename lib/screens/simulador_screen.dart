@@ -415,7 +415,9 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   bool _aplicarIva = true;
   static const double _ivaPct = 16.0;
   List<Map<String, dynamic>> _materialesInv = [];
-  Map<String, dynamic>? _materialInvSel; // material del inventario seleccionado
+  Map<String, dynamic>? _materialInvSel;
+  bool _mostrarTarifas = false;
+  final Map<String, TextEditingController> _tarifasEditadas = {}; // material del inventario seleccionado
 
   // Campos del formulario
   SimMaterial? _matSel;
@@ -763,7 +765,119 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       campos.add(_chipSelector<SimTipoTrabajo>(
         cfg.tipos, _tipoSel, (t) => t.nombre,
         (t) => setState(() => _tipoSel = t)));
-      campos.add(const SizedBox(height: 12));
+      campos.add(const SizedBox(height: 8));
+
+      // ── Panel de tarifas del modo seleccionado ──
+      if (_tipoSel != null && cfg.tarifas.isNotEmpty) {
+        campos.add(GestureDetector(
+          onTap: () => setState(() => _mostrarTarifas = !_mostrarTarifas),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.azulClaro,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.azul.withOpacity(0.3))),
+            child: Row(children: [
+              const Icon(Icons.tune_outlined, size: 16, color: AppColors.azul),
+              const SizedBox(width: 6),
+              Expanded(child: Text(
+                'Tarifas de ${_tipoSel!.nombre}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                  color: AppColors.azul))),
+              Icon(_mostrarTarifas ? Icons.expand_less : Icons.expand_more,
+                size: 18, color: AppColors.azul),
+            ]))));
+
+        if (_mostrarTarifas) {
+          campos.add(Container(
+            margin: const EdgeInsets.only(top: 6),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.grisBorde)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const Text('Editar tarifas',
+                  style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                GestureDetector(
+                  onTap: () async {
+                    final sb = Supabase.instance.client;
+                    for (final t in _tarifasEditadas.entries) {
+                      final val = double.tryParse(t.value.text);
+                      if (val != null) {
+                        await sb.from('sim_tarifas')
+                          .update({'valor': val}).eq('id', t.key);
+                      }
+                    }
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                        content: Text('✅ Tarifas guardadas'),
+                        backgroundColor: AppColors.verde));
+                      _cargar();
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.verde,
+                      borderRadius: BorderRadius.circular(20)),
+                    child: const Text('Guardar',
+                      style: TextStyle(fontSize: 11, color: Colors.white,
+                        fontWeight: FontWeight.w700)))),
+              ]),
+              const SizedBox(height: 8),
+              ...cfg.tarifas.values.map((t) {
+                _tarifasEditadas.putIfAbsent(t.id,
+                  () => TextEditingController(text: t.valor.toStringAsFixed(2)));
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(children: [
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(t.nombre, style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w500)),
+                      if (t.unidad != null) Text(t.unidad!,
+                        style: const TextStyle(fontSize: 10,
+                          color: AppColors.textoSecundario)),
+                    ])),
+                    const SizedBox(width: 10),
+                    SizedBox(width: 90, child: TextFormField(
+                      controller: _tarifasEditadas[t.id],
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      textAlign: TextAlign.right,
+                      decoration: InputDecoration(
+                        isDense: true, filled: true, fillColor: AppColors.gris,
+                        prefixText: r'$',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6))),
+                      style: const TextStyle(fontSize: 12))),
+                  ]));
+              }),
+              // Rangos del Router
+              if (clave == 'router' && cfg.rangos.isNotEmpty) ...[
+                const Divider(height: 16),
+                const Text('Tabla de rangos (Talla 3D)',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                    color: AppColors.azul)),
+                const SizedBox(height: 6),
+                ...cfg.rangos.map((r) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(children: [
+                    Expanded(child: Text(
+                      '${r.desde.toStringAsFixed(0)} – ${r.hasta.toStringAsFixed(0)}',
+                      style: const TextStyle(fontSize: 11,
+                        color: AppColors.textoSecundario))),
+                    Text(r.precio.toStringAsFixed(2),
+                      style: const TextStyle(fontSize: 11,
+                        fontWeight: FontWeight.w600, color: AppColors.azul)),
+                  ]))),
+              ],
+            ])));
+        }
+        campos.add(const SizedBox(height: 8));
+      }
+      campos.add(const SizedBox(height: 4));
     }
 
     // ── Dimensiones ──

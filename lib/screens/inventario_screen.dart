@@ -167,18 +167,11 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
     final categoriasList = ['Madera', 'MDF', 'Acrílico', 'Consumibles', 'Acabados', 'Metal', 'Otro'];
 
     await showModalBottomSheet(context: context, isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-          child: StatefulBuilder(builder: (ctx2, setS) => SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: StatefulBuilder(builder: (ctx, setS) => Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('Agregar material', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             TextField(controller: n, decoration: const InputDecoration(labelText: 'Nombre *', isDense: true,
@@ -211,24 +204,17 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
             ]),
             const SizedBox(height: 12),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.azul,
-                minimumSize: const Size(double.infinity, 44)),
-              onPressed: () async {
-                if (n.text.isEmpty) return;
-                await SupabaseService.agregarMaterial({
-                  'nombre': n.text.trim(), 'categoria': categoria,
-                  'unidad': unidad.text.trim(), 'stock_actual': int.tryParse(stock.text) ?? 0,
-                  'stock_minimo': int.tryParse(minimo.text) ?? 1,
-                  'costo_unitario': double.tryParse(costo.text) ?? 0,
-                });
-                if (mounted) { Navigator.pop(context); _cargar(); }
-              },
-              child: const Text('Guardar material',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
-            const SizedBox(height: 8),
-          ]))))));
+            ElevatedButton(onPressed: () async {
+              if (n.text.isEmpty) return;
+              await SupabaseService.agregarMaterial({
+                'nombre': n.text.trim(), 'categoria': categoria,
+                'unidad': unidad.text.trim(), 'stock_actual': int.tryParse(stock.text) ?? 0,
+                'stock_minimo': int.tryParse(minimo.text) ?? 1,
+                'costo_unitario': double.tryParse(costo.text) ?? 0,
+              });
+              if (mounted) { Navigator.pop(context); _cargar(); }
+            }, child: const Text('Guardar material')),
+          ])))));
   }
 
   Future<void> _registrarMovimiento() async {
@@ -240,12 +226,17 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
 
     await showModalBottomSheet(context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-        child: StatefulBuilder(builder: (ctx, setS) => Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('Registrar movimiento', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+      builder: (ctx) => StatefulBuilder(builder: (ctx2, setS) => Container(
+        padding: EdgeInsets.only(
+          left: 16, right: 16, top: 16,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
+          const Text('Registrar movimiento', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               value: materialId, isDense: true,
@@ -293,8 +284,13 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                 materialId: materialId!, tipo: tipo,
                 cantidad: int.tryParse(cant.text) ?? 1, motivo: motivo.text.trim());
               if (mounted) { Navigator.pop(context); _cargar(); }
-            }, child: const Text('Registrar')),
-          ])))));
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.azul,
+                minimumSize: const Size(double.infinity, 44)),
+              child: const Text('Registrar',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
+          const SizedBox(height: 8),
+        ]))))));
   }
 }
 
@@ -389,7 +385,12 @@ class _TarjetaMaterial extends StatelessWidget {
               materialId: material['id'], tipo: tipo,
               cantidad: int.tryParse(cant.text) ?? 1);
             if (ctx.mounted) { Navigator.pop(ctx); onMovimiento(); }
-          }, child: const Text('Registrar movimiento')),
-        ]))));
+          style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.azul,
+                minimumSize: const Size(double.infinity, 44)),
+              child: const Text('Registrar movimiento',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
+          const SizedBox(height: 8),
+        ])));
   }
 }
