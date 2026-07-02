@@ -413,31 +413,59 @@ class PdfService {
       margin: const pw.EdgeInsets.all(32),
       build: (ctx) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
         // Header
+        // Header idéntico a la cotización
         pw.Container(
           padding: const pw.EdgeInsets.all(16),
           decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(8)),
-          child: pw.Row(children: [
-            logoImage != null
-              ? pw.Container(
-                  width: 48, height: 48,
-                  decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(6)),
-                  padding: const pw.EdgeInsets.all(4),
-                  margin: const pw.EdgeInsets.only(right: 12),
-                  child: pw.Image(logoImage, fit: pw.BoxFit.contain))
-              : pw.SizedBox(width: 0),
-            pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
-              pw.Text('NOTA DE COMPRA', style: pw.TextStyle(fontSize: 11, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text('Fecha: $fecha', style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
-            ])),
-            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: pw.BoxDecoration(color: verde, borderRadius: pw.BorderRadius.circular(6)),
-                child: pw.Text('ENTREGADO', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold))),
-              pw.SizedBox(height: 4),
-              pw.Text('Folio: $folio', style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
+          child: pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+            // IZQUIERDA: logo + datos empresa
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              if (logoImage != null)
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.white,
+                    borderRadius: pw.BorderRadius.circular(4)),
+                  child: pw.Image(logoImage, width: 100, height: 28, fit: pw.BoxFit.contain))
+              else
+                pw.Text(nombreEmpresa,
+                  style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.SizedBox(height: 6),
+              if (telEmpresa.isNotEmpty)
+                pw.Text(telEmpresa, style: const pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+              if (correo.isNotEmpty)
+                pw.Text(correo, style: const pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
+              if (web.isNotEmpty)
+                pw.Text(web, style: const pw.TextStyle(fontSize: 8, color: PdfColors.white70)),
             ]),
+            // DERECHA: tipo doc + folio + fecha + sello
+            pw.Container(
+              padding: const pw.EdgeInsets.all(12),
+              decoration: pw.BoxDecoration(
+                color: PdfColors.white,
+                borderRadius: pw.BorderRadius.circular(6)),
+              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+                pw.Text('NOTA DE COMPRA',
+                  style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
+                pw.SizedBox(height: 4),
+                pw.Text('Folio: $folio',
+                  style: pw.TextStyle(fontSize: 10, color: azul)),
+                pw.SizedBox(height: 4),
+                pw.Text('Fecha: $fecha',
+                  style: pw.TextStyle(fontSize: 9, color: grisTexto)),
+                pw.SizedBox(height: 6),
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: pw.BoxDecoration(
+                    color: verde,
+                    borderRadius: pw.BorderRadius.circular(4)),
+                  child: pw.Text('ENTREGADO',
+                    style: pw.TextStyle(fontSize: 9, color: PdfColors.white,
+                      fontWeight: pw.FontWeight.bold))),
+              ])),
           ])),
         pw.SizedBox(height: 14),
         // Cliente
