@@ -35,7 +35,7 @@ class _GastosScreenState extends State<GastosScreen>
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
-      final data = await SupabaseService.getGastos();
+      final data = await SupabaseService.getGastos(periodo: 'Todo');
       if (mounted) setState(() {
         _gastos = (data as List)
           .map((j) => Gasto.fromJson(j as Map<String, dynamic>))
