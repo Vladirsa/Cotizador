@@ -399,13 +399,14 @@ class PdfService {
     const verde      = PdfColor.fromInt(0xFF1d9e75);
     const verdeClaro = PdfColor.fromInt(0xFFe6f7f0);
 
-    final nombreEmpresa = empresa['nombre_comercial'] ?? 'HETNA CNC';
-    final tel1   = empresa['telefono'] ?? '';
-    final correo = empresa['correo']   ?? '';
-    final web    = empresa['sitio_web'] ?? 'hetnacnc.com';
-    final fecha  = _fmtFecha.format(DateTime.now());
-    final clienteNombre = _limpiarTexto(cotizacion.cliente?.nombreCompleto ?? cotizacion.cliente?.nombre ?? 'Cliente');
-    final folio = folioPedido ?? cotizacion.folio ?? 'N/A';
+    final nombreEmpresa    = empresa['nombre_comercial'] ?? 'HETNA CNC';
+    final telEmpresa       = empresa['telefono'] ?? empresa['telefono2'] ?? '';
+    final direccionEmpresa = empresa['direccion'] ?? '';
+    final correo           = empresa['correo']   ?? '';
+    final web              = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final fecha            = _fmtFecha.format(DateTime.now());
+    final clienteNombre    = _limpiarTexto(cotizacion.cliente?.nombreCompleto ?? cotizacion.cliente?.nombre ?? 'Cliente');
+    final folio            = folioPedido ?? cotizacion.folio ?? 'N/A';
 
     pdf.addPage(pw.Page(
       pageFormat: PdfPageFormat.a4,
@@ -415,25 +416,19 @@ class PdfService {
         pw.Container(
           padding: const pw.EdgeInsets.all(16),
           decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(8)),
-          child: pw.Row(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
+          child: pw.Row(children: [
             logoImage != null
               ? pw.Container(
-                  width: 56, height: 56,
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.white,
-                    borderRadius: pw.BorderRadius.circular(8)),
-                  padding: const pw.EdgeInsets.all(6),
-                  margin: const pw.EdgeInsets.only(right: 14),
+                  width: 48, height: 48,
+                  decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(6)),
+                  padding: const pw.EdgeInsets.all(4),
+                  margin: const pw.EdgeInsets.only(right: 12),
                   child: pw.Image(logoImage, fit: pw.BoxFit.contain))
               : pw.SizedBox(width: 0),
             pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
-              pw.SizedBox(height: 2),
-              pw.Text('NOTA DE COMPRA', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 2),
-              pw.Text('Fecha: $fecha', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
+              pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+              pw.Text('NOTA DE COMPRA', style: pw.TextStyle(fontSize: 11, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Fecha: $fecha', style: const pw.TextStyle(fontSize: 9, color: PdfColors.white)),
             ])),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
               pw.Container(
