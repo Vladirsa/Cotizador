@@ -951,6 +951,10 @@ class SupabaseService {
   static Future<void> eliminarCita(String id) async {
     await _db.from('citas').delete().eq('id', id);
   }
+  static Future<void> actualizarGasto(String id, Map<String, dynamic> datos) async {
+    await _db.from('gastos').update(datos).eq('id', id);
+  }
+
   // ── Historial por cliente ─────────────────────────
   static Future<List<Cotizacion>> getCotizacionesByCliente(String clienteId) async {
     final res = await _db.from('cotizaciones')
@@ -968,26 +972,5 @@ class SupabaseService {
     return (res as List).map((j) => Pedido.fromJson(j)).toList();
   }
 
-  // ── Gastos con campos fiscales ─────────────────────
-  static Future<void> registrarGasto(Map<String, dynamic> datos) async {
-    await _db.from('gastos').insert(datos);
-  }
-
-  static Future<void> actualizarGasto(String id, Map<String, dynamic> datos) async {
-    await _db.from('gastos').update(datos).eq('id', id);
-  }
-
-  static Future<List<Map<String, dynamic>>> getGastos({
-    DateTime? desde, DateTime? hasta}) async {
-    var query = _db.from('gastos').select();
-    if (desde != null) {
-      query = query.gte('fecha', desde.toIso8601String().substring(0, 10));
-    }
-    if (hasta != null) {
-      query = query.lte('fecha', hasta.toIso8601String().substring(0, 10));
-    }
-    final res = await query.order('fecha', ascending: false);
-    return (res as List).cast<Map<String, dynamic>>();
-  }
 
 }
