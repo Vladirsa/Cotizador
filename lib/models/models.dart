@@ -487,3 +487,130 @@ class PdfCatalogo {
   String get tamanoTexto =>
       tamanoMb != null ? '${tamanoMb!.toStringAsFixed(1)} MB' : '';
 }
+
+
+// ─── GASTO (con campos fiscales SAT) ─────────
+class Gasto {
+  final String? id;
+  final String concepto;
+  final double monto;
+  final String categoria;
+  final String tipo; // directo | indirecto
+  final String? proveedor;
+  final DateTime? fecha;
+
+  // Campos fiscales SAT
+  final bool tieneFactura;
+  final String? rfcProveedor;
+  final String? folioFactura;
+  final double ivaFactura;     // IVA real de la factura
+  final bool esDeducible;
+  final String tipoGastoSat;  // materiales, servicios, renta, etc.
+  final String? comprobanteUrl;
+
+  final DateTime? createdAt;
+
+  Gasto({
+    this.id,
+    required this.concepto,
+    required this.monto,
+    required this.categoria,
+    this.tipo = 'directo',
+    this.proveedor,
+    this.fecha,
+    this.tieneFactura = false,
+    this.rfcProveedor,
+    this.folioFactura,
+    this.ivaFactura = 0,
+    this.esDeducible = true,
+    this.tipoGastoSat = 'materiales',
+    this.comprobanteUrl,
+    this.createdAt,
+  });
+
+  // Monto sin IVA (base)
+  double get montoBase => tieneFactura && ivaFactura > 0
+    ? monto - ivaFactura : monto;
+
+  // IVA acreditable (solo si tiene factura y es deducible)
+  double get ivaAcreditable => (tieneFactura && esDeducible)
+    ? ivaFactura : 0;
+
+  factory Gasto.fromJson(Map<String, dynamic> j) => Gasto(
+    id: j['id'],
+    concepto: j['concepto'] ?? '',
+    monto: (j['monto'] as num?)?.toDouble() ?? 0,
+    categoria: j['categoria'] ?? 'otros',
+    tipo: j['tipo'] ?? 'directo',
+    proveedor: j['proveedor'],
+    fecha: j['fecha'] != null ? DateTime.tryParse(j['fecha']) : null,
+    tieneFactura: j['tiene_factura'] ?? false,
+    rfcProveedor: j['rfc_proveedor'],
+    folioFactura: j['folio_factura'],
+    ivaFactura: (j['iva_factura'] as num?)?.toDouble() ?? 0,
+    esDeducible: j['es_deducible'] ?? true,
+    tipoGastoSat: j['tipo_gasto_sat'] ?? 'materiales',
+    comprobanteUrl: j['comprobante_url'],
+    createdAt: j['created_at'] != null ? DateTime.tryParse(j['created_at']) : null,
+  );
+
+  Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
+    'concepto': concepto,
+    'monto': monto,
+    'categoria': categoria,
+    'tipo': tipo,
+    'proveedor': proveedor,
+    'fecha': fecha?.toIso8601String().substring(0, 10),
+    'tiene_factura': tieneFactura,
+    'rfc_proveedor': rfcProveedor,
+    'folio_factura': folioFactura,
+    'iva_factura': ivaFactura,
+    'es_deducible': esDeducible,
+    'tipo_gasto_sat': tipoGastoSat,
+    'comprobante_url': comprobanteUrl,
+  };
+
+  static const tiposGastoSat = [
+    'materiales',
+    'servicios',
+    'renta',
+    'equipo',
+    'transporte',
+    'publicidad',
+    'telefonia',
+    'nomina',
+    'otros',
+  ];
+
+  static const etiquetasTipoSat = {
+    'materiales':  'Materiales y suministros',
+    'servicios':   'Servicios profesionales',
+    'renta':       'Renta y arrendamiento',
+    'equipo':      'Equipo y herramientas',
+    'transporte':  'Transporte y fletes',
+    'publicidad':  'Publicidad y marketing',
+    'telefonia':   'Telefonía e internet',
+    'nomina':      'Nómina y honorarios',
+    'otros':       'Otros gastos',
+  };
+}
+
+// ─── HISTORIAL DE CLIENTE ─────────────────────
+class HistorialCliente {
+  final List<Cotizacion> cotizaciones;
+  final List<Pedido> pedidos;
+
+  HistorialCliente({
+    required this.cotizaciones,
+    required this.pedidos,
+  });
+
+  double get totalCotizado => cotizaciones.fold(0, (s, c) => s + c.total);
+  double get totalPedidos => pedidos.fold(0, (s, p) => s + (p.total ?? 0));
+  double get totalEntregado => pedidos
+    .where((p) => p.estado == 'Entregado')
+    .fold(0, (s, p) => s + (p.total ?? 0));
+  int get pedidosActivos => pedidos
+    .where((p) => p.estado != 'Entregado').length;
+}
