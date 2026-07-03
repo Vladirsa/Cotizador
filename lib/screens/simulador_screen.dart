@@ -39,18 +39,56 @@ class SimTipoTrabajo {
     this.necesitaMetros = false, this.necesitaHoras = false,
     this.necesitaMinutos = false, this.descripcionFormula});
 
-  factory SimTipoTrabajo.fromJson(Map<String, dynamic> j) => SimTipoTrabajo(
-    id: j['id'], nombre: j['nombre'],
-    formula: j['formula'] ?? 'por_area',
-    factor: (j['factor'] as num?)?.toDouble() ?? 1.0,
-    necesitaLargo: j['necesita_largo'] ?? true,
-    necesitaAncho: j['necesita_ancho'] ?? true,
-    necesitaAlto: j['necesita_alto'] ?? false,
-    necesitaPeso: j['necesita_peso'] ?? false,
-    necesitaMetros: j['necesita_metros'] ?? false,
-    necesitaHoras: j['necesita_horas'] ?? false,
-    necesitaMinutos: j['necesita_minutos'] ?? false,
-    descripcionFormula: j['descripcion_formula']);
+  factory SimTipoTrabajo.fromJson(Map<String, dynamic> j) {
+    final nombre = (j['nombre'] as String? ?? '').toLowerCase();
+    // Inferir fórmula del nombre si no está en BD
+    String formula = j['formula'] as String? ?? _inferirFormula(nombre);
+    return SimTipoTrabajo(
+      id: j['id'], nombre: j['nombre'],
+      formula: formula,
+      factor: (j['factor_complejidad'] as num? ?? j['factor'] as num?)?.toDouble() ?? 1.0,
+      necesitaLargo: j['necesita_largo'] ?? _necesitaLargo(formula),
+      necesitaAncho: j['necesita_ancho'] ?? _necesitaAncho(formula),
+      necesitaAlto: j['necesita_alto'] ?? _necesitaAlto(formula, nombre),
+      necesitaPeso: j['necesita_peso'] ?? (formula == 'por_kg'),
+      necesitaMetros: j['necesita_metros'] ?? (formula == 'por_metro'),
+      necesitaHoras: j['necesita_horas'] ?? (formula == 'por_hora'),
+      necesitaMinutos: j['necesita_minutos'] ?? (formula == 'por_minuto'),
+      descripcionFormula: j['descripcion_formula'] ?? _descFormula(formula));
+  }
+
+  static String _inferirFormula(String nombre) {
+    if (nombre.contains('diseño') || nombre.contains('diseno') || nombre.contains('design')) return 'por_diseno';
+    if (nombre.contains('hora') || nombre.contains('hr ') || nombre.contains('impresion') || nombre.contains('impresión')) return 'por_hora';
+    if (nombre.contains('minuto') || nombre.contains('min ') || nombre.contains('laser') || nombre.contains('láser')) return 'por_minuto';
+    if (nombre.contains('metro') || nombre.contains('lineal') || nombre.contains('herrer')) return 'por_metro';
+    if (nombre.contains('kg') || nombre.contains('kilo') || nombre.contains('peso')) return 'por_kg';
+    if (nombre.contains('pieza') || nombre.contains('pza') || nombre.contains('fijo')) return 'por_pieza';
+    if (nombre.contains('3d') || nombre.contains('relieve') || nombre.contains('talla') ||
+        nombre.contains('escultura') || nombre.contains('rotativo') || nombre.contains('torneado')) return 'por_volumen';
+    return 'por_area'; // default
+  }
+
+  static bool _necesitaLargo(String f) => f != 'por_diseno' && f != 'precio_fijo';
+  static bool _necesitaAncho(String f) => f == 'por_area' || f == 'por_volumen';
+  static bool _necesitaAlto(String f, String nombre) =>
+    f == 'por_volumen' || nombre.contains('3d') || nombre.contains('relieve') ||
+    nombre.contains('talla') || nombre.contains('escultura');
+
+  static String _descFormula(String f) {
+    switch (f) {
+      case 'por_area':    return 'Largo × Ancho → m² × Tarifa';
+      case 'por_volumen': return 'L × A × Alto × Factor → Tabla rangos';
+      case 'por_hora':    return 'Horas × Tarifa/hora';
+      case 'por_minuto':  return 'Minutos × Tarifa/minuto';
+      case 'por_metro':   return 'Metros × Tarifa/metro';
+      case 'por_kg':      return 'Peso × Tarifa/kg';
+      case 'por_pieza':   return 'Cantidad × Precio/pieza';
+      case 'por_diseno':  return 'Simple / Media / Alta / Premium';
+      case 'precio_fijo': return 'Precio fijo negociado';
+      default:            return 'Largo × Ancho → m² × Tarifa';
+    }
+  }
 }
 
 class SimTarifa {
@@ -147,25 +185,49 @@ class SimuladorDataService {
   }
 
   static Future<SimConfig> getConfig(String servicioId) async {
-    final results = await Future.wait([
-      _sb.from('sim_tipos_trabajo').select().eq('servicio_id', servicioId).order('nombre'),
-      _sb.from('sim_tarifas').select().eq('servicio_id', servicioId),
-      _sb.from('sim_rangos').select().eq('servicio_id', servicioId).order('desde'),
-      _sb.from('sim_extras').select().eq('servicio_id', servicioId).eq('activo', true),
-      _sb.from('sim_acabados').select().eq('servicio_id', servicioId),
-      _sb.from('sim_servicios').select().eq('id', servicioId).single(),
-    ]);
+    // Cargar servicio
+    final svcData = await _sb.from('sim_servicios')
+      .select().eq('id', servicioId).maybeSingle();
+    if (svcData == null) throw Exception('Servicio no encontrado');
+    final servicio = SimServicio.fromJson(svcData);
 
-    final servicio = SimServicio.fromJson(results[5] as Map<String, dynamic>);
-    final tipos = (results[0] as List).map((j) => SimTipoTrabajo.fromJson(j)).toList();
+    // Cargar tipos de trabajo
+    List tiposData = [];
+    try { tiposData = await _sb.from('sim_tipos_trabajo')
+      .select().eq('servicio_id', servicioId)
+      .eq('activo', true).order('orden'); } catch (_) {}
+    if (tiposData.isEmpty) {
+      try { tiposData = await _sb.from('sim_tipos_trabajo')
+        .select().eq('servicio_id', servicioId).order('nombre'); } catch (_) {}
+    }
+
+    // Cargar tarifas
+    List tarifasData = [];
+    try { tarifasData = await _sb.from('sim_tarifas')
+      .select().eq('servicio_id', servicioId).eq('activo', true); } catch (_) {}
+    if (tarifasData.isEmpty) {
+      try { tarifasData = await _sb.from('sim_tarifas')
+        .select().eq('servicio_id', servicioId); } catch (_) {}
+    }
+
+    // Cargar rangos, extras, acabados (opcionales)
+    List rangosData = [], extrasData = [], acabadosData = [];
+    try { rangosData = await _sb.from('sim_rangos')
+      .select().eq('servicio_id', servicioId).order('desde'); } catch (_) {}
+    try { extrasData = await _sb.from('sim_extras')
+      .select().eq('servicio_id', servicioId); } catch (_) {}
+    try { acabadosData = await _sb.from('sim_acabados')
+      .select().eq('servicio_id', servicioId); } catch (_) {}
+
+    final tipos = tiposData.map((j) => SimTipoTrabajo.fromJson(j as Map<String,dynamic>)).toList();
     final tarifasMap = <String, SimTarifa>{};
-    for (final j in (results[1] as List)) {
-      final t = SimTarifa.fromJson(j);
+    for (final j in tarifasData) {
+      final t = SimTarifa.fromJson(j as Map<String,dynamic>);
       tarifasMap[t.clave] = t;
     }
-    final rangos = (results[2] as List).map((j) => SimRango.fromJson(j)).toList();
-    final extras = (results[3] as List).map((j) => SimExtra.fromJson(j)).toList();
-    final acabados = (results[4] as List).map((j) => SimAcabado.fromJson(j)).toList();
+    final rangos = rangosData.map((j) => SimRango.fromJson(j as Map<String,dynamic>)).toList();
+    final extras = extrasData.map((j) => SimExtra.fromJson(j as Map<String,dynamic>)).toList();
+    final acabados = acabadosData.map((j) => SimAcabado.fromJson(j as Map<String,dynamic>)).toList();
 
     return SimConfig(servicio: servicio, tipos: tipos, tarifas: tarifasMap,
       rangos: rangos, extras: extras, acabados: acabados);
