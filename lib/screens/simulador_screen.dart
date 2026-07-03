@@ -517,6 +517,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
                     await SimuladorDataService.crearServicio({
+                      'negocio_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                       'nombre': nombreCtrl.text.trim(),
                       'emoji': emojiSel,
                       'activo': true,
@@ -1470,10 +1471,11 @@ class _PantallaServicioState extends State<_PantallaServicio> {
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
                     await SimuladorDataService.crearTipoTrabajo({
+                      'negocio_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
                       'servicio_id': widget.servicio.id,
                       'nombre': nombreCtrl.text.trim(),
                       'formula': formula,
-                      'factor': 1.0,
+                      'factor_complejidad': 1.0,
                       'necesita_largo': true,
                       'necesita_ancho': formula != 'por_hora' && formula != 'por_minuto' && formula != 'por_kg',
                       'necesita_alto': necesitaAlto || formula == 'por_volumen',

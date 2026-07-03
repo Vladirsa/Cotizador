@@ -22,7 +22,7 @@ class _MarketingScreenState extends State<MarketingScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -47,7 +47,6 @@ class _MarketingScreenState extends State<MarketingScreen>
             Tab(icon: Icon(Icons.people_outline, size: 16), text: 'Campañas'),
             Tab(icon: Icon(Icons.message_outlined, size: 16), text: 'Plantillas WA'),
             Tab(icon: Icon(Icons.discount_outlined, size: 16), text: 'Cupones'),
-            Tab(icon: Icon(Icons.settings_outlined, size: 16), text: 'Config WA'),
           ]),
       ),
       body: TabBarView(controller: _tabs, children: [
@@ -55,7 +54,6 @@ class _MarketingScreenState extends State<MarketingScreen>
         const _CampanasTab(),
         const _PlantillasTab(),
         const CuponesScreen(),
-        const _ConfigWaTab(),
       ]));
   }
 }
