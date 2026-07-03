@@ -607,7 +607,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       case 'por_pieza':
         final tarifa = cfg.getTarifa('tarifa_pieza') > 0
           ? cfg.getTarifa('tarifa_pieza') : 100;
-        maquila = tarifa * _cantidad;
+        maquila = tarifa * _cantidad.toDouble();
         desglose['Precio/pieza'] = _fmt.format(tarifa);
         break;
 
@@ -653,7 +653,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           'premium': cfg.getTarifa('precio_premium') > 0
             ? cfg.getTarifa('precio_premium') : 2500,
         };
-        maquila = (precios[_complejidad] ?? 500) * _cantidad;
+        maquila = ((precios[_complejidad] ?? 500) * _cantidad).toDouble();
         desglose['Complejidad'] = _complejidad.toUpperCase();
         desglose['Precio'] = _fmt.format(precios[_complejidad] ?? 500);
         break;
