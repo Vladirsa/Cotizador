@@ -5,6 +5,7 @@ import '../main.dart';
 import 'cupones_screen.dart';
 import 'citas_screen.dart';
 import 'config_simulador_screen.dart';
+import 'config_costos_screen.dart';
 import 'plantillas_wa_screen.dart';
 import '../services/supabase_service.dart';
 import 'inicio_screen.dart';
@@ -53,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 11: return const ReportesScreen();
       case 12: return const ConfigScreen();
       case 13: return const ConfigSimuladorScreen();
+      case 14: return const ConfigCostosScreen();
       default: return const InicioScreen();
     }
   }
@@ -146,6 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11),
       _dItem(Icons.settings_outlined,      'Configuración',      12),
       _dItem(Icons.tune_outlined,          'Config Simulador',   13),
+      _dItem(Icons.calculate_outlined,     'Costos del taller',  14),
       const Divider(height: 1),
       ListTile(
         leading: const Icon(Icons.logout_outlined, color: AppColors.rojo, size: 22),
