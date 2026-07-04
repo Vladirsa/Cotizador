@@ -104,8 +104,8 @@ class SimRango {
   SimRango({required this.id, required this.desde, required this.hasta, required this.precio});
   factory SimRango.fromJson(Map<String, dynamic> j) => SimRango(
     id: j['id'],
-    desde: (j['desde'] as num?)?.toDouble() ?? 0,
-    hasta: (j['hasta'] as num?)?.toDouble() ?? 999999,
+    desde: (j['indice_desde'] as num? ?? j['desde'] as num?)?.toDouble() ?? 0,
+    hasta: (j['indice_hasta'] as num? ?? j['hasta'] as num?)?.toDouble() ?? 999999,
     precio: (j['precio'] as num?)?.toDouble() ?? 0);
 }
 
