@@ -354,6 +354,15 @@ class MotorCalculo {
     double horasLijado = 0,
     double horasBarnizado = 0,
     bool llevaDiseno = false,
+    // Plasma CNC
+    String calibre = 'Cal 14',
+    String material = 'acero_negro',
+    bool llevaLimpieza = false,
+    bool llevaFlete = false,
+    String tamanoFlete = 'mediano',
+    bool llevaDisenoPlasma = false,
+    bool clienteTraeArchivoDXF = false,
+    double horasDisenoPlasma = 1.0,
   }) {
     final fmt = NumberFormat(r'$#,##0.00', 'es_MX');
     final formula = tipo.formula;
@@ -365,39 +374,61 @@ class MotorCalculo {
 
     switch (formula) {
 
-      // ── ROUTER 2D: Por área × tarifa según tipo ──────
+      // ── ROUTER 2D / PLASMA CNC: Por área × tarifa ──────
       case 'por_area':
         final areaM2 = (largo/100) * (ancho/100);
-        // Determinar tarifa según nombre del tipo
         final esCelosia = tipo.nombre.toLowerCase().contains('celosia') ||
                           tipo.nombre.toLowerCase().contains('celosía') ||
                           tipo.nombre.toLowerCase().contains('calado');
-        final tarifaM2 = esCelosia
-          ? (cfg.getTarifa('tarifa_m2_celosia') > 0 ? cfg.getTarifa('tarifa_m2_celosia') : 450)
-          : (cfg.getTarifa('tarifa_m2_normal')  > 0 ? cfg.getTarifa('tarifa_m2_normal')  : 350);
+        // Detectar Plasma por sus tarifas específicas
+        final esPlasma = cfg.getTarifa('tarifa_m2_delgado') > 0;
+        double tarifaM2;
+        if (esPlasma) {
+          final calibresDelgados = ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12'];
+          final esDelgado = calibresDelgados.contains(calibre);
+          final tarifaBase = esDelgado
+            ? (cfg.getTarifa('tarifa_m2_delgado') > 0 ? cfg.getTarifa('tarifa_m2_delgado') : 480)
+            : (cfg.getTarifa('tarifa_m2_medio')   > 0 ? cfg.getTarifa('tarifa_m2_medio')   : 680);
+          final factorMat = material == 'inox'
+            ? (cfg.getTarifa('factor_inox') > 0 ? cfg.getTarifa('factor_inox') : 1.4)
+            : material == 'aluminio'
+              ? (cfg.getTarifa('factor_aluminio') > 0 ? cfg.getTarifa('factor_aluminio') : 1.3)
+              : 1.0;
+          tarifaM2 = tarifaBase * factorMat * (esCelosia ? tipo.factor : 1.0);
+          desglose['material_factor'] = factorMat.toDouble();
+          // Mínimo apertura solo si pieza pequeña
+          final umbral = cfg.getTarifa('umbral_minimo_m2') > 0 ? cfg.getTarifa('umbral_minimo_m2') : 0.09;
+          final minAp = cfg.getTarifa('minimo_apertura') > 0 ? cfg.getTarifa('minimo_apertura') : 150;
+          if (areaM2 < umbral) {
+            desglose['minimo_apertura'] = minAp.toDouble();
+          }
+        } else {
+          tarifaM2 = esCelosia
+            ? (cfg.getTarifa('tarifa_m2_celosia') > 0 ? cfg.getTarifa('tarifa_m2_celosia') : 450)
+            : (cfg.getTarifa('tarifa_m2_normal')  > 0 ? cfg.getTarifa('tarifa_m2_normal')  : 350);
+        }
         precioMaquila = areaM2 * tarifaM2 * cantidad;
-        desglose['area_m2'] = areaM2.toDouble();
+        if (esPlasma) {
+          final umbral2 = cfg.getTarifa('umbral_minimo_m2') > 0 ? cfg.getTarifa('umbral_minimo_m2') : 0.09;
+          final minAp2 = cfg.getTarifa('minimo_apertura') > 0 ? cfg.getTarifa('minimo_apertura') : 150;
+          if (areaM2 < umbral2 && precioMaquila < minAp2) precioMaquila = minAp2.toDouble();
+        }
+        desglose['area_m2'] = areaM2;
         desglose['tarifa_m2'] = tarifaM2.toDouble();
-        // Mano de obra lijado
+        // Extras Router 2D
         if (horasLijado > 0) {
-          final tarifaLijado = cfg.getTarifa('costo_lijado_hora') > 0
-            ? cfg.getTarifa('costo_lijado_hora') : 150;
-          desglose['mano_obra_lijado'] = horasLijado * tarifaLijado * cantidad.toDouble();
+          final tl = cfg.getTarifa('costo_lijado_hora') > 0 ? cfg.getTarifa('costo_lijado_hora') : 150;
+          desglose['mano_obra_lijado'] = (horasLijado * tl * cantidad).toDouble();
         }
-        // Mano de obra barnizado
         if (horasBarnizado > 0) {
-          final tarifaBarn = cfg.getTarifa('costo_barnizado') > 0
-            ? cfg.getTarifa('costo_barnizado') : 200;
-          desglose['mano_obra_barnizado'] = horasBarnizado * tarifaBarn * cantidad.toDouble();
+          final tb = cfg.getTarifa('costo_barnizado') > 0 ? cfg.getTarifa('costo_barnizado') : 200;
+          desglose['mano_obra_barnizado'] = (horasBarnizado * tb * cantidad).toDouble();
         }
-        // Diseño adicional
         if (llevaDiseno) {
-          final tarifaDis = cfg.getTarifa('costo_diseno') > 0
-            ? cfg.getTarifa('costo_diseno') : 300;
-          desglose['diseno_adicional'] = tarifaDis.toDouble();
+          final td = cfg.getTarifa('costo_diseno') > 0 ? cfg.getTarifa('costo_diseno') : 300;
+          desglose['diseno_adicional'] = td.toDouble();
         }
-        tiempoHoras = areaM2 * 0.5 * cantidad; // estimado
-        break;
+        tiempoHoras = areaM2 * 0.5 * cantidad; break;
 
       // ── ROUTER 3D: Por tabla de rangos × factor tipo ─
       case 'por_volumen':
@@ -491,11 +522,27 @@ class MotorCalculo {
         break;
 
       case 'por_metro':
-        final tarifaMt = cfg.getTarifa('tarifa_metro') > 0
-          ? cfg.getTarifa('tarifa_metro') : 100;
+        final tieneMetroPlasma = cfg.getTarifa('tarifa_metro_delgado') > 0;
+        double tarifaMt;
+        if (tieneMetroPlasma) {
+          final calibresD = ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12'];
+          final esD = calibresD.contains(calibre);
+          final tarifaBaseM = esD
+            ? (cfg.getTarifa('tarifa_metro_delgado') > 0 ? cfg.getTarifa('tarifa_metro_delgado') : 80.0)
+            : (cfg.getTarifa('tarifa_metro_medio')   > 0 ? cfg.getTarifa('tarifa_metro_medio')   : 150.0);
+          final fMat = material == 'inox'
+            ? (cfg.getTarifa('factor_inox') > 0 ? cfg.getTarifa('factor_inox') : 1.4)
+            : material == 'aluminio'
+              ? (cfg.getTarifa('factor_aluminio') > 0 ? cfg.getTarifa('factor_aluminio') : 1.3)
+              : 1.0;
+          tarifaMt = (tarifaBaseM * fMat).toDouble();
+        } else {
+          tarifaMt = cfg.getTarifa('tarifa_metro') > 0 ? cfg.getTarifa('tarifa_metro').toDouble() : 100.0;
+        }
         precioMaquila = metros * tarifaMt * cantidad;
         tiempoHoras = metros * 0.1 * cantidad;
-        desglose['metros'] = metros.toDouble();
+        desglose['metros'] = metros;
+        desglose['tarifa_metro'] = tarifaMt;
         break;
 
       case 'por_kg':
@@ -526,6 +573,40 @@ class MotorCalculo {
     final moBarniz = desglose['mano_obra_barnizado'] ?? 0;
     final moDis = desglose['diseno_adicional'] ?? 0;
     final extrasRouter = moLijado + moBarniz + moDis;
+
+    // Extras Plasma CNC
+    double extrasPlasma = 0;
+    if (llevaLimpieza) {
+      final costoLimp = cfg.getTarifa('limpieza_pieza') > 0 ? cfg.getTarifa('limpieza_pieza') : 80;
+      extrasPlasma += costoLimp * cantidad;
+      desglose['limpieza_pieza'] = (costoLimp * cantidad).toDouble();
+    }
+    if (llevaFlete) {
+      final areaTotal = (largo/100) * (ancho/100) * cantidad;
+      double costoFlete = 0;
+      if (areaTotal < 1.0) { costoFlete = 0; }
+      else if (areaTotal <= 3.0) {
+        costoFlete = cfg.getTarifa('flete_mediano') > 0 ? cfg.getTarifa('flete_mediano') : 350;
+      } else {
+        costoFlete = cfg.getTarifa('flete_grande') > 0 ? cfg.getTarifa('flete_grande') : 800;
+      }
+      if (costoFlete > 0) {
+        extrasPlasma += costoFlete;
+        desglose['flete_maniobra'] = costoFlete.toDouble();
+      }
+    }
+    if (llevaDisenoPlasma) {
+      if (clienteTraeArchivoDXF) {
+        final setupDXF = cfg.getTarifa('setup_archivo') > 0 ? cfg.getTarifa('setup_archivo') : 75;
+        extrasPlasma += setupDXF;
+        desglose['setup_dxf'] = setupDXF.toDouble();
+      } else {
+        final tarifaDis = cfg.getTarifa('tarifa_diseno_hora') > 0 ? cfg.getTarifa('tarifa_diseno_hora') : 250;
+        final costoDis = tarifaDis * horasDisenoPlasma;
+        extrasPlasma += costoDis;
+        desglose['diseno_plasma'] = costoDis.toDouble();
+      }
+    }
 
     // ── COSTOS DIRECTOS ─────────────────────────────
     // CM - Material
@@ -577,7 +658,7 @@ class MotorCalculo {
     double costoTotal;
     if (precioMaquila > 0) {
       // Modo directo: maquila + material + acabado + extras
-      costoTotal = precioMaquila + cm + ca + extrasTotal + extrasRouter;
+      costoTotal = precioMaquila + cm + ca + extrasTotal + extrasRouter + extrasPlasma;
       // Registrar en desglose
       if (precioMaquila > 0) {
         final desglMap = {'Maquila/Producción': precioMaquila};
@@ -927,6 +1008,16 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   double _horasBarnizado = 0;
   bool _llevaDiseno = false;
 
+  // Inputs Plasma CNC
+  String _calibre = 'Cal 14';
+  String _material = 'acero_negro';
+  bool _llevaLimpieza = false;
+  bool _llevaFlete = false;
+  String _tamanoFlete = 'mediano';
+  bool _llevaDisenoPlasma = false;
+  bool _clienteTraeArchivoDXF = false;
+  double _horasDisenoPlasma = 1.0;
+
   // Inputs
   SimTipoTrabajo? _tipoSel;
   SimAcabado? _acabadoSel;
@@ -1022,7 +1113,14 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       archivoEditableAlCliente: _archivoEditableAlCliente,
       horasLijado: _horasLijado,
       horasBarnizado: _horasBarnizado,
-      llevaDiseno: _llevaDiseno);
+      llevaDiseno: _llevaDiseno,
+      calibre: _calibre,
+      material: _material,
+      llevaLimpieza: _llevaLimpieza,
+      llevaFlete: _llevaFlete,
+      llevaDisenoPlasma: _llevaDisenoPlasma,
+      clienteTraeArchivoDXF: _clienteTraeArchivoDXF,
+      horasDisenoPlasma: _horasDisenoPlasma);
 
     setState(() { _resultado = r; _descripcionEditable = desc; });
   }
@@ -1236,8 +1334,85 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           style: TextStyle(fontSize: 12, color: AppColors.azul)));
     }
 
-    // Para Router 2D agregar opciones de acabado manual
-    final esRouter2D = formula == 'por_area';
+    // Detectar si es Plasma
+    final _config2 = _config!;
+    final esPlasmaScreen = _config2.getTarifa('tarifa_m2_delgado') > 0 ||
+                           _config2.getTarifa('tarifa_metro_delgado') > 0;
+    final esRouter2D = formula == 'por_area' && !esPlasmaScreen;
+
+    // ── PLASMA: Selector calibre y material ──────────
+    if (esPlasmaScreen) {
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Calibre
+        const Text('Calibre del material:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 6, runSpacing: 6,
+          children: ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12','Cal 10','Cal 8','Cal 6','1/4"','3/8"','1/2"+']
+            .map((c) => GestureDetector(
+              onTap: () => setState(() { _calibre = c; _resultado = null; }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _calibre == c ? AppColors.azul : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: _calibre == c ? AppColors.azul : AppColors.grisBorde)),
+                child: Text(c, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                  color: _calibre == c ? Colors.white : AppColors.textoPrincipal))))).toList()),
+
+        const SizedBox(height: 12),
+
+        // Material
+        const Text('Material:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Row(children: [
+          _chipMaterial('acero_negro', '⚙️ Acero negro', 'Tarifa base'),
+          const SizedBox(width: 8),
+          _chipMaterial('inox', '✨ Inoxidable', '×1.4'),
+          const SizedBox(width: 8),
+          _chipMaterial('aluminio', '🔵 Aluminio', '×1.3'),
+        ]),
+
+        const SizedBox(height: 12),
+
+        // Dimensiones según tipo
+        if (formula == 'por_area' || formula == 'por_metro') ...[
+          if (tipo.necesitaLargo) ...[
+            _campoMedida('Largo (cm)', _largo, (v) => setState(() { _largo = v; _resultado = null; })),
+            const SizedBox(height: 10),
+          ],
+          if (tipo.necesitaAncho) ...[
+            _campoMedida('Ancho (cm)', _ancho, (v) => setState(() { _ancho = v; _resultado = null; })),
+            const SizedBox(height: 10),
+          ],
+          if (tipo.necesitaMetros) ...[
+            _campoMedida('Metros lineales', _metros, (v) => setState(() { _metros = v; _resultado = null; })),
+            const SizedBox(height: 10),
+          ],
+        ],
+
+        const Divider(height: 16),
+
+        // Adicionales Plasma
+        const Text('Adicionales:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        _toggleOpcion('🧹 Incluir limpieza de pieza', _llevaLimpieza,
+          (v) => setState(() { _llevaLimpieza = v; _resultado = null; })),
+        _toggleOpcion('🚚 Incluir flete/maniobra', _llevaFlete,
+          (v) => setState(() { _llevaFlete = v; _resultado = null; })),
+        _toggleOpcion('✏️ Incluir diseño', _llevaDisenoPlasma,
+          (v) => setState(() { _llevaDisenoPlasma = v; _resultado = null; })),
+        if (_llevaDisenoPlasma) ...[
+          const SizedBox(height: 8),
+          _toggleOpcion('📁 Cliente trae archivo DXF', _clienteTraeArchivoDXF,
+            (v) => setState(() { _clienteTraeArchivoDXF = v; _resultado = null; })),
+          if (!_clienteTraeArchivoDXF) ...[
+            const SizedBox(height: 8),
+            _campoMedida('Horas de diseño', _horasDisenoPlasma,
+              (v) => setState(() { _horasDisenoPlasma = v; _resultado = null; })),
+          ],
+        ],
+      ]);
+    }
 
     return Column(children: [
       if (tipo.necesitaLargo && formula != 'por_minuto') ...[
@@ -1320,6 +1495,24 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           ]),
       ],
     ]);
+  }
+
+  Widget _chipMaterial(String val, String titulo, String sub) {
+    final sel = _material == val;
+    return Expanded(child: GestureDetector(
+      onTap: () => setState(() { _material = val; _resultado = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+        child: Column(children: [
+          Text(titulo, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+            color: sel ? Colors.white : AppColors.textoPrincipal)),
+          Text(sub, style: TextStyle(fontSize: 9,
+            color: sel ? Colors.white70 : AppColors.textoSecundario)),
+        ]))));
   }
 
   Widget _chipArchivo(bool trae, bool esVector, String label) {
