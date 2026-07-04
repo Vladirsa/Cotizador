@@ -1,5 +1,6 @@
 // lib/screens/simulador_screen.dart
-// HETNA CNC — Simulador v4: Genérico, dinámico, cualquier negocio
+// HETNA CNC — Simulador v5 completo con motor de costos real
+// Fórmula: PV = (CM + CMO + CMaq + CC + CA + CI) ÷ (1 - Margen)
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -7,10 +8,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import 'cotizar_screen.dart';
 
+const _negId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
 // ══════════════════════════════════════════════════════
 // MODELOS
 // ══════════════════════════════════════════════════════
-
 class SimServicio {
   final String id, nombre, emoji;
   final String? descripcion;
@@ -26,7 +28,7 @@ class SimServicio {
 
 class SimTipoTrabajo {
   final String id, nombre;
-  final String formula; // por_area, por_volumen, por_hora, por_pieza, etc.
+  final String formula;
   final double factor;
   final bool necesitaLargo, necesitaAncho, necesitaAlto;
   final bool necesitaPeso, necesitaMetros, necesitaHoras, necesitaMinutos;
@@ -41,15 +43,14 @@ class SimTipoTrabajo {
 
   factory SimTipoTrabajo.fromJson(Map<String, dynamic> j) {
     final nombre = (j['nombre'] as String? ?? '').toLowerCase();
-    // Inferir fórmula del nombre si no está en BD
     String formula = j['formula'] as String? ?? _inferirFormula(nombre);
     return SimTipoTrabajo(
       id: j['id'], nombre: j['nombre'],
       formula: formula,
       factor: (j['factor_complejidad'] as num? ?? j['factor'] as num?)?.toDouble() ?? 1.0,
-      necesitaLargo: j['necesita_largo'] ?? _necesitaLargo(formula),
-      necesitaAncho: j['necesita_ancho'] ?? _necesitaAncho(formula),
-      necesitaAlto: j['necesita_alto'] ?? _necesitaAlto(formula, nombre),
+      necesitaLargo: j['necesita_largo'] ?? _nLargo(formula),
+      necesitaAncho: j['necesita_ancho'] ?? _nAncho(formula),
+      necesitaAlto: j['necesita_alto'] ?? _nAlto(formula, nombre),
       necesitaPeso: j['necesita_peso'] ?? (formula == 'por_kg'),
       necesitaMetros: j['necesita_metros'] ?? (formula == 'por_metro'),
       necesitaHoras: j['necesita_horas'] ?? (formula == 'por_hora'),
@@ -57,36 +58,30 @@ class SimTipoTrabajo {
       descripcionFormula: j['descripcion_formula'] ?? _descFormula(formula));
   }
 
-  static String _inferirFormula(String nombre) {
-    if (nombre.contains('diseño') || nombre.contains('diseno') || nombre.contains('design')) return 'por_diseno';
-    if (nombre.contains('hora') || nombre.contains('hr ') || nombre.contains('impresion') || nombre.contains('impresión')) return 'por_hora';
-    if (nombre.contains('minuto') || nombre.contains('min ') || nombre.contains('laser') || nombre.contains('láser')) return 'por_minuto';
-    if (nombre.contains('metro') || nombre.contains('lineal') || nombre.contains('herrer')) return 'por_metro';
-    if (nombre.contains('kg') || nombre.contains('kilo') || nombre.contains('peso')) return 'por_kg';
-    if (nombre.contains('pieza') || nombre.contains('pza') || nombre.contains('fijo')) return 'por_pieza';
-    if (nombre.contains('3d') || nombre.contains('relieve') || nombre.contains('talla') ||
-        nombre.contains('escultura') || nombre.contains('rotativo') || nombre.contains('torneado')) return 'por_volumen';
-    return 'por_area'; // default
+  static String _inferirFormula(String n) {
+    if (n.contains('diseño') || n.contains('diseno') || n.contains('vectori') || n.contains('model')) return 'por_diseno';
+    if (n.contains('impresion') || n.contains('impresión') || n.contains('3d print') || n.contains('fdm')) return 'por_hora';
+    if (n.contains('grabado') || n.contains('laser') || n.contains('láser') || n.contains('fibra')) return 'por_minuto';
+    if (n.contains('metro') || n.contains('lineal') || n.contains('herrer') || n.contains('carpint')) return 'por_metro';
+    if (n.contains('pieza') || n.contains('pza') || n.contains('promo')) return 'por_pieza';
+    if (n.contains('3d') || n.contains('relieve') || n.contains('talla') || n.contains('escultura') || n.contains('rotativo')) return 'por_volumen';
+    return 'por_area';
   }
-
-  static bool _necesitaLargo(String f) => f != 'por_diseno' && f != 'precio_fijo';
-  static bool _necesitaAncho(String f) => f == 'por_area' || f == 'por_volumen';
-  static bool _necesitaAlto(String f, String nombre) =>
-    f == 'por_volumen' || nombre.contains('3d') || nombre.contains('relieve') ||
-    nombre.contains('talla') || nombre.contains('escultura');
-
+  static bool _nLargo(String f) => f != 'por_diseno' && f != 'precio_fijo' && f != 'por_pieza';
+  static bool _nAncho(String f) => f == 'por_area' || f == 'por_volumen';
+  static bool _nAlto(String f, String n) => f == 'por_volumen' || n.contains('3d') || n.contains('relieve') || n.contains('escultura');
   static String _descFormula(String f) {
-    switch (f) {
-      case 'por_area':    return 'Largo × Ancho → m² × Tarifa';
-      case 'por_volumen': return 'L × A × Alto × Factor → Tabla rangos';
-      case 'por_hora':    return 'Horas × Tarifa/hora';
-      case 'por_minuto':  return 'Minutos × Tarifa/minuto';
-      case 'por_metro':   return 'Metros × Tarifa/metro';
-      case 'por_kg':      return 'Peso × Tarifa/kg';
-      case 'por_pieza':   return 'Cantidad × Precio/pieza';
-      case 'por_diseno':  return 'Simple / Media / Alta / Premium';
+    switch(f) {
+      case 'por_area': return 'Largo × Ancho → m² × Tarifa';
+      case 'por_volumen': return 'L × A × Alto × Factor → Precio por complejidad';
+      case 'por_hora': return 'Horas × Tarifa/hora';
+      case 'por_minuto': return 'Minutos × Tarifa/minuto';
+      case 'por_metro': return 'Metros × Tarifa/metro';
+      case 'por_kg': return 'Peso × Tarifa/kg';
+      case 'por_pieza': return 'Cantidad × Precio/pieza';
+      case 'por_diseno': return 'Simple / Media / Alta / Premium';
       case 'precio_fijo': return 'Precio fijo negociado';
-      default:            return 'Largo × Ancho → m² × Tarifa';
+      default: return 'Largo × Ancho → m² × Tarifa';
     }
   }
 }
@@ -106,8 +101,7 @@ class SimTarifa {
 class SimRango {
   final String id;
   final double desde, hasta, precio;
-  SimRango({required this.id, required this.desde,
-    required this.hasta, required this.precio});
+  SimRango({required this.id, required this.desde, required this.hasta, required this.precio});
   factory SimRango.fromJson(Map<String, dynamic> j) => SimRango(
     id: j['id'],
     desde: (j['desde'] as num?)?.toDouble() ?? 0,
@@ -119,8 +113,7 @@ class SimExtra {
   final String id, nombre;
   final double precio;
   bool seleccionado;
-  SimExtra({required this.id, required this.nombre,
-    required this.precio, this.seleccionado = false});
+  SimExtra({required this.id, required this.nombre, required this.precio, this.seleccionado = false});
   factory SimExtra.fromJson(Map<String, dynamic> j) => SimExtra(
     id: j['id'], nombre: j['nombre'],
     precio: (j['precio'] as num?)?.toDouble() ?? 0);
@@ -157,161 +150,64 @@ class SimConfig {
   }
 }
 
+class CostosTaller {
+  final double costoHoraTaller;
+  final double costoHoraMaquina;
+  final double costoHoraOperador;
+  final double margenRecomendado;
+  final double margenMinimo;
+  final double ivaPct;
+
+  CostosTaller({this.costoHoraTaller = 0, this.costoHoraMaquina = 0,
+    this.costoHoraOperador = 0, this.margenRecomendado = 35,
+    this.margenMinimo = 20, this.ivaPct = 16});
+
+  double get costoHoraTotal => costoHoraTaller + costoHoraMaquina + costoHoraOperador;
+}
+
+class ResultadoPrecio {
+  final String etiqueta, emoji, descripcion;
+  final double costo, precio, utilidad, margen;
+  final Color color;
+  final bool esRecomendado;
+
+  ResultadoPrecio({required this.etiqueta, required this.emoji,
+    required this.descripcion, required this.costo, required this.precio,
+    required this.utilidad, required this.margen,
+    required this.color, this.esRecomendado = false});
+}
+
 class ResultadoSimulador {
   final String servicio, emoji, descripcion;
-  final double maquila, extras, acabado, costoMaterial, subtotal, iva, total;
-  final Map<String, String> desglose;
+  final double total, subtotal, iva, costoTotal;
+  final double pvMinimo, pvRecomendado, pvPremium;
+  final double utilidad, margenReal, gananciaHora, tiempoHoras;
+  final double cm, cmo, cmaq, cc, ca, ci;
+  final Map<String, double> costosDesglose;
   final bool incluyeIva;
   final String? materialNombre;
-  // Análisis financiero (Capa 5)
-  final double costoTotal;
-  final double pvMinimo;
-  final double pvRecomendado;
-  final double utilidad;
-  final double margenReal;
-  final double gananciaHora;
-  final double tiempoHoras;
+  // Para compatibilidad con cotizacion
+  final double maquila, extras, acabado, costoMaterial;
 
   ResultadoSimulador({
     required this.servicio, required this.emoji, required this.descripcion,
-    required this.maquila, this.extras = 0, this.acabado = 0,
-    this.costoMaterial = 0, required this.subtotal,
-    this.iva = 0, required this.total, required this.desglose,
-    this.incluyeIva = false, this.materialNombre,
-    this.costoTotal = 0, this.pvMinimo = 0, this.pvRecomendado = 0,
-    this.utilidad = 0, this.margenReal = 0, this.gananciaHora = 0,
-    this.tiempoHoras = 0});
+    required this.total, required this.subtotal, this.iva = 0,
+    required this.costoTotal, required this.pvMinimo,
+    required this.pvRecomendado, required this.pvPremium,
+    required this.utilidad, required this.margenReal,
+    required this.gananciaHora, required this.tiempoHoras,
+    required this.cm, required this.cmo, required this.cmaq,
+    required this.cc, required this.ca, required this.ci,
+    required this.costosDesglose, this.incluyeIva = false,
+    this.materialNombre, this.maquila = 0, this.extras = 0,
+    this.acabado = 0, this.costoMaterial = 0});
 }
 
 // ══════════════════════════════════════════════════════
 // DATA SERVICE
 // ══════════════════════════════════════════════════════
-// ── MODELO COSTOS DEL TALLER ─────────────────────────────
-class CostosTaller {
-  final double costoHoraTaller;   // CI: costo indirecto por hora
-  final double costoHoraMaquina;  // CMaq por hora
-  final double costoHoraOperador; // CMO por hora
-  final double margenRecomendado; // % margen
-  final double margenMinimo;
-  final double ivaPct;
-  final String maquinaId;
-  final String operadorId;
-
-  CostosTaller({
-    this.costoHoraTaller = 0,
-    this.costoHoraMaquina = 0,
-    this.costoHoraOperador = 0,
-    this.margenRecomendado = 35,
-    this.margenMinimo = 20,
-    this.ivaPct = 16,
-    this.maquinaId = '',
-    this.operadorId = '',
-  });
-
-  // Costo total por hora de producción
-  double get costoHoraTotal => costoHoraTaller + costoHoraMaquina + costoHoraOperador;
-  double get costoMinutoTotal => costoHoraTotal / 60;
-}
-
 class SimuladorDataService {
   static final _sb = Supabase.instance.client;
-
-  // Cargar costos del taller para el cálculo
-  static Future<CostosTaller> getCostosTaller({
-    String? maquinaId, String? operadorId}) async {
-    try {
-      const negId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-
-      // Config empresa
-      final cfg = await _sb.from('empresa_config')
-        .select().eq('negocio_id', negId).maybeSingle();
-
-      final horasDia = (cfg?['horas_dia'] as num?)?.toDouble() ?? 8;
-      final costoFijo = (cfg?['costo_fijo_mensual'] as num?)?.toDouble() ?? 0;
-      final costoHoraTaller = costoFijo / (30 * horasDia);
-      final margenRec = (cfg?['margen_recomendado'] as num?)?.toDouble() ?? 35;
-      final margenMin = (cfg?['margen_minimo'] as num?)?.toDouble() ?? 20;
-      final ivaPct = (cfg?['iva_pct'] as num?)?.toDouble() ?? 16;
-
-      // Costo hora máquina
-      double costoHoraMaq = 0;
-      String maqId = maquinaId ?? '';
-      if (maquinaId != null && maquinaId.isNotEmpty) {
-        final maq = await _sb.from('maquinaria')
-          .select().eq('id', maquinaId).maybeSingle();
-        if (maq != null) {
-          final valor = (maq['valor_adquisicion'] as num?)?.toDouble() ?? 0;
-          final vida = (maq['vida_util_años'] as num?)?.toDouble() ?? 5;
-          final horas = (maq['horas_mes'] as num?)?.toDouble() ?? 160;
-          final kwh = (maq['consumo_kwh'] as num?)?.toDouble() ?? 0;
-          final cKwh = (maq['costo_kwh'] as num?)?.toDouble() ?? 2.5;
-          final mant = (maq['mantenimiento_mes'] as num?)?.toDouble() ?? 0;
-          final cons = (maq['consumibles_hora'] as num?)?.toDouble() ?? 0;
-          costoHoraMaq = (vida > 0 && horas > 0 ? valor / (vida * 12 * horas) : 0)
-            + (kwh * cKwh)
-            + (horas > 0 ? mant / horas : 0)
-            + cons;
-        }
-      } else {
-        // Tomar primera máquina activa
-        final maqList = await _sb.from('maquinaria')
-          .select().eq('negocio_id', negId).eq('activo', true).limit(1);
-        if ((maqList as List).isNotEmpty) {
-          final maq = maqList.first as Map<String, dynamic>;
-          maqId = maq['id'] as String? ?? '';
-          final valor = (maq['valor_adquisicion'] as num?)?.toDouble() ?? 0;
-          final vida = (maq['vida_util_años'] as num?)?.toDouble() ?? 5;
-          final horas = (maq['horas_mes'] as num?)?.toDouble() ?? 160;
-          final kwh = (maq['consumo_kwh'] as num?)?.toDouble() ?? 0;
-          final cKwh = (maq['costo_kwh'] as num?)?.toDouble() ?? 2.5;
-          final mant = (maq['mantenimiento_mes'] as num?)?.toDouble() ?? 0;
-          final cons = (maq['consumibles_hora'] as num?)?.toDouble() ?? 0;
-          costoHoraMaq = (vida > 0 && horas > 0 ? valor / (vida * 12 * horas) : 0)
-            + (kwh * cKwh)
-            + (horas > 0 ? mant / horas : 0)
-            + cons;
-        }
-      }
-
-      // Costo hora operador
-      double costoHoraOp = 0;
-      String opId = operadorId ?? '';
-      if (operadorId != null && operadorId.isNotEmpty) {
-        final op = await _sb.from('mano_obra')
-          .select().eq('id', operadorId).maybeSingle();
-        if (op != null) {
-          final sal = (op['salario_mes'] as num?)?.toDouble() ?? 0;
-          final prest = (op['prestaciones_pct'] as num?)?.toDouble() ?? 35;
-          final horas = (op['horas_mes'] as num?)?.toDouble() ?? 192;
-          costoHoraOp = horas > 0 ? sal * (1 + prest / 100) / horas : 0;
-        }
-      } else {
-        final opList = await _sb.from('mano_obra')
-          .select().eq('negocio_id', negId).eq('activo', true).limit(1);
-        if ((opList as List).isNotEmpty) {
-          final op = opList.first as Map<String, dynamic>;
-          opId = op['id'] as String? ?? '';
-          final sal = (op['salario_mes'] as num?)?.toDouble() ?? 0;
-          final prest = (op['prestaciones_pct'] as num?)?.toDouble() ?? 35;
-          final horas = (op['horas_mes'] as num?)?.toDouble() ?? 192;
-          costoHoraOp = horas > 0 ? sal * (1 + prest / 100) / horas : 0;
-        }
-      }
-
-      return CostosTaller(
-        costoHoraTaller: costoHoraTaller,
-        costoHoraMaquina: costoHoraMaq,
-        costoHoraOperador: costoHoraOp,
-        margenRecomendado: margenRec,
-        margenMinimo: margenMin,
-        ivaPct: ivaPct,
-        maquinaId: maqId,
-        operadorId: opId,
-      );
-    } catch (_) {
-      return CostosTaller();
-    }
-  }
 
   static Future<List<SimServicio>> getServicios() async {
     final data = await _sb.from('sim_servicios').select()
@@ -320,32 +216,23 @@ class SimuladorDataService {
   }
 
   static Future<SimConfig> getConfig(String servicioId) async {
-    // Cargar servicio
     final svcData = await _sb.from('sim_servicios')
       .select().eq('id', servicioId).maybeSingle();
     if (svcData == null) throw Exception('Servicio no encontrado');
     final servicio = SimServicio.fromJson(svcData);
 
-    // Cargar tipos de trabajo
     List tiposData = [];
     try { tiposData = await _sb.from('sim_tipos_trabajo')
-      .select().eq('servicio_id', servicioId)
-      .eq('activo', true).order('orden'); } catch (_) {}
+      .select().eq('servicio_id', servicioId).eq('activo', true).order('orden'); } catch (_) {}
     if (tiposData.isEmpty) {
       try { tiposData = await _sb.from('sim_tipos_trabajo')
         .select().eq('servicio_id', servicioId).order('nombre'); } catch (_) {}
     }
 
-    // Cargar tarifas
     List tarifasData = [];
     try { tarifasData = await _sb.from('sim_tarifas')
-      .select().eq('servicio_id', servicioId).eq('activo', true); } catch (_) {}
-    if (tarifasData.isEmpty) {
-      try { tarifasData = await _sb.from('sim_tarifas')
-        .select().eq('servicio_id', servicioId); } catch (_) {}
-    }
+      .select().eq('servicio_id', servicioId); } catch (_) {}
 
-    // Cargar rangos, extras, acabados (opcionales)
     List rangosData = [], extrasData = [], acabadosData = [];
     try { rangosData = await _sb.from('sim_rangos')
       .select().eq('servicio_id', servicioId).order('desde'); } catch (_) {}
@@ -360,41 +247,295 @@ class SimuladorDataService {
       final t = SimTarifa.fromJson(j as Map<String,dynamic>);
       tarifasMap[t.clave] = t;
     }
-    final rangos = rangosData.map((j) => SimRango.fromJson(j as Map<String,dynamic>)).toList();
-    final extras = extrasData.map((j) => SimExtra.fromJson(j as Map<String,dynamic>)).toList();
-    final acabados = acabadosData.map((j) => SimAcabado.fromJson(j as Map<String,dynamic>)).toList();
 
-    return SimConfig(servicio: servicio, tipos: tipos, tarifas: tarifasMap,
-      rangos: rangos, extras: extras, acabados: acabados);
+    return SimConfig(
+      servicio: servicio, tipos: tipos, tarifas: tarifasMap,
+      rangos: rangosData.map((j) => SimRango.fromJson(j as Map<String,dynamic>)).toList(),
+      extras: extrasData.map((j) => SimExtra.fromJson(j as Map<String,dynamic>)).toList(),
+      acabados: acabadosData.map((j) => SimAcabado.fromJson(j as Map<String,dynamic>)).toList());
   }
 
-  static Future<List<Map<String, dynamic>>> getMaterialesInventario() async {
+  static Future<CostosTaller> getCostosTaller() async {
+    try {
+      final cfg = await _sb.from('empresa_config')
+        .select().eq('negocio_id', _negId).maybeSingle();
+      final horasDia = (cfg?['horas_dia'] as num?)?.toDouble() ?? 8;
+      final costoFijo = (cfg?['costo_fijo_mensual'] as num?)?.toDouble() ?? 0;
+      final costoHoraTaller = costoFijo > 0 ? costoFijo / (30 * horasDia) : 0;
+      final margenRec = (cfg?['margen_recomendado'] as num?)?.toDouble() ?? 35;
+      final margenMin = (cfg?['margen_minimo'] as num?)?.toDouble() ?? 20;
+      final ivaPct = (cfg?['iva_pct'] as num?)?.toDouble() ?? 16;
+
+      double costoHoraMaq = 0;
+      final maqList = await _sb.from('maquinaria')
+        .select().eq('negocio_id', _negId).eq('activo', true).limit(1);
+      if ((maqList as List).isNotEmpty) {
+        final m = maqList.first as Map<String,dynamic>;
+        final v = (m['valor_adquisicion'] as num?)?.toDouble() ?? 0;
+        final vida = (m['vida_util_años'] as num?)?.toDouble() ?? 10;
+        final hrs = (m['horas_mes'] as num?)?.toDouble() ?? 160;
+        final kwh = (m['consumo_kwh'] as num?)?.toDouble() ?? 0;
+        final ckwh = (m['costo_kwh'] as num?)?.toDouble() ?? 2.5;
+        final mant = (m['mantenimiento_mes'] as num?)?.toDouble() ?? 0;
+        final cons = (m['consumibles_hora'] as num?)?.toDouble() ?? 0;
+        costoHoraMaq = (vida > 0 && hrs > 0 ? v/(vida*12*hrs) : 0) + (kwh*ckwh) + (hrs>0 ? mant/hrs : 0) + cons;
+      }
+
+      double costoHoraOp = 0;
+      final opList = await _sb.from('mano_obra')
+        .select().eq('negocio_id', _negId).eq('activo', true).limit(1);
+      if ((opList as List).isNotEmpty) {
+        final o = opList.first as Map<String,dynamic>;
+        final sal = (o['salario_mes'] as num?)?.toDouble() ?? 0;
+        final prest = (o['prestaciones_pct'] as num?)?.toDouble() ?? 35;
+        final hrs = (o['horas_mes'] as num?)?.toDouble() ?? 192;
+        costoHoraOp = hrs > 0 ? sal*(1+prest/100)/hrs : 0;
+      }
+
+      return CostosTaller(costoHoraTaller: costoHoraTaller,
+        costoHoraMaquina: costoHoraMaq, costoHoraOperador: costoHoraOp,
+        margenRecomendado: margenRec, margenMinimo: margenMin, ivaPct: ivaPct);
+    } catch (_) { return CostosTaller(); }
+  }
+
+  static Future<List<Map<String,dynamic>>> getMaterialesInventario() async {
     try {
       final data = await _sb.from('inventario_bodega')
-        .select('id, nombre, costo_unitario, unidad, categoria, stock_actual')
+        .select('id,nombre,costo_unitario,unidad,stock_actual')
         .eq('activo', true).order('nombre');
-      return (data as List).cast<Map<String, dynamic>>();
+      return (data as List).cast<Map<String,dynamic>>();
     } catch (_) { return []; }
   }
 
-  // Guardar tarifa editada
   static Future<void> actualizarTarifa(String id, double valor) async {
     await _sb.from('sim_tarifas').update({'valor': valor}).eq('id', id);
   }
 
-  // Guardar nuevo tipo de trabajo
-  static Future<void> crearTipoTrabajo(Map<String, dynamic> datos) async {
-    await _sb.from('sim_tipos_trabajo').insert(datos);
+  static Future<void> crearServicio(Map<String,dynamic> datos) async {
+    await _sb.from('sim_servicios').insert(datos);
   }
 
-  // Crear nuevo servicio
-  static Future<void> crearServicio(Map<String, dynamic> datos) async {
-    await _sb.from('sim_servicios').insert(datos);
+  static Future<void> crearTipoTrabajo(Map<String,dynamic> datos) async {
+    await _sb.from('sim_tipos_trabajo').insert(datos);
   }
 }
 
 // ══════════════════════════════════════════════════════
-// PANTALLA PRINCIPAL DEL SIMULADOR
+// MOTOR DE CÁLCULO
+// ══════════════════════════════════════════════════════
+class MotorCalculo {
+  static ResultadoSimulador calcular({
+    required SimConfig cfg,
+    required CostosTaller costos,
+    required SimTipoTrabajo tipo,
+    required String nombreServicio,
+    required String emojiServicio,
+    required double largo, required double ancho, required double alto,
+    required double peso, required double metros,
+    required double horas, required double minutos,
+    required int cantidad, required String complejidad,
+    required bool clienteTreMaterial,
+    required bool usarInventario,
+    required Map<String,dynamic>? materialInv,
+    required String materialLibreNombre,
+    required double materialLibrePrecio,
+    required SimAcabado? acabado,
+    required bool aplicarIva,
+    required List<SimExtra> extrasSeleccionados,
+    required String descripcionEditable,
+  }) {
+    final fmt = NumberFormat(r'$#,##0.00', 'es_MX');
+    final formula = tipo.formula;
+    final desglose = <String, double>{};
+
+    // ── TIEMPO ESTIMADO ─────────────────────────────
+    double tiempoHoras = 0;
+
+    switch (formula) {
+      case 'por_area':
+        final areaM2 = (largo/100) * (ancho/100);
+        // Factor espesor: más grueso = más tiempo
+        final factorEsp = alto > 0 ? (1 + (alto/10) * 0.3) : 1.0;
+        // Factor complejidad del tipo
+        tiempoHoras = areaM2 * tipo.factor * factorEsp;
+        // Mínimo 10 minutos
+        if (tiempoHoras < 0.167 && (largo > 0 || ancho > 0)) tiempoHoras = 0.167;
+        desglose['area_m2'] = areaM2;
+        desglose['factor_espesor'] = factorEsp;
+        break;
+
+      case 'por_volumen':
+        final volumen = largo * ancho * alto;
+        // Factor por complejidad ingresada por usuario
+        final factorComp = {
+          'simple': 0.8, 'media': 1.0, 'alta': 1.5, 'premium': 2.5
+        }[complejidad] ?? 1.0;
+        tiempoHoras = volumen * tipo.factor * factorComp / 1000;
+        if (tiempoHoras < 0.5 && volumen > 0) tiempoHoras = 0.5;
+        desglose['volumen_cm3'] = volumen;
+        desglose['factor_complejidad'] = factorComp;
+        break;
+
+      case 'por_hora':
+        tiempoHoras = horas > 0 ? horas : 1.0;
+        break;
+
+      case 'por_minuto':
+        final areaM2 = (largo/100) * (ancho/100);
+        final minEstimados = minutos > 0 ? minutos : areaM2 * 60 * tipo.factor;
+        tiempoHoras = minEstimados / 60;
+        if (tiempoHoras < 0.1 && (largo > 0)) tiempoHoras = 0.1;
+        desglose['minutos'] = tiempoHoras * 60;
+        break;
+
+      case 'por_metro':
+        tiempoHoras = metros * tipo.factor / 60;
+        if (tiempoHoras < 0.1 && metros > 0) tiempoHoras = 0.1;
+        desglose['metros'] = metros;
+        break;
+
+      case 'por_kg':
+        tiempoHoras = peso * tipo.factor / 60;
+        desglose['peso_kg'] = peso;
+        break;
+
+      case 'por_pieza':
+        tiempoHoras = tipo.factor * cantidad / 60;
+        break;
+
+      case 'por_diseno':
+        final horasBase = {
+          'simple': cfg.getTarifa('horas_simple') > 0 ? cfg.getTarifa('horas_simple') : 1.0,
+          'media':  cfg.getTarifa('horas_medio')  > 0 ? cfg.getTarifa('horas_medio')  : 3.0,
+          'alta':   cfg.getTarifa('horas_alto')   > 0 ? cfg.getTarifa('horas_alto')   : 8.0,
+          'premium':cfg.getTarifa('horas_premium')> 0 ? cfg.getTarifa('horas_premium'): 20.0,
+        };
+        tiempoHoras = (horasBase[complejidad] ?? 3.0) * tipo.factor;
+        break;
+
+      case 'precio_fijo':
+        tiempoHoras = 1.0;
+        break;
+    }
+
+    tiempoHoras *= cantidad;
+
+    // ── COSTOS DIRECTOS ─────────────────────────────
+    // CM - Material
+    double cm = 0;
+    String? materialNombre;
+    if (!clienteTreMaterial) {
+      if (usarInventario && materialInv != null) {
+        cm = ((materialInv['costo_unitario'] as num?)?.toDouble() ?? 0) * cantidad;
+        // Agregar merma 15%
+        cm *= 1.15;
+        materialNombre = materialInv['nombre'] as String?;
+      } else if (!usarInventario && materialLibrePrecio > 0) {
+        cm = materialLibrePrecio * cantidad * 1.15; // +15% merma
+        materialNombre = materialLibreNombre.isNotEmpty ? materialLibreNombre : 'Material';
+      }
+    }
+
+    // CMaq - Máquina
+    double cmaq = costos.costoHoraMaquina * tiempoHoras;
+
+    // CMO - Mano de obra
+    double cmo = costos.costoHoraOperador * tiempoHoras;
+
+    // CC - Consumibles (de tarifa o estimado)
+    double cc = 0;
+    final tarifaCons = cfg.getTarifa('consumibles_hora');
+    if (tarifaCons > 0) {
+      cc = tarifaCons * tiempoHoras;
+    } else {
+      // Default: $25/hr de consumibles
+      cc = 25 * tiempoHoras;
+    }
+
+    // CA - Acabado
+    double ca = (acabado?.precio ?? 0) * cantidad;
+
+    // CI - Costo indirecto del taller
+    double ci = costos.costoHoraTaller * tiempoHoras;
+
+    // Extras
+    double extrasTotal = 0;
+    for (final e in extrasSeleccionados) {
+      extrasTotal += e.precio * cantidad;
+    }
+
+    // ── COSTO TOTAL ─────────────────────────────────
+    final costoTotal = cm + cmaq + cmo + cc + ca + ci + extrasTotal;
+
+    // ── 3 PRECIOS CON MARGEN ─────────────────────────
+    // Para Diseño y Láser de Fibra por pieza, usar tarifas directas si están configuradas
+    double baseMin, baseRec, basePrem;
+
+    if (formula == 'precio_fijo' && cfg.getTarifa('precio_fijo') > 0) {
+      baseMin  = cfg.getTarifa('precio_fijo') * cantidad;
+      baseRec  = baseMin * 1.15;
+      basePrem = baseMin * 1.35;
+    } else if (formula == 'por_pieza' && cfg.getTarifa('tarifa_pieza') > 0) {
+      baseMin  = cfg.getTarifa('tarifa_pieza') * cantidad * 0.85;
+      baseRec  = cfg.getTarifa('tarifa_pieza') * cantidad;
+      basePrem = cfg.getTarifa('tarifa_pieza') * cantidad * 1.30;
+    } else {
+      // Fórmula maestra: PV = Costo ÷ (1 - Margen)
+      final mMin  = costos.margenMinimo / 100;
+      final mRec  = costos.margenRecomendado / 100;
+      final mPrem = (costos.margenRecomendado + 15) / 100;
+      baseMin  = costoTotal > 0 ? costoTotal / (1 - mMin)  : 0;
+      baseRec  = costoTotal > 0 ? costoTotal / (1 - mRec)  : 0;
+      basePrem = costoTotal > 0 ? costoTotal / (1 - mPrem) : 0;
+    }
+
+    // Verificar con rangos si existen (Router 3D)
+    if (cfg.rangos.isNotEmpty) {
+      double indice = 0;
+      if (formula == 'por_volumen') indice = largo * ancho * alto * tipo.factor;
+      else if (formula == 'por_area') indice = (largo/100)*(ancho/100)*tipo.factor*1000;
+      final precioRango = cfg.calcularPrecioRango(indice);
+      if (precioRango > baseRec) {
+        final diff = precioRango / baseRec;
+        baseMin  *= diff;
+        baseRec   = precioRango * cantidad;
+        basePrem *= diff * 1.15;
+      }
+    }
+
+    // IVA
+    final iva = aplicarIva ? baseRec * (costos.ivaPct / 100) : 0.0;
+    final pvConIva = baseRec + iva;
+
+    // Análisis
+    final utilidad = baseRec - costoTotal;
+    final margenReal = baseRec > 0 ? (utilidad / baseRec) * 100 : 0;
+    final gananciaHora = tiempoHoras > 0 ? utilidad / tiempoHoras : 0;
+
+    return ResultadoSimulador(
+      servicio: nombreServicio, emoji: emojiServicio,
+      descripcion: descripcionEditable,
+      total: pvConIva, subtotal: baseRec, iva: iva,
+      costoTotal: costoTotal,
+      pvMinimo: baseMin, pvRecomendado: baseRec, pvPremium: basePrem,
+      utilidad: utilidad,
+      margenReal: margenReal.toDouble(),
+      gananciaHora: gananciaHora.toDouble(),
+      tiempoHoras: tiempoHoras,
+      cm: cm, cmo: cmo, cmaq: cmaq, cc: cc, ca: ca, ci: ci,
+      costosDesglose: {
+        'Material': cm, 'Máquina': cmaq, 'Operador': cmo,
+        'Consumibles': cc, 'Acabado': ca, 'Taller (CI)': ci,
+        'Extras': extrasTotal,
+      },
+      incluyeIva: aplicarIva,
+      materialNombre: materialNombre,
+      maquila: baseRec, costoMaterial: cm, acabado: ca, extras: extrasTotal);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// PANTALLA PRINCIPAL
 // ══════════════════════════════════════════════════════
 class SimuladorScreen extends StatefulWidget {
   const SimuladorScreen({super.key});
@@ -416,20 +557,20 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
-      final servicios = await SimuladorDataService.getServicios();
-      if (mounted) setState(() { _servicios = servicios; _cargando = false; });
+      final s = await SimuladorDataService.getServicios();
+      if (mounted) setState(() { _servicios = s; _cargando = false; });
     } catch (_) { if (mounted) setState(() => _cargando = false); }
   }
 
   void _agregarAlCarrito(ResultadoSimulador r) {
     setState(() => _carrito.add(r));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('✅ ${r.servicio} agregado al carrito'),
+      content: Text('✅ ${r.servicio} agregado — ${_fmt.format(r.total)}'),
       backgroundColor: AppColors.verde,
       duration: const Duration(seconds: 2)));
   }
 
-  void _enviarACotizacion() {
+  void _cotizar() {
     if (_carrito.isEmpty) return;
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => CotizarScreen(carritoSimulador: _carrito)));
@@ -446,15 +587,12 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         actions: [
           IconButton(icon: const Icon(Icons.refresh, color: AppColors.azul), onPressed: _cargar),
-          IconButton(icon: const Icon(Icons.add, color: AppColors.azul),
-            onPressed: _nuevoServicio),
+          IconButton(icon: const Icon(Icons.add, color: AppColors.azul), onPressed: _nuevoServicio),
         ]),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
         : Column(children: [
-            // Banner carrito
             if (_carrito.isNotEmpty) _bannerCarrito(),
-            // Lista de servicios
             Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [
               // Header
               Container(
@@ -463,19 +601,19 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                   gradient: const LinearGradient(colors: [AppColors.azul, Color(0xFF2d5a8e)]),
                   borderRadius: BorderRadius.circular(12)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Calcula el costo de cualquier trabajo',
+                  const Text('Calcula el costo real de cualquier trabajo',
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
                   const SizedBox(height: 4),
-                  const Text('Selecciona el tipo de trabajo, llena las variables y agrega al carrito.',
+                  const Text('Selecciona el servicio y llena las variables.',
                     style: TextStyle(fontSize: 12, color: Colors.white70)),
                   if (_carrito.isNotEmpty) ...[
                     const SizedBox(height: 10),
                     GestureDetector(
-                      onTap: _enviarACotizacion,
+                      onTap: _cotizar,
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.naranja, borderRadius: BorderRadius.circular(20)),
+                        decoration: BoxDecoration(color: AppColors.naranja,
+                          borderRadius: BorderRadius.circular(20)),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           const Icon(Icons.description_outlined, color: Colors.white, size: 16),
                           const SizedBox(width: 6),
@@ -485,20 +623,23 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                   ],
                 ])),
               const SizedBox(height: 14),
+
               // Grid de servicios
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, childAspectRatio: 1.4, crossAxisSpacing: 10, mainAxisSpacing: 10),
-                itemCount: _servicios.length + 1, // +1 para el botón agregar
+                  crossAxisCount: 2, childAspectRatio: 1.4,
+                  crossAxisSpacing: 10, mainAxisSpacing: 10),
+                itemCount: _servicios.length + 1,
                 itemBuilder: (_, i) {
                   if (i == _servicios.length) return _cardAgregar();
                   return _cardServicio(_servicios[i]);
                 }),
-              const SizedBox(height: 20),
-              // Lista del carrito
+
+              // Carrito
               if (_carrito.isNotEmpty) ...[
+                const SizedBox(height: 20),
                 const Text('CARRITO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
                   color: AppColors.textoSecundario, letterSpacing: 1.5)),
                 const SizedBox(height: 8),
@@ -506,12 +647,13 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                 const SizedBox(height: 12),
                 SizedBox(width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _enviarACotizacion,
+                    onPressed: _cotizar,
                     icon: const Icon(Icons.description_outlined, color: Colors.white),
                     label: Text('Crear cotización — ${_fmt.format(_totalCarrito)}',
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.naranja, padding: const EdgeInsets.symmetric(vertical: 14)))),
+                      backgroundColor: AppColors.naranja,
+                      padding: const EdgeInsets.symmetric(vertical: 14)))),
               ],
             ])),
           ]));
@@ -523,9 +665,9 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
     child: Row(children: [
       const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 18),
       const SizedBox(width: 8),
-      Expanded(child: Text('${_carrito.length} servicio${_carrito.length > 1 ? "s" : ""} — ${_fmt.format(_totalCarrito)}',
+      Expanded(child: Text('${_carrito.length} servicio${_carrito.length > 1?"s":""} — ${_fmt.format(_totalCarrito)}',
         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
-      GestureDetector(onTap: _enviarACotizacion,
+      GestureDetector(onTap: _cotizar,
         child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
           child: const Text('Cotizar', style: TextStyle(color: AppColors.naranja,
@@ -534,139 +676,110 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
 
   Widget _cardServicio(SimServicio s) => GestureDetector(
     onTap: () => Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _PantallaServicio(
-        servicio: s,
-        onAgregar: _agregarAlCarrito))),
+      builder: (_) => _PantallaServicio(servicio: s, onAgregar: _agregarAlCarrito))),
     child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.grisBorde, width: 0.5),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
-          blurRadius: 8, offset: const Offset(0, 2))]),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0,2))]),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Text(s.emoji, style: const TextStyle(fontSize: 32)),
         const SizedBox(height: 8),
         Text(s.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
           color: AppColors.azul), textAlign: TextAlign.center),
-        if (s.descripcion != null) ...[
-          const SizedBox(height: 4),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(s.descripcion!, style: const TextStyle(
-              fontSize: 10, color: AppColors.textoSecundario), textAlign: TextAlign.center,
-              maxLines: 2, overflow: TextOverflow.ellipsis)),
-        ],
+        if (s.descripcion != null) Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: Text(s.descripcion!, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
+            textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
       ])));
 
   Widget _cardAgregar() => GestureDetector(
     onTap: _nuevoServicio,
     child: Container(
-      decoration: BoxDecoration(
-        color: AppColors.azulClaro,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.azul.withOpacity(0.3)),
-        ),
+      decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.azul.withOpacity(0.3))),
       child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(Icons.add_circle_outline, size: 32, color: AppColors.azul),
         SizedBox(height: 8),
-        Text('Nuevo servicio', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-          color: AppColors.azul)),
-        SizedBox(height: 4),
+        Text('Nuevo servicio', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
         Text('Para tu negocio', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
       ])));
 
-  Widget _cardCarrito(int idx, ResultadoSimulador r) => Container(
-    margin: const EdgeInsets.only(bottom: 8),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-    child: Row(children: [
-      Text(r.emoji, style: const TextStyle(fontSize: 22)),
-      const SizedBox(width: 10),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(r.servicio, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-        Text(r.descripcion, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
-          maxLines: 2, overflow: TextOverflow.ellipsis),
-      ])),
-      const SizedBox(width: 8),
-      Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-        Text(_fmt.format(r.total), style: const TextStyle(fontSize: 14,
-          fontWeight: FontWeight.w800, color: AppColors.azul)),
-        GestureDetector(onTap: () => setState(() => _carrito.removeAt(idx)),
-          child: const Text('Quitar', style: TextStyle(fontSize: 10, color: AppColors.rojo))),
-      ]),
-    ]));
+  Widget _cardCarrito(int idx, ResultadoSimulador r) {
+    final fmt = NumberFormat(r'$#,##0', 'es_MX');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+      child: Row(children: [
+        Text(r.emoji, style: const TextStyle(fontSize: 22)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(r.servicio, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          Text(r.descripcion, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
+            maxLines: 2, overflow: TextOverflow.ellipsis),
+        ])),
+        const SizedBox(width: 8),
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(fmt.format(r.total), style: const TextStyle(fontSize: 14,
+            fontWeight: FontWeight.w800, color: AppColors.azul)),
+          GestureDetector(onTap: () => setState(() => _carrito.removeAt(idx)),
+            child: const Text('Quitar', style: TextStyle(fontSize: 10, color: AppColors.rojo))),
+        ]),
+      ]));
+  }
 
   void _nuevoServicio() {
     final nombreCtrl = TextEditingController();
     String emojiSel = '🔧';
-    final emojis = ['🔧','🪵','⚙️','🔴','🖨️','✏️','🔩','🪛','🏭','🛠️',
-      '📐','📏','🎨','🪚','⚡','🔥','❄️','🌊','🎯','💡','🍞','🌽',
-      '🍕','🥖','🪟','🪞','🔲','🏗️','📦','🎁','💎','🌿'];
-
+    final emojis = ['🔧','🪵','⚙️','🔴','🖨️','✏️','🔩','🪛','🏭','🛠️','📐','📏','🎨','🪚',
+      '⚡','🔥','❄️','🌊','🎯','💡','🍞','🌽','🍕','🪟','🪞','🔲','🏗️','📦','🎁','💎','🌿','⚒️'];
     showModalBottomSheet(context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(builder: (ctx2, setS) => Container(
-        height: MediaQuery.of(ctx).size.height * 0.7,
+      builder: (ctx) => StatefulBuilder(builder: (_, setS) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.65,
         decoration: const BoxDecoration(color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
         child: Column(children: [
-          Container(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          Padding(padding: const EdgeInsets.fromLTRB(16,16,16,12),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Nuevo tipo de servicio',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              GestureDetector(onTap: () => Navigator.pop(ctx),
-                child: const Icon(Icons.close)),
+              const Text('Nuevo servicio', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              GestureDetector(onTap: () => Navigator.pop(ctx), child: const Icon(Icons.close)),
             ])),
           const Divider(height: 1),
           Expanded(child: SingleChildScrollView(
-            padding: EdgeInsets.only(left: 16, right: 16, top: 16,
+            padding: EdgeInsets.only(left:16, right:16, top:16,
               bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              // Emoji selector
-              const Text('Ícono del servicio',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
+            child: Column(children: [
               Wrap(spacing: 8, runSpacing: 8,
                 children: emojis.map((e) => GestureDetector(
                   onTap: () => setS(() => emojiSel = e),
-                  child: Container(
-                    width: 44, height: 44,
+                  child: Container(width: 44, height: 44,
                     decoration: BoxDecoration(
                       color: emojiSel == e ? AppColors.azulClaro : AppColors.gris,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: emojiSel == e ? AppColors.azul : AppColors.grisBorde)),
+                      border: Border.all(color: emojiSel == e ? AppColors.azul : AppColors.grisBorde)),
                     child: Center(child: Text(e, style: const TextStyle(fontSize: 22)))))).toList()),
               const SizedBox(height: 16),
-              // Nombre
-              TextFormField(controller: nombreCtrl,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del servicio *',
-                  hintText: 'Ej: Corte de aluminio, Panadería, Carpintería...',
+              TextFormField(controller: nombreCtrl, textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Nombre del servicio *',
+                  hintText: 'Ej: Router CNC, Panadería, Cancelería...',
                   border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 20),
               SizedBox(width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
-                    final negId = Supabase.instance.client.auth.currentUser?.id
-        ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+                    final negId = Supabase.instance.client.auth.currentUser?.id ?? _negId;
                     await SimuladorDataService.crearServicio({
-                      'negocio_id': negId,
-                      'nombre': nombreCtrl.text.trim(),
-                      'emoji': emojiSel,
-                      'activo': true,
-                      'orden': _servicios.length + 1,
-                    });
+                      'negocio_id': negId, 'nombre': nombreCtrl.text.trim(),
+                      'emoji': emojiSel, 'activo': true, 'orden': _servicios.length + 1});
                     if (mounted) { Navigator.pop(ctx); _cargar(); }
                   },
                   icon: const Icon(Icons.save_outlined, color: Colors.white),
                   label: const Text('Crear servicio',
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.azul,
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                     padding: const EdgeInsets.symmetric(vertical: 13)))),
             ]))),
         ]))));
@@ -689,39 +802,27 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   CostosTaller? _costosTaller;
   bool _cargando = true;
   ResultadoSimulador? _resultado;
-  String? _maquinaSelId;
-  String? _operadorSelId;
-  List<Map<String,dynamic>> _maquinas = [];
-  List<Map<String,dynamic>> _operadores = [];
+  bool _mostrarTarifas = false;
 
-  // Variables de entrada
+  // Inputs
   SimTipoTrabajo? _tipoSel;
   SimAcabado? _acabadoSel;
   bool _aplicarIva = false;
   bool _clienteTreMaterial = false;
-  bool _mostrarTarifas = false;
-
-  // Material
-  Map<String, dynamic>? _materialInvSel; // del inventario
-  String _materialLibreNombre = ''; // escrito manualmente
-  double _materialLibrePrecio = 0;
   bool _usarInventario = true;
-  List<Map<String, dynamic>> _materialesInv = [];
+  Map<String,dynamic>? _materialInvSel;
+  String _materialLibreNombre = '';
+  double _materialLibrePrecio = 0;
+  List<Map<String,dynamic>> _materialesInv = [];
 
-  // Medidas
   double _largo = 0, _ancho = 0, _alto = 0;
   double _peso = 0, _metros = 0, _horas = 0, _minutos = 0;
   int _cantidad = 1;
-  String _complejidad = 'media'; // para por_diseno
-
-  // Tarifas editables
-  final Map<String, TextEditingController> _tarifasCtrls = {};
-
-  // Descripción editable antes de cotizar
+  String _complejidad = 'media';
   String _descripcionEditable = '';
 
-  static const double _ivaPct = 16.0;
-  final _fmt = NumberFormat(r'$#,##0.00', 'es_MX');
+  final Map<String,TextEditingController> _tarifasCtrls = {};
+  final _fmt = NumberFormat(r'$#,##0', 'es_MX');
 
   @override
   void initState() { super.initState(); _cargar(); }
@@ -732,13 +833,75 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     super.dispose();
   }
 
+  Future<void> _cargar() async {
+    setState(() => _cargando = true);
+    try {
+      final cfg = await SimuladorDataService.getConfig(widget.servicio.id);
+      final inv = await SimuladorDataService.getMaterialesInventario();
+      final costos = await SimuladorDataService.getCostosTaller();
+      if (mounted) setState(() {
+        _config = cfg; _costosTaller = costos; _materialesInv = inv;
+        _cargando = false;
+        if (cfg.tipos.isNotEmpty) _tipoSel = cfg.tipos.first;
+        if (cfg.acabados.isNotEmpty) _acabadoSel = cfg.acabados.first;
+        for (final t in cfg.tarifas.values) {
+          _tarifasCtrls[t.id] = TextEditingController(text: t.valor.toStringAsFixed(2));
+        }
+      });
+    } catch (_) { if (mounted) setState(() => _cargando = false); }
+  }
+
+  void _calcular() {
+    final cfg = _config;
+    final costos = _costosTaller ?? CostosTaller();
+    if (cfg == null || _tipoSel == null) return;
+
+    // Generar descripción automática
+    final descParts = <String>[_tipoSel!.nombre];
+    if (_tipoSel!.necesitaLargo && _largo > 0 && _ancho > 0) {
+      descParts.add('Medidas: ${_largo}×${_ancho}${_alto > 0 ? "×${_alto}" : ""} cm');
+    }
+    if (_peso > 0) descParts.add('Peso: ${_peso} kg');
+    if (_metros > 0) descParts.add('${_metros} metros lineales');
+    if (_materialInvSel != null && !_clienteTreMaterial && _usarInventario) {
+      descParts.add('Material: ${_materialInvSel!['nombre']}');
+    } else if (_materialLibreNombre.isNotEmpty && !_clienteTreMaterial) {
+      descParts.add('Material: $_materialLibreNombre');
+    }
+    if (_clienteTreMaterial) descParts.add('Cliente trae el material');
+    if (_acabadoSel != null && _acabadoSel!.nombre != 'Sin acabado') {
+      descParts.add('Acabado: ${_acabadoSel!.nombre}');
+    }
+    if (_cantidad > 1) descParts.add('Cantidad: $_cantidad piezas');
+    final desc = _descripcionEditable.isNotEmpty
+      ? _descripcionEditable : descParts.join('\n');
+
+    final r = MotorCalculo.calcular(
+      cfg: cfg, costos: costos, tipo: _tipoSel!,
+      nombreServicio: widget.servicio.nombre,
+      emojiServicio: widget.servicio.emoji,
+      largo: _largo, ancho: _ancho, alto: _alto,
+      peso: _peso, metros: _metros, horas: _horas, minutos: _minutos,
+      cantidad: _cantidad, complejidad: _complejidad,
+      clienteTreMaterial: _clienteTreMaterial,
+      usarInventario: _usarInventario,
+      materialInv: _materialInvSel,
+      materialLibreNombre: _materialLibreNombre,
+      materialLibrePrecio: _materialLibrePrecio,
+      acabado: _acabadoSel,
+      aplicarIva: _aplicarIva,
+      extrasSeleccionados: cfg.extras.where((e) => e.seleccionado).toList(),
+      descripcionEditable: desc);
+
+    setState(() { _resultado = r; _descripcionEditable = desc; });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
+        backgroundColor: Colors.white, elevation: 0.5,
         title: Row(children: [
           Text(widget.servicio.emoji, style: const TextStyle(fontSize: 20)),
           const SizedBox(width: 8),
@@ -752,7 +915,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           : SingleChildScrollView(
               padding: const EdgeInsets.all(14),
               child: Column(children: [
-                _seccionCard('Tipo de trabajo', _buildTiposTrabajo()),
+                _seccionCard('Tipo de trabajo', _buildTipos()),
                 const SizedBox(height: 10),
                 if (_tipoSel != null) _seccionTarifas(),
                 const SizedBox(height: 10),
@@ -760,280 +923,27 @@ class _PantallaServicioState extends State<_PantallaServicio> {
                 const SizedBox(height: 10),
                 _seccionCard('Material', _buildMaterial()),
                 const SizedBox(height: 10),
-                _seccionCard('Cantidad y extras', _buildCantidadExtras()),
+                _seccionCard('Cantidad y extras', _buildExtras()),
                 const SizedBox(height: 14),
                 SizedBox(width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: _calcular,
                     icon: const Icon(Icons.calculate_outlined, color: Colors.white),
                     label: const Text('Calcular precio',
-                      style: TextStyle(fontSize: 15, color: Colors.white,
-                        fontWeight: FontWeight.w700)),
+                      style: TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.azul,
                       padding: const EdgeInsets.symmetric(vertical: 14)))),
                 if (_resultado != null) ...[
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 16),
                   _widgetResultado(_resultado!),
                 ],
                 const SizedBox(height: 40),
               ])));
   }
 
-  Future<void> _cargar() async {
-    setState(() => _cargando = true);
-    try {
-      final sb = Supabase.instance.client;
-      const negId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-      final cfg = await SimuladorDataService.getConfig(widget.servicio.id);
-      final inv = await SimuladorDataService.getMaterialesInventario();
-      final costos = await SimuladorDataService.getCostosTaller();
-      final maquinasRaw = await sb.from('maquinaria')
-        .select('id,nombre,emoji').eq('negocio_id',negId).eq('activo',true);
-      final operadoresRaw = await sb.from('mano_obra')
-        .select('id,nombre,emoji,tipo').eq('negocio_id',negId).eq('activo',true);
-      final maquinas = (maquinasRaw as List).cast<Map<String,dynamic>>();
-      final operadores = (operadoresRaw as List).cast<Map<String,dynamic>>();
-      if (mounted) setState(() {
-        _config = cfg;
-        _costosTaller = costos;
-        _materialesInv = inv;
-        _maquinas = maquinas;
-        _operadores = operadores;
-        _maquinaSelId = costos.maquinaId.isNotEmpty ? costos.maquinaId : null;
-        _operadorSelId = costos.operadorId.isNotEmpty ? costos.operadorId : null;
-        _cargando = false;
-        if (cfg.tipos.isNotEmpty) _tipoSel = cfg.tipos.first;
-        if (cfg.acabados.isNotEmpty) _acabadoSel = cfg.acabados.first;
-        for (final t in cfg.tarifas.values) {
-          _tarifasCtrls[t.id] = TextEditingController(
-            text: t.valor.toStringAsFixed(2));
-        }
-      });
-    } catch (e) { if (mounted) setState(() => _cargando = false); }
-  }
-
-  // ── MOTOR DE CÁLCULO — FÓRMULA MAESTRA ────────────────
-  // PV = (CM + CMO + CMaq + CC + CA + CI) ÷ (1 - Margen)
-  void _calcular() {
-    final cfg = _config;
-    final costos = _costosTaller ?? CostosTaller();
-    if (cfg == null || _tipoSel == null) return;
-
-    final tipo = _tipoSel!;
-    final formula = tipo.formula;
-    final desglose = <String, String>{};
-
-    // ── 1. TIEMPO ESTIMADO DE MÁQUINA ─────────────
-    double tiempoHoras = 0; // horas de trabajo
-
-    switch (formula) {
-      case 'por_area':
-        final areaM2 = (_largo / 100) * (_ancho / 100);
-        // Factor por material y espesor (configurable)
-        final factorMat = cfg.getTarifa('factor_material') > 0
-          ? cfg.getTarifa('factor_material') : 1.0;
-        final factorEsp = _alto > 0
-          ? (1 + (_alto / 25) * 0.5) : 1.0; // más grueso = más tiempo
-        tiempoHoras = areaM2 * factorMat * factorEsp;
-        desglose['Área'] = '${_largo}×${_ancho} cm = ${areaM2.toStringAsFixed(4)} m²';
-        if (_alto > 0) desglose['Espesor/Alto'] = '${_alto} mm • Factor: ×${factorEsp.toStringAsFixed(2)}';
-        break;
-
-      case 'por_volumen':
-        final volumen = _largo * _ancho * _alto;
-        final factor = tipo.factor > 0 ? tipo.factor : 1.0;
-        tiempoHoras = volumen * factor / 1000000; // cm³ → m³ equivalente de tiempo
-        // Mínimo 0.5 horas para trabajos 3D
-        if (tiempoHoras < 0.5 && volumen > 0) tiempoHoras = 0.5;
-        desglose['Volumen'] = '${_largo}×${_ancho}×${_alto} cm = ${volumen.toStringAsFixed(0)} cm³';
-        desglose['Factor complejidad'] = '×${factor.toStringAsFixed(2)}';
-        break;
-
-      case 'por_hora':
-        tiempoHoras = _horas > 0 ? _horas : 1.0;
-        desglose['Tiempo'] = '${tiempoHoras.toStringAsFixed(1)} horas';
-        break;
-
-      case 'por_minuto':
-        // Estimar minutos por área y densidad
-        final areaM2 = (_largo / 100) * (_ancho / 100);
-        final factorGrab = cfg.getTarifa('factor_grabado') > 0
-          ? cfg.getTarifa('factor_grabado') : 2.0;
-        final minutos = _minutos > 0 ? _minutos : areaM2 * factorGrab * 60;
-        tiempoHoras = minutos / 60;
-        desglose['Tiempo'] = '${minutos.toStringAsFixed(1)} min';
-        break;
-
-      case 'por_metro':
-        tiempoHoras = _metros * 0.1; // 6 min por metro lineal default
-        desglose['Metros'] = '${_metros.toStringAsFixed(2)} m';
-        break;
-
-      case 'por_kg':
-        tiempoHoras = _peso * 0.05; // 3 min por kg default
-        desglose['Peso'] = '${_peso.toStringAsFixed(2)} kg';
-        break;
-
-      case 'precio_fijo':
-        tiempoHoras = 1.0;
-        desglose['Modo'] = 'Precio fijo';
-        break;
-
-      case 'por_diseno':
-        final horasBase = {
-          'simple': cfg.getTarifa('horas_simple') > 0 ? cfg.getTarifa('horas_simple') : 1.0,
-          'media':  cfg.getTarifa('horas_medio')  > 0 ? cfg.getTarifa('horas_medio')  : 3.0,
-          'alta':   cfg.getTarifa('horas_alto')   > 0 ? cfg.getTarifa('horas_alto')   : 8.0,
-          'premium':cfg.getTarifa('horas_premium')> 0 ? cfg.getTarifa('horas_premium'): 20.0,
-        };
-        tiempoHoras = (horasBase[_complejidad] ?? 3.0) * tipo.factor;
-        desglose['Complejidad'] = _complejidad.toUpperCase();
-        desglose['Horas estimadas'] = '${tiempoHoras.toStringAsFixed(1)} hrs';
-        break;
-    }
-
-    desglose['Tiempo total'] = '${tiempoHoras.toStringAsFixed(2)} horas';
-
-    // ── 2. COSTOS DIRECTOS ─────────────────────────
-    // CM - Costo de Material
-    double cm = 0;
-    String? materialNombre;
-    if (!_clienteTreMaterial) {
-      if (_usarInventario && _materialInvSel != null) {
-        cm = ((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0) * _cantidad;
-        materialNombre = _materialInvSel!['nombre'] as String?;
-      } else if (!_usarInventario && _materialLibrePrecio > 0) {
-        cm = _materialLibrePrecio * _cantidad;
-        materialNombre = _materialLibreNombre.isNotEmpty ? _materialLibreNombre : 'Material';
-      }
-      if (cm > 0) desglose['CM Material ($materialNombre)'] = _fmt.format(cm);
-    } else {
-      desglose['Material'] = 'Cliente trae el material';
-    }
-
-    // CMaq - Costo de Máquina
-    double cmaq = costos.costoHoraMaquina * tiempoHoras * _cantidad;
-    if (cmaq > 0) desglose['CMaq Máquina'] = '${tiempoHoras.toStringAsFixed(2)}h × ${_fmt.format(costos.costoHoraMaquina)}/h = ${_fmt.format(cmaq)}';
-
-    // CMO - Costo Mano de Obra
-    double cmo = costos.costoHoraOperador * tiempoHoras * _cantidad;
-    if (cmo > 0) desglose['CMO Operador'] = '${tiempoHoras.toStringAsFixed(2)}h × ${_fmt.format(costos.costoHoraOperador)}/h = ${_fmt.format(cmo)}';
-
-    // CC - Consumibles (de tarifa configurada o % del tiempo)
-    double cc = 0;
-    final tarifaConsumibles = cfg.getTarifa('consumibles_hora');
-    if (tarifaConsumibles > 0) {
-      cc = tarifaConsumibles * tiempoHoras * _cantidad;
-      desglose['CC Consumibles'] = _fmt.format(cc);
-    }
-
-    // CA - Acabados
-    double ca = (_acabadoSel?.precio ?? 0) * _cantidad;
-    if (ca > 0) desglose['CA Acabado (${_acabadoSel?.nombre})'] = _fmt.format(ca);
-
-    // CI - Costo Indirecto asignado (proporción del costo fijo del taller)
-    double ci = costos.costoHoraTaller * tiempoHoras * _cantidad;
-    if (ci > 0) desglose['CI Costo taller'] = '${tiempoHoras.toStringAsFixed(2)}h × ${_fmt.format(costos.costoHoraTaller)}/h = ${_fmt.format(ci)}';
-
-    // Extras seleccionados
-    double extrasTotal = 0;
-    for (final e in (cfg.extras).where((e) => e.seleccionado)) {
-      extrasTotal += e.precio * _cantidad;
-      desglose['Extra: ${e.nombre}'] = _fmt.format(e.precio * _cantidad);
-    }
-
-    // ── 3. COSTO TOTAL ─────────────────────────────
-    final costoTotal = cm + cmaq + cmo + cc + ca + ci + extrasTotal;
-    desglose['─────────────────'] = '───────────────';
-    desglose['Costo Total'] = _fmt.format(costoTotal);
-
-    // ── 4. PRECIO DE VENTA CON MARGEN ──────────────
-    // PV = Costo ÷ (1 - Margen)
-    final margenRec = costos.margenRecomendado / 100;
-    final margenMin = costos.margenMinimo / 100;
-
-    // Si el servicio tiene precio fijo en tarifas, usar ese
-    double pvRecomendado, pvMinimo;
-    if (formula == 'precio_fijo' && cfg.getTarifa('precio_fijo') > 0) {
-      pvRecomendado = cfg.getTarifa('precio_fijo') * _cantidad;
-      pvMinimo = pvRecomendado * 0.85;
-    } else if (formula == 'por_volumen' && cfg.rangos.isNotEmpty) {
-      // Para Router 3D usar tabla de rangos como precio base
-      double indice = 0;
-      if (formula == 'por_volumen') {
-        indice = _largo * _ancho * _alto * tipo.factor;
-      }
-      final precioRango = cfg.calcularPrecioRango(indice);
-      pvRecomendado = precioRango > costoTotal / (1 - margenRec)
-        ? precioRango * _cantidad
-        : costoTotal / (1 - margenRec) * _cantidad;
-      pvMinimo = costoTotal / (1 - margenMin) * _cantidad;
-      desglose['Rango aplicado'] = _fmt.format(precioRango);
-    } else {
-      pvRecomendado = costoTotal > 0
-        ? (costoTotal / (1 - margenRec)) * _cantidad
-        : 0;
-      pvMinimo = costoTotal > 0
-        ? (costoTotal / (1 - margenMin)) * _cantidad
-        : 0;
-    }
-
-    // IVA
-    final iva = _aplicarIva ? pvRecomendado * (costos.ivaPct / 100) : 0.0;
-    final pvConIva = pvRecomendado + iva;
-    if (_aplicarIva) desglose['IVA ${costos.ivaPct.toStringAsFixed(0)}%'] = _fmt.format(iva);
-
-    // ── 5. ANÁLISIS FINANCIERO ─────────────────────
-    final utilidad = pvRecomendado - costoTotal * _cantidad;
-    final margenReal = pvRecomendado > 0 ? (utilidad / pvRecomendado) * 100 : 0;
-    final gananciaHora = tiempoHoras > 0 ? utilidad / (tiempoHoras * _cantidad) : 0;
-
-    // Descripción automática
-    final descParts = <String>[tipo.nombre];
-    if (_tipoSel?.necesitaLargo == true && _largo > 0 && _ancho > 0) {
-      descParts.add('Medidas: ${_largo}×${_ancho}${_alto > 0 ? "×${_alto}" : ""} cm');
-    }
-    if (_peso > 0) descParts.add('Peso: ${_peso} kg');
-    if (_metros > 0) descParts.add('${_metros} metros lineales');
-    if (materialNombre != null) descParts.add('Material: $materialNombre');
-    if (_clienteTreMaterial) descParts.add('Cliente trae el material');
-    if (_acabadoSel != null && _acabadoSel!.nombre != 'Sin acabado') {
-      descParts.add('Acabado: ${_acabadoSel!.nombre}');
-    }
-    if (_cantidad > 1) descParts.add('Cantidad: $_cantidad piezas');
-
-    setState(() {
-      _descripcionEditable = descParts.join('\n');
-      _resultado = ResultadoSimulador(
-        servicio: widget.servicio.nombre,
-        emoji: widget.servicio.emoji,
-        descripcion: _descripcionEditable,
-        maquila: pvRecomendado,
-        extras: extrasTotal,
-        acabado: ca,
-        costoMaterial: cm,
-        subtotal: pvRecomendado,
-        iva: iva,
-        total: pvConIva,
-        desglose: desglose,
-        incluyeIva: _aplicarIva,
-        materialNombre: materialNombre,
-        // Análisis financiero
-        costoTotal: costoTotal * _cantidad,
-        pvMinimo: pvMinimo,
-        pvRecomendado: pvRecomendado,
-        utilidad: utilidad,
-        margenReal: margenReal.toDouble(),
-        gananciaHora: gananciaHora.toDouble(),
-        tiempoHoras: tiempoHoras * _cantidad,
-      );
-    });
-  }
-
-
-  // ── SECCIÓN: TIPOS DE TRABAJO ─────────────────────
-  Widget _buildTiposTrabajo() {
+  // ── TIPOS DE TRABAJO ─────────────────────────────
+  Widget _buildTipos() {
     final cfg = _config!;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Wrap(spacing: 8, runSpacing: 8,
@@ -1051,30 +961,25 @@ class _PantallaServicioState extends State<_PantallaServicio> {
                 Text(t.nombre, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                   color: sel ? Colors.white : AppColors.textoPrincipal)),
                 if (t.descripcionFormula != null) Text(t.descripcionFormula!,
-                  style: TextStyle(fontSize: 9,
-                    color: sel ? Colors.white70 : AppColors.textoSecundario)),
+                  style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : AppColors.textoSecundario)),
               ])));
         }).toList()),
       const SizedBox(height: 8),
-      // Botón agregar nuevo modo
       GestureDetector(
-        onTap: _nuevoTipoTrabajo,
+        onTap: _nuevoModo,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.azulClaro,
-            borderRadius: BorderRadius.circular(20),
+          decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppColors.azul.withOpacity(0.3))),
           child: const Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.add, size: 14, color: AppColors.azul),
             SizedBox(width: 4),
-            Text('Agregar modo', style: TextStyle(fontSize: 11, color: AppColors.azul,
-              fontWeight: FontWeight.w600)),
+            Text('Agregar modo', style: TextStyle(fontSize: 11, color: AppColors.azul, fontWeight: FontWeight.w600)),
           ]))),
     ]);
   }
 
-  // ── SECCIÓN: TARIFAS EDITABLES ────────────────────
+  // ── TARIFAS EDITABLES ────────────────────────────
   Widget _seccionTarifas() {
     final cfg = _config!;
     if (cfg.tarifas.isEmpty) return const SizedBox();
@@ -1082,69 +987,45 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Column(children: [
-        // Header colapsable
         GestureDetector(
           onTap: () => setState(() => _mostrarTarifas = !_mostrarTarifas),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+          child: Padding(padding: const EdgeInsets.all(14),
             child: Row(children: [
               const Icon(Icons.tune_outlined, size: 18, color: AppColors.azul),
               const SizedBox(width: 8),
-              Expanded(child: Text('Tarifas de ${_tipoSel?.nombre ?? "este servicio"}',
+              Expanded(child: Text('Tarifas de ${_tipoSel?.nombre ?? "este modo"}',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.azul))),
               Icon(_mostrarTarifas ? Icons.expand_less : Icons.expand_more, color: AppColors.azul),
             ]))),
         if (_mostrarTarifas) ...[
           const Divider(height: 1),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(children: [
-              ...cfg.tarifas.values.map((t) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Row(children: [
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t.nombre, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                    if (t.unidad != null) Text(t.unidad!,
-                      style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-                  ])),
-                  const SizedBox(width: 10),
-                  SizedBox(width: 100, child: TextFormField(
-                    controller: _tarifasCtrls[t.id],
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-                    textAlign: TextAlign.right,
-                    decoration: InputDecoration(
-                      isDense: true, filled: true, fillColor: AppColors.gris,
-                      prefixText: r'$',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))))),
-                ]))),
-              // Rangos
-              if (cfg.rangos.isNotEmpty) ...[
-                const Divider(height: 16),
-                const Align(alignment: Alignment.centerLeft,
-                  child: Text('Tabla de rangos', style: TextStyle(fontSize: 11,
-                    fontWeight: FontWeight.w700, color: AppColors.azul))),
-                const SizedBox(height: 8),
-                ...cfg.rangos.map((r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(children: [
-                    Expanded(child: Text(
-                      '${r.desde.toStringAsFixed(0)} – ${r.hasta.toStringAsFixed(0)}',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
-                    Text(_fmt.format(r.precio), style: const TextStyle(fontSize: 11,
-                      fontWeight: FontWeight.w700, color: AppColors.azul)),
-                  ]))),
-              ],
-              const SizedBox(height: 8),
-              SizedBox(width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _guardarTarifas,
-                  icon: const Icon(Icons.save_outlined, size: 16, color: AppColors.verde),
-                  label: const Text('Guardar tarifas',
-                    style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.verde)))),
-            ])),
+          Padding(padding: const EdgeInsets.all(14), child: Column(children: [
+            ...cfg.tarifas.values.map((t) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(t.nombre, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                  if (t.unidad != null) Text(t.unidad!,
+                    style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+                ])),
+                const SizedBox(width: 10),
+                SizedBox(width: 100, child: TextFormField(
+                  controller: _tarifasCtrls[t.id],
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+                  textAlign: TextAlign.right,
+                  decoration: InputDecoration(isDense: true, filled: true,
+                    fillColor: AppColors.gris, prefixText: r'$',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))))),
+              ]))),
+            SizedBox(width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _guardarTarifas,
+                icon: const Icon(Icons.save_outlined, size: 16, color: AppColors.verde),
+                label: const Text('Guardar tarifas',
+                  style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.verde)))),
+          ])),
         ],
       ]));
   }
@@ -1162,87 +1043,108 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       content: Text('✅ Tarifas guardadas'), backgroundColor: AppColors.verde));
   }
 
-  // ── SECCIÓN: VARIABLES SEGÚN FÓRMULA ─────────────
+  // ── VARIABLES SEGÚN FÓRMULA ──────────────────────
   Widget _buildVariables() {
     final tipo = _tipoSel!;
     final formula = tipo.formula;
-    final campos = <Widget>[];
 
     if (formula == 'por_diseno') {
-      campos.add(const Text('Complejidad del diseño',
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)));
-      campos.add(const SizedBox(height: 8));
-      final niveles = [
-        {'v': 'simple', 'l': 'Simple', 'd': 'Logo o figura básica'},
-        {'v': 'media', 'l': 'Media', 'd': 'Ilustración con detalle'},
-        {'v': 'alta', 'l': 'Alta', 'd': 'Diseño complejo o 3D'},
-        {'v': 'premium', 'l': 'Premium', 'd': 'Proyecto completo'},
-      ];
-      campos.add(Wrap(spacing: 8, runSpacing: 8,
-        children: niveles.map((n) {
-          final sel = _complejidad == n['v'];
-          return GestureDetector(
-            onTap: () => setState(() { _complejidad = n['v']!; _resultado = null; }),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: sel ? AppColors.azul : Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-              child: Column(children: [
-                Text(n['l']!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                  color: sel ? Colors.white : AppColors.textoPrincipal)),
-                Text(n['d']!, style: TextStyle(fontSize: 10,
-                  color: sel ? Colors.white70 : AppColors.textoSecundario)),
-              ])));
-        }).toList()));
-      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: campos);
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Complejidad del trabajo:',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        Wrap(spacing: 8, runSpacing: 8,
+          children: [
+            _chipComp('simple', 'Simple', 'Trazos básicos, logo sencillo'),
+            _chipComp('media', 'Media', 'Ilustración con detalle'),
+            _chipComp('alta', 'Alta', 'Diseño complejo o 3D'),
+            _chipComp('premium', 'Premium', 'Proyecto completo, escultura'),
+          ]),
+      ]);
     }
 
     if (formula == 'precio_fijo') {
-      campos.add(Container(padding: const EdgeInsets.all(12),
+      return Container(padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
-        child: const Text('Precio fijo negociado. Edita la tarifa en la sección de tarifas arriba.',
-          style: TextStyle(fontSize: 12, color: AppColors.azul))));
-      return Column(children: campos);
+        child: const Text('Precio fijo negociado. Edita la tarifa "precio_fijo" arriba.',
+          style: TextStyle(fontSize: 12, color: AppColors.azul)));
     }
 
-    // Medidas según fórmula
-    if (tipo.necesitaLargo) {
-      campos.add(_campoMedida('Largo (cm)', _largo, (v) => setState(() { _largo = v; _resultado = null; })));
-      campos.add(const SizedBox(height: 10));
-    }
-    if (tipo.necesitaAncho) {
-      campos.add(_campoMedida('Ancho (cm)', _ancho, (v) => setState(() { _ancho = v; _resultado = null; })));
-      campos.add(const SizedBox(height: 10));
-    }
-    if (tipo.necesitaAlto || formula == 'por_volumen') {
-      campos.add(_campoMedida('Alto / Grosor (cm)', _alto, (v) => setState(() { _alto = v; _resultado = null; })));
-      campos.add(const SizedBox(height: 10));
-    }
-    if (tipo.necesitaPeso || formula == 'por_kg') {
-      campos.add(_campoMedida('Peso (kg)', _peso, (v) => setState(() { _peso = v; _resultado = null; })));
-      campos.add(const SizedBox(height: 10));
-    }
-    if (tipo.necesitaMetros || formula == 'por_metro') {
-      campos.add(_campoMedida('Metros lineales', _metros, (v) => setState(() { _metros = v; _resultado = null; })));
-      campos.add(const SizedBox(height: 10));
-    }
-    if (tipo.necesitaHoras || formula == 'por_hora') {
-      campos.add(_campoMedida('Horas de trabajo', _horas, (v) => setState(() { _horas = v; _resultado = null; })));
-      campos.add(const SizedBox(height: 10));
-    }
-    if (tipo.necesitaMinutos || formula == 'por_minuto') {
-      campos.add(_campoMedida('Minutos', _minutos, (v) => setState(() { _minutos = v; _resultado = null; })));
-      campos.add(const SizedBox(height: 10));
-    }
-
-    return Column(children: campos);
+    return Column(children: [
+      if (tipo.necesitaLargo && formula != 'por_minuto') ...[
+        _campoMedida('Largo (cm)', _largo, (v) => setState(() { _largo = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      if (tipo.necesitaAncho && formula != 'por_minuto') ...[
+        _campoMedida('Ancho (cm)', _ancho, (v) => setState(() { _ancho = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      if (tipo.necesitaAlto || formula == 'por_volumen') ...[
+        _campoMedida('Alto / Profundidad (cm)', _alto,
+          (v) => setState(() { _alto = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      if (tipo.necesitaHoras || formula == 'por_hora') ...[
+        _campoMedida('Horas de trabajo', _horas,
+          (v) => setState(() { _horas = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      if (tipo.necesitaMinutos || formula == 'por_minuto') ...[
+        _campoMedida('Minutos estimados', _minutos,
+          (v) => setState(() { _minutos = v; _resultado = null; })),
+        const SizedBox(height: 10),
+        if (formula == 'por_minuto' && _largo > 0 && _ancho > 0 && _minutos == 0)
+          Container(padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
+            child: const Text('💡 Si no sabes los minutos exactos, '
+              'deja en 0 y el sistema estimará según el área.',
+              style: TextStyle(fontSize: 11, color: AppColors.azul))),
+      ],
+      if (tipo.necesitaMetros || formula == 'por_metro') ...[
+        _campoMedida('Metros lineales', _metros,
+          (v) => setState(() { _metros = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      if (tipo.necesitaPeso || formula == 'por_kg') ...[
+        _campoMedida('Peso (kg)', _peso,
+          (v) => setState(() { _peso = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      // Complejidad para volumétrico
+      if (formula == 'por_volumen') ...[
+        const Text('Complejidad del tallado:',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        Wrap(spacing: 8, runSpacing: 8,
+          children: [
+            _chipComp('simple', 'Simple', 'Relieve bajo < 1cm'),
+            _chipComp('media', 'Media', 'Relieve normal 1-2cm'),
+            _chipComp('alta', 'Alta', 'Escultura > 2cm'),
+            _chipComp('premium', 'Premium', 'Escultura compleja'),
+          ]),
+      ],
+    ]);
   }
 
-  // ── SECCIÓN: MATERIAL ─────────────────────────────
+  Widget _chipComp(String val, String titulo, String sub) {
+    final sel = _complejidad == val;
+    return GestureDetector(
+      onTap: () => setState(() { _complejidad = val; _resultado = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+        child: Column(children: [
+          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+            color: sel ? Colors.white : AppColors.textoPrincipal)),
+          Text(sub, style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : AppColors.textoSecundario)),
+        ])));
+  }
+
+  // ── MATERIAL ─────────────────────────────────────
   Widget _buildMaterial() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    // Toggle: cliente trae material
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('Cliente trae el material', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -1252,13 +1154,10 @@ class _PantallaServicioState extends State<_PantallaServicio> {
         onChanged: (v) => setState(() { _clienteTreMaterial = v; _resultado = null; }),
         activeColor: AppColors.verde),
     ]),
-
     if (!_clienteTreMaterial) ...[
       const SizedBox(height: 12),
       const Divider(height: 1),
       const SizedBox(height: 12),
-
-      // Toggle: inventario o manual
       Row(children: [
         Expanded(child: GestureDetector(
           onTap: () => setState(() => _usarInventario = true),
@@ -1293,19 +1192,16 @@ class _PantallaServicioState extends State<_PantallaServicio> {
             ])))),
       ]),
       const SizedBox(height: 12),
-
       if (_usarInventario) ...[
-        // Dropdown de inventario
         if (_materialesInv.isEmpty)
           Container(padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
-            child: const Text('No hay materiales en inventario. Usa captura manual.',
+            child: const Text('Sin materiales en inventario. Usa captura manual.',
               style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)))
         else
           DropdownButtonFormField<String>(
             value: _materialInvSel?['id'] as String?,
-            decoration: const InputDecoration(
-              labelText: 'Seleccionar del inventario',
+            decoration: const InputDecoration(labelText: 'Material del inventario',
               border: OutlineInputBorder(), isDense: true,
               prefixIcon: Icon(Icons.search, size: 18)),
             items: [
@@ -1314,12 +1210,10 @@ class _PantallaServicioState extends State<_PantallaServicio> {
               ..._materialesInv.map((m) => DropdownMenuItem<String>(
                 value: m['id'] as String,
                 child: Row(children: [
-                  Expanded(child: Text(m['nombre'] ?? '',
-                    style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
-                  const SizedBox(width: 8),
+                  Expanded(child: Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis)),
                   Text('\$${((m['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.verde,
-                      fontWeight: FontWeight.w700)),
+                    style: const TextStyle(fontSize: 11, color: AppColors.verde, fontWeight: FontWeight.w700)),
                 ]))),
             ],
             onChanged: (id) => setState(() {
@@ -1328,30 +1222,21 @@ class _PantallaServicioState extends State<_PantallaServicio> {
               _resultado = null;
             })),
         if (_materialInvSel != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Container(padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: AppColors.verde.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8)),
-            child: Row(children: [
-              Icon((_materialInvSel!['stock_actual'] as int? ?? 0) > 0
-                ? Icons.check_circle_outline : Icons.warning_amber_outlined,
-                size: 16,
-                color: (_materialInvSel!['stock_actual'] as int? ?? 0) > 0
-                  ? AppColors.verde : AppColors.rojo),
-              const SizedBox(width: 6),
-              Text('Stock: ${_materialInvSel!['stock_actual']} ${_materialInvSel!['unidad'] ?? 'pzas'}  |  '
-                'Costo: \$${((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}/pza',
-                style: const TextStyle(fontSize: 11, color: AppColors.textoPrincipal)),
-            ])),
+            child: Text('Stock: ${_materialInvSel!['stock_actual']} ${_materialInvSel!['unidad'] ?? 'pzas'}  '
+              '|  Costo: \$${((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}/pza '
+              '(+15% merma incluida)',
+              style: const TextStyle(fontSize: 11))),
         ],
       ] else ...[
-        // Captura manual
         Row(children: [
           Expanded(child: TextFormField(
             initialValue: _materialLibreNombre,
-            decoration: const InputDecoration(
-              labelText: 'Nombre del material',
-              hintText: 'Ej: Cedro, Aluminio 6061...',
+            decoration: const InputDecoration(labelText: 'Nombre del material',
+              hintText: 'Ej: Cedro, MDF 15mm, Acrílico...',
               border: OutlineInputBorder(), isDense: true),
             onChanged: (v) => setState(() { _materialLibreNombre = v; _resultado = null; }),
             style: const TextStyle(fontSize: 13))),
@@ -1360,28 +1245,23 @@ class _PantallaServicioState extends State<_PantallaServicio> {
             initialValue: _materialLibrePrecio > 0 ? _materialLibrePrecio.toStringAsFixed(2) : '',
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-            decoration: const InputDecoration(
-              labelText: 'Precio',
-              prefixText: r'$',
+            decoration: const InputDecoration(labelText: 'Precio', prefixText: r'$',
               border: OutlineInputBorder(), isDense: true),
             onChanged: (v) => setState(() {
-              _materialLibrePrecio = double.tryParse(v) ?? 0;
-              _resultado = null;
-            }),
+              _materialLibrePrecio = double.tryParse(v) ?? 0; _resultado = null; }),
             style: const TextStyle(fontSize: 13))),
         ]),
-        const SizedBox(height: 6),
-        const Text('El precio es por unidad/pieza del material.',
+        const SizedBox(height: 4),
+        const Text('Se agrega automáticamente +15% de merma.',
           style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
       ],
     ],
   ]);
 
-  // ── SECCIÓN: CANTIDAD Y EXTRAS ────────────────────
-  Widget _buildCantidadExtras() {
+  // ── CANTIDAD Y EXTRAS ────────────────────────────
+  Widget _buildExtras() {
     final cfg = _config!;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Cantidad
       Row(children: [
         const Text('Cantidad:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         const Spacer(),
@@ -1393,11 +1273,10 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           onPressed: () => setState(() { _cantidad++; _resultado = null; }),
           icon: const Icon(Icons.add_circle_outline, color: AppColors.azul)),
       ]),
-
       if (cfg.acabados.isNotEmpty) ...[
         const Divider(height: 16),
         const Text('Acabado:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Wrap(spacing: 8, runSpacing: 8,
           children: cfg.acabados.map((a) => GestureDetector(
             onTap: () => setState(() { _acabadoSel = a; _resultado = null; }),
@@ -1406,65 +1285,23 @@ class _PantallaServicioState extends State<_PantallaServicio> {
               decoration: BoxDecoration(
                 color: _acabadoSel?.id == a.id ? AppColors.azul : Colors.white,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: _acabadoSel?.id == a.id ? AppColors.azul : AppColors.grisBorde)),
+                border: Border.all(color: _acabadoSel?.id == a.id ? AppColors.azul : AppColors.grisBorde)),
               child: Text('${a.nombre} ${a.precio > 0 ? "(+\$${a.precio.toStringAsFixed(0)})" : ""}',
                 style: TextStyle(fontSize: 11,
-                  color: _acabadoSel?.id == a.id ? Colors.white : AppColors.textoPrincipal,
-                  fontWeight: FontWeight.w500))))).toList()),
+                  color: _acabadoSel?.id == a.id ? Colors.white : AppColors.textoPrincipal))))).toList()),
       ],
-
       if (cfg.extras.isNotEmpty) ...[
         const Divider(height: 16),
         const Text('Extras:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
         ...cfg.extras.map((e) => CheckboxListTile(
           value: e.seleccionado,
           onChanged: (v) => setState(() { e.seleccionado = v ?? false; _resultado = null; }),
           title: Text(e.nombre, style: const TextStyle(fontSize: 13)),
           subtitle: Text('+${_fmt.format(e.precio)}',
             style: const TextStyle(fontSize: 11, color: AppColors.verde)),
-          activeColor: AppColors.azul, dense: true,
-          contentPadding: EdgeInsets.zero)),
-      ],
-
-      const Divider(height: 16),
-      // Selector de máquina
-      if (_maquinas.isNotEmpty) ...[
-        const Text('Máquina:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: _maquinaSelId,
-          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-          items: _maquinas.map((m) => DropdownMenuItem<String>(
-            value: m['id'] as String,
-            child: Row(children: [
-              Text(m['emoji'] ?? '⚙️'),
-              const SizedBox(width: 8),
-              Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 13)),
-            ]))).toList(),
-          onChanged: (v) => setState(() { _maquinaSelId = v; _resultado = null; })),
-        const SizedBox(height: 10),
-      ],
-      // Selector de operador
-      if (_operadores.isNotEmpty) ...[
-        const Text('Operador:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        DropdownButtonFormField<String>(
-          value: _operadorSelId,
-          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-          items: _operadores.map((o) => DropdownMenuItem<String>(
-            value: o['id'] as String,
-            child: Row(children: [
-              Text(o['emoji'] ?? '👷'),
-              const SizedBox(width: 8),
-              Text(o['nombre'] ?? '', style: const TextStyle(fontSize: 13)),
-            ]))).toList(),
-          onChanged: (v) => setState(() { _operadorSelId = v; _resultado = null; })),
-        const SizedBox(height: 10),
+          activeColor: AppColors.azul, dense: true, contentPadding: EdgeInsets.zero)),
       ],
       const Divider(height: 16),
-      // IVA toggle
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Incluir IVA 16%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -1477,209 +1314,353 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     ]);
   }
 
-  // ── RESULTADO ─────────────────────────────────────
-  Widget _widgetResultado(ResultadoSimulador r) => Container(
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: AppColors.azul.withOpacity(0.3), width: 1.5)),
-    child: Column(children: [
-      // Header azul con precio recomendado
+  // ── RESULTADO CON 3 PRECIOS Y GRÁFICAS ───────────
+  Widget _widgetResultado(ResultadoSimulador r) {
+    final fmt = NumberFormat(r'$#,##0', 'es_MX');
+
+    final precios = [
+      ResultadoPrecio(
+        etiqueta: 'PRECIO MÍNIMO', emoji: '🟡',
+        descripcion: 'Cubre costos, margen mínimo.\n⚠️ Úsalo solo en casos especiales o clientes frecuentes.',
+        costo: r.costoTotal, precio: r.pvMinimo,
+        utilidad: r.pvMinimo - r.costoTotal,
+        margen: r.costoTotal > 0 ? ((r.pvMinimo - r.costoTotal)/r.pvMinimo*100) : 0,
+        color: AppColors.ambar),
+      ResultadoPrecio(
+        etiqueta: 'PRECIO RECOMENDADO', emoji: '🟢',
+        descripcion: 'Precio competitivo y rentable.\n✅ Recomendado para la mayoría de trabajos.',
+        costo: r.costoTotal, precio: r.pvRecomendado,
+        utilidad: r.pvRecomendado - r.costoTotal,
+        margen: r.costoTotal > 0 ? ((r.pvRecomendado - r.costoTotal)/r.pvRecomendado*100) : 0,
+        color: AppColors.verde, esRecomendado: true),
+      ResultadoPrecio(
+        etiqueta: 'PRECIO PREMIUM', emoji: '🔵',
+        descripcion: 'Para clientes de alto valor o trabajos urgentes.\n💎 Aumenta la rentabilidad del negocio.',
+        costo: r.costoTotal, precio: r.pvPremium,
+        utilidad: r.pvPremium - r.costoTotal,
+        margen: r.costoTotal > 0 ? ((r.pvPremium - r.costoTotal)/r.pvPremium*100) : 0,
+        color: AppColors.azul),
+    ];
+
+    int precioSelIdx = 1; // Recomendado por default
+
+    return StatefulBuilder(builder: (ctx, setS) => Column(children: [
+
+      // ── 3 PRECIOS ──────────────────────────────
+      ...precios.asMap().entries.map((entry) {
+        final i = entry.key; final p = entry.value;
+        final sel = precioSelIdx == i;
+        return GestureDetector(
+          onTap: () => setS(() => precioSelIdx = i),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: sel ? p.color.withOpacity(0.08) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: sel ? p.color : AppColors.grisBorde,
+                width: sel ? 2 : 0.5)),
+            child: Column(children: [
+              Row(children: [
+                Text(p.emoji, style: const TextStyle(fontSize: 20)),
+                const SizedBox(width: 8),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(p.etiqueta, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                    color: p.color, letterSpacing: 0.5)),
+                  Row(children: [
+                    Text(fmt.format(p.precio),
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: p.color)),
+                    if (r.incluyeIva) ...[
+                      const SizedBox(width: 8),
+                      Text('+IVA: ${fmt.format(p.precio * 0.16)}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                    ],
+                  ]),
+                ])),
+                if (p.esRecomendado) Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: AppColors.verde,
+                    borderRadius: BorderRadius.circular(20)),
+                  child: const Text('✓ MEJOR', style: TextStyle(fontSize: 9,
+                    color: Colors.white, fontWeight: FontWeight.w700))),
+                if (sel && !p.esRecomendado) Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: p.color,
+                    borderRadius: BorderRadius.circular(20)),
+                  child: const Text('ELEGIDO', style: TextStyle(fontSize: 9,
+                    color: Colors.white, fontWeight: FontWeight.w700))),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                _kpiPrecio('Costo', fmt.format(p.costo), AppColors.textoSecundario),
+                _kpiPrecio('Utilidad', fmt.format(p.utilidad), p.color),
+                _kpiPrecio('Margen', '${p.margen.toStringAsFixed(1)}%', p.color),
+                _kpiPrecio('Gan/hr', fmt.format(r.gananciaHora), AppColors.textoSecundario),
+              ]),
+              const SizedBox(height: 8),
+              Container(padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
+                child: Text(p.descripcion, style: const TextStyle(fontSize: 11, color: AppColors.textoPrincipal))),
+            ])));
+      }),
+
+      // ── GRÁFICA DE DESGLOSE ─────────────────────
+      const SizedBox(height: 4),
       Container(
-        padding: const EdgeInsets.all(16),
-        decoration: const BoxDecoration(color: AppColors.azul,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
-        child: Column(children: [
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('DESGLOSE DE COSTOS', style: TextStyle(fontSize: 10,
+            fontWeight: FontWeight.w700, color: AppColors.textoSecundario, letterSpacing: 1.5)),
+          const SizedBox(height: 12),
+          ...r.costosDesglose.entries
+            .where((e) => e.value > 0)
+            .map((e) {
+              final pct = r.costoTotal > 0 ? e.value / r.costoTotal : 0.0;
+              final color = _colorCosto(e.key);
+              return Padding(padding: const EdgeInsets.only(bottom: 8), child: Column(children: [
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text(e.key, style: const TextStyle(fontSize: 12)),
+                  Row(children: [
+                    Text('${(pct*100).toStringAsFixed(1)}%',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                    const SizedBox(width: 8),
+                    Text(fmt.format(e.value),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+                  ]),
+                ]),
+                const SizedBox(height: 4),
+                LinearProgressIndicator(value: pct.toDouble(), backgroundColor: AppColors.gris,
+                  valueColor: AlwaysStoppedAnimation<Color>(color), minHeight: 6,
+                  borderRadius: BorderRadius.circular(3)),
+              ]));
+            }),
+          const Divider(height: 16),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('PRECIO RECOMENDADO', style: TextStyle(
-                fontSize: 10, color: Colors.white70, letterSpacing: 1)),
-              if (r.pvMinimo > 0 && r.pvMinimo < r.pvRecomendado)
-                Text('Mínimo: ${_fmt.format(r.pvMinimo)}',
-                  style: const TextStyle(fontSize: 11, color: Colors.white60)),
-              if (r.incluyeIva) Text('Sin IVA: ${_fmt.format(r.subtotal)}',
-                style: const TextStyle(fontSize: 11, color: Colors.white60)),
-            ]),
-            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(_fmt.format(r.total), style: const TextStyle(fontSize: 28,
-                fontWeight: FontWeight.w800, color: Colors.white)),
-              if (r.incluyeIva) Text('IVA: +${_fmt.format(r.iva)}',
-                style: const TextStyle(fontSize: 11, color: Colors.white70)),
-              if (_cantidad > 1) Text('${_fmt.format(r.total / _cantidad)}/pieza',
-                style: const TextStyle(fontSize: 11, color: Colors.white60)),
-            ]),
+            const Text('COSTO TOTAL', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(fmt.format(r.costoTotal),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.rojo)),
           ]),
-          // Análisis financiero rápido
-          if (r.costoTotal > 0) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8)),
-              child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                _kpiResultado('Costo total', _fmt.format(r.costoTotal), Colors.white70),
-                _kpiResultado('Utilidad', _fmt.format(r.utilidad),
-                  r.utilidad > 0 ? const Color(0xFF4ade80) : Colors.redAccent),
-                _kpiResultado('Margen real', '${r.margenReal.toStringAsFixed(1)}%',
-                  r.margenReal >= 30 ? const Color(0xFF4ade80) :
-                  r.margenReal >= 20 ? Colors.amber : Colors.redAccent),
-                _kpiResultado('Gan/hora', _fmt.format(r.gananciaHora), Colors.white70),
-              ])),
-          ],
         ])),
 
-      // Desglose
-      Padding(padding: const EdgeInsets.all(14), child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Desglose:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-          color: AppColors.textoSecundario)),
-        const SizedBox(height: 8),
-        ...r.desglose.entries.map((e) => Padding(
-          padding: const EdgeInsets.only(bottom: 4),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(e.key, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-            Text(e.value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-              color: AppColors.textoPrincipal)),
-          ]))),
-      ])),
+      // ── OBSERVACIONES AUTOMÁTICAS ───────────────
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.azul.withOpacity(0.2))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Row(children: [
+            Icon(Icons.lightbulb_outline, size: 16, color: AppColors.azul),
+            SizedBox(width: 6),
+            Text('Observaciones financieras', style: TextStyle(fontSize: 12,
+              fontWeight: FontWeight.w700, color: AppColors.azul)),
+          ]),
+          const SizedBox(height: 10),
+          ..._generarObservaciones(r, fmt),
+        ])),
 
-      // Descripción editable
-      Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 14), child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Divider(height: 1),
-        const SizedBox(height: 10),
-        const Text('Descripción para cotización:',
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textoSecundario)),
-        const SizedBox(height: 6),
-        TextFormField(
-          initialValue: _descripcionEditable,
-          maxLines: 4, minLines: 2,
-          onChanged: (v) => setState(() => _descripcionEditable = v),
-          decoration: InputDecoration(
-            hintText: 'Descripción del trabajo...',
-            filled: true, fillColor: AppColors.gris,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-          style: const TextStyle(fontSize: 12)),
-      ])),
+      // ── DESCRIPCIÓN EDITABLE ─────────────────────
+      const SizedBox(height: 10),
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Descripción para cotización:',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textoSecundario)),
+          const SizedBox(height: 8),
+          TextFormField(
+            initialValue: _descripcionEditable,
+            maxLines: 4, minLines: 2,
+            onChanged: (v) => setState(() => _descripcionEditable = v),
+            decoration: InputDecoration(hintText: 'Descripción del trabajo...',
+              filled: true, fillColor: AppColors.gris,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+            style: const TextStyle(fontSize: 12)),
+        ])),
 
-      // Botones
-      Padding(padding: const EdgeInsets.fromLTRB(14, 0, 14, 14), child: Column(children: [
-        SizedBox(width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              final rFinal = ResultadoSimulador(
-                servicio: r.servicio, emoji: r.emoji,
-                descripcion: _descripcionEditable,
-                maquila: r.maquila, extras: r.extras, acabado: r.acabado,
-                costoMaterial: r.costoMaterial, subtotal: r.subtotal,
-                iva: r.iva, total: r.total, desglose: r.desglose,
-                incluyeIva: r.incluyeIva, materialNombre: r.materialNombre);
-              widget.onAgregar(rFinal);
-              Navigator.pop(context);
-            },
-            icon: const Icon(Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
-            label: const Text('Agregar al carrito',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.verde,
-              padding: const EdgeInsets.symmetric(vertical: 12)))),
-        const SizedBox(height: 8),
-        SizedBox(width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: () {
-              final rFinal = ResultadoSimulador(
-                servicio: r.servicio, emoji: r.emoji,
-                descripcion: _descripcionEditable,
-                maquila: r.maquila, extras: r.extras, acabado: r.acabado,
-                costoMaterial: r.costoMaterial, subtotal: r.subtotal,
-                iva: r.iva, total: r.total, desglose: r.desglose,
-                incluyeIva: r.incluyeIva, materialNombre: r.materialNombre);
-              widget.onAgregar(rFinal);
-              Navigator.pushReplacement(context, MaterialPageRoute(
-                builder: (_) => CotizarScreen(carritoSimulador: [rFinal])));
-            },
-            icon: const Icon(Icons.description_outlined, color: Colors.white, size: 16),
-            label: const Text('Cotizar ahora',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.naranja,
-              padding: const EdgeInsets.symmetric(vertical: 12)))),
+      // ── BOTONES ─────────────────────────────────
+      const SizedBox(height: 14),
+      SizedBox(width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            final rFinal = _resultadoConPrecio(r, precioSelIdx);
+            widget.onAgregar(rFinal);
+            Navigator.pop(context);
+          },
+          icon: const Icon(Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
+          label: const Text('Agregar al carrito',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde,
+            padding: const EdgeInsets.symmetric(vertical: 12)))),
+      const SizedBox(height: 8),
+      SizedBox(width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {
+            final rFinal = _resultadoConPrecio(r, precioSelIdx);
+            widget.onAgregar(rFinal);
+            Navigator.pushReplacement(context, MaterialPageRoute(
+              builder: (_) => CotizarScreen(carritoSimulador: [rFinal])));
+          },
+          icon: const Icon(Icons.description_outlined, color: Colors.white, size: 16),
+          label: const Text('Cotizar ahora',
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.naranja,
+            padding: const EdgeInsets.symmetric(vertical: 12)))),
+    ]));
+  }
+
+  ResultadoSimulador _resultadoConPrecio(ResultadoSimulador r, int idx) {
+    final precios = [r.pvMinimo, r.pvRecomendado, r.pvPremium];
+    final precio = precios[idx];
+    final iva = r.incluyeIva ? precio * 0.16 : 0.0;
+    return ResultadoSimulador(
+      servicio: r.servicio, emoji: r.emoji,
+      descripcion: _descripcionEditable.isNotEmpty ? _descripcionEditable : r.descripcion,
+      total: precio + iva, subtotal: precio, iva: iva,
+      costoTotal: r.costoTotal, pvMinimo: r.pvMinimo,
+      pvRecomendado: r.pvRecomendado, pvPremium: r.pvPremium,
+      utilidad: precio - r.costoTotal,
+      margenReal: precio > 0 ? ((precio - r.costoTotal)/precio*100) : 0,
+      gananciaHora: r.tiempoHoras > 0 ? (precio - r.costoTotal)/r.tiempoHoras : 0,
+      tiempoHoras: r.tiempoHoras,
+      cm: r.cm, cmo: r.cmo, cmaq: r.cmaq, cc: r.cc, ca: r.ca, ci: r.ci,
+      costosDesglose: r.costosDesglose, incluyeIva: r.incluyeIva,
+      materialNombre: r.materialNombre, maquila: precio,
+      costoMaterial: r.cm, acabado: r.ca, extras: r.extras);
+  }
+
+  List<Widget> _generarObservaciones(ResultadoSimulador r, NumberFormat fmt) {
+    final obs = <Widget>[];
+
+    // Observación margen
+    if (r.margenReal < 20) {
+      obs.add(_obs('⚠️ Margen bajo (${r.margenReal.toStringAsFixed(1)}%)',
+        'Este trabajo apenas cubre costos. Considera aumentar el precio o reducir el material.', AppColors.rojo));
+    } else if (r.margenReal >= 40) {
+      obs.add(_obs('✅ Excelente margen (${r.margenReal.toStringAsFixed(1)}%)',
+        'Este trabajo es muy rentable. Mantén este precio como referencia.', AppColors.verde));
+    } else {
+      obs.add(_obs('👍 Margen saludable (${r.margenReal.toStringAsFixed(1)}%)',
+        'El precio recomendado es competitivo y cubre bien los costos.', AppColors.azul));
+    }
+
+    // Observación material
+    final pctMat = r.costoTotal > 0 ? (r.cm / r.costoTotal * 100) : 0;
+    if (pctMat > 40) {
+      obs.add(_obs('📦 Material: ${pctMat.toStringAsFixed(0)}% del costo',
+        'El material es el mayor costo. Busca precio de mayoreo con tu proveedor.', AppColors.naranja));
+    }
+
+    // Observación tiempo
+    if (r.tiempoHoras > 0) {
+      obs.add(_obs('⏱️ Tiempo estimado: ${r.tiempoHoras.toStringAsFixed(1)} horas',
+        'Ganancia por hora: ${fmt.format(r.gananciaHora)}. '
+        '${r.gananciaHora > 200 ? "Trabajo muy rentable." : r.gananciaHora > 100 ? "Rentabilidad aceptable." : "Considera ajustar el precio."}',
+        AppColors.azul));
+    }
+
+    // Observación costos taller
+    final pctCI = r.costoTotal > 0 ? (r.ci / r.costoTotal * 100) : 0;
+    if (pctCI < 5 && (_costosTaller?.costoHoraTaller ?? 0) < 1) {
+      obs.add(_obs('💡 Configura tus costos fijos',
+        'Ve a "Costos del taller" y agrega renta, luz y salarios para calcular el precio real.',
+        AppColors.ambar));
+    }
+
+    return obs;
+  }
+
+  Widget _obs(String titulo, String detalle, Color color) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(width: 3, height: 40, color: color, margin: const EdgeInsets.only(right: 8, top: 2)),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(titulo, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        Text(detalle, style: const TextStyle(fontSize: 11, color: AppColors.textoPrincipal)),
       ])),
     ]));
 
-  // ── HELPERS ──────────────────────────────────────
-  Widget _kpiResultado(String label, String val, Color color) =>
-    Column(children: [
-      Text(val, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
-      Text(label, style: const TextStyle(fontSize: 9, color: Colors.white60)),
-    ]);
+  Color _colorCosto(String key) {
+    switch (key) {
+      case 'Material': return AppColors.naranja;
+      case 'Máquina': return AppColors.azul;
+      case 'Operador': return AppColors.verde;
+      case 'Consumibles': return const Color(0xFF7c3aed);
+      case 'Acabado': return const Color(0xFF0891b2);
+      case 'Taller (CI)': return AppColors.rojo;
+      default: return AppColors.textoSecundario;
+    }
+  }
 
+  Widget _kpiPrecio(String label, String val, Color color) =>
+    Expanded(child: Column(children: [
+      Text(val, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+      Text(label, style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario)),
+    ]));
+
+  // ── HELPERS ──────────────────────────────────────
   Widget _seccionCard(String titulo, Widget child) => Container(
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-        child: Text(titulo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-          color: AppColors.azul))),
+      Padding(padding: const EdgeInsets.fromLTRB(14,12,14,8),
+        child: Text(titulo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul))),
       const Divider(height: 1),
       Padding(padding: const EdgeInsets.all(14), child: child),
     ]));
 
   Widget _campoMedida(String label, double val, void Function(double) onChange) =>
     TextFormField(
-      initialValue: val > 0 ? val.toStringAsFixed(val % 1 == 0 ? 0 : 2) : '',
+      key: ValueKey('$label${val.toStringAsFixed(0)}'),
+      initialValue: val > 0 ? val.toStringAsFixed(val % 1 == 0 ? 0 : 1) : '',
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-      decoration: InputDecoration(labelText: label,
-        border: const OutlineInputBorder(), isDense: true),
+      decoration: InputDecoration(labelText: label, border: const OutlineInputBorder(), isDense: true),
       onChanged: (v) => onChange(double.tryParse(v) ?? 0),
       style: const TextStyle(fontSize: 13));
 
-  void _nuevoTipoTrabajo() {
+  void _nuevoModo() {
     final nombreCtrl = TextEditingController();
     String formula = 'por_area';
-    bool necesitaAlto = false;
-
     final formulas = [
-      {'v': 'por_area', 'l': 'Por m²', 'd': 'Largo × Ancho × Tarifa/m²'},
-      {'v': 'por_volumen', 'l': 'Por volumen', 'd': 'L×A×Alto × Factor → Rangos'},
-      {'v': 'por_hora', 'l': 'Por hora', 'd': 'Horas × Tarifa/hora'},
-      {'v': 'por_pieza', 'l': 'Por pieza', 'd': 'Cantidad × Precio/pieza'},
-      {'v': 'por_minuto', 'l': 'Por minuto', 'd': 'Minutos × Tarifa/minuto'},
-      {'v': 'por_metro', 'l': 'Por metro', 'd': 'Metros lineales × Tarifa/m'},
-      {'v': 'precio_fijo', 'l': 'Precio fijo', 'd': 'Monto fijo negociado'},
-      {'v': 'por_kg', 'l': 'Por kg', 'd': 'Peso × Tarifa/kg'},
-      {'v': 'por_diseno', 'l': 'Diseño', 'd': 'Simple / Media / Alta / Premium'},
+      {'v':'por_area','l':'Por m²','d':'Largo × Ancho × Tarifa/m²'},
+      {'v':'por_volumen','l':'Por volumen','d':'L×A×Alto × Factor → Precio'},
+      {'v':'por_hora','l':'Por hora','d':'Horas × Tarifa/hora'},
+      {'v':'por_minuto','l':'Por minuto','d':'Minutos × Tarifa/minuto'},
+      {'v':'por_metro','l':'Por metro','d':'Metros × Tarifa/metro'},
+      {'v':'precio_fijo','l':'Precio fijo','d':'Monto fijo negociado'},
+      {'v':'por_kg','l':'Por kg','d':'Peso × Tarifa/kg'},
+      {'v':'por_pieza','l':'Por pieza','d':'Cantidad × Precio/pieza'},
+      {'v':'por_diseno','l':'Diseño','d':'Simple/Media/Alta/Premium'},
     ];
-
     showModalBottomSheet(context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(builder: (ctx2, setS) => Container(
-        height: MediaQuery.of(ctx).size.height * 0.8,
+      builder: (ctx) => StatefulBuilder(builder: (_, setS) => Container(
+        height: MediaQuery.of(ctx).size.height * 0.85,
         decoration: const BoxDecoration(color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
         child: Column(children: [
-          Container(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          Padding(padding: const EdgeInsets.fromLTRB(16,16,16,12),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Nuevo modo de trabajo',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-              GestureDetector(onTap: () => Navigator.pop(ctx),
-                child: const Icon(Icons.close)),
+              const Text('Nuevo modo de trabajo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              GestureDetector(onTap: () => Navigator.pop(ctx), child: const Icon(Icons.close)),
             ])),
           const Divider(height: 1),
           Expanded(child: SingleChildScrollView(
-            padding: EdgeInsets.only(left: 16, right: 16, top: 16,
+            padding: EdgeInsets.only(left:16, right:16, top:12,
               bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              TextFormField(controller: nombreCtrl,
-                textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del modo *',
-                  hintText: 'Ej: Corte de aluminio, Fresado CNC...',
+              TextFormField(controller: nombreCtrl, textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Nombre del modo *',
+                  hintText: 'Ej: Corte 2D, Talla 3D, Grabado...',
                   border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 16),
-              const Text('¿Cómo se cobra?',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
+              const Text('¿Cómo se cobra?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
               ...formulas.map((f) => GestureDetector(
                 onTap: () => setS(() => formula = f['v']!),
                 child: Container(
@@ -1688,58 +1669,45 @@ class _PantallaServicioState extends State<_PantallaServicio> {
                   decoration: BoxDecoration(
                     color: formula == f['v'] ? AppColors.azulClaro : Colors.white,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: formula == f['v'] ? AppColors.azul : AppColors.grisBorde)),
+                    border: Border.all(color: formula == f['v'] ? AppColors.azul : AppColors.grisBorde)),
                   child: Row(children: [
-                    Icon(formula == f['v']
-                      ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    Icon(formula == f['v'] ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                       color: formula == f['v'] ? AppColors.azul : AppColors.grisBorde, size: 18),
                     const SizedBox(width: 10),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(f['l']!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                         color: formula == f['v'] ? AppColors.azul : AppColors.textoPrincipal)),
-                      Text(f['d']!, style: const TextStyle(fontSize: 11,
-                        color: AppColors.textoSecundario)),
+                      Text(f['d']!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                     ])),
                   ])))),
-              if (formula == 'por_volumen') ...[
-                const Divider(height: 16),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  const Text('Necesita medida de alto/grosor',
-                    style: TextStyle(fontSize: 13)),
-                  Switch(value: necesitaAlto, activeColor: AppColors.azul,
-                    onChanged: (v) => setS(() => necesitaAlto = v)),
-                ]),
-              ],
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
               SizedBox(width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
-                    final negId2 = Supabase.instance.client.auth.currentUser?.id
-                      ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+                    final negId2 = Supabase.instance.client.auth.currentUser?.id ?? _negId;
+                    final f = formulas.firstWhere((f) => f['v'] == formula);
                     await SimuladorDataService.crearTipoTrabajo({
                       'negocio_id': negId2,
                       'servicio_id': widget.servicio.id,
                       'nombre': nombreCtrl.text.trim(),
                       'formula': formula,
                       'factor_complejidad': 1.0,
-                      'necesita_largo': true,
-                      'necesita_ancho': formula != 'por_hora' && formula != 'por_minuto' && formula != 'por_kg',
-                      'necesita_alto': necesitaAlto || formula == 'por_volumen',
+                      'necesita_largo': formula != 'por_diseno' && formula != 'precio_fijo' && formula != 'por_pieza',
+                      'necesita_ancho': formula == 'por_area' || formula == 'por_volumen',
+                      'necesita_alto': formula == 'por_volumen',
                       'necesita_horas': formula == 'por_hora',
                       'necesita_minutos': formula == 'por_minuto',
                       'necesita_metros': formula == 'por_metro',
                       'necesita_peso': formula == 'por_kg',
-                      'descripcion_formula': formulas.firstWhere((f) => f['v'] == formula)['d'],
+                      'descripcion_formula': f['d'],
+                      'activo': true,
                     });
                     if (mounted) { Navigator.pop(ctx); _cargar(); }
                   },
                   icon: const Icon(Icons.save_outlined, color: Colors.white),
-                  label: const Text('Crear modo de trabajo',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.azul,
+                  label: const Text('Crear modo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                     padding: const EdgeInsets.symmetric(vertical: 13)))),
             ]))),
         ]))));
