@@ -376,25 +376,25 @@ class MotorCalculo {
           ? (cfg.getTarifa('tarifa_m2_celosia') > 0 ? cfg.getTarifa('tarifa_m2_celosia') : 450)
           : (cfg.getTarifa('tarifa_m2_normal')  > 0 ? cfg.getTarifa('tarifa_m2_normal')  : 350);
         precioMaquila = areaM2 * tarifaM2 * cantidad;
-        desglose['area_m2'] = areaM2;
-        desglose['tarifa_m2'] = tarifaM2;
+        desglose['area_m2'] = areaM2.toDouble();
+        desglose['tarifa_m2'] = tarifaM2.toDouble();
         // Mano de obra lijado
         if (horasLijado > 0) {
           final tarifaLijado = cfg.getTarifa('costo_lijado_hora') > 0
             ? cfg.getTarifa('costo_lijado_hora') : 150;
-          desglose['mano_obra_lijado'] = horasLijado * tarifaLijado * cantidad;
+          desglose['mano_obra_lijado'] = horasLijado * tarifaLijado * cantidad.toDouble();
         }
         // Mano de obra barnizado
         if (horasBarnizado > 0) {
           final tarifaBarn = cfg.getTarifa('costo_barnizado') > 0
             ? cfg.getTarifa('costo_barnizado') : 200;
-          desglose['mano_obra_barnizado'] = horasBarnizado * tarifaBarn * cantidad;
+          desglose['mano_obra_barnizado'] = horasBarnizado * tarifaBarn * cantidad.toDouble();
         }
         // Diseño adicional
         if (llevaDiseno) {
           final tarifaDis = cfg.getTarifa('costo_diseno') > 0
             ? cfg.getTarifa('costo_diseno') : 300;
-          desglose['diseno_adicional'] = tarifaDis;
+          desglose['diseno_adicional'] = tarifaDis.toDouble();
         }
         tiempoHoras = areaM2 * 0.5 * cantidad; // estimado
         break;
@@ -407,9 +407,9 @@ class MotorCalculo {
         if (precioRango == 0 && volumen > 0) precioRango = 580; // mínimo
         // Factor según tipo (Relieve=1.0, Escultura=1.8, Rotativo=2.5)
         precioMaquila = precioRango * tipo.factor * cantidad;
-        desglose['volumen_cm3'] = volumen;
-        desglose['precio_rango_base'] = precioRango;
-        desglose['factor_tipo'] = tipo.factor;
+        desglose['volumen_cm3'] = volumen.toDouble();
+        desglose['precio_rango_base'] = precioRango.toDouble();
+        desglose['factor_tipo'] = tipo.factor.toDouble();
         tiempoHoras = volumen * 0.003 * tipo.factor * cantidad;
         if (tiempoHoras < 0.5 && volumen > 0) tiempoHoras = 0.5;
         break;
@@ -421,7 +421,7 @@ class MotorCalculo {
           precioMaquila = cfg.getTarifa('tarifa_setup') > 0
             ? cfg.getTarifa('tarifa_setup') : 75;
           tiempoHoras = 0.25;
-          desglose['setup_montaje'] = precioMaquila;
+          desglose['setup_montaje'] = precioMaquila.toDouble();
         } else {
           // Determinar tarifa por hora según tipo
           double tarifaHr;
@@ -435,13 +435,13 @@ class MotorCalculo {
           // Horas = factor del tipo (ya incluye complejidad)
           tiempoHoras = tipo.factor;
           precioMaquila = tiempoHoras * tarifaHr;
-          desglose['horas_diseno'] = tiempoHoras;
-          desglose['tarifa_hora'] = tarifaHr;
+          desglose['horas_diseno'] = tiempoHoras.toDouble();
+          desglose['tarifa_hora'] = tarifaHr.toDouble();
 
           // Si cliente trae imagen (JPG) → precio normal
           // Si diseña desde cero → precio normal
           if (clienteTraeArchivo && !archivoEsVector) {
-            desglose['vectorizacion_imagen'] = precioMaquila;
+            desglose['vectorizacion_imagen'] = precioMaquila.toDouble();
           }
         }
 
@@ -451,7 +451,7 @@ class MotorCalculo {
             ? cfg.getTarifa('cargo_urgente') : 40;
           final cargoUrgente = precioMaquila * pctUrgente / 100;
           precioMaquila += cargoUrgente;
-          desglose['cargo_urgente'] = cargoUrgente;
+          desglose['cargo_urgente'] = cargoUrgente.toDouble();
         }
 
         // Revisiones extra
@@ -460,7 +460,7 @@ class MotorCalculo {
             ? cfg.getTarifa('cargo_revision') : 150;
           final totalRev = cargoRev * revisionesExtra;
           precioMaquila += totalRev;
-          desglose['revisiones_extra'] = totalRev;
+          desglose['revisiones_extra'] = totalRev.toDouble();
         }
 
         // Archivo editable al cliente
@@ -469,7 +469,7 @@ class MotorCalculo {
             ? cfg.getTarifa('cargo_archivo_editable') : 200;
           final cargoArch = precioMaquila * pctArch / 100;
           precioMaquila += cargoArch;
-          desglose['archivo_editable'] = cargoArch;
+          desglose['archivo_editable'] = cargoArch.toDouble();
         }
         break;
 
@@ -487,7 +487,7 @@ class MotorCalculo {
         final tarifaMin = cfg.getTarifa('tarifa_minuto') > 0
           ? cfg.getTarifa('tarifa_minuto') : 8;
         precioMaquila = minEst * tarifaMin * cantidad;
-        desglose['minutos'] = minEst;
+        desglose['minutos'] = minEst.toDouble();
         break;
 
       case 'por_metro':
@@ -495,7 +495,7 @@ class MotorCalculo {
           ? cfg.getTarifa('tarifa_metro') : 100;
         precioMaquila = metros * tarifaMt * cantidad;
         tiempoHoras = metros * 0.1 * cantidad;
-        desglose['metros'] = metros;
+        desglose['metros'] = metros.toDouble();
         break;
 
       case 'por_kg':
@@ -508,7 +508,7 @@ class MotorCalculo {
       case 'por_pieza':
         final tarifaPza = cfg.getTarifa('tarifa_pieza') > 0
           ? cfg.getTarifa('tarifa_pieza') : 100;
-        precioMaquila = tarifaPza * cantidad;
+        precioMaquila = tarifaPza.toDouble() * cantidad;
         tiempoHoras = tipo.factor * cantidad / 60;
         break;
 
