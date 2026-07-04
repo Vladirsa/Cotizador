@@ -732,23 +732,68 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     super.dispose();
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.gris,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        title: Row(children: [
+          Text(widget.servicio.emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Text(widget.servicio.nombre, style: const TextStyle(
+            fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
+        ])),
+      body: _cargando
+        ? const Center(child: CircularProgressIndicator())
+        : _config == null
+          ? const Center(child: Text('Error cargando configuración'))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(14),
+              child: Column(children: [
+                _seccionCard('Tipo de trabajo', _buildTiposTrabajo()),
+                const SizedBox(height: 10),
+                if (_tipoSel != null) _seccionTarifas(),
+                const SizedBox(height: 10),
+                if (_tipoSel != null) _seccionCard('Variables', _buildVariables()),
+                const SizedBox(height: 10),
+                _seccionCard('Material', _buildMaterial()),
+                const SizedBox(height: 10),
+                _seccionCard('Cantidad y extras', _buildCantidadExtras()),
+                const SizedBox(height: 14),
+                SizedBox(width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _calcular,
+                    icon: const Icon(Icons.calculate_outlined, color: Colors.white),
+                    label: const Text('Calcular precio',
+                      style: TextStyle(fontSize: 15, color: Colors.white,
+                        fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.azul,
+                      padding: const EdgeInsets.symmetric(vertical: 14)))),
+                if (_resultado != null) ...[
+                  const SizedBox(height: 14),
+                  _widgetResultado(_resultado!),
+                ],
+                const SizedBox(height: 40),
+              ])));
+  }
+
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
       final sb = Supabase.instance.client;
       const negId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-      final results = await Future.wait([
-        SimuladorDataService.getConfig(widget.servicio.id),
-        SimuladorDataService.getMaterialesInventario(),
-        SimuladorDataService.getCostosTaller(),
-        sb.from('maquinaria').select('id,nombre,emoji').eq('negocio_id',negId).eq('activo',true),
-        sb.from('mano_obra').select('id,nombre,emoji,tipo').eq('negocio_id',negId).eq('activo',true),
-      ]);
-      final cfg = results[0] as SimConfig;
-      final inv = results[1] as List<Map<String, dynamic>>;
-      final costos = results[2] as CostosTaller;
-      final maquinas = (results[3] as List).cast<Map<String,dynamic>>();
-      final operadores = (results[4] as List).cast<Map<String,dynamic>>();
+      final cfg = await SimuladorDataService.getConfig(widget.servicio.id);
+      final inv = await SimuladorDataService.getMaterialesInventario();
+      final costos = await SimuladorDataService.getCostosTaller();
+      final maquinasRaw = await sb.from('maquinaria')
+        .select('id,nombre,emoji').eq('negocio_id',negId).eq('activo',true);
+      final operadoresRaw = await sb.from('mano_obra')
+        .select('id,nombre,emoji,tipo').eq('negocio_id',negId).eq('activo',true);
+      final maquinas = (maquinasRaw as List).cast<Map<String,dynamic>>();
+      final operadores = (operadoresRaw as List).cast<Map<String,dynamic>>();
       if (mounted) setState(() {
         _config = cfg;
         _costosTaller = costos;
@@ -959,8 +1004,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     if (_cantidad > 1) descParts.add('Cantidad: $_cantidad piezas');
 
     setState(() {
-      _descripcionEditable = descParts.join('
-');
+      _descripcionEditable = descParts.join('\n');
       _resultado = ResultadoSimulador(
         servicio: widget.servicio.nombre,
         emoji: widget.servicio.emoji,
@@ -980,8 +1024,8 @@ class _PantallaServicioState extends State<_PantallaServicio> {
         pvMinimo: pvMinimo,
         pvRecomendado: pvRecomendado,
         utilidad: utilidad,
-        margenReal: margenReal,
-        gananciaHora: gananciaHora,
+        margenReal: margenReal.toDouble(),
+        gananciaHora: gananciaHora.toDouble(),
         tiempoHoras: tiempoHoras * _cantidad,
       );
     });
