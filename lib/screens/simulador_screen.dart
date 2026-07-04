@@ -344,82 +344,188 @@ class MotorCalculo {
     required bool aplicarIva,
     required List<SimExtra> extrasSeleccionados,
     required String descripcionEditable,
+    // Extras Diseño Digital
+    bool clienteTraeArchivo = false,
+    bool archivoEsVector = false,
+    bool entregaUrgente = false,
+    int revisionesExtra = 0,
+    bool archivoEditableAlCliente = false,
+    // Extras Router 2D
+    double horasLijado = 0,
+    double horasBarnizado = 0,
+    bool llevaDiseno = false,
   }) {
     final fmt = NumberFormat(r'$#,##0.00', 'es_MX');
     final formula = tipo.formula;
     final desglose = <String, double>{};
 
-    // ── TIEMPO ESTIMADO ─────────────────────────────
+    // ── CÁLCULO POR FÓRMULA ──────────────────────────
+    double precioMaquila = 0;  // precio directo de maquila
     double tiempoHoras = 0;
 
     switch (formula) {
+
+      // ── ROUTER 2D: Por área × tarifa según tipo ──────
       case 'por_area':
         final areaM2 = (largo/100) * (ancho/100);
-        // Factor espesor: más grueso = más tiempo
-        final factorEsp = alto > 0 ? (1 + (alto/10) * 0.3) : 1.0;
-        // Factor complejidad del tipo
-        tiempoHoras = areaM2 * tipo.factor * factorEsp;
-        // Mínimo 10 minutos
-        if (tiempoHoras < 0.167 && (largo > 0 || ancho > 0)) tiempoHoras = 0.167;
+        // Determinar tarifa según nombre del tipo
+        final esCelosia = tipo.nombre.toLowerCase().contains('celosia') ||
+                          tipo.nombre.toLowerCase().contains('celosía') ||
+                          tipo.nombre.toLowerCase().contains('calado');
+        final tarifaM2 = esCelosia
+          ? (cfg.getTarifa('tarifa_m2_celosia') > 0 ? cfg.getTarifa('tarifa_m2_celosia') : 450)
+          : (cfg.getTarifa('tarifa_m2_normal')  > 0 ? cfg.getTarifa('tarifa_m2_normal')  : 350);
+        precioMaquila = areaM2 * tarifaM2 * cantidad;
         desglose['area_m2'] = areaM2;
-        desglose['factor_espesor'] = factorEsp;
+        desglose['tarifa_m2'] = tarifaM2;
+        // Mano de obra lijado
+        if (horasLijado > 0) {
+          final tarifaLijado = cfg.getTarifa('costo_lijado_hora') > 0
+            ? cfg.getTarifa('costo_lijado_hora') : 150;
+          desglose['mano_obra_lijado'] = horasLijado * tarifaLijado * cantidad;
+        }
+        // Mano de obra barnizado
+        if (horasBarnizado > 0) {
+          final tarifaBarn = cfg.getTarifa('costo_barnizado') > 0
+            ? cfg.getTarifa('costo_barnizado') : 200;
+          desglose['mano_obra_barnizado'] = horasBarnizado * tarifaBarn * cantidad;
+        }
+        // Diseño adicional
+        if (llevaDiseno) {
+          final tarifaDis = cfg.getTarifa('costo_diseno') > 0
+            ? cfg.getTarifa('costo_diseno') : 300;
+          desglose['diseno_adicional'] = tarifaDis;
+        }
+        tiempoHoras = areaM2 * 0.5 * cantidad; // estimado
         break;
 
+      // ── ROUTER 3D: Por tabla de rangos × factor tipo ─
       case 'por_volumen':
         final volumen = largo * ancho * alto;
-        // Factor por complejidad ingresada por usuario
-        final factorComp = {
-          'simple': 0.8, 'media': 1.0, 'alta': 1.5, 'premium': 2.5
-        }[complejidad] ?? 1.0;
-        tiempoHoras = volumen * tipo.factor * factorComp / 1000;
-        if (tiempoHoras < 0.5 && volumen > 0) tiempoHoras = 0.5;
+        // Precio base de tabla de rangos
+        double precioRango = cfg.calcularPrecioRango(volumen);
+        if (precioRango == 0 && volumen > 0) precioRango = 580; // mínimo
+        // Factor según tipo (Relieve=1.0, Escultura=1.8, Rotativo=2.5)
+        precioMaquila = precioRango * tipo.factor * cantidad;
         desglose['volumen_cm3'] = volumen;
-        desglose['factor_complejidad'] = factorComp;
+        desglose['precio_rango_base'] = precioRango;
+        desglose['factor_tipo'] = tipo.factor;
+        tiempoHoras = volumen * 0.003 * tipo.factor * cantidad;
+        if (tiempoHoras < 0.5 && volumen > 0) tiempoHoras = 0.5;
+        break;
+
+      // ── DISEÑO DIGITAL ────────────────────────────────
+      case 'por_diseno':
+        // Si cliente trae vector listo → solo setup
+        if (clienteTraeArchivo && archivoEsVector) {
+          precioMaquila = cfg.getTarifa('tarifa_setup') > 0
+            ? cfg.getTarifa('tarifa_setup') : 75;
+          tiempoHoras = 0.25;
+          desglose['setup_montaje'] = precioMaquila;
+        } else {
+          // Determinar tarifa por hora según tipo
+          double tarifaHr;
+          if (tipo.nombre.contains('3D') || tipo.nombre.contains('3d')) {
+            tarifaHr = cfg.getTarifa('tarifa_hora_3d') > 0 ? cfg.getTarifa('tarifa_hora_3d') : 500;
+          } else if (tipo.nombre.toUpperCase().contains('CAM')) {
+            tarifaHr = cfg.getTarifa('tarifa_hora_cam') > 0 ? cfg.getTarifa('tarifa_hora_cam') : 400;
+          } else {
+            tarifaHr = cfg.getTarifa('tarifa_hora_2d') > 0 ? cfg.getTarifa('tarifa_hora_2d') : 300;
+          }
+          // Horas = factor del tipo (ya incluye complejidad)
+          tiempoHoras = tipo.factor;
+          precioMaquila = tiempoHoras * tarifaHr;
+          desglose['horas_diseno'] = tiempoHoras;
+          desglose['tarifa_hora'] = tarifaHr;
+
+          // Si cliente trae imagen (JPG) → precio normal
+          // Si diseña desde cero → precio normal
+          if (clienteTraeArchivo && !archivoEsVector) {
+            desglose['vectorizacion_imagen'] = precioMaquila;
+          }
+        }
+
+        // Cargo urgente
+        if (entregaUrgente) {
+          final pctUrgente = cfg.getTarifa('cargo_urgente') > 0
+            ? cfg.getTarifa('cargo_urgente') : 40;
+          final cargoUrgente = precioMaquila * pctUrgente / 100;
+          precioMaquila += cargoUrgente;
+          desglose['cargo_urgente'] = cargoUrgente;
+        }
+
+        // Revisiones extra
+        if (revisionesExtra > 0) {
+          final cargoRev = cfg.getTarifa('cargo_revision') > 0
+            ? cfg.getTarifa('cargo_revision') : 150;
+          final totalRev = cargoRev * revisionesExtra;
+          precioMaquila += totalRev;
+          desglose['revisiones_extra'] = totalRev;
+        }
+
+        // Archivo editable al cliente
+        if (archivoEditableAlCliente) {
+          final pctArch = cfg.getTarifa('cargo_archivo_editable') > 0
+            ? cfg.getTarifa('cargo_archivo_editable') : 200;
+          final cargoArch = precioMaquila * pctArch / 100;
+          precioMaquila += cargoArch;
+          desglose['archivo_editable'] = cargoArch;
+        }
         break;
 
       case 'por_hora':
         tiempoHoras = horas > 0 ? horas : 1.0;
+        precioMaquila = tiempoHoras * (cfg.getTarifa('tarifa_hora') > 0
+          ? cfg.getTarifa('tarifa_hora') : costos.costoHoraTotal * 1.5);
+        tiempoHoras *= cantidad;
         break;
 
       case 'por_minuto':
-        final areaM2 = (largo/100) * (ancho/100);
-        final minEstimados = minutos > 0 ? minutos : areaM2 * 60 * tipo.factor;
-        tiempoHoras = minEstimados / 60;
-        if (tiempoHoras < 0.1 && (largo > 0)) tiempoHoras = 0.1;
-        desglose['minutos'] = tiempoHoras * 60;
+        final areaM2min = (largo/100) * (ancho/100);
+        final minEst = minutos > 0 ? minutos : areaM2min * 60 * tipo.factor;
+        tiempoHoras = minEst / 60 * cantidad;
+        final tarifaMin = cfg.getTarifa('tarifa_minuto') > 0
+          ? cfg.getTarifa('tarifa_minuto') : 8;
+        precioMaquila = minEst * tarifaMin * cantidad;
+        desglose['minutos'] = minEst;
         break;
 
       case 'por_metro':
-        tiempoHoras = metros * tipo.factor / 60;
-        if (tiempoHoras < 0.1 && metros > 0) tiempoHoras = 0.1;
+        final tarifaMt = cfg.getTarifa('tarifa_metro') > 0
+          ? cfg.getTarifa('tarifa_metro') : 100;
+        precioMaquila = metros * tarifaMt * cantidad;
+        tiempoHoras = metros * 0.1 * cantidad;
         desglose['metros'] = metros;
         break;
 
       case 'por_kg':
-        tiempoHoras = peso * tipo.factor / 60;
-        desglose['peso_kg'] = peso;
+        final tarifaKg = cfg.getTarifa('tarifa_kg') > 0
+          ? cfg.getTarifa('tarifa_kg') : 50;
+        precioMaquila = peso * tarifaKg * cantidad;
+        tiempoHoras = peso * 0.05 * cantidad;
         break;
 
       case 'por_pieza':
+        final tarifaPza = cfg.getTarifa('tarifa_pieza') > 0
+          ? cfg.getTarifa('tarifa_pieza') : 100;
+        precioMaquila = tarifaPza * cantidad;
         tiempoHoras = tipo.factor * cantidad / 60;
         break;
 
-      case 'por_diseno':
-        final horasBase = {
-          'simple': cfg.getTarifa('horas_simple') > 0 ? cfg.getTarifa('horas_simple') : 1.0,
-          'media':  cfg.getTarifa('horas_medio')  > 0 ? cfg.getTarifa('horas_medio')  : 3.0,
-          'alta':   cfg.getTarifa('horas_alto')   > 0 ? cfg.getTarifa('horas_alto')   : 8.0,
-          'premium':cfg.getTarifa('horas_premium')> 0 ? cfg.getTarifa('horas_premium'): 20.0,
-        };
-        tiempoHoras = (horasBase[complejidad] ?? 3.0) * tipo.factor;
-        break;
-
       case 'precio_fijo':
+        precioMaquila = cfg.getTarifa('precio_fijo') * cantidad;
         tiempoHoras = 1.0;
         break;
+
+      default:
+        tiempoHoras = 1.0;
     }
 
-    tiempoHoras *= cantidad;
+    // Agregar extras Router 2D al desglose
+    final moLijado = desglose['mano_obra_lijado'] ?? 0;
+    final moBarniz = desglose['mano_obra_barnizado'] ?? 0;
+    final moDis = desglose['diseno_adicional'] ?? 0;
+    final extrasRouter = moLijado + moBarniz + moDis;
 
     // ── COSTOS DIRECTOS ─────────────────────────────
     // CM - Material
@@ -466,42 +572,46 @@ class MotorCalculo {
     }
 
     // ── COSTO TOTAL ─────────────────────────────────
-    final costoTotal = cm + cmaq + cmo + cc + ca + ci + extrasTotal;
+    // Para Router y Diseño: el precioMaquila YA incluye la ganancia
+    // Solo sumamos materiales y acabados como costo adicional
+    double costoTotal;
+    if (precioMaquila > 0) {
+      // Modo directo: maquila + material + acabado + extras
+      costoTotal = precioMaquila + cm + ca + extrasTotal + extrasRouter;
+      // Registrar en desglose
+      if (precioMaquila > 0) {
+        final desglMap = {'Maquila/Producción': precioMaquila};
+        if (cm > 0) desglMap['Material'] = cm;
+        if (ca > 0) desglMap['Acabado'] = ca;
+        if (extrasRouter > 0) desglMap['Mano de obra'] = extrasRouter;
+        if (extrasTotal > 0) desglMap['Extras'] = extrasTotal;
+      }
+    } else {
+      // Modo costo real: suma todos los componentes
+      costoTotal = cm + cmaq + cmo + cc + ca + ci + extrasTotal;
+    }
 
     // ── 3 PRECIOS CON MARGEN ─────────────────────────
     // Para Diseño y Láser de Fibra por pieza, usar tarifas directas si están configuradas
     double baseMin, baseRec, basePrem;
 
-    if (formula == 'precio_fijo' && cfg.getTarifa('precio_fijo') > 0) {
-      baseMin  = cfg.getTarifa('precio_fijo') * cantidad;
-      baseRec  = baseMin * 1.15;
-      basePrem = baseMin * 1.35;
-    } else if (formula == 'por_pieza' && cfg.getTarifa('tarifa_pieza') > 0) {
-      baseMin  = cfg.getTarifa('tarifa_pieza') * cantidad * 0.85;
-      baseRec  = cfg.getTarifa('tarifa_pieza') * cantidad;
-      basePrem = cfg.getTarifa('tarifa_pieza') * cantidad * 1.30;
+    // ── 3 PRECIOS ────────────────────────────────────
+    // Para Router/Diseño: el precio de maquila ya está calculado
+    // Solo aplicamos márgenes sobre el costo total
+    final mMin  = costos.margenMinimo / 100;
+    final mRec  = costos.margenRecomendado / 100;
+    final mPrem = (costos.margenRecomendado + 15) / 100;
+
+    if (precioMaquila > 0) {
+      // El precio recomendado = maquila + material + acabados
+      baseRec  = costoTotal;
+      baseMin  = costoTotal * (1 - (mRec - mMin));
+      basePrem = costoTotal * (1 + (mPrem - mRec));
     } else {
       // Fórmula maestra: PV = Costo ÷ (1 - Margen)
-      final mMin  = costos.margenMinimo / 100;
-      final mRec  = costos.margenRecomendado / 100;
-      final mPrem = (costos.margenRecomendado + 15) / 100;
       baseMin  = costoTotal > 0 ? costoTotal / (1 - mMin)  : 0;
       baseRec  = costoTotal > 0 ? costoTotal / (1 - mRec)  : 0;
       basePrem = costoTotal > 0 ? costoTotal / (1 - mPrem) : 0;
-    }
-
-    // Verificar con rangos si existen (Router 3D)
-    if (cfg.rangos.isNotEmpty) {
-      double indice = 0;
-      if (formula == 'por_volumen') indice = largo * ancho * alto * tipo.factor;
-      else if (formula == 'por_area') indice = (largo/100)*(ancho/100)*tipo.factor*1000;
-      final precioRango = cfg.calcularPrecioRango(indice);
-      if (precioRango > baseRec) {
-        final diff = precioRango / baseRec;
-        baseMin  *= diff;
-        baseRec   = precioRango * cantidad;
-        basePrem *= diff * 1.15;
-      }
     }
 
     // IVA
@@ -805,6 +915,18 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   ResultadoSimulador? _resultado;
   bool _mostrarTarifas = false;
 
+  // Inputs Diseño Digital
+  bool _clienteTraeArchivo = false;
+  bool _archivoEsVector = false;
+  bool _entregaUrgente = false;
+  int _revisionesExtra = 0;
+  bool _archivoEditableAlCliente = false;
+
+  // Inputs Router 2D
+  double _horasLijado = 0;
+  double _horasBarnizado = 0;
+  bool _llevaDiseno = false;
+
   // Inputs
   SimTipoTrabajo? _tipoSel;
   SimAcabado? _acabadoSel;
@@ -892,7 +1014,15 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       acabado: _acabadoSel,
       aplicarIva: _aplicarIva,
       extrasSeleccionados: cfg.extras.where((e) => e.seleccionado).toList(),
-      descripcionEditable: desc);
+      descripcionEditable: desc,
+      clienteTraeArchivo: _clienteTraeArchivo,
+      archivoEsVector: _archivoEsVector,
+      entregaUrgente: _entregaUrgente,
+      revisionesExtra: _revisionesExtra,
+      archivoEditableAlCliente: _archivoEditableAlCliente,
+      horasLijado: _horasLijado,
+      horasBarnizado: _horasBarnizado,
+      llevaDiseno: _llevaDiseno);
 
     setState(() { _resultado = r; _descripcionEditable = desc; });
   }
@@ -1051,16 +1181,51 @@ class _PantallaServicioState extends State<_PantallaServicio> {
 
     if (formula == 'por_diseno') {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Complejidad del trabajo:',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        // ¿El cliente trae archivo?
+        const Text('Estado del archivo:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8,
-          children: [
-            _chipComp('simple', 'Simple', 'Trazos básicos, logo sencillo'),
-            _chipComp('media', 'Media', 'Ilustración con detalle'),
-            _chipComp('alta', 'Alta', 'Diseño complejo o 3D'),
-            _chipComp('premium', 'Premium', 'Proyecto completo, escultura'),
-          ]),
+        Row(children: [
+          Expanded(child: _chipArchivo(false, false, '🎨 Diseñar desde cero')),
+          const SizedBox(width: 6),
+          Expanded(child: _chipArchivo(true, false, '🖼️ Cliente trae imagen')),
+          const SizedBox(width: 6),
+          Expanded(child: _chipArchivo(true, true, '✅ Trae vector listo')),
+        ]),
+        const SizedBox(height: 12),
+
+        // Si no trae vector listo, mostrar tipos
+        if (!(_clienteTraeArchivo && _archivoEsVector)) ...[
+          const Text('El tipo de trabajo ya determina el precio:',
+            style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+          const SizedBox(height: 4),
+          Container(padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
+            child: Text(
+              '${_tipoSel?.nombre ?? ""} — ${_tipoSel?.descripcionFormula ?? ""}',
+              style: const TextStyle(fontSize: 12, color: AppColors.azul, fontWeight: FontWeight.w600))),
+          const SizedBox(height: 12),
+        ],
+
+        // Opciones adicionales
+        const Text('Opciones:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        _toggleOpcion('🚀 Entrega urgente (+40%)', _entregaUrgente,
+          (v) => setState(() { _entregaUrgente = v; _resultado = null; })),
+        _toggleOpcion('📁 Entregar archivo editable (.AI/.DXF) (+200%)',
+          _archivoEditableAlCliente,
+          (v) => setState(() { _archivoEditableAlCliente = v; _resultado = null; })),
+        const SizedBox(height: 8),
+        Row(children: [
+          const Text('Revisiones extra (+\$150 c/u):', style: TextStyle(fontSize: 12)),
+          const Spacer(),
+          IconButton(
+            onPressed: () => setState(() { if (_revisionesExtra > 0) { _revisionesExtra--; _resultado = null; } }),
+            icon: const Icon(Icons.remove_circle_outline, color: AppColors.azul, size: 20)),
+          Text('$_revisionesExtra', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          IconButton(
+            onPressed: () => setState(() { _revisionesExtra++; _resultado = null; }),
+            icon: const Icon(Icons.add_circle_outline, color: AppColors.azul, size: 20)),
+        ]),
       ]);
     }
 
@@ -1070,6 +1235,9 @@ class _PantallaServicioState extends State<_PantallaServicio> {
         child: const Text('Precio fijo negociado. Edita la tarifa "precio_fijo" arriba.',
           style: TextStyle(fontSize: 12, color: AppColors.azul)));
     }
+
+    // Para Router 2D agregar opciones de acabado manual
+    final esRouter2D = formula == 'por_area';
 
     return Column(children: [
       if (tipo.necesitaLargo && formula != 'por_minuto') ...[
@@ -1111,6 +1279,33 @@ class _PantallaServicioState extends State<_PantallaServicio> {
           (v) => setState(() { _peso = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
+      // Opciones adicionales Router 2D
+      if (esRouter2D) ...[
+        const SizedBox(height: 10),
+        const Divider(height: 1),
+        const SizedBox(height: 10),
+        const Text('Acabado manual (opcional):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 8),
+        _toggleOpcion('🪚 Lleva lijado', _horasLijado > 0,
+          (v) => setState(() { _horasLijado = v ? 1.0 : 0; _resultado = null; })),
+        if (_horasLijado > 0) ...[
+          const SizedBox(height: 6),
+          _campoMedida('Horas de lijado', _horasLijado,
+            (v) => setState(() { _horasLijado = v; _resultado = null; })),
+        ],
+        const SizedBox(height: 8),
+        _toggleOpcion('🖌️ Lleva barnizado/pintado', _horasBarnizado > 0,
+          (v) => setState(() { _horasBarnizado = v ? 1.0 : 0; _resultado = null; })),
+        if (_horasBarnizado > 0) ...[
+          const SizedBox(height: 6),
+          _campoMedida('Horas de barnizado', _horasBarnizado,
+            (v) => setState(() { _horasBarnizado = v; _resultado = null; })),
+        ],
+        const SizedBox(height: 8),
+        _toggleOpcion('✏️ Requiere diseño adicional', _llevaDiseno,
+          (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
+      ],
+
       // Complejidad para volumétrico
       if (formula == 'por_volumen') ...[
         const Text('Complejidad del tallado:',
@@ -1126,6 +1321,44 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       ],
     ]);
   }
+
+  Widget _chipArchivo(bool trae, bool esVector, String label) {
+    final sel = _clienteTraeArchivo == trae && _archivoEsVector == esVector;
+    return GestureDetector(
+      onTap: () => setState(() {
+        _clienteTraeArchivo = trae;
+        _archivoEsVector = esVector;
+        _resultado = null;
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+        child: Text(label, textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+            color: sel ? Colors.white : AppColors.textoPrincipal))));
+  }
+
+  Widget _toggleOpcion(String label, bool val, void Function(bool) onChange) =>
+    GestureDetector(
+      onTap: () => onChange(!val),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: val ? AppColors.azulClaro : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: val ? AppColors.azul : AppColors.grisBorde)),
+        child: Row(children: [
+          Icon(val ? Icons.check_box_outlined : Icons.check_box_outline_blank,
+            size: 18, color: val ? AppColors.azul : AppColors.grisBorde),
+          const SizedBox(width: 8),
+          Expanded(child: Text(label, style: TextStyle(fontSize: 12,
+            color: val ? AppColors.azul : AppColors.textoPrincipal,
+            fontWeight: val ? FontWeight.w600 : FontWeight.normal))),
+        ])));
 
   Widget _chipComp(String val, String titulo, String sub) {
     final sel = _complejidad == val;
