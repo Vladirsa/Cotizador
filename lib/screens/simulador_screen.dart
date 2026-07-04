@@ -163,20 +163,155 @@ class ResultadoSimulador {
   final Map<String, String> desglose;
   final bool incluyeIva;
   final String? materialNombre;
+  // Análisis financiero (Capa 5)
+  final double costoTotal;
+  final double pvMinimo;
+  final double pvRecomendado;
+  final double utilidad;
+  final double margenReal;
+  final double gananciaHora;
+  final double tiempoHoras;
 
   ResultadoSimulador({
     required this.servicio, required this.emoji, required this.descripcion,
     required this.maquila, this.extras = 0, this.acabado = 0,
     this.costoMaterial = 0, required this.subtotal,
     this.iva = 0, required this.total, required this.desglose,
-    this.incluyeIva = false, this.materialNombre});
+    this.incluyeIva = false, this.materialNombre,
+    this.costoTotal = 0, this.pvMinimo = 0, this.pvRecomendado = 0,
+    this.utilidad = 0, this.margenReal = 0, this.gananciaHora = 0,
+    this.tiempoHoras = 0});
 }
 
 // ══════════════════════════════════════════════════════
 // DATA SERVICE
 // ══════════════════════════════════════════════════════
+// ── MODELO COSTOS DEL TALLER ─────────────────────────────
+class CostosTaller {
+  final double costoHoraTaller;   // CI: costo indirecto por hora
+  final double costoHoraMaquina;  // CMaq por hora
+  final double costoHoraOperador; // CMO por hora
+  final double margenRecomendado; // % margen
+  final double margenMinimo;
+  final double ivaPct;
+  final String maquinaId;
+  final String operadorId;
+
+  CostosTaller({
+    this.costoHoraTaller = 0,
+    this.costoHoraMaquina = 0,
+    this.costoHoraOperador = 0,
+    this.margenRecomendado = 35,
+    this.margenMinimo = 20,
+    this.ivaPct = 16,
+    this.maquinaId = '',
+    this.operadorId = '',
+  });
+
+  // Costo total por hora de producción
+  double get costoHoraTotal => costoHoraTaller + costoHoraMaquina + costoHoraOperador;
+  double get costoMinutoTotal => costoHoraTotal / 60;
+}
+
 class SimuladorDataService {
   static final _sb = Supabase.instance.client;
+
+  // Cargar costos del taller para el cálculo
+  static Future<CostosTaller> getCostosTaller({
+    String? maquinaId, String? operadorId}) async {
+    try {
+      const negId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
+      // Config empresa
+      final cfg = await _sb.from('empresa_config')
+        .select().eq('negocio_id', negId).maybeSingle();
+
+      final horasDia = (cfg?['horas_dia'] as num?)?.toDouble() ?? 8;
+      final costoFijo = (cfg?['costo_fijo_mensual'] as num?)?.toDouble() ?? 0;
+      final costoHoraTaller = costoFijo / (30 * horasDia);
+      final margenRec = (cfg?['margen_recomendado'] as num?)?.toDouble() ?? 35;
+      final margenMin = (cfg?['margen_minimo'] as num?)?.toDouble() ?? 20;
+      final ivaPct = (cfg?['iva_pct'] as num?)?.toDouble() ?? 16;
+
+      // Costo hora máquina
+      double costoHoraMaq = 0;
+      String maqId = maquinaId ?? '';
+      if (maquinaId != null && maquinaId.isNotEmpty) {
+        final maq = await _sb.from('maquinaria')
+          .select().eq('id', maquinaId).maybeSingle();
+        if (maq != null) {
+          final valor = (maq['valor_adquisicion'] as num?)?.toDouble() ?? 0;
+          final vida = (maq['vida_util_años'] as num?)?.toDouble() ?? 5;
+          final horas = (maq['horas_mes'] as num?)?.toDouble() ?? 160;
+          final kwh = (maq['consumo_kwh'] as num?)?.toDouble() ?? 0;
+          final cKwh = (maq['costo_kwh'] as num?)?.toDouble() ?? 2.5;
+          final mant = (maq['mantenimiento_mes'] as num?)?.toDouble() ?? 0;
+          final cons = (maq['consumibles_hora'] as num?)?.toDouble() ?? 0;
+          costoHoraMaq = (vida > 0 && horas > 0 ? valor / (vida * 12 * horas) : 0)
+            + (kwh * cKwh)
+            + (horas > 0 ? mant / horas : 0)
+            + cons;
+        }
+      } else {
+        // Tomar primera máquina activa
+        final maqList = await _sb.from('maquinaria')
+          .select().eq('negocio_id', negId).eq('activo', true).limit(1);
+        if ((maqList as List).isNotEmpty) {
+          final maq = maqList.first as Map<String, dynamic>;
+          maqId = maq['id'] as String? ?? '';
+          final valor = (maq['valor_adquisicion'] as num?)?.toDouble() ?? 0;
+          final vida = (maq['vida_util_años'] as num?)?.toDouble() ?? 5;
+          final horas = (maq['horas_mes'] as num?)?.toDouble() ?? 160;
+          final kwh = (maq['consumo_kwh'] as num?)?.toDouble() ?? 0;
+          final cKwh = (maq['costo_kwh'] as num?)?.toDouble() ?? 2.5;
+          final mant = (maq['mantenimiento_mes'] as num?)?.toDouble() ?? 0;
+          final cons = (maq['consumibles_hora'] as num?)?.toDouble() ?? 0;
+          costoHoraMaq = (vida > 0 && horas > 0 ? valor / (vida * 12 * horas) : 0)
+            + (kwh * cKwh)
+            + (horas > 0 ? mant / horas : 0)
+            + cons;
+        }
+      }
+
+      // Costo hora operador
+      double costoHoraOp = 0;
+      String opId = operadorId ?? '';
+      if (operadorId != null && operadorId.isNotEmpty) {
+        final op = await _sb.from('mano_obra')
+          .select().eq('id', operadorId).maybeSingle();
+        if (op != null) {
+          final sal = (op['salario_mes'] as num?)?.toDouble() ?? 0;
+          final prest = (op['prestaciones_pct'] as num?)?.toDouble() ?? 35;
+          final horas = (op['horas_mes'] as num?)?.toDouble() ?? 192;
+          costoHoraOp = horas > 0 ? sal * (1 + prest / 100) / horas : 0;
+        }
+      } else {
+        final opList = await _sb.from('mano_obra')
+          .select().eq('negocio_id', negId).eq('activo', true).limit(1);
+        if ((opList as List).isNotEmpty) {
+          final op = opList.first as Map<String, dynamic>;
+          opId = op['id'] as String? ?? '';
+          final sal = (op['salario_mes'] as num?)?.toDouble() ?? 0;
+          final prest = (op['prestaciones_pct'] as num?)?.toDouble() ?? 35;
+          final horas = (op['horas_mes'] as num?)?.toDouble() ?? 192;
+          costoHoraOp = horas > 0 ? sal * (1 + prest / 100) / horas : 0;
+        }
+      }
+
+      return CostosTaller(
+        costoHoraTaller: costoHoraTaller,
+        costoHoraMaquina: costoHoraMaq,
+        costoHoraOperador: costoHoraOp,
+        margenRecomendado: margenRec,
+        margenMinimo: margenMin,
+        ivaPct: ivaPct,
+        maquinaId: maqId,
+        operadorId: opId,
+      );
+    } catch (_) {
+      return CostosTaller();
+    }
+  }
 
   static Future<List<SimServicio>> getServicios() async {
     final data = await _sb.from('sim_servicios').select()
@@ -549,8 +684,13 @@ class _PantallaServicio extends StatefulWidget {
 
 class _PantallaServicioState extends State<_PantallaServicio> {
   SimConfig? _config;
+  CostosTaller? _costosTaller;
   bool _cargando = true;
   ResultadoSimulador? _resultado;
+  String? _maquinaSelId;
+  String? _operadorSelId;
+  List<Map<String,dynamic>> _maquinas = [];
+  List<Map<String,dynamic>> _operadores = [];
 
   // Variables de entrada
   SimTipoTrabajo? _tipoSel;
@@ -593,19 +733,31 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
+      final sb = Supabase.instance.client;
+      const negId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
       final results = await Future.wait([
         SimuladorDataService.getConfig(widget.servicio.id),
         SimuladorDataService.getMaterialesInventario(),
+        SimuladorDataService.getCostosTaller(),
+        sb.from('maquinaria').select('id,nombre,emoji').eq('negocio_id',negId).eq('activo',true),
+        sb.from('mano_obra').select('id,nombre,emoji,tipo').eq('negocio_id',negId).eq('activo',true),
       ]);
       final cfg = results[0] as SimConfig;
       final inv = results[1] as List<Map<String, dynamic>>;
+      final costos = results[2] as CostosTaller;
+      final maquinas = (results[3] as List).cast<Map<String,dynamic>>();
+      final operadores = (results[4] as List).cast<Map<String,dynamic>>();
       if (mounted) setState(() {
         _config = cfg;
+        _costosTaller = costos;
         _materialesInv = inv;
+        _maquinas = maquinas;
+        _operadores = operadores;
+        _maquinaSelId = costos.maquinaId.isNotEmpty ? costos.maquinaId : null;
+        _operadorSelId = costos.operadorId.isNotEmpty ? costos.operadorId : null;
         _cargando = false;
         if (cfg.tipos.isNotEmpty) _tipoSel = cfg.tipos.first;
         if (cfg.acabados.isNotEmpty) _acabadoSel = cfg.acabados.first;
-        // Inicializar controladores de tarifas
         for (final t in cfg.tarifas.values) {
           _tarifasCtrls[t.id] = TextEditingController(
             text: t.valor.toStringAsFixed(2));
@@ -614,160 +766,194 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     } catch (e) { if (mounted) setState(() => _cargando = false); }
   }
 
-  // ── CALCULAR PRECIO ─────────────────────────────────
+  // ── MOTOR DE CÁLCULO — FÓRMULA MAESTRA ────────────────
+  // PV = (CM + CMO + CMaq + CC + CA + CI) ÷ (1 - Margen)
   void _calcular() {
     final cfg = _config;
+    final costos = _costosTaller ?? CostosTaller();
     if (cfg == null || _tipoSel == null) return;
 
     final tipo = _tipoSel!;
     final formula = tipo.formula;
-    double maquila = 0;
     final desglose = <String, String>{};
+
+    // ── 1. TIEMPO ESTIMADO DE MÁQUINA ─────────────
+    double tiempoHoras = 0; // horas de trabajo
 
     switch (formula) {
       case 'por_area':
         final areaM2 = (_largo / 100) * (_ancho / 100);
-        final tarifa = cfg.getTarifa('tarifa_m2') > 0
-          ? cfg.getTarifa('tarifa_m2')
-          : cfg.getTarifa('tarifa_m2_acero') > 0
-            ? cfg.getTarifa('tarifa_m2_acero') : 100;
-        final areaMin = cfg.getTarifa('area_minima_m2');
-        if (areaM2 >= areaMin && areaMin > 0) {
-          maquila = tarifa * areaM2 * _cantidad;
-          desglose['Área'] = '${_largo}×${_ancho} cm = ${areaM2.toStringAsFixed(3)} m²';
-          desglose['Tarifa'] = '${_fmt.format(tarifa)}/m²';
-        } else {
-          final tarifaPieza = cfg.getTarifa('tarifa_pieza') > 0
-            ? cfg.getTarifa('tarifa_pieza') : tarifa * areaM2;
-          maquila = tarifaPieza * _cantidad;
-          desglose['Modo'] = 'Por pieza';
-          desglose['Tarifa'] = _fmt.format(tarifaPieza);
-        }
+        // Factor por material y espesor (configurable)
+        final factorMat = cfg.getTarifa('factor_material') > 0
+          ? cfg.getTarifa('factor_material') : 1.0;
+        final factorEsp = _alto > 0
+          ? (1 + (_alto / 25) * 0.5) : 1.0; // más grueso = más tiempo
+        tiempoHoras = areaM2 * factorMat * factorEsp;
+        desglose['Área'] = '${_largo}×${_ancho} cm = ${areaM2.toStringAsFixed(4)} m²';
+        if (_alto > 0) desglose['Espesor/Alto'] = '${_alto} mm • Factor: ×${factorEsp.toStringAsFixed(2)}';
         break;
 
       case 'por_volumen':
         final volumen = _largo * _ancho * _alto;
-        final indice = volumen * tipo.factor;
-        maquila = cfg.calcularPrecioRango(indice) * _cantidad;
-        desglose['Pieza'] = '${_largo}×${_ancho}×${_alto} cm';
-        desglose['Volumen'] = '${volumen.toStringAsFixed(0)} cm³';
-        desglose['Factor ${tipo.nombre}'] = '×${tipo.factor}';
-        desglose['Índice'] = '${indice.toStringAsFixed(0)}';
-        if (cfg.rangos.isNotEmpty) {
-          desglose['Rango'] = _fmt.format(cfg.calcularPrecioRango(indice));
-        }
+        final factor = tipo.factor > 0 ? tipo.factor : 1.0;
+        tiempoHoras = volumen * factor / 1000000; // cm³ → m³ equivalente de tiempo
+        // Mínimo 0.5 horas para trabajos 3D
+        if (tiempoHoras < 0.5 && volumen > 0) tiempoHoras = 0.5;
+        desglose['Volumen'] = '${_largo}×${_ancho}×${_alto} cm = ${volumen.toStringAsFixed(0)} cm³';
+        desglose['Factor complejidad'] = '×${factor.toStringAsFixed(2)}';
         break;
 
       case 'por_hora':
-        final tarifa = cfg.getTarifa('tarifa_hora') > 0
-          ? cfg.getTarifa('tarifa_hora') : cfg.getTarifa('tarifa_hr') > 0
-          ? cfg.getTarifa('tarifa_hr') : 200;
-        maquila = tarifa * _horas * _cantidad;
-        desglose['Horas'] = '${_horas.toStringAsFixed(1)} hrs';
-        desglose['Tarifa'] = '${_fmt.format(tarifa)}/hr';
-        break;
-
-      case 'por_pieza':
-        final tarifa = cfg.getTarifa('tarifa_pieza') > 0
-          ? cfg.getTarifa('tarifa_pieza') : 100;
-        maquila = tarifa * _cantidad.toDouble();
-        desglose['Precio/pieza'] = _fmt.format(tarifa);
+        tiempoHoras = _horas > 0 ? _horas : 1.0;
+        desglose['Tiempo'] = '${tiempoHoras.toStringAsFixed(1)} horas';
         break;
 
       case 'por_minuto':
-        final tarifa = cfg.getTarifa('tarifa_minuto') > 0
-          ? cfg.getTarifa('tarifa_minuto') : cfg.getTarifa('tarifa_min') > 0
-          ? cfg.getTarifa('tarifa_min') : 5;
-        maquila = tarifa * _minutos * _cantidad;
-        desglose['Minutos'] = '${_minutos.toStringAsFixed(0)} min';
-        desglose['Tarifa'] = '${_fmt.format(tarifa)}/min';
+        // Estimar minutos por área y densidad
+        final areaM2 = (_largo / 100) * (_ancho / 100);
+        final factorGrab = cfg.getTarifa('factor_grabado') > 0
+          ? cfg.getTarifa('factor_grabado') : 2.0;
+        final minutos = _minutos > 0 ? _minutos : areaM2 * factorGrab * 60;
+        tiempoHoras = minutos / 60;
+        desglose['Tiempo'] = '${minutos.toStringAsFixed(1)} min';
         break;
 
       case 'por_metro':
-        final tarifa = cfg.getTarifa('tarifa_metro') > 0
-          ? cfg.getTarifa('tarifa_metro') : cfg.getTarifa('tarifa_metro_lineal') > 0
-          ? cfg.getTarifa('tarifa_metro_lineal') : 100;
-        maquila = tarifa * _metros * _cantidad;
+        tiempoHoras = _metros * 0.1; // 6 min por metro lineal default
         desglose['Metros'] = '${_metros.toStringAsFixed(2)} m';
-        desglose['Tarifa'] = '${_fmt.format(tarifa)}/m';
-        break;
-
-      case 'precio_fijo':
-        maquila = cfg.getTarifa('precio_fijo') * _cantidad;
-        desglose['Precio fijo'] = _fmt.format(cfg.getTarifa('precio_fijo'));
         break;
 
       case 'por_kg':
-        final tarifa = cfg.getTarifa('tarifa_kg') > 0
-          ? cfg.getTarifa('tarifa_kg') : 50;
-        maquila = tarifa * _peso * _cantidad;
+        tiempoHoras = _peso * 0.05; // 3 min por kg default
         desglose['Peso'] = '${_peso.toStringAsFixed(2)} kg';
-        desglose['Tarifa'] = '${_fmt.format(tarifa)}/kg';
+        break;
+
+      case 'precio_fijo':
+        tiempoHoras = 1.0;
+        desglose['Modo'] = 'Precio fijo';
         break;
 
       case 'por_diseno':
-        final precios = {
-          'simple': cfg.getTarifa('precio_simple') > 0
-            ? cfg.getTarifa('precio_simple') : 200,
-          'media': cfg.getTarifa('precio_medio') > 0
-            ? cfg.getTarifa('precio_medio') : 500,
-          'alta': cfg.getTarifa('precio_alto') > 0
-            ? cfg.getTarifa('precio_alto') : 1200,
-          'premium': cfg.getTarifa('precio_premium') > 0
-            ? cfg.getTarifa('precio_premium') : 2500,
+        final horasBase = {
+          'simple': cfg.getTarifa('horas_simple') > 0 ? cfg.getTarifa('horas_simple') : 1.0,
+          'media':  cfg.getTarifa('horas_medio')  > 0 ? cfg.getTarifa('horas_medio')  : 3.0,
+          'alta':   cfg.getTarifa('horas_alto')   > 0 ? cfg.getTarifa('horas_alto')   : 8.0,
+          'premium':cfg.getTarifa('horas_premium')> 0 ? cfg.getTarifa('horas_premium'): 20.0,
         };
-        maquila = ((precios[_complejidad] ?? 500) * _cantidad).toDouble();
+        tiempoHoras = (horasBase[_complejidad] ?? 3.0) * tipo.factor;
         desglose['Complejidad'] = _complejidad.toUpperCase();
-        desglose['Precio'] = _fmt.format(precios[_complejidad] ?? 500);
+        desglose['Horas estimadas'] = '${tiempoHoras.toStringAsFixed(1)} hrs';
         break;
     }
 
-    // Pedido mínimo
-    final pedMin = cfg.getTarifa('pedido_minimo');
-    if (pedMin > 0 && maquila < pedMin) {
-      desglose['Pedido mínimo'] = _fmt.format(pedMin);
-      maquila = pedMin;
-    }
+    desglose['Tiempo total'] = '${tiempoHoras.toStringAsFixed(2)} horas';
 
-    // Acabado
-    double acabadoTotal = _acabadoSel?.precio ?? 0;
-    if (acabadoTotal > 0) desglose['Acabado ${_acabadoSel?.nombre}'] = _fmt.format(acabadoTotal);
-
-    // Extras
-    double extrasTotal = 0;
-    for (final e in cfg.extras.where((e) => e.seleccionado)) {
-      extrasTotal += e.precio;
-      desglose['Extra: ${e.nombre}'] = _fmt.format(e.precio);
-    }
-
-    // Material
-    double costoMaterial = 0;
+    // ── 2. COSTOS DIRECTOS ─────────────────────────
+    // CM - Costo de Material
+    double cm = 0;
     String? materialNombre;
     if (!_clienteTreMaterial) {
       if (_usarInventario && _materialInvSel != null) {
-        costoMaterial = ((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0) * _cantidad;
+        cm = ((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0) * _cantidad;
         materialNombre = _materialInvSel!['nombre'] as String?;
-        if (costoMaterial > 0) desglose['Material ($materialNombre)'] = _fmt.format(costoMaterial);
       } else if (!_usarInventario && _materialLibrePrecio > 0) {
-        costoMaterial = _materialLibrePrecio * _cantidad;
+        cm = _materialLibrePrecio * _cantidad;
         materialNombre = _materialLibreNombre.isNotEmpty ? _materialLibreNombre : 'Material';
-        desglose['Material ($materialNombre)'] = _fmt.format(costoMaterial);
       }
+      if (cm > 0) desglose['CM Material ($materialNombre)'] = _fmt.format(cm);
     } else {
       desglose['Material'] = 'Cliente trae el material';
     }
 
-    final subtotal = maquila + extrasTotal + acabadoTotal + costoMaterial;
-    final iva = _aplicarIva ? subtotal * _ivaPct / 100 : 0.0;
-    final total = subtotal + iva;
-    if (_aplicarIva) desglose['IVA 16%'] = _fmt.format(iva);
+    // CMaq - Costo de Máquina
+    double cmaq = costos.costoHoraMaquina * tiempoHoras * _cantidad;
+    if (cmaq > 0) desglose['CMaq Máquina'] = '${tiempoHoras.toStringAsFixed(2)}h × ${_fmt.format(costos.costoHoraMaquina)}/h = ${_fmt.format(cmaq)}';
 
-    // Generar descripción automática
-    final descParts = <String>[];
-    descParts.add(tipo.nombre);
+    // CMO - Costo Mano de Obra
+    double cmo = costos.costoHoraOperador * tiempoHoras * _cantidad;
+    if (cmo > 0) desglose['CMO Operador'] = '${tiempoHoras.toStringAsFixed(2)}h × ${_fmt.format(costos.costoHoraOperador)}/h = ${_fmt.format(cmo)}';
+
+    // CC - Consumibles (de tarifa configurada o % del tiempo)
+    double cc = 0;
+    final tarifaConsumibles = cfg.getTarifa('consumibles_hora');
+    if (tarifaConsumibles > 0) {
+      cc = tarifaConsumibles * tiempoHoras * _cantidad;
+      desglose['CC Consumibles'] = _fmt.format(cc);
+    }
+
+    // CA - Acabados
+    double ca = (_acabadoSel?.precio ?? 0) * _cantidad;
+    if (ca > 0) desglose['CA Acabado (${_acabadoSel?.nombre})'] = _fmt.format(ca);
+
+    // CI - Costo Indirecto asignado (proporción del costo fijo del taller)
+    double ci = costos.costoHoraTaller * tiempoHoras * _cantidad;
+    if (ci > 0) desglose['CI Costo taller'] = '${tiempoHoras.toStringAsFixed(2)}h × ${_fmt.format(costos.costoHoraTaller)}/h = ${_fmt.format(ci)}';
+
+    // Extras seleccionados
+    double extrasTotal = 0;
+    for (final e in (cfg.extras).where((e) => e.seleccionado)) {
+      extrasTotal += e.precio * _cantidad;
+      desglose['Extra: ${e.nombre}'] = _fmt.format(e.precio * _cantidad);
+    }
+
+    // ── 3. COSTO TOTAL ─────────────────────────────
+    final costoTotal = cm + cmaq + cmo + cc + ca + ci + extrasTotal;
+    desglose['─────────────────'] = '───────────────';
+    desglose['Costo Total'] = _fmt.format(costoTotal);
+
+    // ── 4. PRECIO DE VENTA CON MARGEN ──────────────
+    // PV = Costo ÷ (1 - Margen)
+    final margenRec = costos.margenRecomendado / 100;
+    final margenMin = costos.margenMinimo / 100;
+
+    // Si el servicio tiene precio fijo en tarifas, usar ese
+    double pvRecomendado, pvMinimo;
+    if (formula == 'precio_fijo' && cfg.getTarifa('precio_fijo') > 0) {
+      pvRecomendado = cfg.getTarifa('precio_fijo') * _cantidad;
+      pvMinimo = pvRecomendado * 0.85;
+    } else if (formula == 'por_volumen' && cfg.rangos.isNotEmpty) {
+      // Para Router 3D usar tabla de rangos como precio base
+      double indice = 0;
+      if (formula == 'por_volumen') {
+        indice = _largo * _ancho * _alto * tipo.factor;
+      }
+      final precioRango = cfg.calcularPrecioRango(indice);
+      pvRecomendado = precioRango > costoTotal / (1 - margenRec)
+        ? precioRango * _cantidad
+        : costoTotal / (1 - margenRec) * _cantidad;
+      pvMinimo = costoTotal / (1 - margenMin) * _cantidad;
+      desglose['Rango aplicado'] = _fmt.format(precioRango);
+    } else {
+      pvRecomendado = costoTotal > 0
+        ? (costoTotal / (1 - margenRec)) * _cantidad
+        : 0;
+      pvMinimo = costoTotal > 0
+        ? (costoTotal / (1 - margenMin)) * _cantidad
+        : 0;
+    }
+
+    // Pedido mínimo
+    final pedMin = cfg.getTarifa('pedido_minimo');
+    if (pedMin > 0 && pvRecomendado < pedMin) {
+      desglose['Pedido mínimo aplicado'] = _fmt.format(pedMin);
+      pvRecomendado = pedMin;
+      pvMinimo = pedMin;
+    }
+
+    // IVA
+    final iva = _aplicarIva ? pvRecomendado * (costos.ivaPct / 100) : 0.0;
+    final pvConIva = pvRecomendado + iva;
+    if (_aplicarIva) desglose['IVA ${costos.ivaPct.toStringAsFixed(0)}%'] = _fmt.format(iva);
+
+    // ── 5. ANÁLISIS FINANCIERO ─────────────────────
+    final utilidad = pvRecomendado - costoTotal * _cantidad;
+    final margenReal = pvRecomendado > 0 ? (utilidad / pvRecomendado) * 100 : 0;
+    final gananciaHora = tiempoHoras > 0 ? utilidad / (tiempoHoras * _cantidad) : 0;
+
+    // Descripción automática
+    final descParts = <String>[tipo.nombre];
     if (_tipoSel?.necesitaLargo == true && _largo > 0 && _ancho > 0) {
-      final medidas = _alto > 0 ? '${_largo}×${_ancho}×${_alto} cm' : '${_largo}×${_ancho} cm';
-      descParts.add('Medidas: $medidas');
+      descParts.add('Medidas: ${_largo}×${_ancho}${_alto > 0 ? "×${_alto}" : ""} cm');
     }
     if (_peso > 0) descParts.add('Peso: ${_peso} kg');
     if (_metros > 0) descParts.add('${_metros} metros lineales');
@@ -779,77 +965,34 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     if (_cantidad > 1) descParts.add('Cantidad: $_cantidad piezas');
 
     setState(() {
-      _descripcionEditable = descParts.join('\n');
+      _descripcionEditable = descParts.join('
+');
       _resultado = ResultadoSimulador(
         servicio: widget.servicio.nombre,
         emoji: widget.servicio.emoji,
         descripcion: _descripcionEditable,
-        maquila: maquila,
+        maquila: pvRecomendado,
         extras: extrasTotal,
-        acabado: acabadoTotal,
-        costoMaterial: costoMaterial,
-        subtotal: subtotal,
+        acabado: ca,
+        costoMaterial: cm,
+        subtotal: pvRecomendado,
         iva: iva,
-        total: total,
+        total: pvConIva,
         desglose: desglose,
         incluyeIva: _aplicarIva,
-        materialNombre: materialNombre);
+        materialNombre: materialNombre,
+        // Análisis financiero
+        costoTotal: costoTotal * _cantidad,
+        pvMinimo: pvMinimo,
+        pvRecomendado: pvRecomendado,
+        utilidad: utilidad,
+        margenReal: margenReal,
+        gananciaHora: gananciaHora,
+        tiempoHoras: tiempoHoras * _cantidad,
+      );
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.gris,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0.5,
-        title: Row(children: [
-          Text(widget.servicio.emoji, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 8),
-          Text(widget.servicio.nombre,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
-        ])),
-      body: _cargando
-        ? const Center(child: CircularProgressIndicator())
-        : _config == null
-          ? const Center(child: Text('Error cargando configuración'))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(14),
-              child: Column(children: [
-                // 1. TIPO DE TRABAJO
-                _seccionCard('Tipo de trabajo', _buildTiposTrabajo()),
-                const SizedBox(height: 10),
-                // 2. TARIFAS DEL MODO (colapsables)
-                if (_tipoSel != null) _seccionTarifas(),
-                const SizedBox(height: 10),
-                // 3. MEDIDAS / VARIABLES
-                if (_tipoSel != null) _seccionCard('Variables del trabajo', _buildVariables()),
-                const SizedBox(height: 10),
-                // 4. MATERIAL
-                _seccionCard('Material', _buildMaterial()),
-                const SizedBox(height: 10),
-                // 5. CANTIDAD
-                _seccionCard('Cantidad y extras', _buildCantidadExtras()),
-                const SizedBox(height: 14),
-                // 6. BOTÓN CALCULAR
-                SizedBox(width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _calcular,
-                    icon: const Icon(Icons.calculate_outlined, color: Colors.white),
-                    label: const Text('Calcular precio',
-                      style: TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w700)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.azul,
-                      padding: const EdgeInsets.symmetric(vertical: 14)))),
-                // 7. RESULTADO
-                if (_resultado != null) ...[
-                  const SizedBox(height: 14),
-                  _widgetResultado(_resultado!),
-                ],
-                const SizedBox(height: 40),
-              ])));
-  }
 
   // ── SECCIÓN: TIPOS DE TRABAJO ─────────────────────
   Widget _buildTiposTrabajo() {
@@ -1248,6 +1391,41 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       ],
 
       const Divider(height: 16),
+      // Selector de máquina
+      if (_maquinas.isNotEmpty) ...[
+        const Text('Máquina:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: _maquinaSelId,
+          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+          items: _maquinas.map((m) => DropdownMenuItem<String>(
+            value: m['id'] as String,
+            child: Row(children: [
+              Text(m['emoji'] ?? '⚙️'),
+              const SizedBox(width: 8),
+              Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 13)),
+            ]))).toList(),
+          onChanged: (v) => setState(() { _maquinaSelId = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      // Selector de operador
+      if (_operadores.isNotEmpty) ...[
+        const Text('Operador:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: _operadorSelId,
+          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+          items: _operadores.map((o) => DropdownMenuItem<String>(
+            value: o['id'] as String,
+            child: Row(children: [
+              Text(o['emoji'] ?? '👷'),
+              const SizedBox(width: 8),
+              Text(o['nombre'] ?? '', style: const TextStyle(fontSize: 13)),
+            ]))).toList(),
+          onChanged: (v) => setState(() { _operadorSelId = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      const Divider(height: 16),
       // IVA toggle
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1266,25 +1444,49 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
       border: Border.all(color: AppColors.azul.withOpacity(0.3), width: 1.5)),
     child: Column(children: [
-      // Header azul
+      // Header azul con precio recomendado
       Container(
         padding: const EdgeInsets.all(16),
         decoration: const BoxDecoration(color: AppColors.azul,
           borderRadius: BorderRadius.vertical(top: Radius.circular(12))),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('PRECIO ESTIMADO', style: TextStyle(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
-            if (r.incluyeIva) Text('Sin IVA: ${_fmt.format(r.subtotal)}',
-              style: const TextStyle(fontSize: 11, color: Colors.white60)),
+        child: Column(children: [
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('PRECIO RECOMENDADO', style: TextStyle(
+                fontSize: 10, color: Colors.white70, letterSpacing: 1)),
+              if (r.pvMinimo > 0 && r.pvMinimo < r.pvRecomendado)
+                Text('Mínimo: ${_fmt.format(r.pvMinimo)}',
+                  style: const TextStyle(fontSize: 11, color: Colors.white60)),
+              if (r.incluyeIva) Text('Sin IVA: ${_fmt.format(r.subtotal)}',
+                style: const TextStyle(fontSize: 11, color: Colors.white60)),
+            ]),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(_fmt.format(r.total), style: const TextStyle(fontSize: 28,
+                fontWeight: FontWeight.w800, color: Colors.white)),
+              if (r.incluyeIva) Text('IVA: +${_fmt.format(r.iva)}',
+                style: const TextStyle(fontSize: 11, color: Colors.white70)),
+              if (_cantidad > 1) Text('${_fmt.format(r.total / _cantidad)}/pieza',
+                style: const TextStyle(fontSize: 11, color: Colors.white60)),
+            ]),
           ]),
-          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(_fmt.format(r.total), style: const TextStyle(fontSize: 28,
-              fontWeight: FontWeight.w800, color: Colors.white)),
-            if (r.incluyeIva) Text('IVA: +${_fmt.format(r.iva)}',
-              style: const TextStyle(fontSize: 11, color: Colors.white70)),
-            if (_cantidad > 1) Text('${_fmt.format(r.total / _cantidad)}/pieza',
-              style: const TextStyle(fontSize: 11, color: Colors.white60)),
-          ]),
+          // Análisis financiero rápido
+          if (r.costoTotal > 0) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8)),
+              child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
+                _kpiResultado('Costo total', _fmt.format(r.costoTotal), Colors.white70),
+                _kpiResultado('Utilidad', _fmt.format(r.utilidad),
+                  r.utilidad > 0 ? const Color(0xFF4ade80) : Colors.redAccent),
+                _kpiResultado('Margen real', '${r.margenReal.toStringAsFixed(1)}%',
+                  r.margenReal >= 30 ? const Color(0xFF4ade80) :
+                  r.margenReal >= 20 ? Colors.amber : Colors.redAccent),
+                _kpiResultado('Gan/hora', _fmt.format(r.gananciaHora), Colors.white70),
+              ])),
+          ],
         ])),
 
       // Desglose
@@ -1367,6 +1569,12 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     ]));
 
   // ── HELPERS ──────────────────────────────────────
+  Widget _kpiResultado(String label, String val, Color color) =>
+    Column(children: [
+      Text(val, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+      Text(label, style: const TextStyle(fontSize: 9, color: Colors.white60)),
+    ]);
+
   Widget _seccionCard(String titulo, Widget child) => Container(
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
