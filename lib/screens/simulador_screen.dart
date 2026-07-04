@@ -651,8 +651,10 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
+                    final negId = Supabase.instance.client.auth.currentUser?.id
+        ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
                     await SimuladorDataService.crearServicio({
-                      'negocio_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+                      'negocio_id': negId,
                       'nombre': nombreCtrl.text.trim(),
                       'emoji': emojiSel,
                       'activo': true,
@@ -930,14 +932,6 @@ class _PantallaServicioState extends State<_PantallaServicio> {
       pvMinimo = costoTotal > 0
         ? (costoTotal / (1 - margenMin)) * _cantidad
         : 0;
-    }
-
-    // Pedido mínimo
-    final pedMin = cfg.getTarifa('pedido_minimo');
-    if (pedMin > 0 && pvRecomendado < pedMin) {
-      desglose['Pedido mínimo aplicado'] = _fmt.format(pedMin);
-      pvRecomendado = pedMin;
-      pvMinimo = pedMin;
     }
 
     // IVA
@@ -1678,8 +1672,10 @@ class _PantallaServicioState extends State<_PantallaServicio> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
+                    final negId2 = Supabase.instance.client.auth.currentUser?.id
+                      ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
                     await SimuladorDataService.crearTipoTrabajo({
-                      'negocio_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+                      'negocio_id': negId2,
                       'servicio_id': widget.servicio.id,
                       'nombre': nombreCtrl.text.trim(),
                       'formula': formula,

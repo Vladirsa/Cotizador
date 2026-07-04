@@ -508,7 +508,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
           decoration: const InputDecoration(labelText: 'Unidad (\$/m2, \$/min...)',
             isDense: true, border: OutlineInputBorder())),
       ], onGuardar: () async {
-        await _sb.from('sim_tarifas').insert({'negocio_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        await _sb.from('sim_tarifas').insert({'negocio_id': Supabase.instance.client.auth.currentUser?.id ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
           'servicio_id': _servicioSel!.id,
           'clave': nombreCtrl.text.trim().toLowerCase().replaceAll(' ', '_'),
           'nombre': nombreCtrl.text.trim(),
@@ -550,7 +550,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
           decoration: const InputDecoration(labelText: 'Descripcion (opcional)',
             isDense: true, border: OutlineInputBorder())),
       ], onGuardar: () async {
-        await _sb.from('sim_rangos').insert({'negocio_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        await _sb.from('sim_rangos').insert({'negocio_id': Supabase.instance.client.auth.currentUser?.id ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
           'servicio_id': _servicioSel!.id,
           'indice_desde': double.tryParse(desdeCtrl.text) ?? 0,
           'indice_hasta': double.tryParse(hastaCtrl.text) ?? 0,
@@ -601,7 +601,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
             helperText: 'Corte simple = 1.0, Relieve 3D = 3.0, Escultura = 6.0',
             isDense: true, border: OutlineInputBorder())),
       ], onGuardar: () async {
-        await _sb.from('sim_tipos_trabajo').insert({'negocio_id': 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        await _sb.from('sim_tipos_trabajo').insert({'negocio_id': Supabase.instance.client.auth.currentUser?.id ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
           'servicio_id': _servicioSel!.id,
           'nombre': nombreCtrl.text.trim(),
           'factor_complejidad': double.tryParse(factorCtrl.text) ?? 1.0,
