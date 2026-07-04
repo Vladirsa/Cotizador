@@ -292,9 +292,10 @@ class SimuladorDataService {
         costoHoraOp = hrs > 0 ? sal*(1+prest/100)/hrs : 0;
       }
 
-      return CostosTaller(costoHoraTaller: costoHoraTaller,
-        costoHoraMaquina: costoHoraMaq, costoHoraOperador: costoHoraOp,
-        margenRecomendado: margenRec, margenMinimo: margenMin, ivaPct: ivaPct);
+      return CostosTaller(costoHoraTaller: costoHoraTaller.toDouble(),
+        costoHoraMaquina: costoHoraMaq.toDouble(), costoHoraOperador: costoHoraOp.toDouble(),
+        margenRecomendado: margenRec.toDouble(), margenMinimo: margenMin.toDouble(),
+        ivaPct: ivaPct.toDouble());
     } catch (_) { return CostosTaller(); }
   }
 
