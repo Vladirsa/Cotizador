@@ -379,10 +379,9 @@ class MotorCalculo {
     final desglose = <String, double>{};
 
     // ── CÁLCULO POR FÓRMULA ──────────────────────────
-    double precioMaquila = 0;  // precio directo de maquila
+    double precioMaquila = 0;
     double tiempoHoras = 0;
-    double cm = 0;      // CM: Costo Material
-    double cmTemp = 0;  // material calculado en switch
+    double cm = 0;
 
     switch (formula) {
 
@@ -870,7 +869,28 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   double get _totalCarrito => _carrito.fold(0, (s, r) => s + r.total);
 
   @override
-  void initState() { super.initState(); _cargar(); }
+  void initState() {
+    super.initState();
+    _laserTabCtrl = TabController(length: 5, vsync: this);
+    // Listeners para sincronizar controllers con variables
+    _largoCtrl.addListener(() => setState(() {
+      _largo = double.tryParse(_largoCtrl.text) ?? 0; _resultado = null; }));
+    _anchoCtrl.addListener(() => setState(() {
+      _ancho = double.tryParse(_anchoCtrl.text) ?? 0; _resultado = null; }));
+    _altoCtrl.addListener(() => setState(() {
+      _alto = double.tryParse(_altoCtrl.text) ?? 0; _resultado = null; }));
+    _pesoPCtrl.addListener(() => setState(() {
+      _peso = double.tryParse(_pesoPCtrl.text) ?? 0; _resultado = null; }));
+    _metrosCtrl.addListener(() => setState(() {
+      _metros = double.tryParse(_metrosCtrl.text) ?? 0; _resultado = null; }));
+    _horasCtrl.addListener(() => setState(() {
+      _horas = double.tryParse(_horasCtrl.text) ?? 0; _resultado = null; }));
+    _minutosCtrl.addListener(() => setState(() {
+      _minutos = double.tryParse(_minutosCtrl.text) ?? 0; _resultado = null; }));
+    _cantCtrl.addListener(() => setState(() {
+      _cantidad = int.tryParse(_cantCtrl.text) ?? 1; _resultado = null; }));
+    _cargar();
+  }
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
@@ -1115,7 +1135,7 @@ class _PantallaServicio extends StatefulWidget {
   State<_PantallaServicio> createState() => _PantallaServicioState();
 }
 
-class _PantallaServicioState extends State<_PantallaServicio> {
+class _PantallaServicioState extends State<_PantallaServicio> with TickerProviderStateMixin {
   SimConfig? _config;
   CostosTaller? _costosTaller;
   bool _cargando = true;
@@ -1151,6 +1171,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   bool _clienteTreMaterial = false;
   bool _usarInventario = true;
   int _tabActual = 0;
+  TabController? _laserTabCtrl;
   String _materialLaser = 'mdf_fino';
   String _densidadLaser = 'normal';
   String _tipoLaser = 'corte'; // corte, grabado, ambos
@@ -1201,6 +1222,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   @override
   void initState() {
     super.initState();
+    _laserTabCtrl = TabController(length: 5, vsync: this);
     // Listeners para sincronizar controllers con variables
     _largoCtrl.addListener(() => setState(() {
       _largo = double.tryParse(_largoCtrl.text) ?? 0; _resultado = null; }));
@@ -1225,6 +1247,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   void dispose() {
     for (final c in _tarifasCtrls.values) c.dispose();
     for (final c in _medidaCtrls.values) c.dispose();
+    _laserTabCtrl?.dispose();
     _largoCtrl.dispose(); _anchoCtrl.dispose(); _altoCtrl.dispose();
     _pesoPCtrl.dispose(); _metrosCtrl.dispose(); _horasCtrl.dispose();
     _minutosCtrl.dispose(); _cantCtrl.dispose();
@@ -1318,398 +1341,87 @@ class _PantallaServicioState extends State<_PantallaServicio> {
 
   @override
   Widget build(BuildContext context) {
-    if (_cargando) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (_config == null) return const Scaffold(body: Center(child: Text('Error cargando')));
+    if (_cargando) return const Scaffold(
+      body: Center(child: CircularProgressIndicator()));
+    if (_config == null) return const Scaffold(
+      body: Center(child: Text('Error cargando')));
 
     final cfg = _config!;
+    final esLaser = cfg.getTarifa('vel_mdf_fino') > 0;
+    final esFibra = cfg.getTarifa('precio_1_10') > 0;
+
+    return Scaffold(
+      backgroundColor: AppColors.gris,
+      appBar: AppBar(
+        backgroundColor: Colors.white, elevation: 0.5,
+        title: Row(children: [
+          Text(widget.servicio.emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 8),
+          Expanded(child: Text(widget.servicio.nombre,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+              color: AppColors.azul), overflow: TextOverflow.ellipsis)),
+        ]),
+        bottom: esLaser && !esFibra ? TabBar(
+          controller: _laserTabCtrl,
+          labelColor: AppColors.azul,
+          unselectedLabelColor: AppColors.textoSecundario,
+          indicatorColor: AppColors.azul,
+          isScrollable: true,
+          tabs: const [Tab(text: 'Tipo'), Tab(text: 'Material'),
+            Tab(text: 'Densidad'), Tab(text: 'Dimensiones'), Tab(text: 'Extras'),
+          ]) : null),
+      body: Column(children: [
+        Expanded(child: esLaser && !esFibra
+          ? TabBarView(controller: _laserTabCtrl, children: [
+              _scrollable(_seccionCard('Tipo de trabajo', _buildTipos())),
+              _scrollable(_seccionCard('Material', _buildMaterialLaser())),
+              _scrollable(_seccionCard('Densidad del grabado', _buildDensidadLaser())),
+              _scrollable(_seccionCard('Dimensiones', _buildMedidasSimple())),
+              _scrollable(_seccionCard('Extras', _buildExtrasLaser(cfg))),
+            ])
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(14),
+              child: _buildBodyServicio(cfg))),
+        _panelCalcular(),
+      ]));
+  }
+
+  Widget _scrollable(Widget child) =>
+    SingleChildScrollView(padding: const EdgeInsets.all(14), child: child);
+
+  Widget _buildBodyServicio(SimConfig cfg) {
     final esPlasma = cfg.getTarifa('tarifa_m2_delgado') > 0;
-    final esLaser  = cfg.getTarifa('tarifa_minuto') > 0 || cfg.getTarifa('tarifa_min') > 0;
+    final esFibra  = cfg.getTarifa('precio_1_10') > 0;
+    final esImp3D  = cfg.getTarifa('factor_rapida') > 0;
+    final esHerr   = cfg.getTarifa('material_hora') > 0 && !esImp3D;
+    final esCarp   = cfg.getTarifa('material_mdf_m2') > 0;
 
-    // Definir tabs según servicio
-    final tabs = _getTabs(esPlasma, esLaser);
-
-    return DefaultTabController(
-      length: tabs.length,
-      child: Scaffold(
-        backgroundColor: AppColors.gris,
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0.5,
-          title: Row(children: [
-            Text(widget.servicio.emoji, style: const TextStyle(fontSize: 20)),
-            const SizedBox(width: 8),
-            Expanded(child: Text(widget.servicio.nombre, style: const TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.azul),
-              overflow: TextOverflow.ellipsis)),
-          ]),
-          bottom: TabBar(
-            onTap: (i) => setState(() => _tabActual = i),
-            labelColor: AppColors.azul,
-            unselectedLabelColor: AppColors.textoSecundario,
-            indicatorColor: AppColors.azul,
-            isScrollable: true,
-            tabs: tabs.map((t) => Tab(text: t)).toList())),
-        body: Column(children: [
-          // Contenido de cada tab
-          Expanded(child: SingleChildScrollView(
-            padding: const EdgeInsets.all(14),
-            child: Column(children: [
-              _buildTabContent(_tabActual, esPlasma, esLaser),
-              const SizedBox(height: 40),
-            ]))),
-          // Botón calcular siempre visible
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-            child: Column(children: [
-              SizedBox(width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _calcular,
-                  icon: const Icon(Icons.calculate_outlined, color: Colors.white),
-                  label: const Text('Calcular precio',
-                    style: TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w700)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.azul,
-                    padding: const EdgeInsets.symmetric(vertical: 14)))),
-              if (_resultado != null) ...[
-                const SizedBox(height: 10),
-                _widgetResultado(_resultado!),
-              ],
-            ])),
-        ])));
+    if (esPlasma) return _bodyPlasma(cfg);
+    if (esFibra)  return _bodyFibra(cfg);
+    if (esImp3D)  return _bodyImpresion(cfg);
+    if (esHerr)   return _bodyHerreria(cfg);
+    if (esCarp)   return _bodyCarpinteria(cfg);
+    return _bodyRouter(cfg);
   }
 
-  List<String> _getTabs(bool esPlasma, bool esLaser) {
-    if (esPlasma) return ['Tipo', 'Calibre', 'Material', 'Medidas', 'Extras'];
-    if (esLaser) {
-      // Detectar Fibra por sus tarifas específicas
-      final esFibra = _config!.getTarifa('precio_1_10') > 0;
-      if (esFibra) return ['Tipo', 'Material', 'Medidas', 'Extras'];
-      return ['Tipo', 'Material', 'Densidad', 'Medidas', 'Extras'];
-    }
-    // Detectar otros módulos
-    if (_config != null) {
-      if (_config!.getTarifa('factor_rapida') > 0)
-        return ['Tipo', 'Material', 'Dimensiones', 'Extras'];
-      if (_config!.getTarifa('material_hora') > 0 && _config!.getTarifa('factor_rapida') == 0)
-        return ['Tipo', 'Material', 'Medidas', 'Extras'];
-      if (_config!.getTarifa('material_mdf_m2') > 0)
-        return ['Tipo', 'Material', 'Medidas', 'Extras'];
-    }
-    return ['Tipo', 'Medidas', 'Material', 'Acabados', 'Extras'];
-  }
-
-  Widget _buildTabContent(int tab, bool esPlasma, bool esLaser) {
-    if (esPlasma) {
-      switch (tab) {
-        case 0: return _seccionCard('Tipo de trabajo', _buildTipos());
-        case 1: return _seccionCard('Calibre del material', _buildCalibre());
-        case 2: return _seccionCard('Tipo de material', _buildMaterialPlasma());
-        case 3: return _seccionCard('Medidas', _buildMedidas());
-        case 4: return _seccionCard('Extras', _buildExtrasPlasma());
-        default: return const SizedBox();
-      }
-    }
-    if (esLaser) {
-      final esFibra = _config!.getTarifa('precio_1_10') > 0;
-      if (esFibra) {
-        switch (tab) {
-          case 0: return _seccionCard('Tipo de trabajo', _buildTipos());
-          case 1: return _seccionCard('Material del grabado', _buildMaterialFibra());
-          case 2: return _seccionCard('Medidas del área', _buildMedidas());
-          case 3: return _seccionCard('Extras', _buildExtrasFibra());
-          default: return const SizedBox();
-        }
-      }
-      switch (tab) {
-        case 0: return _seccionCard('Tipo de trabajo', _buildTipos());
-        case 1: return _seccionCard('Material', _buildMaterialLaser());
-        case 2: return _seccionCard('Densidad del grabado', _buildDensidadLaser());
-        case 3: return _seccionCard('Medidas', _buildMedidas());
-        case 4: return _seccionCard('Extras', _buildExtras());
-        default: return const SizedBox();
-      }
-    }
-    // Detectar módulo por tarifas
-    final esImpresion3D = _config!.getTarifa('factor_rapida') > 0;
-    final esHerreria = _config!.getTarifa('material_hora') > 0 && !esImpresion3D;
-    final esCarpinteria = _config!.getTarifa('material_mdf_m2') > 0;
-
-    if (esImpresion3D) {
-      switch (tab) {
-        case 0: return _seccionCard('Tipo / Calidad', _buildTipos());
-        case 1: return _seccionCard('Material', _buildMaterialImpresion());
-        case 2: return _seccionCard('Dimensiones', _buildMedidas());
-        case 3: return _seccionCard('Acabados y extras', _buildExtrasImpresion());
-        default: return const SizedBox();
-      }
-    }
-    if (esHerreria) {
-      switch (tab) {
-        case 0: return _seccionCard('Tipo de trabajo', _buildTipos());
-        case 1: return _seccionCard('Material y acabado', _buildMaterialHerreria());
-        case 2: return _seccionCard('Medidas', _buildMedidas());
-        case 3: return _seccionCard('Instalación y extras', _buildExtrasHerreria());
-        default: return const SizedBox();
-      }
-    }
-    if (esCarpinteria) {
-      switch (tab) {
-        case 0: return _seccionCard('Tipo de trabajo', _buildTipos());
-        case 1: return _seccionCard('Material y acabado', _buildMaterialCarpinteria());
-        case 2: return _seccionCard('Medidas', _buildMedidas());
-        case 3: return _seccionCard('Extras', _buildExtrasCarpinteria());
-        default: return const SizedBox();
-      }
-    }
-    // Router y genérico
-    switch (tab) {
-      case 0: return _seccionCard('Tipo de trabajo', _buildTipos());
-      case 1: return _seccionCard('Medidas y variables', _buildVariables());
-      case 2: return _seccionCard('Material', _buildMaterial());
-      case 3: return _seccionCard('Acabados', _buildAcabadosRouter());
-      case 4: return _seccionCard('Extras', _buildExtras());
-      default: return const SizedBox();
-    }
-  }
-
-
-  // ── TAB: MEDIDAS (genérico con controllers) ──────
-  Widget _buildMedidas() {
-    final tipo = _tipoSel;
-    if (tipo == null) return const Text('Selecciona un tipo de trabajo primero');
-    final formula = tipo.formula;
-    return Column(children: [
-      if (tipo.necesitaLargo && formula != 'por_minuto') ...[
-        _campoMedida('Largo (cm)', _largo, (v) => setState(() { _largo = v; _resultado = null; })),
-        const SizedBox(height: 10),
-      ],
-      if (tipo.necesitaAncho && formula != 'por_minuto') ...[
-        _campoMedida('Ancho (cm)', _ancho, (v) => setState(() { _ancho = v; _resultado = null; })),
-        const SizedBox(height: 10),
-      ],
-      if (tipo.necesitaAlto || formula == 'por_volumen') ...[
-        _campoMedida('Alto / Profundidad (cm)', _alto,
-          (v) => setState(() { _alto = v; _resultado = null; })),
-        const SizedBox(height: 10),
-      ],
-      if (tipo.necesitaHoras || formula == 'por_hora') ...[
-        _campoMedida('Horas de trabajo', _horas,
-          (v) => setState(() { _horas = v; _resultado = null; })),
-        const SizedBox(height: 10),
-      ],
-      if (tipo.necesitaMinutos || formula == 'por_minuto') ...[
-        _campoMedida('Minutos estimados', _minutos,
-          (v) => setState(() { _minutos = v; _resultado = null; })),
-        const SizedBox(height: 10),
-      ],
-      if (tipo.necesitaMetros || formula == 'por_metro') ...[
-        _campoMedida('Metros lineales', _metros,
-          (v) => setState(() { _metros = v; _resultado = null; })),
-        const SizedBox(height: 10),
-      ],
-      if (tipo.necesitaPeso || formula == 'por_kg') ...[
-        _campoMedida('Peso (kg)', _peso,
-          (v) => setState(() { _peso = v; _resultado = null; })),
-        const SizedBox(height: 10),
-      ],
-      // Cantidad
-      Row(children: [
-        const Text('Cantidad:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const Spacer(),
-        IconButton(
-          onPressed: () => setState(() { if (_cantidad > 1) { _cantidad--; _resultado = null; } }),
-          icon: const Icon(Icons.remove_circle_outline, color: AppColors.azul)),
-        Text('$_cantidad', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        IconButton(
-          onPressed: () => setState(() { _cantidad++; _resultado = null; }),
-          icon: const Icon(Icons.add_circle_outline, color: AppColors.azul)),
-      ]),
-    ]);
-  }
-
-  // ── TAB: CALIBRE (Plasma) ─────────────────────────
-  Widget _buildCalibre() => Wrap(spacing: 8, runSpacing: 8,
-    children: ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12',
-                'Cal 10','Cal 8','Cal 6','1/4"','3/8"','1/2"+']
-      .map((c) => GestureDetector(
-        onTap: () => setState(() { _calibre = c; _resultado = null; }),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: _calibre == c ? AppColors.azul : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _calibre == c ? AppColors.azul : AppColors.grisBorde)),
-          child: Column(children: [
-            Text(c, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-              color: _calibre == c ? Colors.white : AppColors.textoPrincipal)),
-            Text(_calibre == c
-              ? (['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12'].contains(c) ? 'Delgado' : 'Medio/Grueso')
-              : '',
-              style: const TextStyle(fontSize: 9, color: Colors.white70)),
-          ])))).toList());
-
-  // ── TAB: MATERIAL PLASMA ──────────────────────────
-  Widget _buildMaterialPlasma() => Column(children: [
-    Row(children: [
-      _chipMaterial('acero_negro', '⚙️ Acero negro', 'Tarifa base'),
-      const SizedBox(width: 8),
-      _chipMaterial('inox', '✨ Inoxidable', '×1.4'),
-      const SizedBox(width: 8),
-      _chipMaterial('aluminio', '🔵 Aluminio', '×1.3'),
-    ]),
-    const SizedBox(height: 12),
-    Container(padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
-      child: Row(children: [
-        const Icon(Icons.info_outline, size: 14, color: AppColors.azul),
-        const SizedBox(width: 6),
-        Expanded(child: Text(
-          'Los factores de Inox y Aluminio son editables en la sección de Tarifas.',
-          style: const TextStyle(fontSize: 11, color: AppColors.azul))),
-      ])),
-  ]);
-
-  // ── TAB: MATERIAL LÁSER ───────────────────────────
-  Widget _buildMaterialLaser() => Wrap(spacing: 8, runSpacing: 8,
-    children: [
-      {'v':'mdf_fino',    'l':'MDF 2.5mm', 'v2':'30 mm/s'},
-      {'v':'mdf_medio',   'l':'MDF 3-5mm', 'v2':'21 mm/s'},
-      {'v':'mdf_grueso',  'l':'MDF 6mm+',  'v2':'editable'},
-      {'v':'acrilico',    'l':'Acrílico',   'v2':'editable'},
-      {'v':'cuero',       'l':'Cuero',      'v2':'editable'},
-      {'v':'papel',       'l':'Papel',      'v2':'editable'},
-      {'v':'piedra',      'l':'Piedra',     'v2':'editable'},
-      {'v':'metal',       'l':'Metal',      'v2':'editable'},
-    ].map((m) => GestureDetector(
-      onTap: () => setState(() { _materialLaser = m['v']!; _resultado = null; }),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: _materialLaser == m['v'] ? AppColors.azul : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _materialLaser == m['v'] ? AppColors.azul : AppColors.grisBorde)),
-        child: Column(children: [
-          Text(m['l']!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-            color: _materialLaser == m['v'] ? Colors.white : AppColors.textoPrincipal)),
-          Text(m['v2']!, style: TextStyle(fontSize: 9,
-            color: _materialLaser == m['v'] ? Colors.white70 : AppColors.textoSecundario)),
-        ])))).toList());
-
-  // ── TAB: DENSIDAD LÁSER ───────────────────────────
-  Widget _buildDensidadLaser() {
-    final tipo = _tipoSel;
-    final formula = tipo?.formula ?? '';
-    final esGrabado = tipo?.nombre.toLowerCase().contains('grab') == true ||
-                      tipo?.nombre.toLowerCase().contains('delin') == true;
-    if (!esGrabado) {
-      return Container(padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
-        child: const Text('La densidad aplica solo para grabado. Selecciona un tipo de grabado.',
-          style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)));
-    }
-    return Column(children: [
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        _chipDensidad('ligero', 'Ligero', 'Intervalo 0.2mm\n180 mm/s'),
-        _chipDensidad('normal', 'Normal', 'Intervalo 0.15mm\n190 mm/s'),
-        _chipDensidad('denso', 'Denso', 'Intervalo 0.1mm\n200 mm/s'),
-      ]),
-    ]);
-  }
-
-  Widget _chipDensidad(String val, String titulo, String sub) {
-    final sel = _densidadLaser == val;
-    return GestureDetector(
-      onTap: () => setState(() { _densidadLaser = val; _resultado = null; }),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: sel ? AppColors.azul : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-        child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-            color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(sub, textAlign: TextAlign.center, style: TextStyle(fontSize: 10,
-            color: sel ? Colors.white70 : AppColors.textoSecundario)),
-        ])));
-  }
-
-  // ── TAB: ACABADOS ROUTER ──────────────────────────
-  Widget _buildAcabadosRouter() {
-    final cfg = _config!;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (cfg.acabados.isNotEmpty) ...[
-        const Text('Acabado:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8,
-          children: cfg.acabados.map((a) => GestureDetector(
-            onTap: () => setState(() { _acabadoSel = a; _resultado = null; }),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _acabadoSel?.id == a.id ? AppColors.azul : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _acabadoSel?.id == a.id ? AppColors.azul : AppColors.grisBorde)),
-              child: Text('${a.nombre} ${a.precio > 0 ? "(+\$${a.precio.toStringAsFixed(0)})" : ""}',
-                style: TextStyle(fontSize: 11,
-                  color: _acabadoSel?.id == a.id ? Colors.white : AppColors.textoPrincipal))))).toList()),
+  Widget _panelCalcular() => Container(
+    color: Colors.white,
+    padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      SizedBox(width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _calcular,
+          icon: const Icon(Icons.calculate_outlined, color: Colors.white),
+          label: const Text('Calcular precio',
+            style: TextStyle(fontSize: 15, color: Colors.white,
+              fontWeight: FontWeight.w700)),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+            padding: const EdgeInsets.symmetric(vertical: 14)))),
+      if (_resultado != null) ...[
         const SizedBox(height: 12),
+        _widgetResultado(_resultado!),
       ],
-      _toggleOpcion('🪚 Lleva lijado', _horasLijado > 0,
-        (v) => setState(() { _horasLijado = v ? 1.0 : 0; _resultado = null; })),
-      if (_horasLijado > 0) ...[
-        const SizedBox(height: 6),
-        _campoMedida('Horas de lijado', _horasLijado,
-          (v) => setState(() { _horasLijado = v; _resultado = null; })),
-      ],
-      const SizedBox(height: 6),
-      _toggleOpcion('🖌️ Lleva barnizado/pintado', _horasBarnizado > 0,
-        (v) => setState(() { _horasBarnizado = v ? 1.0 : 0; _resultado = null; })),
-      if (_horasBarnizado > 0) ...[
-        const SizedBox(height: 6),
-        _campoMedida('Horas de barnizado', _horasBarnizado,
-          (v) => setState(() { _horasBarnizado = v; _resultado = null; })),
-      ],
-      const SizedBox(height: 6),
-      _toggleOpcion('✏️ Requiere diseño adicional', _llevaDiseno,
-        (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
-      const Divider(height: 16),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('IVA 16%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        Switch(value: _aplicarIva,
-          onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
-          activeColor: AppColors.azul),
-      ]),
-    ]);
-  }
-
-  // ── TAB: EXTRAS PLASMA ────────────────────────────
-  Widget _buildExtrasPlasma() => Column(children: [
-    _toggleOpcion('🧹 Limpieza de pieza', _llevaLimpieza,
-      (v) => setState(() { _llevaLimpieza = v; _resultado = null; })),
-    _toggleOpcion('🚚 Flete / Maniobra', _llevaFlete,
-      (v) => setState(() { _llevaFlete = v; _resultado = null; })),
-    _toggleOpcion('✏️ Diseño adicional', _llevaDisenoPlasma,
-      (v) => setState(() { _llevaDisenoPlasma = v; _resultado = null; })),
-    if (_llevaDisenoPlasma) ...[
-      const SizedBox(height: 8),
-      _toggleOpcion('📁 Cliente trae archivo DXF', _clienteTraeArchivoDXF,
-        (v) => setState(() { _clienteTraeArchivoDXF = v; _resultado = null; })),
-      if (!_clienteTraeArchivoDXF) ...[
-        const SizedBox(height: 8),
-        _campoMedida('Horas de diseño', _horasDisenoPlasma,
-          (v) => setState(() { _horasDisenoPlasma = v; _resultado = null; })),
-      ],
-    ],
-    const Divider(height: 16),
-    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const Text('IVA 16%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      Switch(value: _aplicarIva,
-        onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
-        activeColor: AppColors.azul),
-    ]),
-  ]);
+    ]));
 
 
   // ── MATERIAL FIBRA ────────────────────────────────
@@ -1781,11 +1493,14 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     const Text('Calidad de impresión:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
     const SizedBox(height: 8),
     Row(children: [
-      _chipCalidad('rapida', '⚡ Rapida', 'Menor detalle / Mas barata'),
+      _chipCalidad('rapida', '⚡ Rápida', 'Menor detalle
+Más barata'),
       const SizedBox(width: 8),
-      _chipCalidad('normal', '⚖️ Normal', 'Equilibrio calidad-precio'),
+      _chipCalidad('normal', '⚖️ Normal', 'Equilibrio
+calidad-precio'),
       const SizedBox(width: 8),
-      _chipCalidad('alta', '💎 Alta', 'Maximo detalle / Mas tiempo'),
+      _chipCalidad('alta', '💎 Alta', 'Máximo detalle
+Más tiempo'),
     ]),
   ]);
 
@@ -2103,8 +1818,9 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     }
 
     // Detectar si es Plasma
-    final esPlasmaScreen = _config!.getTarifa('tarifa_m2_delgado') > 0 ||
-                           _config!.getTarifa('tarifa_metro_delgado') > 0;
+    final _config2 = _config!;
+    final esPlasmaScreen = _config2.getTarifa('tarifa_m2_delgado') > 0 ||
+                           _config2.getTarifa('tarifa_metro_delgado') > 0;
     final esRouter2D = formula == 'por_area' && !esPlasmaScreen;
 
     // ── PLASMA: Selector calibre y material ──────────
@@ -2337,7 +2053,874 @@ class _PantallaServicioState extends State<_PantallaServicio> {
         ])));
   }
 
-  // ── MATERIAL ─────────────────────────────────────
+  // ── CUERPOS POR SERVICIO (flujo top-down) ───────────────────
+
+  // ROUTER CNC ─────────────────────────────────────────────────
+  Widget _bodyRouter(SimConfig cfg) {
+    final tipo = _tipoSel;
+    final es3D = tipo?.formula == 'por_volumen';
+    final fmt = NumberFormat(r'$#,##0', 'es_MX');
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+      // 1. Tipo de trabajo
+      _seccionCard('Tipo de trabajo', Column(
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Wrap(spacing: 8, runSpacing: 8,
+          children: cfg.tipos.map((t) {
+            final sel = _tipoSel?.id == t.id;
+            return GestureDetector(
+              onTap: () => setState(() { _tipoSel = t; _resultado = null; }),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: sel ? AppColors.azul : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+                child: Column(children: [
+                  Text(t.nombre, style: TextStyle(fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: sel ? Colors.white : AppColors.textoPrincipal)),
+                  if (t.descripcionFormula != null)
+                    Text(t.descripcionFormula!, style: TextStyle(fontSize: 9,
+                      color: sel ? Colors.white70 : AppColors.textoSecundario)),
+                ])));
+          }).toList()),
+        if (cfg.tipos.isEmpty) ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _nuevoModo,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(color: AppColors.azulClaro,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.azul.withOpacity(0.3))),
+              child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.add, size: 14, color: AppColors.azul),
+                SizedBox(width: 4),
+                Text('Agregar tipo', style: TextStyle(fontSize: 11,
+                  color: AppColors.azul, fontWeight: FontWeight.w600)),
+              ]))),
+        ] else ...[
+          const SizedBox(height: 8),
+          GestureDetector(
+            onTap: _nuevoModo,
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.add, size: 14, color: AppColors.azul),
+              SizedBox(width: 4),
+              Text('Agregar modo', style: TextStyle(fontSize: 11,
+                color: AppColors.azul, fontWeight: FontWeight.w600)),
+            ])),
+        ],
+      ])),
+
+      const SizedBox(height: 10),
+
+      // 2. Dimensiones
+      if (tipo != null) _seccionCard('Medidas', Column(children: [
+        if (tipo.necesitaLargo || tipo.formula == 'por_area' || tipo.formula == 'por_volumen') ...[
+          _campoMedida('Largo (cm)', _largo,
+            (v) => setState(() { _largo = v; _resultado = null; })),
+          const SizedBox(height: 10),
+        ],
+        if (tipo.necesitaAncho || tipo.formula == 'por_area' || tipo.formula == 'por_volumen') ...[
+          _campoMedida('Ancho (cm)', _ancho,
+            (v) => setState(() { _ancho = v; _resultado = null; })),
+          const SizedBox(height: 10),
+        ],
+        if (es3D || tipo.necesitaAlto) ...[
+          _campoMedida('Alto / Profundidad (cm)', _alto,
+            (v) => setState(() { _alto = v; _resultado = null; })),
+          const SizedBox(height: 10),
+        ],
+        // Mostrar volumen calculado en tiempo real para 3D
+        if (es3D && _largo > 0 && _ancho > 0 && _alto > 0) ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.azulClaro,
+              borderRadius: BorderRadius.circular(8)),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              const Text('Volumen calculado:',
+                style: TextStyle(fontSize: 12, color: AppColors.azul)),
+              Text('${(_largo * _ancho * _alto).toStringAsFixed(0)} cm³',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                  color: AppColors.azul)),
+            ])),
+          const SizedBox(height: 10),
+          // Mostrar rango aplicado
+          if (cfg.rangos.isNotEmpty) () {
+            final vol = _largo * _ancho * _alto;
+            final precio = cfg.calcularPrecioRango(vol);
+            return Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: AppColors.verde.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.verde.withOpacity(0.3))),
+              child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Text('Precio rango base × ${_tipoSel?.factor.toStringAsFixed(1)}:',
+                  style: const TextStyle(fontSize: 12)),
+                Text(fmt.format(precio * (_tipoSel?.factor ?? 1.0)),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                    color: AppColors.verde)),
+              ]));
+          }(),
+        ],
+        // Cantidad
+        _filaCantidad(),
+      ])),
+
+      const SizedBox(height: 10),
+
+      // 3. Tarifas editables (colapsable)
+      if (tipo != null && cfg.tarifas.isNotEmpty) _seccionTarifas(),
+
+      const SizedBox(height: 10),
+
+      // 4. Material
+      _seccionCard('Material', _buildMaterial()),
+
+      const SizedBox(height: 10),
+
+      // 5. Acabados (sin Extras duplicado)
+      if (cfg.acabados.isNotEmpty) _seccionCard('Acabado', _buildAcabadoChips(cfg)),
+
+      const SizedBox(height: 10),
+
+      // 6. Adicionales Router 2D
+      if (tipo?.formula == 'por_area') _seccionCard('Acabado manual', Column(children: [
+        _toggleOpcion('Lijado', _horasLijado > 0,
+          (v) => setState(() { _horasLijado = v ? 1.0 : 0; _resultado = null; })),
+        if (_horasLijado > 0) ...[
+          const SizedBox(height: 8),
+          _campoMedida('Horas de lijado', _horasLijado,
+            (v) => setState(() { _horasLijado = v; _resultado = null; })),
+        ],
+        const SizedBox(height: 6),
+        _toggleOpcion('Barnizado / Pintado', _horasBarnizado > 0,
+          (v) => setState(() { _horasBarnizado = v ? 1.0 : 0; _resultado = null; })),
+        if (_horasBarnizado > 0) ...[
+          const SizedBox(height: 8),
+          _campoMedida('Horas de barnizado', _horasBarnizado,
+            (v) => setState(() { _horasBarnizado = v; _resultado = null; })),
+        ],
+        const SizedBox(height: 6),
+        _toggleOpcion('Requiere diseño adicional', _llevaDiseno,
+          (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
+      ])),
+
+      const SizedBox(height: 10),
+
+      // 7. IVA
+      _seccionCard('Facturación', Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Incluir IVA 16%',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text('Para clientes con factura',
+            style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        ]),
+        Switch(value: _aplicarIva,
+          onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+          activeColor: AppColors.azul),
+      ])),
+
+      const SizedBox(height: 40),
+    ]);
+  }
+
+  Widget _buildAcabadoChips(SimConfig cfg) => Wrap(spacing: 8, runSpacing: 8,
+    children: cfg.acabados.map((a) => GestureDetector(
+      onTap: () => setState(() { _acabadoSel = a; _resultado = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: _acabadoSel?.id == a.id ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _acabadoSel?.id == a.id
+            ? AppColors.azul : AppColors.grisBorde)),
+        child: Text(
+          '${a.nombre}${a.precio > 0 ? " (+\$${a.precio.toStringAsFixed(0)})" : ""}',
+          style: TextStyle(fontSize: 11,
+            color: _acabadoSel?.id == a.id ? Colors.white : AppColors.textoPrincipal)))
+    )).toList());
+
+  Widget _filaCantidad() => Row(children: [
+    const Text('Cantidad:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+    const Spacer(),
+    IconButton(
+      onPressed: () => setState(() { if (_cantidad > 1) { _cantidad--; _resultado = null; } }),
+      icon: const Icon(Icons.remove_circle_outline, color: AppColors.azul)),
+    Text('$_cantidad', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+    IconButton(
+      onPressed: () => setState(() { _cantidad++; _resultado = null; }),
+      icon: const Icon(Icons.add_circle_outline, color: AppColors.azul)),
+  ]);
+
+  // PLASMA CNC ──────────────────────────────────────────────────
+  Widget _bodyPlasma(SimConfig cfg) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+    // Tipo
+    _seccionCard('Tipo de trabajo', _buildTipos()),
+    const SizedBox(height: 10),
+
+    // Calibre
+    _seccionCard('Calibre del material', _buildCalibre()),
+    const SizedBox(height: 10),
+
+    // Material
+    _seccionCard('Material', Row(children: [
+      _chipMaterial('acero_negro', 'Acero negro', 'Base'),
+      const SizedBox(width: 8),
+      _chipMaterial('inox', 'Inoxidable', 'x1.4'),
+      const SizedBox(width: 8),
+      _chipMaterial('aluminio', 'Aluminio', 'x1.3'),
+    ])),
+    const SizedBox(height: 10),
+
+    // Medidas
+    _seccionCard('Medidas', Column(children: [
+      if (_tipoSel?.necesitaLargo == true || _tipoSel?.formula == 'por_area') ...[
+        _campoMedida('Largo (cm)', _largo,
+          (v) => setState(() { _largo = v; _resultado = null; })),
+        const SizedBox(height: 10),
+        _campoMedida('Ancho (cm)', _ancho,
+          (v) => setState(() { _ancho = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      if (_tipoSel?.necesitaMetros == true || _tipoSel?.formula == 'por_metro') ...[
+        _campoMedida('Metros lineales', _metros,
+          (v) => setState(() { _metros = v; _resultado = null; })),
+        const SizedBox(height: 10),
+      ],
+      _filaCantidad(),
+    ])),
+    const SizedBox(height: 10),
+
+    // Tarifas editables
+    if (cfg.tarifas.isNotEmpty) _seccionTarifas(),
+    const SizedBox(height: 10),
+
+    // Extras
+    _seccionCard('Adicionales', Column(children: [
+      _toggleOpcion('Limpieza de pieza', _llevaLimpieza,
+        (v) => setState(() { _llevaLimpieza = v; _resultado = null; })),
+      _toggleOpcion('Flete / Maniobra', _llevaFlete,
+        (v) => setState(() { _llevaFlete = v; _resultado = null; })),
+      _toggleOpcion('Diseño / Vectorizacion', _llevaDisenoPlasma,
+        (v) => setState(() { _llevaDisenoPlasma = v; _resultado = null; })),
+      if (_llevaDisenoPlasma) ...[
+        const SizedBox(height: 8),
+        _toggleOpcion('Cliente trae archivo DXF', _clienteTraeArchivoDXF,
+          (v) => setState(() { _clienteTraeArchivoDXF = v; _resultado = null; })),
+        if (!_clienteTraeArchivoDXF) ...[
+          const SizedBox(height: 8),
+          _campoMedida('Horas de diseno', _horasDisenoPlasma,
+            (v) => setState(() { _horasDisenoPlasma = v; _resultado = null; })),
+        ],
+      ],
+      const Divider(height: 16),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('IVA 16%',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Switch(value: _aplicarIva,
+          onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+          activeColor: AppColors.azul),
+      ]),
+    ])),
+    const SizedBox(height: 40),
+  ]);
+
+  // LÁSER CO₂ - tabs ────────────────────────────────────────────
+  Widget _bodyLaser(SimConfig cfg) => TabBarView(
+    controller: _laserTabCtrl,
+    children: [
+      // Tab 1: Tipo
+      _scrollable(_seccionCard('Tipo de trabajo', Wrap(spacing: 8, runSpacing: 8,
+        children: [
+          _chipLaserTipo('corte', 'Solo corte', 'Perimetro de la pieza'),
+          _chipLaserTipo('grabado', 'Solo grabado', 'Raster sobre la superficie'),
+          _chipLaserTipo('ambos', 'Corte + Grabado', 'Corta y graba'),
+        ]))),
+      // Tab 2: Material
+      _scrollable(_seccionCard('Material', Column(children: [
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          _chipMatLaser('mdf_fino', 'MDF 2.5mm', '30 mm/s'),
+          _chipMatLaser('mdf_medio', 'MDF 3-5mm', '21 mm/s'),
+          _chipMatLaser('mdf_grueso', 'MDF 6mm+', 'editable'),
+          _chipMatLaser('acrilico', 'Acrilico', 'editable'),
+          _chipMatLaser('cuero', 'Cuero', 'editable'),
+          _chipMatLaser('papel', 'Papel', 'editable'),
+          _chipMatLaser('piedra', 'Piedra', 'editable'),
+          _chipMatLaser('metal', 'Metal', 'editable'),
+        ]),
+        const SizedBox(height: 12),
+        if (cfg.tarifas.isNotEmpty) ...[
+          const Text('Velocidades (editables):',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+              color: AppColors.textoSecundario)),
+          const SizedBox(height: 8),
+          ...cfg.tarifas.values
+            .where((t) => t.clave.startsWith('vel_'))
+            .map((t) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Expanded(child: Text(t.nombre,
+                  style: const TextStyle(fontSize: 12))),
+                SizedBox(width: 90, child: TextFormField(
+                  controller: _tarifasCtrls[t.id],
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textAlign: TextAlign.right,
+                  decoration: const InputDecoration(isDense: true, filled: true,
+                    border: OutlineInputBorder()),
+                  onChanged: (v) {
+                    final val = double.tryParse(v);
+                    if (val != null) t.valor = val;
+                  })),
+              ]))),
+        ],
+      ]))),
+      // Tab 3: Densidad
+      _scrollable(_seccionCard('Densidad del grabado', Column(children: [
+        if (_tipoLaser == 'corte')
+          Container(padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: AppColors.gris,
+              borderRadius: BorderRadius.circular(8)),
+            child: const Text('La densidad solo aplica para grabado.',
+              style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)))
+        else ...[
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _chipDensidad('ligero', 'Ligero', 'Intervalo 0.2mm - 180mm/s'),
+            _chipDensidad('normal', 'Normal', 'Intervalo 0.15mm - 190mm/s'),
+            _chipDensidad('denso', 'Denso', 'Intervalo 0.1mm - 200mm/s'),
+          ]),
+          const SizedBox(height: 12),
+          // Tarifas de intervalo editables
+          ...cfg.tarifas.values
+            .where((t) => t.clave.startsWith('intervalo_'))
+            .map((t) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                Expanded(child: Text(t.nombre,
+                  style: const TextStyle(fontSize: 12))),
+                SizedBox(width: 90, child: TextFormField(
+                  controller: _tarifasCtrls[t.id],
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textAlign: TextAlign.right,
+                  decoration: const InputDecoration(isDense: true, filled: true,
+                    border: OutlineInputBorder()),
+                  onChanged: (v) {
+                    final val = double.tryParse(v);
+                    if (val != null) t.valor = val;
+                  })),
+              ]))),
+        ],
+      ]))),
+      // Tab 4: Dimensiones
+      _scrollable(_seccionCard('Dimensiones', Column(children: [
+        _campoMedida('Largo (cm)', _largo,
+          (v) => setState(() { _largo = v; _resultado = null; })),
+        const SizedBox(height: 10),
+        _campoMedida('Ancho (cm)', _ancho,
+          (v) => setState(() { _ancho = v; _resultado = null; })),
+        const SizedBox(height: 10),
+        _filaCantidad(),
+        const SizedBox(height: 10),
+        // Tarifa por minuto editable
+        ...cfg.tarifas.values
+          .where((t) => t.clave == 'tarifa_min')
+          .map((t) => Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+              Text(t.nombre, style: const TextStyle(fontSize: 13,
+                fontWeight: FontWeight.w600)),
+              const Text('Editable segun tu tarifa real',
+                style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+            ])),
+            SizedBox(width: 110, child: TextFormField(
+              controller: _tarifasCtrls[t.id],
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
+              textAlign: TextAlign.right,
+              decoration: InputDecoration(isDense: true, filled: true,
+                fillColor: AppColors.gris, prefixText: r'$',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
+              onChanged: (v) {
+                final val = double.tryParse(v);
+                if (val != null) t.valor = val;
+              })),
+          ])),
+      ]))),
+      // Tab 5: Extras
+      _scrollable(_seccionCard('Extras', Column(children: [
+        _toggleOpcion('Diseño / Vectorizacion', _llevaDiseno,
+          (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
+        _toggleOpcion('Incluir desgaste tubo CO2', _llevaTuboCO2,
+          (v) => setState(() { _llevaTuboCO2 = v; _resultado = null; })),
+        _toggleOpcion('Flete / Entrega', _llevaFlete,
+          (v) => setState(() { _llevaFlete = v; _resultado = null; })),
+        const Divider(height: 16),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text('IVA 16%',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Switch(value: _aplicarIva,
+            onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+            activeColor: AppColors.azul),
+        ]),
+      ]))),
+    ]);
+
+  Widget _chipLaserTipo(String val, String titulo, String sub) {
+    final sel = _tipoLaser == val;
+    return GestureDetector(
+      onTap: () => setState(() { _tipoLaser = val; _resultado = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+        child: Column(children: [
+          Text(titulo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+            color: sel ? Colors.white : AppColors.textoPrincipal)),
+          Text(sub, style: TextStyle(fontSize: 10,
+            color: sel ? Colors.white70 : AppColors.textoSecundario)),
+        ])));
+  }
+
+  Widget _chipMatLaser(String val, String titulo, String vel) {
+    final sel = _materialLaser == val;
+    return GestureDetector(
+      onTap: () => setState(() { _materialLaser = val; _resultado = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+        child: Column(children: [
+          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+            color: sel ? Colors.white : AppColors.textoPrincipal)),
+          Text(vel, style: TextStyle(fontSize: 9,
+            color: sel ? Colors.white70 : AppColors.textoSecundario)),
+        ])));
+  }
+
+  // LÁSER FIBRA ─────────────────────────────────────────────────
+  Widget _bodyFibra(SimConfig cfg) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+    // Tipo
+    _seccionCard('Tipo de grabado', Wrap(spacing: 8, runSpacing: 8,
+      children: cfg.tipos.map((t) {
+        final sel = _tipoSel?.id == t.id;
+        return GestureDetector(
+          onTap: () => setState(() { _tipoSel = t; _resultado = null; }),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: sel ? AppColors.azul : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+            child: Column(children: [
+              Text(t.nombre, style: TextStyle(fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: sel ? Colors.white : AppColors.textoPrincipal)),
+              if (t.descripcionFormula != null)
+                Text(t.descripcionFormula!, style: TextStyle(fontSize: 9,
+                  color: sel ? Colors.white70 : AppColors.textoSecundario)),
+            ])));
+      }).toList())),
+    const SizedBox(height: 10),
+
+    // Material del grabado
+    _seccionCard('Material a grabar', Wrap(spacing: 8, runSpacing: 8,
+      children: [
+        _chipFibraMat('acero_inox', 'Acero Inox', 'Marcado negro'),
+        _chipFibraMat('acero_negro', 'Acero negro', 'Marcado gris'),
+        _chipFibraMat('aluminio', 'Aluminio', 'Marcado oscuro'),
+        _chipFibraMat('laton', 'Laton', 'Grabado dorado'),
+        _chipFibraMat('cobre', 'Cobre', 'Grabado cobre'),
+        _chipFibraMat('titanio', 'Titanio', 'Coloracion'),
+      ])),
+    const SizedBox(height: 10),
+
+    // Cantidad - precio escalonado
+    _seccionCard('Cantidad', Column(children: [
+      _filaCantidad(),
+      const SizedBox(height: 10),
+      _previewPrecioFibra(cfg),
+    ])),
+    const SizedBox(height: 10),
+
+    // Tarifas editables
+    _seccionTarifas(),
+    const SizedBox(height: 10),
+
+    // Extras
+    _seccionCard('Extras', Column(children: [
+      _toggleOpcion('Plantilla de sujecion (+\$150)', _llevaPlantilla,
+        (v) => setState(() { _llevaPlantilla = v; _resultado = null; })),
+      _toggleOpcion('Eje rotativo (+\$25/pza)', _llevaRotativo,
+        (v) => setState(() { _llevaRotativo = v; _resultado = null; })),
+      _toggleOpcion('Setup / Diseno', _llevaDisenoFibra,
+        (v) => setState(() { _llevaDisenoFibra = v; _resultado = null; })),
+      const Divider(height: 16),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('IVA 16%',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Switch(value: _aplicarIva,
+          onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+          activeColor: AppColors.azul),
+      ]),
+    ])),
+    const SizedBox(height: 40),
+  ]);
+
+  Widget _chipFibraMat(String val, String titulo, String sub) {
+    final sel = _material == val;
+    return GestureDetector(
+      onTap: () => setState(() { _material = val; _resultado = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+        child: Column(children: [
+          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+            color: sel ? Colors.white : AppColors.textoPrincipal)),
+          Text(sub, style: TextStyle(fontSize: 9,
+            color: sel ? Colors.white70 : AppColors.textoSecundario)),
+        ])));
+  }
+
+  Widget _previewPrecioFibra(SimConfig cfg) {
+    final fmt = NumberFormat(r'$#,##0', 'es_MX');
+    double tarifa;
+    String rango;
+    if (_cantidad <= 10) {
+      tarifa = cfg.getTarifa('precio_1_10') > 0 ? cfg.getTarifa('precio_1_10') : 80;
+      rango = '1-10 pzas';
+    } else if (_cantidad <= 50) {
+      tarifa = cfg.getTarifa('precio_11_50') > 0 ? cfg.getTarifa('precio_11_50') : 45;
+      rango = '11-50 pzas';
+    } else if (_cantidad <= 200) {
+      tarifa = cfg.getTarifa('precio_51_200') > 0 ? cfg.getTarifa('precio_51_200') : 20;
+      rango = '51-200 pzas';
+    } else {
+      tarifa = cfg.getTarifa('precio_200_mas') > 0 ? cfg.getTarifa('precio_200_mas') : 10;
+      rango = '200+ pzas';
+    }
+    final factor = _tipoSel?.factor ?? 1.0;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: AppColors.azulClaro,
+        borderRadius: BorderRadius.circular(8)),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Rango: $rango',
+            style: const TextStyle(fontSize: 11, color: AppColors.azul)),
+          Text('${fmt.format(tarifa)} x pieza (factor x${factor.toStringAsFixed(1)})',
+            style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        ]),
+        Text(fmt.format(tarifa * factor * _cantidad),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
+            color: AppColors.azul)),
+      ]));
+  }
+
+  // IMPRESION 3D ────────────────────────────────────────────────
+  Widget _bodyImpresion(SimConfig cfg) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+    _seccionCard('Tipo / Calidad', Column(children: [
+      Wrap(spacing: 8, runSpacing: 8,
+        children: cfg.tipos.map((t) {
+          final sel = _tipoSel?.id == t.id;
+          return GestureDetector(
+            onTap: () => setState(() { _tipoSel = t; _resultado = null; }),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: sel ? AppColors.azul : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+              child: Column(children: [
+                Text(t.nombre, style: TextStyle(fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: sel ? Colors.white : AppColors.textoPrincipal)),
+                if (t.descripcionFormula != null)
+                  Text(t.descripcionFormula!, style: TextStyle(fontSize: 9,
+                    color: sel ? Colors.white70 : AppColors.textoSecundario)),
+              ])));
+        }).toList()),
+    ])),
+    const SizedBox(height: 10),
+
+    _seccionCard('Material', Wrap(spacing: 8, runSpacing: 8, children: [
+      _chipImpMat('pla', 'PLA', 'Basico'),
+      _chipImpMat('abs', 'ABS', 'Resistente'),
+      _chipImpMat('petg', 'PETG', 'Semi-flex'),
+      _chipImpMat('tpu', 'TPU', 'Flexible'),
+    ])),
+    const SizedBox(height: 10),
+
+    _seccionCard('Dimensiones de la pieza', Column(children: [
+      _campoMedida('Largo (cm)', _largo,
+        (v) => setState(() { _largo = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _campoMedida('Ancho (cm)', _ancho,
+        (v) => setState(() { _ancho = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _campoMedida('Alto (cm)', _alto,
+        (v) => setState(() { _alto = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _filaCantidad(),
+      if (_largo > 0 && _ancho > 0 && _alto > 0) ...[
+        const SizedBox(height: 10),
+        () {
+          final vol = _largo * _ancho * _alto * 0.20;
+          final dens = {'pla':1.24,'abs':1.04,'petg':1.27,'tpu':1.20}[_materialImpresion] ?? 1.24;
+          final gr = vol * dens;
+          return Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.azulClaro,
+              borderRadius: BorderRadius.circular(8)),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text('Gramos estimados (20% relleno):',
+                style: const TextStyle(fontSize: 11, color: AppColors.azul)),
+              Text('${gr.toStringAsFixed(0)} gr',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+                  color: AppColors.azul)),
+            ]));
+        }(),
+      ],
+    ])),
+    const SizedBox(height: 10),
+
+    _seccionCard('Extras', Column(children: [
+      _toggleOpcion('Incluir modelado 3D', _llevaDisenyo3D,
+        (v) => setState(() { _llevaDisenyo3D = v; _resultado = null; })),
+      _toggleOpcion('Post-proceso (lijado/pintura)', _llevaPostProceso,
+        (v) => setState(() { _llevaPostProceso = v; _resultado = null; })),
+      const Divider(height: 16),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('IVA 16%',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Switch(value: _aplicarIva,
+          onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+          activeColor: AppColors.azul),
+      ]),
+    ])),
+    const SizedBox(height: 40),
+  ]);
+
+  Widget _chipImpMat(String val, String titulo, String sub) {
+    final sel = _materialImpresion == val;
+    return GestureDetector(
+      onTap: () => setState(() { _materialImpresion = val; _resultado = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
+        child: Column(children: [
+          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+            color: sel ? Colors.white : AppColors.textoPrincipal)),
+          Text(sub, style: TextStyle(fontSize: 9,
+            color: sel ? Colors.white70 : AppColors.textoSecundario)),
+        ])));
+  }
+
+  // HERRERÍA ────────────────────────────────────────────────────
+  Widget _bodyHerreria(SimConfig cfg) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start, children: [
+    _seccionCard('Tipo de trabajo', _buildTipos()),
+    const SizedBox(height: 10),
+    _seccionCard('Material', Wrap(spacing: 8, runSpacing: 8,
+      children: ['Cuadrado 1"', 'Cuadrado 3/4"', 'Angulo', 'Placa', 'Cliente trae']
+        .map((m) => GestureDetector(
+          onTap: () => setState(() {
+            _materialHerreria = m;
+            _clienteTreMaterial = m == 'Cliente trae';
+            _resultado = null;
+          }),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _materialHerreria == m ? AppColors.azul : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _materialHerreria == m
+                ? AppColors.azul : AppColors.grisBorde)),
+            child: Text(m, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+              color: _materialHerreria == m ? Colors.white : AppColors.textoPrincipal)))
+        )).toList())),
+    const SizedBox(height: 10),
+    _seccionCard('Medidas', Column(children: [
+      _campoMedida('Largo (cm)', _largo,
+        (v) => setState(() { _largo = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _campoMedida('Ancho (cm)', _ancho,
+        (v) => setState(() { _ancho = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _campoMedida('Horas estimadas', _horas,
+        (v) => setState(() { _horas = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _filaCantidad(),
+    ])),
+    const SizedBox(height: 10),
+    _seccionCard('Acabado', Wrap(spacing: 8, runSpacing: 8,
+      children: ['Sin acabado', 'Anticorrosivo', 'Pintura epoxica', 'Galvanizado']
+        .map((a) => GestureDetector(
+          onTap: () => setState(() { _acabadoHerreria = a; _resultado = null; }),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _acabadoHerreria == a ? AppColors.naranja : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _acabadoHerreria == a
+                ? AppColors.naranja : AppColors.grisBorde)),
+            child: Text(a, style: TextStyle(fontSize: 11,
+              color: _acabadoHerreria == a ? Colors.white : AppColors.textoPrincipal)))
+        )).toList())),
+    const SizedBox(height: 10),
+    _seccionCard('Extras', Column(children: [
+      _toggleOpcion('Instalacion', _llevaInstalacion,
+        (v) => setState(() { _llevaInstalacion = v; _resultado = null; })),
+      if (_llevaInstalacion) ...[
+        const SizedBox(height: 8),
+        _campoMedida('Horas de instalacion', _horasInstalacion,
+          (v) => setState(() { _horasInstalacion = v; _resultado = null; })),
+      ],
+      const Divider(height: 16),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('IVA 16%',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Switch(value: _aplicarIva,
+          onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+          activeColor: AppColors.azul),
+      ]),
+    ])),
+    const SizedBox(height: 40),
+  ]);
+
+  // CARPINTERÍA ─────────────────────────────────────────────────
+  Widget _bodyCarpinteria(SimConfig cfg) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start, children: [
+    _seccionCard('Tipo de trabajo', _buildTipos()),
+    const SizedBox(height: 10),
+    _seccionCard('Material', Wrap(spacing: 8, runSpacing: 8,
+      children: [
+        {'v':'mdf','l':'MDF','d':'\$320/m²'},
+        {'v':'triplay','l':'Triplay','d':'\$450/m²'},
+        {'v':'cedro','l':'Cedro','d':'\$800+/m²'},
+        {'v':'parota','l':'Parota','d':'\$1,000+/m²'},
+        {'v':'caoba','l':'Caoba','d':'\$900+/m²'},
+        {'v':'cliente','l':'Cliente trae','d':'Sin costo'},
+      ].map((m) => GestureDetector(
+        onTap: () => setState(() {
+          _materialCarpinteria = m['v']!;
+          _clienteTreMaterial = m['v'] == 'cliente';
+          _resultado = null;
+        }),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: _materialCarpinteria == m['v'] ? AppColors.azul : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _materialCarpinteria == m['v']
+              ? AppColors.azul : AppColors.grisBorde)),
+          child: Column(children: [
+            Text(m['l']!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+              color: _materialCarpinteria == m['v'] ? Colors.white : AppColors.textoPrincipal)),
+            Text(m['d']!, style: TextStyle(fontSize: 9,
+              color: _materialCarpinteria == m['v'] ? Colors.white70 : AppColors.textoSecundario)),
+          ]))
+      )).toList())),
+    const SizedBox(height: 10),
+    _seccionCard('Medidas', Column(children: [
+      _campoMedida('Largo (cm)', _largo,
+        (v) => setState(() { _largo = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _campoMedida('Ancho (cm)', _ancho,
+        (v) => setState(() { _ancho = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _campoMedida('Alto (cm)', _alto,
+        (v) => setState(() { _alto = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _campoMedida('Horas estimadas de trabajo', _horas,
+        (v) => setState(() { _horas = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _filaCantidad(),
+    ])),
+    const SizedBox(height: 10),
+    _seccionCard('Acabado', Wrap(spacing: 8, runSpacing: 8,
+      children: ['Sin acabado', 'Barniz', 'Pintura', 'Sellador', 'Laminado']
+        .map((a) => GestureDetector(
+          onTap: () => setState(() { _acabadoCarpinteria = a; _resultado = null; }),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: _acabadoCarpinteria == a ? AppColors.naranja : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: _acabadoCarpinteria == a
+                ? AppColors.naranja : AppColors.grisBorde)),
+            child: Text(a, style: TextStyle(fontSize: 11,
+              color: _acabadoCarpinteria == a ? Colors.white : AppColors.textoPrincipal)))
+        )).toList())),
+    const SizedBox(height: 10),
+    _seccionCard('Extras', Column(children: [
+      _toggleOpcion('Herrajes incluidos', _llevaHerrajes,
+        (v) => setState(() { _llevaHerrajes = v; _resultado = null; })),
+      _toggleOpcion('Instalacion', _llevaInstalacionCarp,
+        (v) => setState(() { _llevaInstalacionCarp = v; _resultado = null; })),
+      if (_llevaInstalacionCarp) ...[
+        const SizedBox(height: 8),
+        _campoMedida('Horas de instalacion', _horasInstalacionCarp,
+          (v) => setState(() { _horasInstalacionCarp = v; _resultado = null; })),
+      ],
+      const Divider(height: 16),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('IVA 16%',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Switch(value: _aplicarIva,
+          onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+          activeColor: AppColors.azul),
+      ]),
+    ])),
+    const SizedBox(height: 40),
+  ]);
+
+  Widget _buildExtrasLaser(SimConfig cfg) => Column(children: [
+    _toggleOpcion('Diseno / Vectorizacion', _llevaDiseno,
+      (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
+    _toggleOpcion('Desgaste tubo CO2', _llevaTuboCO2,
+      (v) => setState(() { _llevaTuboCO2 = v; _resultado = null; })),
+    _toggleOpcion('Flete / Entrega', _llevaFlete,
+      (v) => setState(() { _llevaFlete = v; _resultado = null; })),
+    const Divider(height: 16),
+    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      const Text('IVA 16%',
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      Switch(value: _aplicarIva,
+        onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+        activeColor: AppColors.azul),
+    ]),
+  ]);
+
+  Widget _buildMedidasSimple() => Column(children: [
+    _campoMedida('Largo (cm)', _largo,
+      (v) => setState(() { _largo = v; _resultado = null; })),
+    const SizedBox(height: 10),
+    _campoMedida('Ancho (cm)', _ancho,
+      (v) => setState(() { _ancho = v; _resultado = null; })),
+    const SizedBox(height: 10),
+    _filaCantidad(),
+  ]);
+
+────
   Widget _buildMaterial() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
