@@ -1180,7 +1180,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
   // Impresión 3D
   String _materialImpresion = 'pla';
   String _calidadImpresion = 'normal';
-  bool _llevaDiseño3D = false;
+  bool _llevaDisenyo3D = false;
   bool _llevaPostProceso = false;
   // Herrería
   String _materialHerreria = 'cuadrado_1';
@@ -1629,12 +1629,9 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     }
     return Column(children: [
       Wrap(spacing: 8, runSpacing: 8, children: [
-        _chipDensidad('ligero', 'Ligero', 'Intervalo 0.2mm
-180 mm/s'),
-        _chipDensidad('normal', 'Normal', 'Intervalo 0.15mm
-190 mm/s'),
-        _chipDensidad('denso', 'Denso', 'Intervalo 0.1mm
-200 mm/s'),
+        _chipDensidad('ligero', 'Ligero', 'Intervalo 0.2mm\n180 mm/s'),
+        _chipDensidad('normal', 'Normal', 'Intervalo 0.15mm\n190 mm/s'),
+        _chipDensidad('denso', 'Denso', 'Intervalo 0.1mm\n200 mm/s'),
       ]),
     ]);
   }
@@ -1803,14 +1800,11 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     const Text('Calidad de impresión:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
     const SizedBox(height: 8),
     Row(children: [
-      _chipCalidad('rapida', '⚡ Rápida', 'Menor detalle
-Más barata'),
+      _chipCalidad('rapida', '⚡ Rapida', 'Menor detalle / Mas barata'),
       const SizedBox(width: 8),
-      _chipCalidad('normal', '⚖️ Normal', 'Equilibrio
-calidad-precio'),
+      _chipCalidad('normal', '⚖️ Normal', 'Equilibrio calidad-precio'),
       const SizedBox(width: 8),
-      _chipCalidad('alta', '💎 Alta', 'Máximo detalle
-Más tiempo'),
+      _chipCalidad('alta', '💎 Alta', 'Maximo detalle / Mas tiempo'),
     ]),
   ]);
 
@@ -1916,8 +1910,8 @@ Más tiempo'),
 
 
   Widget _buildExtrasImpresion() => Column(children: [
-    _toggleOpcion('🎨 Incluir modelado 3D', _llevaDiseño3D,
-      (v) => setState(() { _llevaDiseño3D = v; _resultado = null; })),
+    _toggleOpcion('🎨 Incluir modelado 3D', _llevaDisenyo3D,
+      (v) => setState(() { _llevaDisenyo3D = v; _resultado = null; })),
     _toggleOpcion('✨ Post-proceso (lijado/pintura)', _llevaPostProceso,
       (v) => setState(() { _llevaPostProceso = v; _resultado = null; })),
     const Divider(height: 16),
