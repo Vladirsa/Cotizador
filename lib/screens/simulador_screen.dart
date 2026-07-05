@@ -869,28 +869,8 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   double get _totalCarrito => _carrito.fold(0, (s, r) => s + r.total);
 
   @override
-  void initState() {
-    super.initState();
-    _laserTabCtrl = TabController(length: 5, vsync: this);
-    // Listeners para sincronizar controllers con variables
-    _largoCtrl.addListener(() => setState(() {
-      _largo = double.tryParse(_largoCtrl.text) ?? 0; _resultado = null; }));
-    _anchoCtrl.addListener(() => setState(() {
-      _ancho = double.tryParse(_anchoCtrl.text) ?? 0; _resultado = null; }));
-    _altoCtrl.addListener(() => setState(() {
-      _alto = double.tryParse(_altoCtrl.text) ?? 0; _resultado = null; }));
-    _pesoPCtrl.addListener(() => setState(() {
-      _peso = double.tryParse(_pesoPCtrl.text) ?? 0; _resultado = null; }));
-    _metrosCtrl.addListener(() => setState(() {
-      _metros = double.tryParse(_metrosCtrl.text) ?? 0; _resultado = null; }));
-    _horasCtrl.addListener(() => setState(() {
-      _horas = double.tryParse(_horasCtrl.text) ?? 0; _resultado = null; }));
-    _minutosCtrl.addListener(() => setState(() {
-      _minutos = double.tryParse(_minutosCtrl.text) ?? 0; _resultado = null; }));
-    _cantCtrl.addListener(() => setState(() {
-      _cantidad = int.tryParse(_cantCtrl.text) ?? 1; _resultado = null; }));
-    _cargar();
-  }
+  void initState() { super.initState(); _cargar(); }
+
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
@@ -1493,14 +1473,11 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     const Text('Calidad de impresión:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
     const SizedBox(height: 8),
     Row(children: [
-      _chipCalidad('rapida', '⚡ Rápida', 'Menor detalle
-Más barata'),
+      _chipCalidad('rapida', '⚡ Rapida', 'Menor detalle / Mas barata'),
       const SizedBox(width: 8),
-      _chipCalidad('normal', '⚖️ Normal', 'Equilibrio
-calidad-precio'),
+      _chipCalidad('normal', '⚖️ Normal', 'Equilibrio / calidad-precio'),
       const SizedBox(width: 8),
-      _chipCalidad('alta', '💎 Alta', 'Máximo detalle
-Más tiempo'),
+      _chipCalidad('alta', '💎 Alta', 'Maximo detalle / Mas tiempo'),
     ]),
   ]);
 
@@ -2920,7 +2897,6 @@ Más tiempo'),
     _filaCantidad(),
   ]);
 
-────
   Widget _buildMaterial() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
