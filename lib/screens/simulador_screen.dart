@@ -1392,12 +1392,13 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     crossAxisAlignment: CrossAxisAlignment.start, children: [
 
     // 1. Tipo de trabajo -> controla _tipoLaser directamente
-    _seccionCard('Tipo de trabajo', Wrap(spacing: 8, runSpacing: 8,
-      children: [
-        _chipLaserTipo('corte', 'Solo corte', 'Perimetro de la pieza'),
-        _chipLaserTipo('grabado', 'Solo grabado', 'Raster sobre superficie'),
-        _chipLaserTipo('ambos', 'Corte + Grabado', 'Corta y graba'),
-      ])),
+    _seccionCard('Tipo de trabajo', _dropdownGenerico<String>(
+      value: _tipoLaser,
+      opciones: const ['corte', 'grabado', 'ambos'],
+      label: (t) => {'corte':'Solo corte','grabado':'Solo grabado','ambos':'Corte + Grabado'}[t] ?? t,
+      sublabel: (t) => {'corte':'Perimetro de la pieza','grabado':'Raster sobre superficie','ambos':'Corta y graba'}[t],
+      onSelect: (t) => setState(() { _tipoLaser = t; _resultado = null; }),
+      hint: 'Selecciona el tipo de trabajo')),
     const SizedBox(height: 10),
 
     // 2. Material
@@ -1691,28 +1692,52 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         activeColor: AppColors.azul),
     ]),
   ]);
+
+  // ── DROPDOWN GENÉRICO (selector tipo menú) ──────────────────
+  Widget _dropdownGenerico<T>({
+    required T? value,
+    required List<T> opciones,
+    required String Function(T) label,
+    String? Function(T)? sublabel,
+    required void Function(T) onSelect,
+    String hint = 'Selecciona una opción',
+  }) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        hintText: hint,
+        filled: true, fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.grisBorde)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.grisBorde))),
+      items: opciones.map((o) => DropdownMenuItem<T>(
+        value: o,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label(o), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+            color: AppColors.textoPrincipal)),
+          if (sublabel != null && sublabel(o) != null)
+            Text(sublabel(o)!, style: const TextStyle(fontSize: 10,
+              color: AppColors.textoSecundario)),
+        ]))).toList(),
+      onChanged: (v) { if (v != null) onSelect(v); },
+      style: const TextStyle(fontSize: 13, color: AppColors.textoPrincipal));
+  }
+
   // ── TIPOS DE TRABAJO ─────────────────────────────
   Widget _buildTipos() {
     final cfg = _config!;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Wrap(spacing: 8, runSpacing: 8,
-        children: cfg.tipos.map((t) {
-          final sel = _tipoSel?.id == t.id;
-          return GestureDetector(
-            onTap: () => setState(() { _tipoSel = t; _resultado = null; }),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: sel ? AppColors.azul : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(t.nombre, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                  color: sel ? Colors.white : AppColors.textoPrincipal)),
-                if (t.descripcionFormula != null) Text(t.descripcionFormula!,
-                  style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : AppColors.textoSecundario)),
-              ])));
-        }).toList()),
+      if (cfg.tipos.isNotEmpty)
+        _dropdownGenerico<SimTipoTrabajo>(
+          value: _tipoSel,
+          opciones: cfg.tipos,
+          label: (t) => t.nombre,
+          sublabel: (t) => t.descripcionFormula,
+          onSelect: (t) => setState(() { _tipoSel = t; _resultado = null; }),
+          hint: 'Selecciona el tipo de trabajo'),
       const SizedBox(height: 8),
       GestureDetector(
         onTap: _nuevoModo,
@@ -1884,13 +1909,13 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         // Material
         const Text('Material:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        Row(children: [
-          _chipMaterial('acero_negro', '⚙️ Acero negro', 'Tarifa base'),
-          const SizedBox(width: 8),
-          _chipMaterial('inox', '✨ Inoxidable', '×1.4'),
-          const SizedBox(width: 8),
-          _chipMaterial('aluminio', '🔵 Aluminio', '×1.3'),
-        ]),
+        _dropdownGenerico<String>(
+          value: _material,
+          opciones: const ['acero_negro', 'inox', 'aluminio'],
+          label: (m) => {'acero_negro':'Acero negro','inox':'Inoxidable','aluminio':'Aluminio'}[m] ?? m,
+          sublabel: (m) => {'acero_negro':'Tarifa base','inox':'x1.4','aluminio':'x1.3'}[m],
+          onSelect: (m) => setState(() { _material = m; _resultado = null; }),
+          hint: 'Selecciona el material'),
 
         const SizedBox(height: 12),
 
@@ -2265,21 +2290,13 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     ]);
   }
 
-  Widget _buildAcabadoChips(SimConfig cfg) => Wrap(spacing: 8, runSpacing: 8,
-    children: cfg.acabados.map((a) => GestureDetector(
-      onTap: () => setState(() { _acabadoSel = a; _resultado = null; }),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: _acabadoSel?.id == a.id ? AppColors.azul : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _acabadoSel?.id == a.id
-            ? AppColors.azul : AppColors.grisBorde)),
-        child: Text(
-          '${a.nombre}${a.precio > 0 ? " (+\$${a.precio.toStringAsFixed(0)})" : ""}',
-          style: TextStyle(fontSize: 11,
-            color: _acabadoSel?.id == a.id ? Colors.white : AppColors.textoPrincipal)))
-    )).toList());
+  Widget _buildAcabadoChips(SimConfig cfg) => _dropdownGenerico<SimAcabado>(
+    value: _acabadoSel,
+    opciones: cfg.acabados,
+    label: (a) => a.nombre,
+    sublabel: (a) => a.precio > 0 ? '+\$${a.precio.toStringAsFixed(0)}' : 'Sin costo adicional',
+    onSelect: (a) => setState(() { _acabadoSel = a; _resultado = null; }),
+    hint: 'Selecciona el acabado');
 
   Widget _filaCantidad() => Row(children: [
     const Text('Cantidad:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -2434,15 +2451,23 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     const SizedBox(height: 10),
 
     // Material del grabado
-    _seccionCard('Material a grabar', Wrap(spacing: 8, runSpacing: 8,
-      children: [
-        _chipFibraMat('acero_inox', 'Acero Inox', 'Marcado negro'),
-        _chipFibraMat('acero_negro', 'Acero negro', 'Marcado gris'),
-        _chipFibraMat('aluminio', 'Aluminio', 'Marcado oscuro'),
-        _chipFibraMat('laton', 'Laton', 'Grabado dorado'),
-        _chipFibraMat('cobre', 'Cobre', 'Grabado cobre'),
-        _chipFibraMat('titanio', 'Titanio', 'Coloracion'),
-      ])),
+    _seccionCard('Material a grabar', () {
+      const mats = {
+        'acero_inox':'Acero Inox', 'acero_negro':'Acero negro', 'aluminio':'Aluminio',
+        'laton':'Laton', 'cobre':'Cobre', 'titanio':'Titanio',
+      };
+      const subs = {
+        'acero_inox':'Marcado negro', 'acero_negro':'Marcado gris', 'aluminio':'Marcado oscuro',
+        'laton':'Grabado dorado', 'cobre':'Grabado cobre', 'titanio':'Coloracion',
+      };
+      return _dropdownGenerico<String>(
+        value: _material,
+        opciones: mats.keys.toList(),
+        label: (m) => mats[m] ?? m,
+        sublabel: (m) => subs[m],
+        onSelect: (m) => setState(() { _material = m; _resultado = null; }),
+        hint: 'Selecciona el material');
+    }()),
     const SizedBox(height: 10),
 
     // Cantidad - precio escalonado
@@ -2558,12 +2583,17 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     ])),
     const SizedBox(height: 10),
 
-    _seccionCard('Material', Wrap(spacing: 8, runSpacing: 8, children: [
-      _chipImpMat('pla', 'PLA', 'Basico'),
-      _chipImpMat('abs', 'ABS', 'Resistente'),
-      _chipImpMat('petg', 'PETG', 'Semi-flex'),
-      _chipImpMat('tpu', 'TPU', 'Flexible'),
-    ])),
+    _seccionCard('Material', () {
+      const mats = {'pla':'PLA','abs':'ABS','petg':'PETG','tpu':'TPU'};
+      const subs = {'pla':'Basico','abs':'Resistente','petg':'Semi-flex','tpu':'Flexible'};
+      return _dropdownGenerico<String>(
+        value: _materialImpresion,
+        opciones: mats.keys.toList(),
+        label: (m) => mats[m] ?? m,
+        sublabel: (m) => subs[m],
+        onSelect: (m) => setState(() { _materialImpresion = m; _resultado = null; }),
+        hint: 'Selecciona el material');
+    }()),
     const SizedBox(height: 10),
 
     _seccionCard('Dimensiones de la pieza', Column(children: [
@@ -2639,24 +2669,16 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     crossAxisAlignment: CrossAxisAlignment.start, children: [
     _seccionCard('Tipo de trabajo', _buildTipos()),
     const SizedBox(height: 10),
-    _seccionCard('Material', Wrap(spacing: 8, runSpacing: 8,
-      children: ['Cuadrado 1"', 'Cuadrado 3/4"', 'Angulo', 'Placa', 'Cliente trae']
-        .map((m) => GestureDetector(
-          onTap: () => setState(() {
-            _materialHerreria = m;
-            _clienteTreMaterial = m == 'Cliente trae';
-            _resultado = null;
-          }),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: _materialHerreria == m ? AppColors.azul : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _materialHerreria == m
-                ? AppColors.azul : AppColors.grisBorde)),
-            child: Text(m, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-              color: _materialHerreria == m ? Colors.white : AppColors.textoPrincipal)))
-        )).toList())),
+    _seccionCard('Material', _dropdownGenerico<String>(
+      value: _materialHerreria.isNotEmpty ? _materialHerreria : null,
+      opciones: const ['Cuadrado 1"', 'Cuadrado 3/4"', 'Angulo', 'Placa', 'Cliente trae'],
+      label: (m) => m,
+      onSelect: (m) => setState(() {
+        _materialHerreria = m;
+        _clienteTreMaterial = m == 'Cliente trae';
+        _resultado = null;
+      }),
+      hint: 'Selecciona el material')),
     const SizedBox(height: 10),
     _seccionCard('Medidas', Column(children: [
       _campoMedida('Largo (cm)', _largo,
@@ -2671,20 +2693,12 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       _filaCantidad(),
     ])),
     const SizedBox(height: 10),
-    _seccionCard('Acabado', Wrap(spacing: 8, runSpacing: 8,
-      children: ['Sin acabado', 'Anticorrosivo', 'Pintura epoxica', 'Galvanizado']
-        .map((a) => GestureDetector(
-          onTap: () => setState(() { _acabadoHerreria = a; _resultado = null; }),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: _acabadoHerreria == a ? AppColors.naranja : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _acabadoHerreria == a
-                ? AppColors.naranja : AppColors.grisBorde)),
-            child: Text(a, style: TextStyle(fontSize: 11,
-              color: _acabadoHerreria == a ? Colors.white : AppColors.textoPrincipal)))
-        )).toList())),
+    _seccionCard('Acabado', _dropdownGenerico<String>(
+      value: _acabadoHerreria.isNotEmpty ? _acabadoHerreria : null,
+      opciones: const ['Sin acabado', 'Anticorrosivo', 'Pintura epoxica', 'Galvanizado'],
+      label: (a) => a,
+      onSelect: (a) => setState(() { _acabadoHerreria = a; _resultado = null; }),
+      hint: 'Selecciona el acabado')),
     const SizedBox(height: 10),
     _seccionCard('Extras', Column(children: [
       _toggleOpcion('Instalacion', _llevaInstalacion,
@@ -2711,34 +2725,23 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     crossAxisAlignment: CrossAxisAlignment.start, children: [
     _seccionCard('Tipo de trabajo', _buildTipos()),
     const SizedBox(height: 10),
-    _seccionCard('Material', Wrap(spacing: 8, runSpacing: 8,
-      children: [
-        {'v':'mdf','l':'MDF','d':'\$320/m²'},
-        {'v':'triplay','l':'Triplay','d':'\$450/m²'},
-        {'v':'cedro','l':'Cedro','d':'\$800+/m²'},
-        {'v':'parota','l':'Parota','d':'\$1,000+/m²'},
-        {'v':'caoba','l':'Caoba','d':'\$900+/m²'},
-        {'v':'cliente','l':'Cliente trae','d':'Sin costo'},
-      ].map((m) => GestureDetector(
-        onTap: () => setState(() {
-          _materialCarpinteria = m['v']!;
-          _clienteTreMaterial = m['v'] == 'cliente';
+    _seccionCard('Material', () {
+      const mats = {'mdf':'MDF','triplay':'Triplay','cedro':'Cedro',
+        'parota':'Parota','caoba':'Caoba','cliente':'Cliente trae'};
+      const subs = {'mdf':'\$320/m2','triplay':'\$450/m2','cedro':'\$800+/m2',
+        'parota':'\$1,000+/m2','caoba':'\$900+/m2','cliente':'Sin costo'};
+      return _dropdownGenerico<String>(
+        value: _materialCarpinteria.isNotEmpty ? _materialCarpinteria : null,
+        opciones: mats.keys.toList(),
+        label: (m) => mats[m] ?? m,
+        sublabel: (m) => subs[m],
+        onSelect: (m) => setState(() {
+          _materialCarpinteria = m;
+          _clienteTreMaterial = m == 'cliente';
           _resultado = null;
         }),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: _materialCarpinteria == m['v'] ? AppColors.azul : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: _materialCarpinteria == m['v']
-              ? AppColors.azul : AppColors.grisBorde)),
-          child: Column(children: [
-            Text(m['l']!, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-              color: _materialCarpinteria == m['v'] ? Colors.white : AppColors.textoPrincipal)),
-            Text(m['d']!, style: TextStyle(fontSize: 9,
-              color: _materialCarpinteria == m['v'] ? Colors.white70 : AppColors.textoSecundario)),
-          ]))
-      )).toList())),
+        hint: 'Selecciona el material');
+    }()),
     const SizedBox(height: 10),
     _seccionCard('Medidas', Column(children: [
       _campoMedida('Largo (cm)', _largo,
@@ -2756,20 +2759,12 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       _filaCantidad(),
     ])),
     const SizedBox(height: 10),
-    _seccionCard('Acabado', Wrap(spacing: 8, runSpacing: 8,
-      children: ['Sin acabado', 'Barniz', 'Pintura', 'Sellador', 'Laminado']
-        .map((a) => GestureDetector(
-          onTap: () => setState(() { _acabadoCarpinteria = a; _resultado = null; }),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: _acabadoCarpinteria == a ? AppColors.naranja : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _acabadoCarpinteria == a
-                ? AppColors.naranja : AppColors.grisBorde)),
-            child: Text(a, style: TextStyle(fontSize: 11,
-              color: _acabadoCarpinteria == a ? Colors.white : AppColors.textoPrincipal)))
-        )).toList())),
+    _seccionCard('Acabado', _dropdownGenerico<String>(
+      value: _acabadoCarpinteria.isNotEmpty ? _acabadoCarpinteria : null,
+      opciones: const ['Sin acabado', 'Barniz', 'Pintura', 'Sellador', 'Laminado'],
+      label: (a) => a,
+      onSelect: (a) => setState(() { _acabadoCarpinteria = a; _resultado = null; }),
+      hint: 'Selecciona el acabado')),
     const SizedBox(height: 10),
     _seccionCard('Extras', Column(children: [
       _toggleOpcion('Herrajes incluidos', _llevaHerrajes,
@@ -3405,17 +3400,25 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   }
 
   // ── LASER CO₂: métodos de tabs ───────────────────────────
-  Widget _buildMaterialLaser() => Wrap(spacing: 8, runSpacing: 8,
-    children: [
-      _chipMatLaser('mdf_fino',   'MDF 2.5mm', '30 mm/s'),
-      _chipMatLaser('mdf_medio',  'MDF 3-5mm', '21 mm/s'),
-      _chipMatLaser('mdf_grueso', 'MDF 6mm+',  'editable'),
-      _chipMatLaser('acrilico',   'Acrilico',  'editable'),
-      _chipMatLaser('cuero',      'Cuero',     'editable'),
-      _chipMatLaser('papel',      'Papel',     'editable'),
-      _chipMatLaser('piedra',     'Piedra',    'editable'),
-      _chipMatLaser('metal',      'Metal',     'editable'),
-    ]);
+  Widget _buildMaterialLaser() {
+    const mats = {
+      'mdf_fino':'MDF 2.5mm', 'mdf_medio':'MDF 3-5mm', 'mdf_grueso':'MDF 6mm+',
+      'acrilico':'Acrilico', 'cuero':'Cuero', 'papel':'Papel',
+      'piedra':'Piedra', 'metal':'Metal',
+    };
+    const vels = {
+      'mdf_fino':'30 mm/s', 'mdf_medio':'21 mm/s', 'mdf_grueso':'editable',
+      'acrilico':'editable', 'cuero':'editable', 'papel':'editable',
+      'piedra':'editable', 'metal':'editable',
+    };
+    return _dropdownGenerico<String>(
+      value: _materialLaser,
+      opciones: mats.keys.toList(),
+      label: (m) => mats[m] ?? m,
+      sublabel: (m) => vels[m],
+      onSelect: (m) => setState(() { _materialLaser = m; _resultado = null; }),
+      hint: 'Selecciona el material');
+  }
 
   Widget _buildDensidadLaser() {
     if (_tipoLaser == 'corte') {
@@ -3427,11 +3430,21 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           'La densidad aplica solo para grabado.',
           style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)));
     }
-    return Wrap(spacing: 8, runSpacing: 8, children: [
-      _chipDensidad('ligero', 'Ligero', 'Intervalo 0.2mm - 180mm/s'),
-      _chipDensidad('normal', 'Normal', 'Intervalo 0.15mm - 190mm/s'),
-      _chipDensidad('denso',  'Denso',  'Intervalo 0.1mm - 200mm/s'),
-    ]);
+    const dens = {
+      'ligero':'Ligero', 'normal':'Normal', 'denso':'Denso',
+    };
+    const subs = {
+      'ligero':'Intervalo 0.2mm - 180mm/s',
+      'normal':'Intervalo 0.15mm - 190mm/s',
+      'denso':'Intervalo 0.1mm - 200mm/s',
+    };
+    return _dropdownGenerico<String>(
+      value: _densidadLaser,
+      opciones: dens.keys.toList(),
+      label: (d) => dens[d] ?? d,
+      sublabel: (d) => subs[d],
+      onSelect: (d) => setState(() { _densidadLaser = d; _resultado = null; }),
+      hint: 'Selecciona la densidad');
   }
 
   Widget _chipDensidad(String val, String titulo, String sub) {
@@ -3454,30 +3467,17 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         ])));
   }
 
-  Widget _buildCalibre() => Wrap(spacing: 6, runSpacing: 6,
-    children: [
-      'Cal 20','Cal 18','Cal 16','Cal 14','Cal 12',
-      'Cal 10','Cal 8','Cal 6','1/4"','3/8"','1/2"+'
-    ].map((c) {
-      final sel = _calibre == c;
-      final delgado = ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12'].contains(c);
-      return GestureDetector(
-        onTap: () => setState(() { _calibre = c; _resultado = null; }),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: sel ? AppColors.azul : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: sel ? AppColors.azul : AppColors.grisBorde)),
-          child: Column(children: [
-            Text(c, style: TextStyle(fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: sel ? Colors.white : AppColors.textoPrincipal)),
-            Text(delgado ? 'Delgado' : 'Medio/Grueso',
-              style: TextStyle(fontSize: 9,
-                color: sel ? Colors.white70 : AppColors.textoSecundario)),
-          ])));
-    }).toList());
+  Widget _buildCalibre() {
+    const calibres = ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12',
+      'Cal 10','Cal 8','Cal 6','1/4"','3/8"','1/2"+'];
+    const delgados = ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12'];
+    return _dropdownGenerico<String>(
+      value: _calibre,
+      opciones: calibres,
+      label: (c) => c,
+      sublabel: (c) => delgados.contains(c) ? 'Delgado' : 'Medio/Grueso',
+      onSelect: (c) => setState(() { _calibre = c; _resultado = null; }),
+      hint: 'Selecciona el calibre');
+  }
 
 }
