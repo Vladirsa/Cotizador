@@ -381,6 +381,8 @@ class MotorCalculo {
     // ── CÁLCULO POR FÓRMULA ──────────────────────────
     double precioMaquila = 0;  // precio directo de maquila
     double tiempoHoras = 0;
+    double cm = 0;      // CM: Costo Material
+    double cmTemp = 0;  // material calculado en switch
 
     switch (formula) {
 
@@ -735,7 +737,6 @@ class MotorCalculo {
 
     // ── COSTOS DIRECTOS ─────────────────────────────
     // CM - Material
-    double cm = 0;
     String? materialNombre;
     if (!clienteTreMaterial) {
       if (usarInventario && materialInv != null) {
