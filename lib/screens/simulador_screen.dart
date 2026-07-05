@@ -1151,7 +1151,6 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   bool _clienteTreMaterial = false;
   bool _usarInventario = true;
   int _tabActual = 0;
-  TabController? _laserTabCtrl;
   String _materialLaser = 'mdf_fino';
   String _densidadLaser = 'normal';
   String _tipoLaser = 'corte'; // corte, grabado, ambos
@@ -1203,7 +1202,6 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   @override
   void initState() {
     super.initState();
-    _laserTabCtrl = TabController(length: 5, vsync: this);
     // Listeners para sincronizar controllers con variables
     _largoCtrl.addListener(() => setState(() {
       _largo = double.tryParse(_largoCtrl.text) ?? 0; _resultado = null; }));
@@ -1228,7 +1226,6 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   void dispose() {
     for (final c in _tarifasCtrls.values) c.dispose();
     for (final c in _medidaCtrls.values) c.dispose();
-    _laserTabCtrl?.dispose();
     _largoCtrl.dispose(); _anchoCtrl.dispose(); _altoCtrl.dispose();
     _pesoPCtrl.dispose(); _metrosCtrl.dispose(); _horasCtrl.dispose();
     _minutosCtrl.dispose(); _cantCtrl.dispose();
@@ -1328,8 +1325,6 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       body: Center(child: Text('Error cargando')));
 
     final cfg = _config!;
-    final esLaser = cfg.getTarifa('vel_mdf_fino') > 0;
-    final esFibra = cfg.getTarifa('precio_1_10') > 0;
 
     return Scaffold(
       backgroundColor: AppColors.gris,
@@ -1341,31 +1336,31 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           Expanded(child: Text(widget.servicio.nombre,
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
               color: AppColors.azul), overflow: TextOverflow.ellipsis)),
-        ]),
-        bottom: esLaser && !esFibra ? TabBar(
-          controller: _laserTabCtrl,
-          labelColor: AppColors.azul,
-          unselectedLabelColor: AppColors.textoSecundario,
-          indicatorColor: AppColors.azul,
-          isScrollable: true,
-          tabs: const [Tab(text: 'Tipo'), Tab(text: 'Material'),
-            Tab(text: 'Densidad'), Tab(text: 'Dimensiones'), Tab(text: 'Extras'),
-          ]) : null),
-      body: Column(children: [
-        Expanded(child: esLaser && !esFibra
-          ? TabBarView(controller: _laserTabCtrl, children: [
-              _scrollable(_seccionCard('Tipo de trabajo', _buildTipos())),
-              _scrollable(_seccionCard('Material', _buildMaterialLaser())),
-              _scrollable(_seccionCard('Densidad del grabado', _buildDensidadLaser())),
-              _scrollable(_seccionCard('Dimensiones', _buildMedidasSimple())),
-              _scrollable(_seccionCard('Extras', _buildExtrasLaser(cfg))),
-            ])
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(14),
-              child: _buildBodyServicio(cfg))),
-        _panelCalcular(),
-      ]));
+        ])),
+      // TODO fluye en una sola pantalla scrolleable: secciones + boton + resultado
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(14),
+        child: Column(children: [
+          _buildBodyServicio(cfg),
+          const SizedBox(height: 14),
+          SizedBox(width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _calcular,
+              icon: const Icon(Icons.calculate_outlined, color: Colors.white),
+              label: const Text('Calcular precio',
+                style: TextStyle(fontSize: 15, color: Colors.white,
+                  fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.azul,
+                padding: const EdgeInsets.symmetric(vertical: 14)))),
+          if (_resultado != null) ...[
+            const SizedBox(height: 14),
+            _widgetResultado(_resultado!),
+          ],
+          const SizedBox(height: 40),
+        ])));
   }
+
 
   Widget _scrollable(Widget child) =>
     SingleChildScrollView(padding: const EdgeInsets.all(14), child: child);
@@ -1373,17 +1368,81 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   Widget _buildBodyServicio(SimConfig cfg) {
     final esPlasma = cfg.getTarifa('tarifa_m2_delgado') > 0;
     final esFibra  = cfg.getTarifa('precio_1_10') > 0;
+    final esLaser  = cfg.getTarifa('vel_mdf_fino') > 0 && !esFibra;
     final esImp3D  = cfg.getTarifa('factor_rapida') > 0;
     final esHerr   = cfg.getTarifa('material_hora') > 0 && !esImp3D;
     final esCarp   = cfg.getTarifa('material_mdf_m2') > 0;
 
+    // Auto-seleccionar tipo si no hay ninguno (necesario para la formula)
+    if (_tipoSel == null && cfg.tipos.isNotEmpty) {
+      _tipoSel = cfg.tipos.first;
+    }
+
     if (esPlasma) return _bodyPlasma(cfg);
     if (esFibra)  return _bodyFibra(cfg);
+    if (esLaser)  return _bodyLaserTopDown(cfg);
     if (esImp3D)  return _bodyImpresion(cfg);
     if (esHerr)   return _bodyHerreria(cfg);
     if (esCarp)   return _bodyCarpinteria(cfg);
     return _bodyRouter(cfg);
   }
+
+  // ── LASER CO2: flujo top-down (sin tabs) ────────────────────
+  Widget _bodyLaserTopDown(SimConfig cfg) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+    // 1. Tipo de trabajo -> controla _tipoLaser directamente
+    _seccionCard('Tipo de trabajo', Wrap(spacing: 8, runSpacing: 8,
+      children: [
+        _chipLaserTipo('corte', 'Solo corte', 'Perimetro de la pieza'),
+        _chipLaserTipo('grabado', 'Solo grabado', 'Raster sobre superficie'),
+        _chipLaserTipo('ambos', 'Corte + Grabado', 'Corta y graba'),
+      ])),
+    const SizedBox(height: 10),
+
+    // 2. Material
+    _seccionCard('Material', _buildMaterialLaser()),
+    const SizedBox(height: 10),
+
+    // 3. Densidad (solo si lleva grabado) -- ahora sincronizado con _tipoLaser
+    _seccionCard('Densidad del grabado', _buildDensidadLaser()),
+    const SizedBox(height: 10),
+
+    // 4. Dimensiones
+    _seccionCard('Dimensiones', Column(children: [
+      _campoMedida('Largo (cm)', _largo,
+        (v) => setState(() { _largo = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _campoMedida('Ancho (cm)', _ancho,
+        (v) => setState(() { _ancho = v; _resultado = null; })),
+      const SizedBox(height: 10),
+      _filaCantidad(),
+    ])),
+    const SizedBox(height: 10),
+
+    // 5. Tarifas editables (velocidades, intervalos, tarifa/min)
+    if (cfg.tarifas.isNotEmpty) _seccionTarifas(),
+    const SizedBox(height: 10),
+
+    // 6. Extras
+    _seccionCard('Extras', Column(children: [
+      _toggleOpcion('Diseno / Vectorizacion', _llevaDiseno,
+        (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
+      _toggleOpcion('Desgaste tubo CO2', _llevaTuboCO2,
+        (v) => setState(() { _llevaTuboCO2 = v; _resultado = null; })),
+      _toggleOpcion('Flete / Entrega', _llevaFlete,
+        (v) => setState(() { _llevaFlete = v; _resultado = null; })),
+      const Divider(height: 16),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        const Text('IVA 16%',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Switch(value: _aplicarIva,
+          onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+          activeColor: AppColors.azul),
+      ]),
+    ])),
+    const SizedBox(height: 40),
+  ]);
 
   Widget _panelCalcular() => Container(
     color: Colors.white,
@@ -2309,144 +2368,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     const SizedBox(height: 40),
   ]);
 
-  // LÁSER CO₂ - tabs ────────────────────────────────────────────
-  Widget _bodyLaser(SimConfig cfg) => TabBarView(
-    controller: _laserTabCtrl,
-    children: [
-      // Tab 1: Tipo
-      _scrollable(_seccionCard('Tipo de trabajo', Wrap(spacing: 8, runSpacing: 8,
-        children: [
-          _chipLaserTipo('corte', 'Solo corte', 'Perimetro de la pieza'),
-          _chipLaserTipo('grabado', 'Solo grabado', 'Raster sobre la superficie'),
-          _chipLaserTipo('ambos', 'Corte + Grabado', 'Corta y graba'),
-        ]))),
-      // Tab 2: Material
-      _scrollable(_seccionCard('Material', Column(children: [
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          _chipMatLaser('mdf_fino', 'MDF 2.5mm', '30 mm/s'),
-          _chipMatLaser('mdf_medio', 'MDF 3-5mm', '21 mm/s'),
-          _chipMatLaser('mdf_grueso', 'MDF 6mm+', 'editable'),
-          _chipMatLaser('acrilico', 'Acrilico', 'editable'),
-          _chipMatLaser('cuero', 'Cuero', 'editable'),
-          _chipMatLaser('papel', 'Papel', 'editable'),
-          _chipMatLaser('piedra', 'Piedra', 'editable'),
-          _chipMatLaser('metal', 'Metal', 'editable'),
-        ]),
-        const SizedBox(height: 12),
-        if (cfg.tarifas.isNotEmpty) ...[
-          const Text('Velocidades (editables):',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-              color: AppColors.textoSecundario)),
-          const SizedBox(height: 8),
-          ...cfg.tarifas.values
-            .where((t) => t.clave.startsWith('vel_'))
-            .map((t) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(children: [
-                Expanded(child: Text(t.nombre,
-                  style: const TextStyle(fontSize: 12))),
-                SizedBox(width: 90, child: TextFormField(
-                  controller: _tarifasCtrls[t.id],
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  textAlign: TextAlign.right,
-                  decoration: const InputDecoration(isDense: true, filled: true,
-                    border: OutlineInputBorder()),
-                  onChanged: (v) {
-                    final val = double.tryParse(v);
-                    if (val != null) t.valor = val;
-                  })),
-              ]))),
-        ],
-      ]))),
-      // Tab 3: Densidad
-      _scrollable(_seccionCard('Densidad del grabado', Column(children: [
-        if (_tipoLaser == 'corte')
-          Container(padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: AppColors.gris,
-              borderRadius: BorderRadius.circular(8)),
-            child: const Text('La densidad solo aplica para grabado.',
-              style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)))
-        else ...[
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            _chipDensidad('ligero', 'Ligero', 'Intervalo 0.2mm - 180mm/s'),
-            _chipDensidad('normal', 'Normal', 'Intervalo 0.15mm - 190mm/s'),
-            _chipDensidad('denso', 'Denso', 'Intervalo 0.1mm - 200mm/s'),
-          ]),
-          const SizedBox(height: 12),
-          // Tarifas de intervalo editables
-          ...cfg.tarifas.values
-            .where((t) => t.clave.startsWith('intervalo_'))
-            .map((t) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(children: [
-                Expanded(child: Text(t.nombre,
-                  style: const TextStyle(fontSize: 12))),
-                SizedBox(width: 90, child: TextFormField(
-                  controller: _tarifasCtrls[t.id],
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  textAlign: TextAlign.right,
-                  decoration: const InputDecoration(isDense: true, filled: true,
-                    border: OutlineInputBorder()),
-                  onChanged: (v) {
-                    final val = double.tryParse(v);
-                    if (val != null) t.valor = val;
-                  })),
-              ]))),
-        ],
-      ]))),
-      // Tab 4: Dimensiones
-      _scrollable(_seccionCard('Dimensiones', Column(children: [
-        _campoMedida('Largo (cm)', _largo,
-          (v) => setState(() { _largo = v; _resultado = null; })),
-        const SizedBox(height: 10),
-        _campoMedida('Ancho (cm)', _ancho,
-          (v) => setState(() { _ancho = v; _resultado = null; })),
-        const SizedBox(height: 10),
-        _filaCantidad(),
-        const SizedBox(height: 10),
-        // Tarifa por minuto editable
-        ...cfg.tarifas.values
-          .where((t) => t.clave == 'tarifa_min')
-          .map((t) => Row(children: [
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-              Text(t.nombre, style: const TextStyle(fontSize: 13,
-                fontWeight: FontWeight.w600)),
-              const Text('Editable segun tu tarifa real',
-                style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-            ])),
-            SizedBox(width: 110, child: TextFormField(
-              controller: _tarifasCtrls[t.id],
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-              textAlign: TextAlign.right,
-              decoration: InputDecoration(isDense: true, filled: true,
-                fillColor: AppColors.gris, prefixText: r'$',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
-              onChanged: (v) {
-                final val = double.tryParse(v);
-                if (val != null) t.valor = val;
-              })),
-          ])),
-      ]))),
-      // Tab 5: Extras
-      _scrollable(_seccionCard('Extras', Column(children: [
-        _toggleOpcion('Diseño / Vectorizacion', _llevaDiseno,
-          (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
-        _toggleOpcion('Incluir desgaste tubo CO2', _llevaTuboCO2,
-          (v) => setState(() { _llevaTuboCO2 = v; _resultado = null; })),
-        _toggleOpcion('Flete / Entrega', _llevaFlete,
-          (v) => setState(() { _llevaFlete = v; _resultado = null; })),
-        const Divider(height: 16),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text('IVA 16%',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          Switch(value: _aplicarIva,
-            onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
-            activeColor: AppColors.azul),
-        ]),
-      ]))),
-    ]);
+    // (bodyLaser con tabs removido - ahora usa _bodyLaserTopDown)
 
   Widget _chipLaserTipo(String val, String titulo, String sub) {
     final sel = _tipoLaser == val;
