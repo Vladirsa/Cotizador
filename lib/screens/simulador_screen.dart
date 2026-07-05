@@ -869,27 +869,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   double get _totalCarrito => _carrito.fold(0, (s, r) => s + r.total);
 
   @override
-  void initState() {
-    super.initState();
-    // Listeners para sincronizar controllers con variables
-    _largoCtrl.addListener(() => setState(() {
-      _largo = double.tryParse(_largoCtrl.text) ?? 0; _resultado = null; }));
-    _anchoCtrl.addListener(() => setState(() {
-      _ancho = double.tryParse(_anchoCtrl.text) ?? 0; _resultado = null; }));
-    _altoCtrl.addListener(() => setState(() {
-      _alto = double.tryParse(_altoCtrl.text) ?? 0; _resultado = null; }));
-    _pesoPCtrl.addListener(() => setState(() {
-      _peso = double.tryParse(_pesoPCtrl.text) ?? 0; _resultado = null; }));
-    _metrosCtrl.addListener(() => setState(() {
-      _metros = double.tryParse(_metrosCtrl.text) ?? 0; _resultado = null; }));
-    _horasCtrl.addListener(() => setState(() {
-      _horas = double.tryParse(_horasCtrl.text) ?? 0; _resultado = null; }));
-    _minutosCtrl.addListener(() => setState(() {
-      _minutos = double.tryParse(_minutosCtrl.text) ?? 0; _resultado = null; }));
-    _cantCtrl.addListener(() => setState(() {
-      _cantidad = int.tryParse(_cantCtrl.text) ?? 1; _resultado = null; }));
-    _cargar();
-  }
+  void initState() { super.initState(); _cargar(); }
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
@@ -1402,7 +1382,7 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     if (esPlasma) return ['Tipo', 'Calibre', 'Material', 'Medidas', 'Extras'];
     if (esLaser) {
       // Detectar Fibra por sus tarifas específicas
-      final esFibra = _config2.getTarifa('precio_1_10') > 0;
+      final esFibra = _config!.getTarifa('precio_1_10') > 0;
       if (esFibra) return ['Tipo', 'Material', 'Medidas', 'Extras'];
       return ['Tipo', 'Material', 'Densidad', 'Medidas', 'Extras'];
     }
@@ -2122,9 +2102,8 @@ class _PantallaServicioState extends State<_PantallaServicio> {
     }
 
     // Detectar si es Plasma
-    final _config2 = _config!;
-    final esPlasmaScreen = _config2.getTarifa('tarifa_m2_delgado') > 0 ||
-                           _config2.getTarifa('tarifa_metro_delgado') > 0;
+    final esPlasmaScreen = _config!.getTarifa('tarifa_m2_delgado') > 0 ||
+                           _config!.getTarifa('tarifa_metro_delgado') > 0;
     final esRouter2D = formula == 'por_area' && !esPlasmaScreen;
 
     // ── PLASMA: Selector calibre y material ──────────
