@@ -3481,4 +3481,81 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             ]))),
         ]))));
   }
+
+  // ── LASER CO₂: métodos de tabs ───────────────────────────
+  Widget _buildMaterialLaser() => Wrap(spacing: 8, runSpacing: 8,
+    children: [
+      _chipMatLaser('mdf_fino',   'MDF 2.5mm', '30 mm/s'),
+      _chipMatLaser('mdf_medio',  'MDF 3-5mm', '21 mm/s'),
+      _chipMatLaser('mdf_grueso', 'MDF 6mm+',  'editable'),
+      _chipMatLaser('acrilico',   'Acrilico',  'editable'),
+      _chipMatLaser('cuero',      'Cuero',     'editable'),
+      _chipMatLaser('papel',      'Papel',     'editable'),
+      _chipMatLaser('piedra',     'Piedra',    'editable'),
+      _chipMatLaser('metal',      'Metal',     'editable'),
+    ]);
+
+  Widget _buildDensidadLaser() {
+    if (_tipoLaser == 'corte') {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: AppColors.gris,
+          borderRadius: BorderRadius.circular(8)),
+        child: const Text(
+          'La densidad aplica solo para grabado.',
+          style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)));
+    }
+    return Wrap(spacing: 8, runSpacing: 8, children: [
+      _chipDensidad('ligero', 'Ligero', 'Intervalo 0.2mm - 180mm/s'),
+      _chipDensidad('normal', 'Normal', 'Intervalo 0.15mm - 190mm/s'),
+      _chipDensidad('denso',  'Denso',  'Intervalo 0.1mm - 200mm/s'),
+    ]);
+  }
+
+  Widget _chipDensidad(String val, String titulo, String sub) {
+    final sel = _densidadLaser == val;
+    return GestureDetector(
+      onTap: () => setState(() { _densidadLaser = val; _resultado = null; }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: sel ? AppColors.azul : AppColors.grisBorde)),
+        child: Column(children: [
+          Text(titulo, style: TextStyle(fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: sel ? Colors.white : AppColors.textoPrincipal)),
+          Text(sub, style: TextStyle(fontSize: 10,
+            color: sel ? Colors.white70 : AppColors.textoSecundario)),
+        ])));
+  }
+
+  Widget _buildCalibre() => Wrap(spacing: 6, runSpacing: 6,
+    children: [
+      'Cal 20','Cal 18','Cal 16','Cal 14','Cal 12',
+      'Cal 10','Cal 8','Cal 6','1/4"','3/8"','1/2"+'
+    ].map((c) {
+      final sel = _calibre == c;
+      final delgado = ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12'].contains(c);
+      return GestureDetector(
+        onTap: () => setState(() { _calibre = c; _resultado = null; }),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: sel ? AppColors.azul : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: sel ? AppColors.azul : AppColors.grisBorde)),
+          child: Column(children: [
+            Text(c, style: TextStyle(fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: sel ? Colors.white : AppColors.textoPrincipal)),
+            Text(delgado ? 'Delgado' : 'Medio/Grueso',
+              style: TextStyle(fontSize: 9,
+                color: sel ? Colors.white70 : AppColors.textoSecundario)),
+          ])));
+    }).toList());
+
 }
