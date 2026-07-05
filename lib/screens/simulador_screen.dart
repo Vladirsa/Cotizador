@@ -1372,6 +1372,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     final esImp3D  = cfg.getTarifa('factor_rapida') > 0;
     final esHerr   = cfg.getTarifa('material_hora') > 0 && !esImp3D;
     final esCarp   = cfg.getTarifa('material_mdf_m2') > 0;
+    final esDiseno = cfg.getTarifa('tarifa_hora_2d') > 0 ||
+                     cfg.getTarifa('tarifa_setup') > 0 ||
+                     cfg.getTarifa('cargo_urgente') > 0;
 
     // Auto-seleccionar tipo si no hay ninguno (necesario para la formula)
     if (_tipoSel == null && cfg.tipos.isNotEmpty) {
@@ -1381,10 +1384,116 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     if (esPlasma) return _bodyPlasma(cfg);
     if (esFibra)  return _bodyFibra(cfg);
     if (esLaser)  return _bodyLaserTopDown(cfg);
+    if (esDiseno) return _bodyDiseno(cfg);
     if (esImp3D)  return _bodyImpresion(cfg);
     if (esHerr)   return _bodyHerreria(cfg);
     if (esCarp)   return _bodyCarpinteria(cfg);
     return _bodyRouter(cfg);
+  }
+
+  // ── DISEÑO DIGITAL: filtro por categoria + complejidad ───────
+  String _categoriaDiseno = '2D';
+
+  Widget _bodyDiseno(SimConfig cfg) {
+    // Clasificar los tipos de la BD por categoria segun su nombre
+    final tipos2D = cfg.tipos.where((t) =>
+      t.nombre.contains('2D') && !t.nombre.toUpperCase().contains('CAD')).toList();
+    final tipos3D = cfg.tipos.where((t) => t.nombre.contains('3D')).toList();
+    final tiposCamCad = cfg.tipos.where((t) =>
+      t.nombre.toUpperCase().contains('CAD') ||
+      t.nombre.toUpperCase().contains('CAM')).toList();
+
+    List<SimTipoTrabajo> tiposFiltrados;
+    switch (_categoriaDiseno) {
+      case '3D': tiposFiltrados = tipos3D; break;
+      case 'CAM/CAD': tiposFiltrados = tiposCamCad; break;
+      default: tiposFiltrados = tipos2D;
+    }
+
+    // Si el tipo seleccionado no pertenece a la categoria actual, seleccionar el primero
+    if (tiposFiltrados.isNotEmpty &&
+        !tiposFiltrados.any((t) => t.id == _tipoSel?.id)) {
+      _tipoSel = tiposFiltrados.first;
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+      // 1. Filtro de categoria: 2D / 3D / CAM-CAD
+      _seccionCard('Categoria de diseno', _dropdownGenerico<String>(
+        value: _categoriaDiseno,
+        opciones: const ['2D', '3D', 'CAM/CAD'],
+        label: (c) => c == '2D' ? 'Diseno 2D (vectores)'
+          : c == '3D' ? 'Modelado 3D' : 'CAM / CAD (planos e ingenieria)',
+        sublabel: (c) => c == '2D' ? 'Corte laser, plasma, router 2D'
+          : c == '3D' ? 'Relieves, esculturas, tallado 3D'
+          : 'Planos tecnicos, programacion CNC',
+        onSelect: (c) => setState(() {
+          _categoriaDiseno = c; _tipoSel = null; _resultado = null;
+        }),
+        hint: 'Selecciona la categoria')),
+      const SizedBox(height: 10),
+
+      // 2. Complejidad dentro de la categoria elegida
+      _seccionCard('Nivel de complejidad', tiposFiltrados.isEmpty
+        ? Container(padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: AppColors.gris,
+              borderRadius: BorderRadius.circular(8)),
+            child: const Text('No hay niveles configurados para esta categoria.',
+              style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)))
+        : _dropdownGenerico<SimTipoTrabajo>(
+            value: _tipoSel,
+            opciones: tiposFiltrados,
+            label: (t) => t.nombre,
+            sublabel: (t) => t.descripcionFormula,
+            onSelect: (t) => setState(() { _tipoSel = t; _resultado = null; }),
+            hint: 'Selecciona el nivel')),
+      const SizedBox(height: 10),
+
+      // 3. Estado del archivo
+      _seccionCard('Estado del archivo', Column(
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: _chipArchivo(false, false, 'Diseno desde cero')),
+          const SizedBox(width: 6),
+          Expanded(child: _chipArchivo(true, false, 'Cliente trae imagen')),
+          const SizedBox(width: 6),
+          Expanded(child: _chipArchivo(true, true, 'Trae vector listo')),
+        ]),
+      ])),
+      const SizedBox(height: 10),
+
+      // 4. Opciones adicionales
+      _seccionCard('Opciones', Column(children: [
+        _toggleOpcion('Entrega urgente (+40%)', _entregaUrgente,
+          (v) => setState(() { _entregaUrgente = v; _resultado = null; })),
+        _toggleOpcion('Entregar archivo editable (+200%)',
+          _archivoEditableAlCliente,
+          (v) => setState(() { _archivoEditableAlCliente = v; _resultado = null; })),
+        const SizedBox(height: 8),
+        Row(children: [
+          const Text('Revisiones extra (+\$150 c/u):', style: TextStyle(fontSize: 12)),
+          const Spacer(),
+          IconButton(
+            onPressed: () => setState(() {
+              if (_revisionesExtra > 0) { _revisionesExtra--; _resultado = null; }
+            }),
+            icon: const Icon(Icons.remove_circle_outline, color: AppColors.azul, size: 20)),
+          Text('$_revisionesExtra', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          IconButton(
+            onPressed: () => setState(() { _revisionesExtra++; _resultado = null; }),
+            icon: const Icon(Icons.add_circle_outline, color: AppColors.azul, size: 20)),
+        ]),
+        const Divider(height: 16),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          const Text('IVA 16%',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Switch(value: _aplicarIva,
+            onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
+            activeColor: AppColors.azul),
+        ]),
+      ])),
+      const SizedBox(height: 40),
+    ]);
   }
 
   // ── LASER CO2: flujo top-down (sin tabs) ────────────────────
@@ -2125,56 +2234,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-      // 1. Tipo de trabajo
-      _seccionCard('Tipo de trabajo', Column(
-        crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Wrap(spacing: 8, runSpacing: 8,
-          children: cfg.tipos.map((t) {
-            final sel = _tipoSel?.id == t.id;
-            return GestureDetector(
-              onTap: () => setState(() { _tipoSel = t; _resultado = null; }),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: sel ? AppColors.azul : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-                child: Column(children: [
-                  Text(t.nombre, style: TextStyle(fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: sel ? Colors.white : AppColors.textoPrincipal)),
-                  if (t.descripcionFormula != null)
-                    Text(t.descripcionFormula!, style: TextStyle(fontSize: 9,
-                      color: sel ? Colors.white70 : AppColors.textoSecundario)),
-                ])));
-          }).toList()),
-        if (cfg.tipos.isEmpty) ...[
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: _nuevoModo,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(color: AppColors.azulClaro,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.azul.withOpacity(0.3))),
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(Icons.add, size: 14, color: AppColors.azul),
-                SizedBox(width: 4),
-                Text('Agregar tipo', style: TextStyle(fontSize: 11,
-                  color: AppColors.azul, fontWeight: FontWeight.w600)),
-              ]))),
-        ] else ...[
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: _nuevoModo,
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.add, size: 14, color: AppColors.azul),
-              SizedBox(width: 4),
-              Text('Agregar modo', style: TextStyle(fontSize: 11,
-                color: AppColors.azul, fontWeight: FontWeight.w600)),
-            ])),
-        ],
-      ])),
+      // 1. Tipo de trabajo (dropdown)
+      _seccionCard('Tipo de trabajo', _buildTipos()),
 
       const SizedBox(height: 10),
 
@@ -2427,27 +2488,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   Widget _bodyFibra(SimConfig cfg) => Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-    // Tipo
-    _seccionCard('Tipo de grabado', Wrap(spacing: 8, runSpacing: 8,
-      children: cfg.tipos.map((t) {
-        final sel = _tipoSel?.id == t.id;
-        return GestureDetector(
-          onTap: () => setState(() { _tipoSel = t; _resultado = null; }),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: sel ? AppColors.azul : Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-            child: Column(children: [
-              Text(t.nombre, style: TextStyle(fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: sel ? Colors.white : AppColors.textoPrincipal)),
-              if (t.descripcionFormula != null)
-                Text(t.descripcionFormula!, style: TextStyle(fontSize: 9,
-                  color: sel ? Colors.white70 : AppColors.textoSecundario)),
-            ])));
-      }).toList())),
+    // Tipo (dropdown)
+    _seccionCard('Tipo de grabado', _buildTipos()),
     const SizedBox(height: 10),
 
     // Material del grabado
@@ -2559,28 +2601,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   Widget _bodyImpresion(SimConfig cfg) => Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-    _seccionCard('Tipo / Calidad', Column(children: [
-      Wrap(spacing: 8, runSpacing: 8,
-        children: cfg.tipos.map((t) {
-          final sel = _tipoSel?.id == t.id;
-          return GestureDetector(
-            onTap: () => setState(() { _tipoSel = t; _resultado = null; }),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: sel ? AppColors.azul : Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-              child: Column(children: [
-                Text(t.nombre, style: TextStyle(fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: sel ? Colors.white : AppColors.textoPrincipal)),
-                if (t.descripcionFormula != null)
-                  Text(t.descripcionFormula!, style: TextStyle(fontSize: 9,
-                    color: sel ? Colors.white70 : AppColors.textoSecundario)),
-              ])));
-        }).toList()),
-    ])),
+    _seccionCard('Tipo / Calidad', _buildTipos()),
     const SizedBox(height: 10),
 
     _seccionCard('Material', () {
