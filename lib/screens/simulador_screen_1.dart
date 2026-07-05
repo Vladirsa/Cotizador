@@ -1159,6 +1159,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   bool _llevaPlantilla = false;
   bool _llevaRotativo = false;
   bool _llevaDisenoFibra = false;
+  bool _llevaTuboCO2 = false;
   // Impresión 3D
   String _materialImpresion = 'pla';
   String _calidadImpresion = 'normal';
