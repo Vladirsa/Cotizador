@@ -234,8 +234,13 @@ class SimuladorDataService {
       .select().eq('servicio_id', servicioId); } catch (_) {}
 
     List rangosData = [], extrasData = [], acabadosData = [];
-    try { rangosData = await _sb.from('sim_rangos')
-      .select().eq('servicio_id', servicioId).order('desde'); } catch (_) {}
+    try {
+      rangosData = await _sb.from('sim_rangos')
+        .select().eq('servicio_id', servicioId).order('indice_desde');
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error cargando rangos: \$e');
+    }
     try { extrasData = await _sb.from('sim_extras')
       .select().eq('servicio_id', servicioId); } catch (_) {}
     try { acabadosData = await _sb.from('sim_acabados')
