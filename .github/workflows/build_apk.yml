@@ -103,4 +103,4 @@ jobs:
         with:
           name: HetnaCNC-APK-AAB
           path: apk_output/
-          retention-days: 30
+          retention-days: 3
