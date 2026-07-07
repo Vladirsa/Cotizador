@@ -99,8 +99,16 @@ jobs:
           cp tmp_app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk apk_output/HetnaCNC_arm32.apk || true
           cp tmp_app/build/app/outputs/bundle/release/app-release.aab apk_output/HetnaCNC_PlayStore.aab || true
           ls -lh apk_output/
-      - uses: actions/upload-artifact@v4
+      - name: Create Release with APK/AAB
+        uses: softprops/action-gh-release@v2
         with:
-          name: HetnaCNC-APK-AAB
-          path: apk_output/
-          retention-days: 3
+          tag_name: build-${{ github.run_number }}
+          name: HETNA CNC Build ${{ github.run_number }}
+          files: apk_output/*
+          body: |
+            Build automatico de HETNA CNC
+            Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
