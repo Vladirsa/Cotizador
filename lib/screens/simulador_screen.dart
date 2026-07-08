@@ -491,8 +491,18 @@ class MotorCalculo {
           desglose['volumen_cm3'] = volumen.toDouble();
           desglose['precio_rango_base'] = precioRango.toDouble();
           desglose['factor_tipo'] = tipo.factor.toDouble();
-          tiempoHoras = volumen * 0.003 * tipo.factor * cantidad;
-          if (tiempoHoras < 0.5 && volumen > 0) tiempoHoras = 0.5;
+          // Tiempo estimado real (referencia informativa, calibrado con datos del taller)
+          // 0-1200cm3=~1h, 60x45x7=18900cm3=~5h, escultura grande 150000+=~40h
+          double horasBase;
+          if (volumen <= 1200) horasBase = 1.0;
+          else if (volumen <= 3000) horasBase = 2.0;
+          else if (volumen <= 7000) horasBase = 3.5;
+          else if (volumen <= 20000) horasBase = 5.0;
+          else if (volumen <= 60000) horasBase = 10.0;
+          else if (volumen <= 150000) horasBase = 20.0;
+          else horasBase = 40.0;
+          tiempoHoras = horasBase * tipo.factor * cantidad;
+          desglose['tiempo_estimado_ref'] = tiempoHoras;
         }
         break;
 
@@ -1094,9 +1104,19 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
                     final negId = Supabase.instance.client.auth.currentUser?.id ?? _negId;
-                    await SimuladorDataService.crearServicio({
-                      'negocio_id': negId, 'nombre': nombreCtrl.text.trim(),
-                      'emoji': emojiSel, 'activo': true, 'orden': _servicios.length + 1});
+                    final claveGen = nombreCtrl.text.trim().toLowerCase()
+                      .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+                      .replaceAll(RegExp(r'^_+|_+\$'), '');
+                    try {
+                      await SimuladorDataService.crearServicio({
+                        'negocio_id': negId, 'nombre': nombreCtrl.text.trim(),
+                        'clave': claveGen.isNotEmpty ? claveGen : 'servicio_${DateTime.now().millisecondsSinceEpoch}',
+                        'emoji': emojiSel, 'activo': true, 'orden': _servicios.length + 1});
+                    } catch (e) {
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error al crear: \$e'), backgroundColor: AppColors.rojo));
+                      return;
+                    }
                     if (mounted) { Navigator.pop(ctx); _cargar(); }
                   },
                   icon: const Icon(Icons.save_outlined, color: Colors.white),
@@ -1868,9 +1888,32 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   }
 
   // ── TARIFAS EDITABLES ────────────────────────────
+  // Filtra qué tarifas mostrar segun el tipo de trabajo seleccionado
+  // Evita confusion (ej: no mostrar tarifas de Corte 2D cuando el tipo es Relieve 3D)
+  List<SimTarifa> _tarifasRelevantes(SimConfig cfg) {
+    final formula = _tipoSel?.formula ?? '';
+    // Claves siempre visibles (acabados/extras aplican a cualquier tipo)
+    const siempreVisibles = ['costo_lijado_hora', 'costo_barnizado', 'costo_diseno'];
+
+    if (formula == 'por_area') {
+      // Corte 2D / Grabado: solo tarifas por m2
+      return cfg.tarifas.values.where((t) =>
+        t.clave.startsWith('tarifa_m2_') || siempreVisibles.contains(t.clave)).toList();
+    }
+    if (formula == 'por_volumen') {
+      // Relieve/Escultura 3D: el precio sale de la tabla de rangos,
+      // solo mostrar acabados (no tarifas de m2 que no aplican aqui)
+      return cfg.tarifas.values.where((t) =>
+        siempreVisibles.contains(t.clave)).toList();
+    }
+    // Otros servicios (Plasma, Laser, etc.): sin filtro definido, mostrar todas
+    return cfg.tarifas.values.toList();
+  }
+
   Widget _seccionTarifas() {
     final cfg = _config!;
-    if (cfg.tarifas.isEmpty) return const SizedBox();
+    final tarifasFiltradas = _tarifasRelevantes(cfg);
+    if (tarifasFiltradas.isEmpty) return const SizedBox();
     return Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
@@ -1888,7 +1931,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         if (_mostrarTarifas) ...[
           const Divider(height: 1),
           Padding(padding: const EdgeInsets.all(14), child: Column(children: [
-            ...cfg.tarifas.values.map((t) => Padding(
+            ...tarifasFiltradas.map((t) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(children: [
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -3252,9 +3295,10 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         'El material es el mayor costo. Busca precio de mayoreo con tu proveedor.', AppColors.naranja));
     }
 
-    // Observación tiempo
+    // Observación tiempo (referencia para planear entregas)
     if (r.tiempoHoras > 0) {
-      obs.add(_obs('⏱️ Tiempo estimado: ${r.tiempoHoras.toStringAsFixed(1)} horas',
+      final dias = (r.tiempoHoras / 8).ceil();
+      obs.add(_obs('⏱️ Tiempo estimado: ${r.tiempoHoras.toStringAsFixed(1)} horas (~$dias día${dias>1?"s":""} de trabajo)',
         'Ganancia por hora: ${fmt.format(r.gananciaHora)}. '
         '${r.gananciaHora > 200 ? "Trabajo muy rentable." : r.gananciaHora > 100 ? "Rentabilidad aceptable." : "Considera ajustar el precio."}',
         AppColors.azul));

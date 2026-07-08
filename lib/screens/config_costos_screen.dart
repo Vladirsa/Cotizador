@@ -154,13 +154,22 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         datos[key] = double.tryParse(_costosCtrls[key]!.text) ?? 0;
       }
 
-      final existing = await _sb.from('empresa_config')
-        .select('id').eq('negocio_id', _negocioId).maybeSingle();
-      if (existing != null) {
-        await _sb.from('empresa_config').update(datos)
-          .eq('negocio_id', _negocioId);
-      } else {
+      // Buscar TODAS las filas existentes (por si hay duplicados de ejecuciones SQL previas)
+      final existingRows = await _sb.from('empresa_config')
+        .select('id').eq('negocio_id', _negocioId);
+      final rows = existingRows as List;
+
+      if (rows.isEmpty) {
         await _sb.from('empresa_config').insert(datos);
+      } else {
+        // Actualizar la primera fila y borrar duplicados si existieran
+        final idPrincipal = rows.first['id'];
+        await _sb.from('empresa_config').update(datos).eq('id', idPrincipal);
+        if (rows.length > 1) {
+          for (int i = 1; i < rows.length; i++) {
+            await _sb.from('empresa_config').delete().eq('id', rows[i]['id']);
+          }
+        }
       }
 
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -168,7 +177,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+        content: Text('Error al guardar: $e'), backgroundColor: AppColors.rojo));
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
