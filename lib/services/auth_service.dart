@@ -55,13 +55,18 @@ class AuthService {
     try {
       final uid = usuarioActual?.id;
       if (uid == null) return;
-      final data = await _sb
+      // Usamos lista en vez de maybeSingle() para no fallar si hay filas
+      // duplicadas (de registros anteriores). Tomamos la más reciente.
+      final rows = await _sb
           .from('usuarios_negocio')
           .select('negocio_id, rol, nombre')
           .eq('user_id', uid)
           .eq('activo', true)
-          .maybeSingle();
-      if (data != null) {
+          .order('id', ascending: false)
+          .limit(1);
+      final list = rows as List;
+      if (list.isNotEmpty) {
+        final data = list.first as Map<String, dynamic>;
         _negocioId     = data['negocio_id'] as String?;
         _rol           = data['rol'] as String?;
         _nombreUsuario = data['nombre'] as String?;

@@ -484,6 +484,25 @@ class SupabaseService {
     await _db.from('inventario_bodega').insert(material);
   }
 
+  static Future<String?> actualizarMaterial(String id, Map<String, dynamic> datos) async {
+    try {
+      datos['updated_at'] = DateTime.now().toIso8601String();
+      await _db.from('inventario_bodega').update(datos).eq('id', id);
+      return null;
+    } catch (e) {
+      return 'Error al actualizar: $e';
+    }
+  }
+
+  static Future<String?> eliminarMaterial(String id) async {
+    try {
+      await _db.from('inventario_bodega').delete().eq('id', id);
+      return null;
+    } catch (e) {
+      return 'Error al eliminar: $e';
+    }
+  }
+
   // ═══════════════════════════════════════════
   // CATÁLOGOS PERSONALIZADOS
   // ═══════════════════════════════════════════
