@@ -130,12 +130,19 @@ class EquipoScreen extends StatefulWidget {
 
 class _EquipoScreenState extends State<EquipoScreen> {
   List<UsuarioNegocio> _usuarios = [];
+  List<Map<String, dynamic>> _invitacionesPendientes = [];
   bool _cargando = true;
 
   @override
   void initState() {
     super.initState();
     _cargar();
+    _cargarInvitaciones();
+  }
+
+  Future<void> _cargarInvitaciones() async {
+    final data = await AuthService.listarInvitacionesPendientes();
+    if (mounted) setState(() => _invitacionesPendientes = data);
   }
 
   Future<void> _cargar() async {
@@ -187,6 +194,13 @@ class _EquipoScreenState extends State<EquipoScreen> {
               else
                 ..._usuarios.map((u) => _cardUsuario(u, esAdmin)),
 
+              // ── Invitaciones pendientes (solo admin) ──
+              if (esAdmin && _invitacionesPendientes.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                _seccion('INVITACIONES PENDIENTES (${_invitacionesPendientes.length})'),
+                ..._invitacionesPendientes.map((inv) => _cardInvitacionPendiente(inv)),
+              ],
+
               const SizedBox(height: 16),
 
               // ── Roles y permisos (info) ──
@@ -195,6 +209,34 @@ class _EquipoScreenState extends State<EquipoScreen> {
 
               const SizedBox(height: 20),
             ])));
+  }
+
+  // ── Tarjeta de invitación pendiente ──────────────────
+  Widget _cardInvitacionPendiente(Map<String, dynamic> inv) {
+    final uTmp = UsuarioNegocio(id:'', userId:'', negocioId:'', rol: inv['rol'] as String);
+    final codigo = inv['codigo'] as String;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white, borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.ambar.withOpacity(0.4))),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
+          child: Text(codigo, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+            letterSpacing: 2, color: AppColors.azul, fontFamily: 'monospace'))),
+        const SizedBox(width: 10),
+        Expanded(child: Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
+          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
+        IconButton(
+          onPressed: () async {
+            await AuthService.cancelarInvitacion(inv['id'] as String);
+            _cargarInvitaciones();
+          },
+          icon: const Icon(Icons.close, size: 18, color: AppColors.rojo)),
+      ]));
   }
 
   // ── Mi perfil ──────────────────────────────────────
@@ -363,12 +405,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
         }).toList()));
   }
 
-  // ── INVITAR USUARIO ─────────────────────────────────
+  // ── INVITAR USUARIO (por código, sin Supabase Dashboard) ──
   void _invitarUsuario() {
     String rolSel = 'vendedor';
-    final nombreCtrl = TextEditingController();
-    final correoCtrl = TextEditingController();
-    final uidCtrl = TextEditingController();
 
     showModalBottomSheet(
       context: context,
@@ -386,66 +425,17 @@ class _EquipoScreenState extends State<EquipoScreen> {
             Container(width: 36, height: 4,
               decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
-            const Text('Agregar usuario al taller',
+            const Text('Invitar a alguien al taller',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            const Text('El usuario debe existir en Supabase Auth.\nCrea la cuenta primero desde el Dashboard de Supabase.',
+            const Text('Genera un código y compártelo. La persona lo usa para crear su propia cuenta.',
               style: TextStyle(fontSize: 12, color: AppColors.textoSecundario),
               textAlign: TextAlign.center),
             const SizedBox(height: 16),
 
-            // Instrucciones
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.azulClaro,
-                borderRadius: BorderRadius.circular(10)),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('📋 Pasos para agregar un usuario:',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
-                const SizedBox(height: 6),
-                const Text('1. Ve a supabase.com → tu proyecto\n2. Authentication → Users → Add user\n3. Crea la cuenta con correo y contraseña\n4. Copia el UID que aparece\n5. Pégalo aquí abajo',
-                  style: TextStyle(fontSize: 11, color: AppColors.azul)),
-              ])),
-            const SizedBox(height: 14),
-
-            // UID
-            TextField(
-              controller: uidCtrl,
-              decoration: InputDecoration(
-                labelText: 'UID del usuario (de Supabase Auth)',
-                hintText: 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
-                prefixIcon: const Icon(Icons.key_outlined, size: 18),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                isDense: true),
-              style: const TextStyle(fontSize: 12, fontFamily: 'monospace')),
-            const SizedBox(height: 10),
-
-            // Nombre
-            TextField(
-              controller: nombreCtrl,
-              textCapitalization: TextCapitalization.words,
-              decoration: InputDecoration(
-                labelText: 'Nombre completo',
-                prefixIcon: const Icon(Icons.person_outline, size: 18),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                isDense: true)),
-            const SizedBox(height: 10),
-
-            // Correo
-            TextField(
-              controller: correoCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: InputDecoration(
-                labelText: 'Correo electrónico',
-                prefixIcon: const Icon(Icons.email_outlined, size: 18),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                isDense: true)),
-            const SizedBox(height: 12),
-
             // Rol
             const Align(alignment: Alignment.centerLeft,
-              child: Text('Rol asignado:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+              child: Text('Rol que tendrá:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
             const SizedBox(height: 8),
             Wrap(spacing: 6, runSpacing: 6,
               children: ['vendedor','operador_cnc','almacenista','contador','administrador'].map((r) {
@@ -470,34 +460,19 @@ class _EquipoScreenState extends State<EquipoScreen> {
             SizedBox(width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: () async {
-                  final uid = uidCtrl.text.trim();
-                  final nombre = nombreCtrl.text.trim();
-                  final correo = correoCtrl.text.trim();
-                  if (uid.isEmpty || nombre.isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                      content: Text('UID y nombre son obligatorios'),
+                  Navigator.pop(ctx);
+                  final inv = await AuthService.crearInvitacion(rol: rolSel);
+                  if (inv == null) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('No se pudo generar la invitación'),
                       backgroundColor: AppColors.rojo));
                     return;
                   }
-                  Navigator.pop(ctx);
-                  final error = await AuthService.registrarUsuarioEnNegocio(
-                    userId: uid, nombre: nombre,
-                    correo: correo, rol: rolSel);
-                  if (error != null) {
-                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $error'),
-                        backgroundColor: AppColors.rojo));
-                  } else {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('✅ Usuario agregado al taller'),
-                        backgroundColor: AppColors.verde));
-                      _cargar();
-                    }
-                  }
+                  if (mounted) _mostrarCodigoGenerado(inv['codigo'] as String, rolSel);
+                  _cargarInvitaciones();
                 },
-                icon: const Icon(Icons.person_add_outlined, color: Colors.white, size: 18),
-                label: const Text('Agregar al taller',
+                icon: const Icon(Icons.qr_code_2, color: Colors.white, size: 18),
+                label: const Text('Generar código de invitación',
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.azul,
@@ -505,6 +480,48 @@ class _EquipoScreenState extends State<EquipoScreen> {
           ])))));
   }
 
+  // ── Mostrar el código generado con opción de compartir ──
+  void _mostrarCodigoGenerado(String codigo, String rol) {
+    final uTmp = UsuarioNegocio(id:'', userId:'', negocioId:'', rol: rol);
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Código generado'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Rol: ${uTmp.rolEmoji} ${uTmp.rolLabel}',
+            style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            decoration: BoxDecoration(
+              color: AppColors.azulClaro,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.azul.withOpacity(0.3))),
+            child: Text(codigo,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800,
+                letterSpacing: 4, color: AppColors.azul))),
+          const SizedBox(height: 12),
+          const Text('Válido por 7 días. La persona lo ingresa al crear su cuenta en la app.',
+            style: TextStyle(fontSize: 11, color: AppColors.textoSecundario),
+            textAlign: TextAlign.center),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+          ElevatedButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: codigo));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Código copiado')));
+            },
+            icon: const Icon(Icons.copy, size: 16, color: Colors.white),
+            label: const Text('Copiar', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul)),
+        ]));
+  }
+
+  // ── EDITAR PERFIL
   // ── EDITAR PERFIL ───────────────────────────────────
   void _editarPerfil(String nombreActual) {
     final ctrl = TextEditingController(text: nombreActual);
@@ -615,22 +632,20 @@ class _EquipoScreenState extends State<EquipoScreen> {
               child: ElevatedButton(
                 onPressed: () async {
                   Navigator.pop(ctx);
-                  try {
-                    await AuthService.registrarUsuarioEnNegocio(
-                      userId: u.userId,
-                      nombre: u.nombre ?? '',
-                      correo: u.correo ?? '',
-                      rol: rolSel);
+                  final error = await AuthService.actualizarRolUsuario(
+                    usuarioNegocioId: u.id,
+                    nuevoRol: rolSel);
+                  if (error != null) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(error),
+                        backgroundColor: AppColors.rojo));
+                  } else {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                         content: Text('✅ Rol actualizado'),
                         backgroundColor: AppColors.verde));
                       _cargar();
                     }
-                  } catch (e) {
-                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Error: $e'),
-                        backgroundColor: AppColors.rojo));
                   }
                 },
                 style: ElevatedButton.styleFrom(

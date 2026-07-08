@@ -7,6 +7,7 @@ import '../main.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'registro_taller_screen.dart';
+import 'unirse_equipo_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -214,6 +215,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         side: const BorderSide(color: AppColors.azul),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10))))),
+                  const SizedBox(height: 10),
+                  SizedBox(width: double.infinity, height: 44,
+                    child: TextButton.icon(
+                      onPressed: () => Navigator.push(context,
+                        MaterialPageRoute(builder: (_) => const UnirseEquipoScreen())),
+                      icon: const Icon(Icons.qr_code_2, color: AppColors.textoSecundario, size: 18),
+                      label: const Text('Tengo un código de invitación',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                          color: AppColors.textoSecundario)))),
                   const SizedBox(height: 24),
 
                   const Text('Acceso restringido - Solo personal autorizado',
