@@ -285,10 +285,15 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
               child: ElevatedButton(
                 onPressed: () async {
                   if (materialId == null) return;
-                  await SupabaseService.registrarMovimiento(
+                  final error = await SupabaseService.registrarMovimiento(
                     materialId: materialId!, tipo: tipo,
                     cantidad: int.tryParse(cant.text) ?? 1,
                     motivo: motivo.text.trim());
+                  if (error != null) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(error), backgroundColor: AppColors.rojo));
+                    return;
+                  }
                   if (mounted) { Navigator.pop(context); _cargar(); }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
