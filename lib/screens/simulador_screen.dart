@@ -1010,20 +1010,62 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   Widget _cardServicio(SimServicio s) => GestureDetector(
     onTap: () => Navigator.push(context, MaterialPageRoute(
       builder: (_) => _PantallaServicio(servicio: s, onAgregar: _agregarAlCarrito))),
+    onLongPress: () => _confirmarBorrarServicio(s),
     child: Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.grisBorde, width: 0.5),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0,2))]),
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text(s.emoji, style: const TextStyle(fontSize: 32)),
-        const SizedBox(height: 8),
-        Text(s.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-          color: AppColors.azul), textAlign: TextAlign.center),
-        if (s.descripcion != null) Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: Text(s.descripcion!, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
-            textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
+      child: Stack(children: [
+        Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(s.emoji, style: const TextStyle(fontSize: 32)),
+          const SizedBox(height: 8),
+          Text(s.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+            color: AppColors.azul), textAlign: TextAlign.center),
+          if (s.descripcion != null) Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: Text(s.descripcion!, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
+              textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
+        ]),
+        Positioned(top: 4, right: 4,
+          child: GestureDetector(
+            onTap: () => _confirmarBorrarServicio(s),
+            child: Container(padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(color: AppColors.gris.withOpacity(0.8), shape: BoxShape.circle),
+              child: const Icon(Icons.close, size: 14, color: AppColors.textoSecundario)))),
       ])));
+
+  void _confirmarBorrarServicio(SimServicio s) {
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('¿Borrar servicio?'),
+      content: Text('Se eliminará "${s.nombre}" y todas sus tarifas y tipos de trabajo configurados. '
+        'Esta acción no se puede deshacer.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            try {
+              final sb = Supabase.instance.client;
+              // Borrar dependencias primero (tarifas, tipos, rangos, extras, acabados)
+              await sb.from('sim_tarifas').delete().eq('servicio_id', s.id);
+              await sb.from('sim_tipos_trabajo').delete().eq('servicio_id', s.id);
+              await sb.from('sim_rangos').delete().eq('servicio_id', s.id);
+              await sb.from('sim_extras').delete().eq('servicio_id', s.id);
+              await sb.from('sim_acabados').delete().eq('servicio_id', s.id);
+              await sb.from('sim_servicios').delete().eq('id', s.id);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('✅ "${s.nombre}" eliminado'), backgroundColor: AppColors.verde));
+                _cargar();
+              }
+            } catch (e) {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Error al eliminar: $e'), backgroundColor: AppColors.rojo));
+            }
+          },
+          child: const Text('Eliminar', style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
+      ]));
+  }
 
   Widget _cardAgregar() => GestureDetector(
     onTap: _nuevoServicio,

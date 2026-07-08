@@ -318,7 +318,7 @@ class _TarjetaMaterial extends StatelessWidget {
     final unidad = material['unidad'] as String? ?? 'pieza';
     final bajStock = stockActual <= stockMinimo;
     final costo = (material['costo_unitario'] as num?)?.toDouble() ?? 0;
-    final fmt = NumberFormat('\$#,##0', 'es_MX');
+    final fmt = NumberFormat(r'$#,##0', 'es_MX');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -351,7 +351,27 @@ class _TarjetaMaterial extends StatelessWidget {
       ));
   }
 
+  // ── Menú principal: Movimiento / Editar / Eliminar ──────
   void _mostrarOpciones(BuildContext context) {
+    showModalBottomSheet(context: context, builder: (ctx) => SafeArea(
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(
+          leading: const Icon(Icons.swap_vert, color: AppColors.azul),
+          title: const Text('Registrar movimiento (entrada/salida)'),
+          onTap: () { Navigator.pop(ctx); _mostrarMovimiento(context); }),
+        ListTile(
+          leading: const Icon(Icons.edit_outlined, color: AppColors.azul),
+          title: const Text('Editar producto'),
+          onTap: () { Navigator.pop(ctx); _mostrarEditar(context); }),
+        ListTile(
+          leading: const Icon(Icons.delete_outline, color: AppColors.rojo),
+          title: const Text('Eliminar producto', style: TextStyle(color: AppColors.rojo)),
+          onTap: () { Navigator.pop(ctx); _confirmarEliminar(context); }),
+      ])));
+  }
+
+  // ── Registrar entrada/salida (lo que ya existía) ────────
+  void _mostrarMovimiento(BuildContext context) {
     final stockActual = material['stock_actual'] as int? ?? 0;
     final cant = TextEditingController(text: '1');
     String tipo = 'entrada';
@@ -393,11 +413,105 @@ class _TarjetaMaterial extends StatelessWidget {
               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8))),
           const SizedBox(height: 12),
           ElevatedButton(onPressed: () async {
-            await SupabaseService.registrarMovimiento(
+            final error = await SupabaseService.registrarMovimiento(
               materialId: material['id'], tipo: tipo,
               cantidad: int.tryParse(cant.text) ?? 1);
+            if (error != null) {
+              if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(content: Text(error), backgroundColor: AppColors.rojo));
+              return;
+            }
             if (ctx.mounted) { Navigator.pop(ctx); onMovimiento(); }
           }, child: const Text('Registrar movimiento')),
         ]))));
+  }
+
+  // ── Editar producto (nombre, categoría, costo, stock mínimo, unidad) ──
+  void _mostrarEditar(BuildContext context) {
+    final nombreCtrl = TextEditingController(text: material['nombre'] ?? '');
+    final categoriaCtrl = TextEditingController(text: material['categoria'] ?? '');
+    final costoCtrl = TextEditingController(
+      text: ((material['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(2));
+    final stockMinCtrl = TextEditingController(
+      text: (material['stock_minimo'] as int? ?? 1).toString());
+    final unidadCtrl = TextEditingController(text: material['unidad'] ?? 'pieza');
+
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          left: 16, right: 16, top: 20),
+        child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Editar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 16),
+          TextField(controller: nombreCtrl,
+            decoration: const InputDecoration(labelText: 'Nombre', isDense: true,
+              border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          TextField(controller: categoriaCtrl,
+            decoration: const InputDecoration(labelText: 'Categoría', isDense: true,
+              border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: TextField(controller: costoCtrl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'Costo unitario', isDense: true,
+                prefixText: r'$', border: OutlineInputBorder()))),
+            const SizedBox(width: 10),
+            Expanded(child: TextField(controller: stockMinCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Stock mínimo', isDense: true,
+                border: OutlineInputBorder()))),
+          ]),
+          const SizedBox(height: 10),
+          TextField(controller: unidadCtrl,
+            decoration: const InputDecoration(labelText: 'Unidad (pieza, m², kg...)', isDense: true,
+              border: OutlineInputBorder())),
+          const SizedBox(height: 20),
+          SizedBox(width: double.infinity, child: ElevatedButton(
+            onPressed: () async {
+              final error = await SupabaseService.actualizarMaterial(material['id'], {
+                'nombre': nombreCtrl.text.trim(),
+                'categoria': categoriaCtrl.text.trim(),
+                'costo_unitario': double.tryParse(costoCtrl.text) ?? 0,
+                'stock_minimo': int.tryParse(stockMinCtrl.text) ?? 1,
+                'unidad': unidadCtrl.text.trim(),
+              });
+              if (error != null) {
+                if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(content: Text(error), backgroundColor: AppColors.rojo));
+                return;
+              }
+              if (ctx.mounted) { Navigator.pop(ctx); onMovimiento(); }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+              padding: const EdgeInsets.symmetric(vertical: 13)),
+            child: const Text('Guardar cambios', style: TextStyle(color: Colors.white,
+              fontWeight: FontWeight.w700)))),
+          const SizedBox(height: 20),
+        ]))));
+  }
+
+  // ── Confirmar y eliminar producto ────────────────────────
+  void _confirmarEliminar(BuildContext context) {
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('¿Eliminar producto?'),
+      content: Text('Se eliminará "${material['nombre']}" permanentemente del inventario. '
+        'Esta acción no se puede deshacer.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            final error = await SupabaseService.eliminarMaterial(material['id']);
+            if (error != null) {
+              if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(error), backgroundColor: AppColors.rojo));
+              return;
+            }
+            onMovimiento();
+          },
+          child: const Text('Eliminar', style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
+      ]));
   }
 }

@@ -27,6 +27,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
     'PagoCompleto': 'Pago 100% completado',
     'Entrega': 'Listo para entrega',
     'Entregado': 'Entregado ✅',
+    'Cancelado': 'Cancelado ❌',
   };
   static const _coloresEtapa = {
     'Pedido': AppColors.azul,
@@ -36,9 +37,10 @@ class _AvancesScreenState extends State<AvancesScreen> {
     'PagoCompleto': Color(0xFF059669),
     'Entrega': AppColors.verde,
     'Entregado': AppColors.verde,
+    'Cancelado': Color(0xFF6b7280),
   };
 
-  final _filtros = ['Activos', 'Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado', 'Todos'];
+  final _filtros = ['Activos', 'Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado', 'Cancelado', 'Todos'];
   final _etiquetasFiltro = {
     'Pago50': 'Pago 50%',
     'Produccion': 'Producción',
@@ -157,6 +159,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
   int get _idx => widget.etapas.indexOf(widget.pedido.estado).clamp(0, widget.etapas.length - 1);
   double get _progreso => (_idx + 1) / widget.etapas.length;
   bool get _esEntregado => widget.pedido.estado == 'Entregado';
+  bool get _cancelado => widget.pedido.estado == 'Cancelado';
   Color get _colorActual => widget.colores[widget.pedido.estado] ?? AppColors.azul;
   String get _etiquetaActual => widget.etiquetas[widget.pedido.estado] ?? widget.pedido.estado;
   String? get _siguienteEtapa => _idx < widget.etapas.length - 1 ? widget.etapas[_idx + 1] : null;
@@ -178,6 +181,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
       case 'PagoCompleto': return '¡Hola $nombre! 💳 Tu pedido *$folio* está listo. Para entregarlo necesitamos el pago del saldo restante${montoRestante.isNotEmpty ? " de *$montoRestante*" : ""}. ¿Cuándo puedes realizarlo? — *HETNA CNC*';
       case 'Entrega': return '¡Hola $nombre! 📦 Tu pedido *$folio* está *LISTO para entrega*. ¿Cuándo coordinamos? — *HETNA CNC*';
       case 'Entregado': return '¡Hola $nombre! 🎉 Tu pedido *$folio* fue entregado. ¡Gracias por confiar en *HETNA CNC*! Si necesitas algo más, con gusto te atendemos. 😊';
+      case 'Cancelado': return 'Hola $nombre, te confirmamos que tu pedido *$folio* fue cancelado. Si tienes dudas o quieres retomarlo más adelante, contáctanos. — *HETNA CNC*';
       default: return '¡Hola $nombre! Tu pedido *$folio* está en proceso. — *HETNA CNC*';
     }
   }
@@ -256,8 +260,16 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
 
         const SizedBox(height: 10),
 
+        // Aviso de cancelado
+        if (_cancelado)
+          Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(color: const Color(0xFF6b7280).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8)),
+            child: const Center(child: Text('❌ Pedido cancelado',
+              style: TextStyle(color: Color(0xFF6b7280), fontWeight: FontWeight.w700, fontSize: 12)))),
+
         // Botones
-        if (!_esEntregado && siguienteEtapa != null)
+        if (!_esEntregado && !_cancelado && siguienteEtapa != null)
           SizedBox(width: double.infinity, child: ElevatedButton(
             onPressed: _cambiando ? null : () => _cambiarEtapa(siguienteEtapa),
             style: ElevatedButton.styleFrom(
@@ -272,6 +284,16 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
                     style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
                     overflow: TextOverflow.ellipsis)),
                 ]))),
+
+        // Cancelar pedido — visible mientras no esté ya entregado o cancelado
+        if (!_esEntregado && !_cancelado) ...[
+          const SizedBox(height: 6),
+          SizedBox(width: double.infinity, child: TextButton.icon(
+            onPressed: _cambiando ? null : _confirmarCancelar,
+            icon: const Icon(Icons.cancel_outlined, size: 14, color: AppColors.rojo),
+            label: const Text('Cancelar pedido',
+              style: TextStyle(fontSize: 12, color: AppColors.rojo, fontWeight: FontWeight.w600)))),
+        ],
 
         const SizedBox(height: 6),
         // Botón Ver PDF de cotización
@@ -314,8 +336,8 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
                 label: const Text('Notificar WA', style: TextStyle(fontSize: 12, color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF25D366), padding: const EdgeInsets.symmetric(vertical: 8)))),
-          if (tieneWA && !_esEntregado) const SizedBox(width: 6),
-          if (!_esEntregado) Expanded(child: OutlinedButton.icon(
+          if (tieneWA && !_esEntregado && !_cancelado) const SizedBox(width: 6),
+          if (!_esEntregado && !_cancelado) Expanded(child: OutlinedButton.icon(
             onPressed: () => _cambiarEtapa('Entregado'),
             icon: const Icon(Icons.check_circle_outline, size: 14),
             label: const Text('Entregado', style: TextStyle(fontSize: 12)),
@@ -376,6 +398,31 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
     }
+  }
+
+  void _confirmarCancelar() {
+    final motivoCtrl = TextEditingController();
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('¿Cancelar este pedido?'),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+        const Text('Esta acción marcará el pedido como cancelado. Podrás seguir viéndolo en el filtro "Cancelado".',
+          style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+        const SizedBox(height: 12),
+        TextField(controller: motivoCtrl,
+          decoration: const InputDecoration(labelText: 'Motivo (opcional)', isDense: true,
+            border: OutlineInputBorder())),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('No cancelar')),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            _cambiarEtapa('Cancelado');
+          },
+          child: const Text('Sí, cancelar pedido',
+            style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
+      ]));
   }
 
   Future<void> _cambiarEtapa(String nueva) async {
