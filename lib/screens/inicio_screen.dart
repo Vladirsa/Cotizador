@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InicioScreen extends StatefulWidget {
   const InicioScreen({super.key});
@@ -19,6 +20,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   List<Map<String, dynamic>> _gastos = [];
   List<Map<String, dynamic>> _materiales = [];
   bool _cargando = true;
+  double _costoFijoMensual = 0;
   // Filtros inventario
   String _filtroCategoria = 'Todas';
   String _filtroStock = 'Todos';
@@ -51,12 +53,23 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         SupabaseService.getGastos(periodo: 'Este mes'),
         SupabaseService.getMateriales(),
       ]);
+      // Costo fijo mensual configurado en "Costos del taller" -> meta de punto de equilibrio
+      double costoFijo = 0;
+      try {
+        final cfg = await Supabase.instance.client
+          .from('empresa_config')
+          .select('costo_fijo_mensual')
+          .limit(1).maybeSingle();
+        costoFijo = (cfg?['costo_fijo_mensual'] as num?)?.toDouble() ?? 0;
+      } catch (_) {}
+
       if (mounted) setState(() {
         _stats = results[0] as Map<String, dynamic>;
         _cotizaciones = results[1] as List<Cotizacion>;
         _pedidos = results[2] as List<Pedido>;
         _gastos = results[3] as List<Map<String, dynamic>>;
         _materiales = results[4] as List<Map<String, dynamic>>;
+        _costoFijoMensual = costoFijo;
         _cargando = false;
       });
     } catch (_) {
@@ -185,6 +198,85 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   // ══════════════════════════════════════
   // TAB 2 — FINANZAS
   // ══════════════════════════════════════
+  // ── META DE PUNTO DE EQUILIBRIO ──────────────────────
+  // Conecta "Costos del taller" con las ventas reales del mes
+  Widget _cardMetaEquilibrio({required double totalVentas}) {
+    final meta = _costoFijoMensual;
+    final progreso = meta > 0 ? (totalVentas / meta).clamp(0.0, 1.0) : 0.0;
+    final cubierto = totalVentas >= meta;
+    final faltante = (meta - totalVentas).clamp(0, double.infinity);
+
+    final hoy = DateTime.now();
+    final diasEnMes = DateTime(hoy.year, hoy.month + 1, 0).day;
+    final diasRestantes = (diasEnMes - hoy.day).clamp(1, diasEnMes);
+    final promedioDiarioNecesario = faltante / diasRestantes;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: cubierto
+          ? [AppColors.verde, const Color(0xFF15803d)]
+          : [const Color(0xFF334155), const Color(0xFF1e293b)]),
+        borderRadius: BorderRadius.circular(14)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(cubierto ? Icons.check_circle : Icons.flag_outlined,
+            color: Colors.white, size: 18),
+          const SizedBox(width: 6),
+          const Text('META: CUBRIR COSTOS FIJOS DEL MES',
+            style: TextStyle(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
+        ]),
+        const SizedBox(height: 10),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(_fmt.format(totalVentas),
+            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white)),
+          const SizedBox(width: 6),
+          Padding(padding: const EdgeInsets.only(bottom: 4),
+            child: Text('de ${_fmt.format(meta)}',
+              style: const TextStyle(fontSize: 13, color: Colors.white60))),
+        ]),
+        const SizedBox(height: 10),
+        ClipRRect(borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: progreso, minHeight: 10,
+            backgroundColor: Colors.white.withOpacity(0.15),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              cubierto ? Colors.white : AppColors.ambar))),
+        const SizedBox(height: 8),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('${(progreso * 100).toStringAsFixed(0)}% cubierto',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+          Text(cubierto
+            ? '✅ Meta alcanzada este mes'
+            : 'Faltan ${_fmt.format(faltante)}',
+            style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        ]),
+        if (!cubierto) ...[
+          const SizedBox(height: 4),
+          Text('Necesitas vender ~${_fmt.format(promedioDiarioNecesario)}/día '
+            'los próximos $diasRestantes días para cubrir renta, luz y demás gastos fijos.',
+            style: const TextStyle(fontSize: 11, color: Colors.white60)),
+        ],
+      ]));
+  }
+
+  // ── Aviso cuando no hay costos configurados ──────────
+  Widget _cardConfigurarCostos() => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(color: AppColors.ambarClaro,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.ambar.withOpacity(0.4))),
+    child: Row(children: [
+      const Icon(Icons.flag_outlined, color: AppColors.ambar, size: 22),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Configura tus costos fijos',
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ambar)),
+        const Text('Ve a "Costos del taller" (renta, luz, etc.) para ver aquí tu meta mensual de punto de equilibrio.',
+          style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      ])),
+    ]));
+
   Widget _tabFinanzas() {
     final totalVentas = (_stats['ventas_mes'] as num?)?.toDouble() ?? 0;
     final totalGastosDirect = _gastos.where((g) => g['tipo'] == 'directo').fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
@@ -202,6 +294,14 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     final sorted = porCategoria.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
+
+      // ── META DE PUNTO DE EQUILIBRIO ──────────────────
+      // Muestra cuánto de tus costos fijos mensuales (renta, luz, etc.
+      // configurados en "Costos del taller") ya cubriste con las ventas del mes
+      if (_costoFijoMensual > 0) _cardMetaEquilibrio(totalVentas: (_stats['ventas_mes'] as num?)?.toDouble() ?? 0),
+      if (_costoFijoMensual > 0) const SizedBox(height: 14),
+      if (_costoFijoMensual == 0) _cardConfigurarCostos(),
+      if (_costoFijoMensual == 0) const SizedBox(height: 14),
 
       // Tarjeta principal
       Container(padding: const EdgeInsets.all(16),
