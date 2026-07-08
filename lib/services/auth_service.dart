@@ -116,17 +116,163 @@ class AuthService {
   }) async {
     try {
       if (_negocioId == null) return 'Sin negocio activo';
-      await _sb.from('usuarios_negocio').insert({
+      // Upsert: si ya existe la fila del usuario, actualiza en vez de duplicar
+      await _sb.from('usuarios_negocio').upsert({
         'user_id'   : userId,
         'negocio_id': _negocioId,
         'rol'       : rol,
         'nombre'    : nombre,
         'correo'    : correo,
         'activo'    : true,
-      });
+      }, onConflict: 'user_id');
       return null;
     } catch (e) {
       return 'Error: $e';
+    }
+  }
+
+  // ── Actualizar solo el ROL de un usuario existente (por id de fila) ──
+  static Future<String?> actualizarRolUsuario({
+    required String usuarioNegocioId,
+    required String nuevoRol,
+  }) async {
+    try {
+      await _sb.from('usuarios_negocio')
+        .update({'rol': nuevoRol}).eq('id', usuarioNegocioId);
+      return null;
+    } catch (e) {
+      return 'Error: $e';
+    }
+  }
+
+  // ══════════════════════════════════════════════════════
+  // SISTEMA DE INVITACIONES DE EQUIPO (dinámico, sin Supabase Dashboard)
+  // ══════════════════════════════════════════════════════
+
+  // Generar código corto legible (6 caracteres)
+  static String _generarCodigo() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // sin O/0/I/1 confusos
+    final rnd = DateTime.now().microsecondsSinceEpoch;
+    var seed = rnd;
+    final buf = StringBuffer();
+    for (int i = 0; i < 6; i++) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      buf.write(chars[seed % chars.length]);
+    }
+    return buf.toString();
+  }
+
+  // Admin genera una invitación con rol asignado
+  static Future<Map<String, dynamic>?> crearInvitacion({
+    required String rol,
+    String? nombreSugerido,
+    String? correoSugerido,
+  }) async {
+    if (_negocioId == null) return null;
+    try {
+      String codigo = _generarCodigo();
+      // Reintentar si el código ya existe (muy improbable, pero por seguridad)
+      for (int intento = 0; intento < 3; intento++) {
+        final existe = await _sb.from('invitaciones_equipo')
+          .select('id').eq('codigo', codigo).maybeSingle();
+        if (existe == null) break;
+        codigo = _generarCodigo();
+      }
+      final data = await _sb.from('invitaciones_equipo').insert({
+        'negocio_id': _negocioId,
+        'codigo': codigo,
+        'rol': rol,
+        'nombre_sugerido': nombreSugerido,
+        'correo_sugerido': correoSugerido,
+        'creado_por': usuarioActual?.id,
+      }).select().single();
+      return data;
+    } catch (e) {
+      print('crearInvitacion error: $e');
+      return null;
+    }
+  }
+
+  // Listar invitaciones pendientes (no usadas) del negocio
+  static Future<List<Map<String, dynamic>>> listarInvitacionesPendientes() async {
+    if (_negocioId == null) return [];
+    try {
+      final data = await _sb.from('invitaciones_equipo')
+        .select()
+        .eq('negocio_id', _negocioId!)
+        .eq('usado', false)
+        .order('created_at', ascending: false);
+      return List<Map<String, dynamic>>.from(data);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // Cancelar/eliminar una invitación pendiente
+  static Future<void> cancelarInvitacion(String id) async {
+    try {
+      await _sb.from('invitaciones_equipo').delete().eq('id', id);
+    } catch (_) {}
+  }
+
+  // ── Nuevo usuario: crear cuenta + canjear código de invitación ──
+  static Future<AuthResult> crearCuentaConInvitacion({
+    required String codigo,
+    required String nombre,
+    required String correo,
+    required String password,
+  }) async {
+    try {
+      final codigoLimpio = codigo.trim().toUpperCase();
+
+      // 1. Validar que el código existe y no ha sido usado
+      final inv = await _sb.from('invitaciones_equipo')
+        .select().eq('codigo', codigoLimpio).maybeSingle();
+
+      if (inv == null) {
+        return AuthResult.error('Código de invitación no válido');
+      }
+      if (inv['usado'] == true) {
+        return AuthResult.error('Este código ya fue utilizado');
+      }
+      final expiresAt = DateTime.tryParse(inv['expires_at'] ?? '');
+      if (expiresAt != null && expiresAt.isBefore(DateTime.now())) {
+        return AuthResult.error('Este código de invitación expiró');
+      }
+
+      // 2. Crear la cuenta en Supabase Auth
+      final res = await _sb.auth.signUp(email: correo, password: password);
+      if (res.user == null) {
+        return AuthResult.error('No se pudo crear la cuenta');
+      }
+      final uid = res.user!.id;
+
+      // 3. Vincular al negocio con el rol de la invitación
+      await _sb.from('usuarios_negocio').insert({
+        'user_id'   : uid,
+        'negocio_id': inv['negocio_id'],
+        'rol'       : inv['rol'],
+        'nombre'    : nombre,
+        'correo'    : correo,
+        'activo'    : true,
+      });
+
+      // 4. Marcar invitación como usada
+      await _sb.from('invitaciones_equipo').update({
+        'usado': true,
+        'usado_por': uid,
+      }).eq('id', inv['id']);
+
+      // 5. Cargar el perfil recién creado en memoria
+      await _cargarPerfil();
+      if (_negocioId == null) {
+        return AuthResult.error('La cuenta se creó pero no se pudo vincular al taller. Contacta al administrador.');
+      }
+      return AuthResult.ok();
+    } on AuthException catch (e) {
+      return AuthResult.error(_traducirError(e.message));
+    } catch (e) {
+      return AuthResult.error('Error al crear la cuenta: $e');
     }
   }
 
