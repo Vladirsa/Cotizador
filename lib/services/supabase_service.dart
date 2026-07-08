@@ -450,29 +450,34 @@ class SupabaseService {
     } catch (_) { return []; }
   }
 
-  static Future<void> registrarMovimiento({
+  static Future<String?> registrarMovimiento({
     required String materialId,
     required String tipo,
     required int cantidad,
     String? motivo,
   }) async {
-    await _db.from('movimientos_inventario').insert({
-      'material_id': materialId,
-      'tipo': tipo,
-      'cantidad': cantidad,
-      'motivo': motivo,
-      'fecha': DateTime.now().toIso8601String(),
-    });
-    final material = await _db.from('inventario_bodega')
-        .select('stock_actual').eq('id', materialId).single();
-    final stockActual = (material as Map<String, dynamic>)['stock_actual'] as int;
-    final nuevoStock = tipo == 'entrada'
-        ? stockActual + cantidad
-        : (stockActual - cantidad).clamp(0, 99999);
-    await _db.from('inventario_bodega').update({
-      'stock_actual': nuevoStock,
-      'updated_at': DateTime.now().toIso8601String()
-    }).eq('id', materialId);
+    try {
+      await _db.from('movimientos_inventario').insert({
+        'material_id': materialId,
+        'tipo': tipo,
+        'cantidad': cantidad,
+        'motivo': motivo,
+        'fecha': DateTime.now().toIso8601String(),
+      });
+      final material = await _db.from('inventario_bodega')
+          .select('stock_actual').eq('id', materialId).single();
+      final stockActual = (material as Map<String, dynamic>)['stock_actual'] as int? ?? 0;
+      final nuevoStock = tipo == 'entrada'
+          ? stockActual + cantidad
+          : (stockActual - cantidad).clamp(0, 99999);
+      await _db.from('inventario_bodega').update({
+        'stock_actual': nuevoStock,
+        'updated_at': DateTime.now().toIso8601String()
+      }).eq('id', materialId);
+      return null; // sin error
+    } catch (e) {
+      return 'Error al registrar movimiento: $e';
+    }
   }
 
   static Future<void> agregarMaterial(Map<String, dynamic> material) async {
