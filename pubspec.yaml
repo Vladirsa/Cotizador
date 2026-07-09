@@ -1,13 +1,15 @@
 name: hetna_cnc
 description: Cotizador profesional HETNA CNC
 publish_to: 'none'
-version: 1.0.1+2
+version: 1.0.2+3
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
 
   supabase_flutter: 1.10.25
