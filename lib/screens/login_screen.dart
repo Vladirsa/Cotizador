@@ -67,7 +67,9 @@ class _LoginScreenState extends State<LoginScreen> {
               }
               setS(() => enviando = true);
               try {
-                await Supabase.instance.client.auth.resetPasswordForEmail(correo);
+                await Supabase.instance.client.auth.resetPasswordForEmail(
+                  correo,
+                  redirectTo: 'com.hetnacnc.app://reset-callback/');
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text('✅ Enviamos un enlace a $correo. Revisa tu correo (y spam).'),
