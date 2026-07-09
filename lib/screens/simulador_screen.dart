@@ -1016,16 +1016,26 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
         border: Border.all(color: AppColors.grisBorde, width: 0.5),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0,2))]),
       child: Stack(children: [
-        Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(s.emoji, style: const TextStyle(fontSize: 32)),
-          const SizedBox(height: 8),
-          Text(s.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-            color: AppColors.azul), textAlign: TextAlign.center),
-          if (s.descripcion != null) Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            child: Text(s.descripcion!, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
-              textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
-        ]),
+        // Positioned.fill + Center garantiza que el contenido quede
+        // centrado dentro de toda la tarjeta, sin importar el ancho
+        // del emoji/nombre (antes quedaba pegado a la izquierda)
+        Positioned.fill(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Column(mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center, children: [
+                Text(s.emoji, style: const TextStyle(fontSize: 32),
+                  textAlign: TextAlign.center),
+                const SizedBox(height: 8),
+                Text(s.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                  color: AppColors.azul), textAlign: TextAlign.center),
+                if (s.descripcion != null) Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  child: Text(s.descripcion!, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
+                    textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
+              ])))),
         Positioned(top: 4, right: 4,
           child: GestureDetector(
             onTap: () => _confirmarBorrarServicio(s),
