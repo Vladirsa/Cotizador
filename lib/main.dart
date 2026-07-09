@@ -4,18 +4,45 @@
 // ============================================
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'services/fcm_service.dart';
+import 'firebase_options.dart';
 import 'services/notificaciones_service.dart';
 import 'screens/home_screen.dart';
+import 'screens/nueva_password_screen.dart';
 
 const supabaseUrl = 'https://ldfmkfbhcbsbecfbzsny.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkZm1rZmJoY2JzYmVjZmJ6c255Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTU5NzEsImV4cCI6MjA5NzI5MTk3MX0.N6KsmCz_HeHdc921VQflXJywgU2ctAON7wLSZViCEc4';
+
+// Se activa cuando el usuario toca el enlace de "recuperar contraseña"
+// desde su correo y regresa a la app.
+final ValueNotifier<bool> mostrarRecuperarPass = ValueNotifier(false);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await initializeDateFormatting('es_MX', null);
+
+  // Escuchar el evento de recuperación de contraseña ANTES de correr la app,
+  // para no perdernos el evento si la app abre recién desde el enlace del correo.
+  Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    if (data.event == AuthChangeEvent.passwordRecovery) {
+      mostrarRecuperarPass.value = true;
+    }
+  });
+
+  // Firebase FCM
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform);
+    await FcmService.inicializar();
+  } catch (e) {
+    print('FCM no disponible: \$e');
+  }
+
   await NotificacionesService.inicializar();
   runApp(const HetnaCncApp());
 }
@@ -28,6 +55,16 @@ class HetnaCncApp extends StatelessWidget {
     return MaterialApp(
       title: 'HETNA CNC',
       debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'MX'),
+        Locale('es'),
+      ],
+      locale: const Locale('es', 'MX'),
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1a3a5c),
@@ -86,7 +123,10 @@ class HetnaCncApp extends StatelessWidget {
           labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
         ),
       ),
-      home: const HomeScreen(),
+      home: ValueListenableBuilder<bool>(
+        valueListenable: mostrarRecuperarPass,
+        builder: (_, mostrar, __) =>
+          mostrar ? const NuevaPasswordScreen() : const HomeScreen()),
     );
   }
 }
