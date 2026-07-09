@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'auth_service.dart';
 import '../models/models.dart';
 
 class SupabaseService {
@@ -457,7 +458,11 @@ class SupabaseService {
     String? motivo,
   }) async {
     try {
+      // Se envía negocio_id explícito para no depender del trigger automático
+      // (evita error "record new has no field negcio_id" en Supabase)
+      final negId = AuthService.negocioId ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
       await _db.from('movimientos_inventario').insert({
+        'negocio_id': negId,
         'material_id': materialId,
         'tipo': tipo,
         'cantidad': cantidad,

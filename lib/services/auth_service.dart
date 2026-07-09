@@ -168,15 +168,17 @@ class AuthService {
   }
 
   // Admin genera una invitación con rol asignado
-  static Future<Map<String, dynamic>?> crearInvitacion({
+  // Devuelve el mapa con la invitación en 'data', o el error en 'error'
+  static Future<Map<String, dynamic>> crearInvitacion({
     required String rol,
     String? nombreSugerido,
     String? correoSugerido,
   }) async {
-    if (_negocioId == null) return null;
+    if (_negocioId == null) {
+      return {'error': 'No se detectó tu taller activo. Cierra sesión y vuelve a entrar.'};
+    }
     try {
       String codigo = _generarCodigo();
-      // Reintentar si el código ya existe (muy improbable, pero por seguridad)
       for (int intento = 0; intento < 3; intento++) {
         final existe = await _sb.from('invitaciones_equipo')
           .select('id').eq('codigo', codigo).maybeSingle();
@@ -191,10 +193,10 @@ class AuthService {
         'correo_sugerido': correoSugerido,
         'creado_por': usuarioActual?.id,
       }).select().single();
-      return data;
+      return {'data': data};
     } catch (e) {
       print('crearInvitacion error: $e');
-      return null;
+      return {'error': 'No se pudo generar la invitación: $e'};
     }
   }
 
