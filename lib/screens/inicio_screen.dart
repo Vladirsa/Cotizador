@@ -21,6 +21,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   List<Map<String, dynamic>> _materiales = [];
   bool _cargando = true;
   double _costoFijoMensual = 0;
+  String _periodoDash = 'mes'; // 'dia' | 'semana' | 'mes'
   // Filtros inventario
   String _filtroCategoria = 'Todas';
   String _filtroStock = 'Todos';
@@ -39,9 +40,48 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 7, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
     _cargar();
   }
+
+  // Trae gastos de los últimos 90 días (sin restringir a "Este mes")
+  // para poder filtrar localmente por Día / Semana / Mes sin ir al servidor
+  Future<List<Map<String, dynamic>>> _getGastosAmplio() async {
+    try {
+      final desde = DateTime.now().subtract(const Duration(days: 90));
+      final res = await Supabase.instance.client
+        .from('gastos')
+        .select()
+        .gte('fecha', desde.toIso8601String())
+        .order('fecha', ascending: false);
+      return List<Map<String, dynamic>>.from(res as List);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // Rango de fecha "desde" según el filtro Día/Semana/Mes seleccionado
+  DateTime get _desdePeriodo {
+    final ahora = DateTime.now();
+    switch (_periodoDash) {
+      case 'dia':
+        return DateTime(ahora.year, ahora.month, ahora.day);
+      case 'semana':
+        final inicioSemana = ahora.subtract(Duration(days: ahora.weekday - 1));
+        return DateTime(inicioSemana.year, inicioSemana.month, inicioSemana.day);
+      default: // mes
+        return DateTime(ahora.year, ahora.month, 1);
+    }
+  }
+
+  // Pedidos y gastos filtrados por el periodo seleccionado
+  List<Pedido> get _pedidosPeriodo => _pedidos.where((p) =>
+    p.createdAt != null && !p.createdAt!.isBefore(_desdePeriodo)).toList();
+
+  List<Map<String, dynamic>> get _gastosPeriodo => _gastos.where((g) {
+    final f = g['fecha'] != null ? DateTime.tryParse(g['fecha']) : null;
+    return f != null && !f.isBefore(_desdePeriodo);
+  }).toList();
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
@@ -50,7 +90,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         SupabaseService.getEstadisticasMes(),
         SupabaseService.getCotizaciones(),
         SupabaseService.getPedidos(),
-        SupabaseService.getGastos(periodo: 'Este mes'),
+        _getGastosAmplio(), // últimos 90 días, para filtrar día/semana/mes localmente
         SupabaseService.getMateriales(),
       ]);
       // Costo fijo mensual configurado en "Costos del taller" -> meta de punto de equilibrio
@@ -100,9 +140,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           indicatorColor: AppColors.azul,
           isScrollable: true,
           tabs: const [
-            Tab(text: '📊 General'),
-            Tab(text: '💰 Finanzas'),
-            Tab(text: '📈 Ventas'),
+            Tab(text: '📊 Dashboard'),
             Tab(text: '📋 Cotizaciones'),
             Tab(text: '🏭 Producción'),
             Tab(text: '📦 Inventario'),
@@ -113,9 +151,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
         : TabBarView(controller: _tabs, children: [
-            _tabGeneral(),
-            _tabFinanzas(),
-            _tabVentas(),
+            _tabDashboard(),
             _tabCotizaciones(),
             _tabProduccion(),
             _tabInventario(),
@@ -127,79 +163,12 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   // ══════════════════════════════════════
   // TAB 1 — GENERAL (portada)
   // ══════════════════════════════════════
-  Widget _tabGeneral() {
-    final totalVentas = (_stats['ventas_mes'] as num?)?.toDouble() ?? 0;
-    final totalGastos = _gastos.fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
-    final utilidad = totalVentas - totalGastos;
-    final pedidosActivos = _pedidos.where((p) => p.estado != 'Entregado').length;
-    final alertas = _stats['alertas_pendientes'] ?? 0;
-    final materialesBajos = _materiales.where((m) => (m['stock_actual'] as int? ?? 0) <= (m['stock_minimo'] as int? ?? 1)).length;
-
-    return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
-
-      // ─── Hero financiero ───
-      Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [AppColors.azul, Color(0xFF2d5a8e)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(16)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('RESUMEN DEL MES', style: TextStyle(fontSize: 10, color: Colors.white60, letterSpacing: 1.5)),
-          const SizedBox(height: 4),
-          Text(_fmt.format(totalVentas), style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white)),
-          const Text('en ventas', style: TextStyle(fontSize: 12, color: Colors.white70)),
-          const SizedBox(height: 14),
-          Row(children: [
-            _heroStat('Gastos', _fmt.format(totalGastos), AppColors.rojo.withOpacity(0.8)),
-            _heroDivider(),
-            _heroStat('Utilidad', _fmt.format(utilidad), utilidad >= 0 ? Colors.greenAccent : Colors.redAccent),
-            _heroDivider(),
-            _heroStat('En proceso', '$pedidosActivos pedidos', Colors.white70),
-          ]),
-        ])),
-
-      const SizedBox(height: 14),
-
-      // ─── Alertas rápidas ───
-      if (alertas > 0 || materialesBajos > 0) ...[
-        Row(children: [
-          if (alertas > 0) Expanded(child: _alertaCard(
-            '⚠️ $alertas seguimientos\npendientes', AppColors.ambar)),
-          if (alertas > 0 && materialesBajos > 0) const SizedBox(width: 8),
-          if (materialesBajos > 0) Expanded(child: _alertaCard(
-            '📦 $materialesBajos materiales\ncon stock bajo', AppColors.rojo)),
-        ]),
-        const SizedBox(height: 14),
-      ],
-
-      // ─── Stats rápidos ───
-      _seccion('RESUMEN OPERATIVO'),
-      GridView.count(crossAxisCount: 2, shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1.6,
-        children: [
-          _statCard('Cotizaciones', '${_cotizaciones.length}', AppColors.azul, Icons.description_outlined),
-          _statCard('Pedidos activos', '$pedidosActivos', const Color(0xFF7c3aed), Icons.local_shipping_outlined),
-          _statCard('Entregados', '${_pedidos.where((p) => p.estado == "Entregado").length}', AppColors.verde, Icons.check_circle_outline),
-          _statCard('Alertas', '$alertas', alertas > 0 ? AppColors.rojo : AppColors.verde, Icons.notifications_outlined),
-        ]),
-
-      const SizedBox(height: 14),
-
-      // ─── Pedidos activos ───
-      if (_pedidos.where((p) => p.estado != 'Entregado').isNotEmpty) ...[
-        _seccion('PEDIDOS EN PROCESO'),
-        ..._pedidos.where((p) => p.estado != 'Entregado').take(3).map((p) => _miniPedido(p)),
-      ],
-    ]));
-  }
-
   // ══════════════════════════════════════
-  // TAB 2 — FINANZAS
+  // DASHBOARD UNIFICADO — General + Finanzas + Ventas
+  // con filtro dinámico por Día / Semana / Mes
   // ══════════════════════════════════════
-  // ── META DE PUNTO DE EQUILIBRIO ──────────────────────
-  // Conecta "Costos del taller" con las ventas reales del mes
+
+  // ── META DE PUNTO DE EQUILIBRIO (siempre mensual) ────
   Widget _cardMetaEquilibrio({required double totalVentas}) {
     final meta = _costoFijoMensual;
     final progreso = meta > 0 ? (totalVentas / meta).clamp(0.0, 1.0) : 0.0;
@@ -260,7 +229,6 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       ]));
   }
 
-  // ── Aviso cuando no hay costos configurados ──────────
   Widget _cardConfigurarCostos() => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(color: AppColors.ambarClaro,
@@ -277,66 +245,168 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       ])),
     ]));
 
-  Widget _tabFinanzas() {
-    final totalVentas = (_stats['ventas_mes'] as num?)?.toDouble() ?? 0;
-    final totalGastosDirect = _gastos.where((g) => g['tipo'] == 'directo').fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
-    final totalGastosIndir = _gastos.where((g) => g['tipo'] == 'indirecto').fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
+  // ── Selector de periodo Día / Semana / Mes ────────────
+  Widget _selectorPeriodo() => Container(
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+    child: Row(children: [
+      _chipPeriodo('dia', 'Día'),
+      _chipPeriodo('semana', 'Semana'),
+      _chipPeriodo('mes', 'Mes'),
+    ]));
+
+  Widget _chipPeriodo(String val, String label) {
+    final sel = _periodoDash == val;
+    return Expanded(child: GestureDetector(
+      onTap: () => setState(() => _periodoDash = val),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.transparent,
+          borderRadius: BorderRadius.circular(8)),
+        child: Text(label, textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+            color: sel ? Colors.white : AppColors.textoSecundario)))));
+  }
+
+  Widget _tabDashboard() {
+    // Datos filtrados por el periodo seleccionado (Día/Semana/Mes)
+    final pedidosPeriodo = _pedidosPeriodo;
+    final gastosPeriodo = _gastosPeriodo;
+
+    final ventas = pedidosPeriodo.where((p) =>
+      p.estado == 'Entregado' || p.estado == 'PagoCompleto' || p.estado == 'Entrega').toList();
+    final totalVentas = ventas.fold(0.0, (s, p) => s + (p.total ?? 0));
+    final totalGastosDirect = gastosPeriodo.where((g) => g['tipo'] == 'directo')
+      .fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
+    final totalGastosIndir = gastosPeriodo.where((g) => g['tipo'] == 'indirecto')
+      .fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
     final totalGastos = totalGastosDirect + totalGastosIndir;
-    final utilidadBruta = totalVentas - totalGastosDirect;
     final utilidadNeta = totalVentas - totalGastos;
     final margen = totalVentas > 0 ? (utilidadNeta / totalVentas * 100) : 0.0;
 
+    final pedidosActivos = _pedidos.where((p) => p.estado != 'Entregado' && p.estado != 'Cancelado').length;
+    final alertas = _stats['alertas_pendientes'] ?? 0;
+    final materialesBajos = _materiales.where((m) =>
+      (m['stock_actual'] as int? ?? 0) <= (m['stock_minimo'] as int? ?? 1)).length;
+
+    final enProceso = _pedidos.where((p) =>
+      p.estado == 'Pago50' || p.estado == 'Produccion' || p.estado == 'Pruebas').toList();
+    final porCobrar = enProceso.fold(0.0, (s, p) => s + ((p.total ?? 0) / 2));
+
+    // Gastos por categoría (del periodo seleccionado)
     final porCategoria = <String, double>{};
-    for (final g in _gastos) {
+    for (final g in gastosPeriodo) {
       final cat = g['categoria'] as String? ?? 'Otro';
       porCategoria[cat] = (porCategoria[cat] ?? 0) + ((g['monto'] as num?)?.toDouble() ?? 0);
     }
-    final sorted = porCategoria.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    final sortedCategorias = porCategoria.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+
+    // Ventas por día de la semana (siempre sobre el periodo seleccionado)
+    final Map<int, double> ventasPorDia = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0};
+    for (final p in ventas) {
+      if (p.createdAt != null) {
+        final dia = p.createdAt!.weekday % 7;
+        ventasPorDia[dia] = (ventasPorDia[dia] ?? 0) + (p.total ?? 0);
+      }
+    }
+    final maxDia = ventasPorDia.values.fold(0.0, (a, b) => a > b ? a : b);
+
+    // Distribución de cotizaciones (histórico completo, no depende del periodo)
+    final estadosCot = <String, int>{};
+    for (final c in _cotizaciones) {
+      estadosCot[c.estado] = (estadosCot[c.estado] ?? 0) + 1;
+    }
+    final coloresCot = [
+      const Color(0xFF185fa5), const Color(0xFF1d9e75), const Color(0xFF7c3aed),
+      const Color(0xFFef9f27), const Color(0xFFe24b4a), Colors.grey,
+    ];
+    final totalCots = _cotizaciones.length;
+    final aprobadas = _cotizaciones.where((c) => c.estado == 'Aprobada' || c.estado == 'Pedido').length;
+    final tasaConversion = totalCots > 0 ? (aprobadas / totalCots * 100) : 0.0;
+
+    final etiquetaPeriodo = {'dia': 'HOY', 'semana': 'ESTA SEMANA', 'mes': 'ESTE MES'}[_periodoDash] ?? 'ESTE MES';
 
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
 
-      // ── META DE PUNTO DE EQUILIBRIO ──────────────────
-      // Muestra cuánto de tus costos fijos mensuales (renta, luz, etc.
-      // configurados en "Costos del taller") ya cubriste con las ventas del mes
+      // ── Selector de periodo ──
+      _selectorPeriodo(),
+      const SizedBox(height: 14),
+
+      // ── Meta de punto de equilibrio (siempre mensual) ──
       if (_costoFijoMensual > 0) _cardMetaEquilibrio(totalVentas: (_stats['ventas_mes'] as num?)?.toDouble() ?? 0),
       if (_costoFijoMensual > 0) const SizedBox(height: 14),
       if (_costoFijoMensual == 0) _cardConfigurarCostos(),
       if (_costoFijoMensual == 0) const SizedBox(height: 14),
 
-      // Tarjeta principal
-      Container(padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: AppColors.azul, borderRadius: BorderRadius.circular(14)),
-        child: Column(children: [
-          const Text('UTILIDAD NETA DEL MES', style: TextStyle(fontSize: 10, color: Colors.white60, letterSpacing: 1)),
+      // ── Hero financiero del periodo seleccionado ──
+      Container(padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [AppColors.azul, Color(0xFF2d5a8e)],
+            begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(16)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('UTILIDAD NETA — $etiquetaPeriodo',
+            style: const TextStyle(fontSize: 10, color: Colors.white60, letterSpacing: 1.5)),
           const SizedBox(height: 4),
           Text(_fmt.format(utilidadNeta),
-            style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800,
+            style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800,
               color: utilidadNeta >= 0 ? Colors.greenAccent : Colors.redAccent)),
           Text('Margen: ${margen.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 12, color: Colors.white70)),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Row(children: [
-            _finStat('Ventas', _fmt.format(totalVentas), Colors.greenAccent),
-            _finStat('G. Directos', _fmt.format(totalGastosDirect), Colors.orangeAccent),
-            _finStat('G. Indirectos', _fmt.format(totalGastosIndir), Colors.redAccent),
+            _heroStat('Ventas', _fmt.format(totalVentas), Colors.greenAccent),
+            _heroDivider(),
+            _heroStat('Gastos', _fmt.format(totalGastos), Colors.orangeAccent),
+            _heroDivider(),
+            _heroStat('Por cobrar', _fmt.format(porCobrar), Colors.yellow.shade200),
           ]),
-          const SizedBox(height: 8),
-          Container(padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Utilidad bruta:', style: TextStyle(color: Colors.white70, fontSize: 12)),
-              Text(_fmt.format(utilidadBruta), style: TextStyle(color: utilidadBruta >= 0 ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.w700)),
-            ])),
         ])),
 
       const SizedBox(height: 14),
-      _seccion('GASTOS POR CATEGORÍA'),
 
-      if (sorted.isEmpty)
+      // ── Alertas rápidas (siempre actuales, no dependen del periodo) ──
+      if (alertas > 0 || materialesBajos > 0) ...[
+        Row(children: [
+          if (alertas > 0) Expanded(child: _alertaCard(
+            '⚠️ $alertas seguimientos\npendientes', AppColors.ambar)),
+          if (alertas > 0 && materialesBajos > 0) const SizedBox(width: 8),
+          if (materialesBajos > 0) Expanded(child: _alertaCard(
+            '📦 $materialesBajos materiales\ncon stock bajo', AppColors.rojo)),
+        ]),
+        const SizedBox(height: 14),
+      ],
+
+      // ── KPIs rápidos ──
+      Row(children: [
+        Expanded(child: _kpiCard2('Ventas cerradas', '${ventas.length}', AppColors.verde, Icons.check_circle_outline)),
+        const SizedBox(width: 8),
+        Expanded(child: _kpiCard2('En proceso', '${enProceso.length}', AppColors.ambar, Icons.pending_outlined)),
+        const SizedBox(width: 8),
+        Expanded(child: _kpiCard2('Ticket prom.', ventas.isEmpty ? '\$0' : _fmt.format(totalVentas / ventas.length), AppColors.azul, Icons.receipt_outlined)),
+      ]),
+      const SizedBox(height: 8),
+      GridView.count(crossAxisCount: 2, shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1.6,
+        children: [
+          _statCard('Cotizaciones', '${_cotizaciones.length}', AppColors.azul, Icons.description_outlined),
+          _statCard('Pedidos activos', '$pedidosActivos', const Color(0xFF7c3aed), Icons.local_shipping_outlined),
+          _statCard('Entregados', '${_pedidos.where((p) => p.estado == "Entregado").length}', AppColors.verde, Icons.check_circle_outline),
+          _statCard('Alertas', '$alertas', alertas > 0 ? AppColors.rojo : AppColors.verde, Icons.notifications_outlined),
+        ]),
+
+      const SizedBox(height: 16),
+
+      // ── Gastos por categoría (del periodo) ──
+      _seccionInicio('GASTOS POR CATEGORÍA — $etiquetaPeriodo'),
+      if (sortedCategorias.isEmpty)
         Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-          child: const Center(child: Text('No hay gastos registrados este mes', style: TextStyle(color: AppColors.textoSecundario))))
+          child: const Center(child: Text('Sin gastos en este periodo', style: TextStyle(color: AppColors.textoSecundario))))
       else Container(padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-        child: Column(children: sorted.map((e) {
+        child: Column(children: sortedCategorias.map((e) {
           final pct = totalGastos > 0 ? e.value / totalGastos : 0.0;
           return Padding(padding: const EdgeInsets.only(bottom: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -351,111 +421,9 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           ]));
         }).toList())),
 
-      const SizedBox(height: 14),
-      _seccion('ÚLTIMOS GASTOS'),
-      ..._gastos.take(5).map((g) {
-        final esDir = g['tipo'] == 'directo';
-        return Container(margin: const EdgeInsets.only(bottom: 6), padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-          child: Row(children: [
-            CircleAvatar(radius: 16, backgroundColor: esDir ? AppColors.rojoClaro : AppColors.ambarClaro,
-              child: Icon(esDir ? Icons.build_outlined : Icons.receipt_outlined, size: 14,
-                color: esDir ? AppColors.rojo : AppColors.ambar)),
-            const SizedBox(width: 10),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(g['concepto'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-              Text(g['categoria'] ?? '', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-            ])),
-            Text(_fmt.format((g['monto'] as num?)?.toDouble() ?? 0),
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
-          ]));
-      }),
-    ]));
-  }
-
-  // ══════════════════════════════════════
-  // TAB 3 — VENTAS con GRÁFICAS fl_chart
-  // ══════════════════════════════════════
-  Widget _tabVentas() {
-    final ventas = _pedidos.where((p) =>
-      p.estado == 'Entregado' || p.estado == 'PagoCompleto' || p.estado == 'Entrega').toList();
-    final totalVentas = ventas.fold(0.0, (s, p) => s + (p.total ?? 0));
-    final totalGastos = _gastos.fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
-    final utilidad = totalVentas - totalGastos;
-    final margen = totalVentas > 0 ? (utilidad / totalVentas * 100) : 0.0;
-
-    final enProceso = _pedidos.where((p) =>
-      p.estado == 'Pago50' || p.estado == 'Produccion' || p.estado == 'Pruebas').toList();
-    final porCobrar = enProceso.fold(0.0, (s, p) => s + ((p.total ?? 0) / 2));
-
-    // ── Datos para gráfica de barras: ventas por día de la semana ──
-    final Map<int, double> ventasPorDia = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0};
-    for (final p in ventas) {
-      if (p.createdAt != null) {
-        final dia = p.createdAt!.weekday % 7; // 0=Dom ... 6=Sab
-        ventasPorDia[dia] = (ventasPorDia[dia] ?? 0) + (p.total ?? 0);
-      }
-    }
-    final maxDia = ventasPorDia.values.fold(0.0, (a, b) => a > b ? a : b);
-
-    // ── Datos para gráfica de dona: estados de cotizaciones ──
-    final estadosCot = <String, int>{};
-    for (final c in _cotizaciones) {
-      final e = c.estado;
-      estadosCot[e] = (estadosCot[e] ?? 0) + 1;
-    }
-    final coloresCot = [
-      const Color(0xFF185fa5), // Enviada
-      const Color(0xFF1d9e75), // Aprobada
-      const Color(0xFF7c3aed), // Pedido
-      const Color(0xFFef9f27), // Vencida
-      const Color(0xFFe24b4a), // Rechazada
-      Colors.grey,             // Borrador
-    ];
-
-    // ── Tasa de conversión ──
-    final totalCots = _cotizaciones.length;
-    final aprobadas = _cotizaciones.where((c) => c.estado == 'Aprobada' || c.estado == 'Pedido').length;
-    final tasaConversion = totalCots > 0 ? (aprobadas / totalCots * 100) : 0.0;
-
-    return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
-
-      // ── Tarjeta resumen ──
-      Container(padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [AppColors.azul, Color(0xFF2a5298)]),
-          borderRadius: BorderRadius.circular(12)),
-        child: Column(children: [
-          const Text('VENTAS DEL PERIODO', style: TextStyle(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
-          const SizedBox(height: 4),
-          Text(_fmt.format(totalVentas), style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w700, color: Colors.white)),
-          Text('Margen: ${margen.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 12, color: Colors.white70)),
-          const SizedBox(height: 12),
-          Row(children: [
-            _miniStat('Utilidad', _fmt.format(utilidad), utilidad >= 0 ? Colors.greenAccent : Colors.redAccent),
-            const SizedBox(width: 8),
-            _miniStat('Gastos', _fmt.format(totalGastos), Colors.orange.shade200),
-            const SizedBox(width: 8),
-            _miniStat('Por cobrar', _fmt.format(porCobrar), Colors.yellow.shade200),
-          ]),
-        ])),
-
-      const SizedBox(height: 12),
-
-      // ── KPIs ──
-      Row(children: [
-        Expanded(child: _kpiCard2('Ventas cerradas', '${ventas.length}', AppColors.verde, Icons.check_circle_outline)),
-        const SizedBox(width: 8),
-        Expanded(child: _kpiCard2('En proceso', '${enProceso.length}', AppColors.ambar, Icons.pending_outlined)),
-        const SizedBox(width: 8),
-        Expanded(child: _kpiCard2('Ticket promedio', ventas.isEmpty ? '\$0' : _fmt.format(totalVentas / ventas.length), AppColors.azul, Icons.receipt_outlined)),
-      ]),
-
       const SizedBox(height: 16),
 
-      // ════════════════════════════════════
-      // GRÁFICA 1 — Barras: ventas por día
-      // ════════════════════════════════════
+      // ── Gráfica: ventas por día de la semana ──
       _seccionInicio('VENTAS POR DÍA DE LA SEMANA'),
       Container(
         padding: const EdgeInsets.fromLTRB(12, 16, 16, 8),
@@ -463,7 +431,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: ventas.isEmpty
           ? const SizedBox(height: 120, child: Center(
-              child: Text('Sin datos de ventas', style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
+              child: Text('Sin datos de ventas en este periodo', style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
           : SizedBox(height: 180,
               child: BarChart(BarChartData(
                 alignment: BarChartAlignment.spaceAround,
@@ -525,9 +493,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
 
       const SizedBox(height: 16),
 
-      // ════════════════════════════════════
-      // GRÁFICA 2 — Dona: estados cotizaciones
-      // ════════════════════════════════════
+      // ── Gráfica: distribución de cotizaciones (histórico) ──
       _seccionInicio('DISTRIBUCIÓN DE COTIZACIONES'),
       Container(
         padding: const EdgeInsets.all(16),
@@ -537,7 +503,6 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           ? const SizedBox(height: 120, child: Center(
               child: Text('Sin cotizaciones', style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
           : Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-              // Dona
               SizedBox(width: 130, height: 130,
                 child: PieChart(PieChartData(
                   sectionsSpace: 2,
@@ -555,7 +520,6 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                   }).toList(),
                 ))),
               const SizedBox(width: 16),
-              // Leyenda
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: estadosCot.entries.mapIndexed((idx, e) {
@@ -574,9 +538,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
 
       const SizedBox(height: 16),
 
-      // ════════════════════════════════════
-      // GRÁFICA 3 — Línea: tasa de conversión
-      // ════════════════════════════════════
+      // ── Tasa de conversión (histórico) ──
       _seccionInicio('TASA DE CONVERSIÓN'),
       Container(
         padding: const EdgeInsets.all(16),
@@ -596,7 +558,6 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
             ]),
           ]),
           const SizedBox(height: 12),
-          // Barra de progreso visual
           ClipRRect(borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: tasaConversion / 100,
@@ -609,7 +570,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
             )),
           const SizedBox(height: 8),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('Meta: 70%', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+            const Text('Meta: 70%', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
                 color: (tasaConversion >= 70 ? AppColors.verde : tasaConversion >= 40 ? AppColors.ambar : AppColors.rojo).withOpacity(0.1),
@@ -623,8 +584,15 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
 
       const SizedBox(height: 16),
 
-      // ── Ventas recientes ──
-      _seccionInicio('VENTAS RECIENTES'),
+      // ── Pedidos en proceso (siempre actuales) ──
+      if (_pedidos.where((p) => p.estado != 'Entregado' && p.estado != 'Cancelado').isNotEmpty) ...[
+        _seccionInicio('PEDIDOS EN PROCESO'),
+        ..._pedidos.where((p) => p.estado != 'Entregado' && p.estado != 'Cancelado').take(3).map((p) => _miniPedido(p)),
+        const SizedBox(height: 16),
+      ],
+
+      // ── Ventas del periodo ──
+      _seccionInicio('VENTAS — $etiquetaPeriodo'),
       if (ventas.isEmpty)
         Container(padding: const EdgeInsets.all(24), alignment: Alignment.center,
           child: const Text('Sin ventas en este periodo', style: TextStyle(color: AppColors.textoSecundario)))
@@ -649,19 +617,19 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const SizedBox(height: 14),
 
       // ── Gastos del periodo ──
-      _seccionInicio('GASTOS DEL PERIODO'),
-      if (_gastos.isEmpty)
+      _seccionInicio('GASTOS — $etiquetaPeriodo'),
+      if (gastosPeriodo.isEmpty)
         Container(padding: const EdgeInsets.all(16), alignment: Alignment.center,
-          child: const Text('Sin gastos registrados', style: TextStyle(color: AppColors.textoSecundario)))
+          child: const Text('Sin gastos registrados en este periodo', style: TextStyle(color: AppColors.textoSecundario)))
       else
-        ..._gastos.take(8).map((g) => Container(
+        ...gastosPeriodo.take(8).map((g) => Container(
           margin: const EdgeInsets.only(bottom: 6), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppColors.grisBorde, width: 0.5)),
           child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(g['concepto'] ?? g['descripcion'] ?? '—', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-              Text(g['tipo'] ?? '', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+              Text(g['categoria'] ?? g['tipo'] ?? '', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             ])),
             Text(_fmt.format((g['monto'] as num?)?.toDouble() ?? 0),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.rojo)),
