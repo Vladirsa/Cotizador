@@ -461,13 +461,14 @@ class _EquipoScreenState extends State<EquipoScreen> {
               child: ElevatedButton.icon(
                 onPressed: () async {
                   Navigator.pop(ctx);
-                  final inv = await AuthService.crearInvitacion(rol: rolSel);
-                  if (inv == null) {
-                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('No se pudo generar la invitación'),
+                  final resultado = await AuthService.crearInvitacion(rol: rolSel);
+                  if (resultado['error'] != null) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(resultado['error'] as String),
                       backgroundColor: AppColors.rojo));
                     return;
                   }
+                  final inv = resultado['data'] as Map<String, dynamic>;
                   if (mounted) _mostrarCodigoGenerado(inv['codigo'] as String, rolSel);
                   _cargarInvitaciones();
                 },

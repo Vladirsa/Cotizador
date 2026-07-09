@@ -17,6 +17,9 @@ class _AvancesScreenState extends State<AvancesScreen> {
   List<Pedido> _pedidos = [];
   bool _cargando = true;
   String _filtro = 'Activos';
+  String _busqueda = '';
+  DateTimeRange? _rangoFechas;
+  final _busquedaCtrl = TextEditingController();
 
   static const _etapas = ['Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado'];
   static const _etiquetas = {
@@ -50,6 +53,9 @@ class _AvancesScreenState extends State<AvancesScreen> {
   @override
   void initState() { super.initState(); _cargar(); }
 
+  @override
+  void dispose() { _busquedaCtrl.dispose(); super.dispose(); }
+
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
@@ -59,11 +65,33 @@ class _AvancesScreenState extends State<AvancesScreen> {
   }
 
   List<Pedido> get _filtrados {
+    List<Pedido> base;
     switch (_filtro) {
-      case 'Activos': return _pedidos.where((p) => p.estado != 'Entregado' && p.estado != 'Cancelado').toList();
-      case 'Todos': return _pedidos;
-      default: return _pedidos.where((p) => p.estado == _filtro).toList();
+      case 'Activos': base = _pedidos.where((p) => p.estado != 'Entregado' && p.estado != 'Cancelado').toList(); break;
+      case 'Todos': base = _pedidos; break;
+      default: base = _pedidos.where((p) => p.estado == _filtro).toList();
     }
+    // Filtro por búsqueda de nombre de cliente / folio
+    if (_busqueda.trim().isNotEmpty) {
+      final q = _busqueda.trim().toLowerCase();
+      base = base.where((p) {
+        final nombre = (p.cliente?.nombre ?? '').toLowerCase();
+        final empresa = (p.cliente?.empresa ?? '').toLowerCase();
+        final folio = p.folio.toLowerCase();
+        return nombre.contains(q) || empresa.contains(q) || folio.contains(q);
+      }).toList();
+    }
+    // Filtro por rango de fechas (usando fecha de creación del pedido)
+    if (_rangoFechas != null) {
+      base = base.where((p) {
+        if (p.createdAt == null) return false;
+        final fecha = DateTime(p.createdAt!.year, p.createdAt!.month, p.createdAt!.day);
+        final desde = DateTime(_rangoFechas!.start.year, _rangoFechas!.start.month, _rangoFechas!.start.day);
+        final hasta = DateTime(_rangoFechas!.end.year, _rangoFechas!.end.month, _rangoFechas!.end.day);
+        return !fecha.isBefore(desde) && !fecha.isAfter(hasta);
+      }).toList();
+    }
+    return base;
   }
 
   int _count(String f) {
@@ -79,6 +107,58 @@ class _AvancesScreenState extends State<AvancesScreen> {
       appBar: AppBar(title: const Text('Avances de pedidos'),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)]),
       body: Column(children: [
+        // Búsqueda por nombre/folio + filtro de fechas
+        Container(color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          child: Row(children: [
+            Expanded(child: TextField(
+              controller: _busquedaCtrl,
+              onChanged: (v) => setState(() => _busqueda = v),
+              decoration: InputDecoration(
+                hintText: 'Buscar por cliente o folio...',
+                hintStyle: const TextStyle(fontSize: 12),
+                prefixIcon: const Icon(Icons.search, size: 18),
+                suffixIcon: _busqueda.isNotEmpty
+                  ? IconButton(icon: const Icon(Icons.close, size: 16),
+                      onPressed: () => setState(() { _busqueda = ''; _busquedaCtrl.clear(); }))
+                  : null,
+                isDense: true, filled: true, fillColor: AppColors.gris,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none)),
+              style: const TextStyle(fontSize: 12))),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () async {
+                final rango = await showDateRangePicker(
+                  context: context,
+                  firstDate: DateTime(2023),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                  initialDateRange: _rangoFechas,
+                  locale: const Locale('es', 'MX'));
+                if (rango != null) setState(() => _rangoFechas = rango);
+              },
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: _rangoFechas != null ? AppColors.azul : AppColors.gris,
+                  borderRadius: BorderRadius.circular(10)),
+                child: Icon(Icons.date_range,
+                  size: 18, color: _rangoFechas != null ? Colors.white : AppColors.textoSecundario))),
+            if (_rangoFechas != null) ...[
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => setState(() => _rangoFechas = null),
+                child: const Icon(Icons.close, size: 16, color: AppColors.rojo)),
+            ],
+          ])),
+        if (_rangoFechas != null)
+          Container(width: double.infinity, color: Colors.white,
+            padding: const EdgeInsets.only(left: 12, right: 12, bottom: 6),
+            child: Text(
+              '${DateFormat('dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat('dd/MM/yy').format(_rangoFechas!.end)}',
+              style: const TextStyle(fontSize: 10, color: AppColors.azul, fontWeight: FontWeight.w600))),
+
         // Filtros por etapa
         Container(color: Colors.white, padding: const EdgeInsets.symmetric(vertical: 8),
           child: SingleChildScrollView(scrollDirection: Axis.horizontal,

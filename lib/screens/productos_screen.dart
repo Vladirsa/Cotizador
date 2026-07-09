@@ -102,6 +102,7 @@ class _ProductosScreenState extends State<ProductosScreen> with SingleTickerProv
               itemBuilder: (_, i) => _TarjetaProducto(
                 producto: _filtrados[i],
                 onEditar: () => _editarProducto(_filtrados[i]),
+                onEliminar: () => _confirmarEliminar(_filtrados[i]),
               )))),
   ]);
 
@@ -129,12 +130,39 @@ class _ProductosScreenState extends State<ProductosScreen> with SingleTickerProv
           onGuardado: () { Navigator.pop(context); _cargar(); }),
       ));
   }
+
+  void _confirmarEliminar(Producto producto) {
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('¿Eliminar producto?'),
+      content: Text('Se eliminará "${producto.nombre}" del catálogo. '
+        'No aparecerá más en cotizaciones ni en el catálogo público.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        TextButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            try {
+              await SupabaseService.eliminarProducto(producto.id!);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('✅ "${producto.nombre}" eliminado'), backgroundColor: AppColors.verde));
+                _cargar();
+              }
+            } catch (e) {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text('Error al eliminar: $e'), backgroundColor: AppColors.rojo));
+            }
+          },
+          child: const Text('Eliminar', style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
+      ]));
+  }
 }
 
 class _TarjetaProducto extends StatelessWidget {
   final Producto producto;
   final VoidCallback onEditar;
-  const _TarjetaProducto({required this.producto, required this.onEditar});
+  final VoidCallback onEliminar;
+  const _TarjetaProducto({required this.producto, required this.onEditar, required this.onEliminar});
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +194,14 @@ class _TarjetaProducto extends StatelessWidget {
           Text('\$${producto.precioVenta.toStringAsFixed(0)}',
             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.azul)),
           Text('Stock: ${producto.stockDisponible}', style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-          GestureDetector(onTap: onEditar, child: const Icon(Icons.edit_outlined, size: 16, color: AppColors.textoSecundario)),
+          const SizedBox(height: 4),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            GestureDetector(onTap: onEditar,
+              child: const Icon(Icons.edit_outlined, size: 16, color: AppColors.textoSecundario)),
+            const SizedBox(width: 10),
+            GestureDetector(onTap: onEliminar,
+              child: const Icon(Icons.delete_outline, size: 16, color: AppColors.rojo)),
+          ]),
         ]),
       ),
     );
