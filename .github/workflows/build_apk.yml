@@ -138,3 +138,26 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.19.6
+          channel: stable
+      - run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
+      - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
+      - run: flutter pub get
+        working-directory: tmp_app
+      - run: flutter build web --release --base-href /cotizador/
+        working-directory: tmp_app
+      - name: Deploy a Hostinger (hetnacnc.com/cotizador)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          local-dir: tmp_app/build/web/
+          server-dir: public_html/cotizador/
