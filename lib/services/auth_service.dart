@@ -16,6 +16,8 @@ class AuthService {
   static String? _rol;
   static String? _plan;
   static DateTime? _trialHasta;
+  static Set<String> _modulosPermitidos = {};
+  static bool _permisosConfigurados = false; // si el admin nunca configuró nada, no bloquear
   static String? _nombreUsuario;
 
   static String? get negocioId     => _negocioId;
@@ -34,6 +36,16 @@ class AuthService {
 
   static bool get trialVencido =>
     _plan == 'trial' && _trialHasta != null && DateTime.now().isAfter(_trialHasta!);
+
+  // Módulos que el usuario actual puede ver.
+  // Admin/super_admin siempre ven todo. Si el negocio nunca configuró
+  // permisos para un rol, por defecto SÍ puede ver todo (no bloquea
+  // por accidente talleres que no han tocado esta función).
+  static bool tieneAcceso(String modulo) {
+    if (esAdmin) return true;
+    if (!_permisosConfigurados) return true;
+    return _modulosPermitidos.contains(modulo);
+  }
 
   static int get diasTrialRestantes {
     if (_plan != 'trial' || _trialHasta == null) return 0;
@@ -112,6 +124,29 @@ class AuthService {
           print('AuthService: error cargando plan: $e');
         }
       }
+
+      // Cargar permisos personalizados del rol actual
+      if (_negocioId != null && _rol != null) {
+        try {
+          final permisos = await _sb.from('permisos_rol')
+            .select('modulo, activo')
+            .eq('negocio_id', _negocioId!)
+            .eq('rol', _rol!);
+          final list = permisos as List;
+          if (list.isNotEmpty) {
+            _permisosConfigurados = true;
+            _modulosPermitidos = list
+              .where((p) => p['activo'] == true)
+              .map((p) => p['modulo'] as String)
+              .toSet();
+          } else {
+            _permisosConfigurados = false;
+            _modulosPermitidos = {};
+          }
+        } catch (e) {
+          print('AuthService: error cargando permisos: $e');
+        }
+      }
     } catch (e) {
       print('AuthService._cargarPerfil error: $e');
     }
@@ -136,7 +171,68 @@ class AuthService {
     _nombreUsuario = null;
     _plan          = null;
     _trialHasta    = null;
+    _modulosPermitidos = {};
+    _permisosConfigurados = false;
     await _sb.auth.signOut();
+  }
+
+  // ── Roles configurables (excluye administrador/super_admin, que
+  //    siempre tienen acceso total) ──
+  static const rolesConfigurables = [
+    'vendedor', 'operador_cnc', 'almacenista', 'contador'
+  ];
+
+  // Todos los módulos que se pueden activar/desactivar por rol
+  static const modulosDisponibles = [
+    'clientes', 'productos', 'inventario', 'gastos',
+    'marketing', 'equipo', 'reportes', 'config', 'simulador',
+  ];
+
+  // Leer los permisos actuales de un rol específico (para la pantalla
+  // de administración, no para el usuario logueado)
+  static Future<Set<String>> leerPermisosDeRol(String rol) async {
+    if (_negocioId == null) return {};
+    try {
+      final data = await _sb.from('permisos_rol')
+        .select('modulo, activo')
+        .eq('negocio_id', _negocioId!)
+        .eq('rol', rol);
+      final list = data as List;
+      return list.where((p) => p['activo'] == true)
+        .map((p) => p['modulo'] as String).toSet();
+    } catch (e) {
+      print('leerPermisosDeRol error: $e');
+      return {};
+    }
+  }
+
+  // Guardar de un jalón todos los permisos de un rol (reemplaza los
+  // anteriores) — se llama al tocar "Guardar" en la pantalla de permisos
+  static Future<String?> guardarPermisosDeRol(String rol, Set<String> modulosActivos) async {
+    if (_negocioId == null) return 'Sin negocio activo';
+    try {
+      // Borrar los permisos viejos del rol y escribir los nuevos
+      await _sb.from('permisos_rol')
+        .delete().eq('negocio_id', _negocioId!).eq('rol', rol);
+
+      final filas = modulosDisponibles.map((m) => {
+        'negocio_id': _negocioId,
+        'rol': rol,
+        'modulo': m,
+        'activo': modulosActivos.contains(m),
+      }).toList();
+
+      await _sb.from('permisos_rol').insert(filas);
+
+      // Si el rol que se configuró es el del usuario actual, refrescar
+      if (_rol == rol) {
+        _permisosConfigurados = true;
+        _modulosPermitidos = modulosActivos;
+      }
+      return null;
+    } catch (e) {
+      return 'Error al guardar permisos: $e';
+    }
   }
 
   // ── Verifica si puede usar una función premium.
