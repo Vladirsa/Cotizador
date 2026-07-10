@@ -1,7 +1,9 @@
 // ============================================
 // lib/screens/config_screen.dart
 // ============================================
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
@@ -24,6 +26,19 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _direccionCtrl= TextEditingController();
   final _rfcCtrl      = TextEditingController();
   final _leyendaCtrl  = TextEditingController();
+  String? _logoUrl;
+  Uint8List? _logoPreview;
+  bool _subiendoLogo = false;
+  String _colorPrimario = '#1a3a5c';
+  String _colorSecundario = '#185fa5';
+  final _coloresDisponibles = [
+    {'nombre': 'Azul HETNA', 'primario': '#1a3a5c', 'secundario': '#185fa5'},
+    {'nombre': 'Verde', 'primario': '#0f4c3a', 'secundario': '#1d9e75'},
+    {'nombre': 'Morado', 'primario': '#3b1f5c', 'secundario': '#7c3aed'},
+    {'nombre': 'Rojo', 'primario': '#5c1a1a', 'secundario': '#dc2626'},
+    {'nombre': 'Naranja', 'primario': '#5c3a1a', 'secundario': '#ea580c'},
+    {'nombre': 'Negro/Gris', 'primario': '#1f2937', 'secundario': '#4b5563'},
+  ];
 
   // WhatsApp
   final _waNumeroPrincipalCtrl = TextEditingController(); // número del taller
@@ -75,6 +90,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _correoCtrl.text    = cfg['correo'] ?? '';
       _direccionCtrl.text = cfg['direccion'] ?? '';
       _rfcCtrl.text       = cfg['rfc'] ?? '';
+      _leyendaCtrl.text   = cfg['leyenda_pdf'] ?? '';
+      _logoUrl            = cfg['logo_url'];
+      _colorPrimario      = cfg['color_primario'] ?? '#1a3a5c';
+      _colorSecundario    = cfg['color_secundario'] ?? '#185fa5';
       // Facturación
       _apiKeyCtrl.text    = cfg['factura_api_key'] ?? '';
       _apiUrlCtrl.text    = cfg['factura_api_url'] ?? '';
@@ -93,6 +112,36 @@ class _ConfigScreenState extends State<ConfigScreen> {
     });
   }
 
+  Future<void> _elegirLogo() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image, withData: true);
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) return;
+
+      setState(() { _logoPreview = bytes; _subiendoLogo = true; });
+
+      final ext = (file.extension ?? 'png').toLowerCase();
+      final url = await SupabaseService.subirLogo(bytes, ext);
+
+      if (url != null) {
+        setState(() { _logoUrl = url; _subiendoLogo = false; });
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('✅ Logo actualizado — no olvides guardar'), backgroundColor: AppColors.azul));
+      } else {
+        setState(() => _subiendoLogo = false);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('No se pudo subir el logo'), backgroundColor: AppColors.rojo));
+      }
+    } catch (e) {
+      setState(() => _subiendoLogo = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+    }
+  }
+
   Future<void> _guardar() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _guardando = true);
@@ -103,6 +152,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'correo'                : _correoCtrl.text.trim(),
         'direccion'             : _direccionCtrl.text.trim(),
         'rfc'                   : _rfcCtrl.text.trim().toUpperCase(),
+        'leyenda_pdf'           : _leyendaCtrl.text.trim(),
+        'color_primario'        : _colorPrimario,
+        'color_secundario'      : _colorSecundario,
+        if (_logoUrl != null) 'logo_url': _logoUrl,
         'factura_api_key'       : _apiKeyCtrl.text.trim(),
         'factura_api_url'       : _apiUrlCtrl.text.trim(),
         'factura_rfc_emisor'    : _rfcEmisorCtrl.text.trim().toUpperCase(),
@@ -163,6 +216,67 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _campo(_direccionCtrl, 'Dirección', Icons.location_on_outlined, lineas: 2),
               _campo(_leyendaCtrl, 'Leyenda en PDF', Icons.notes_outlined, lineas: 2,
                 hint: 'Ej: Garantía 6 meses en productos de madera'),
+
+              const SizedBox(height: 20),
+
+              // ── LOGO Y COLORES DE MARCA ──
+              _seccion('🎨 LOGO Y COLORES DE TUS PDFs'),
+              const SizedBox(height: 8),
+              Container(padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Logo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    Container(width: 70, height: 70,
+                      decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.grisBorde)),
+                      child: _logoPreview != null
+                        ? ClipRRect(borderRadius: BorderRadius.circular(9),
+                            child: Image.memory(_logoPreview!, fit: BoxFit.contain))
+                        : (_logoUrl != null && _logoUrl!.isNotEmpty)
+                          ? ClipRRect(borderRadius: BorderRadius.circular(9),
+                              child: Image.network(_logoUrl!, fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined,
+                                  color: AppColors.textoSecundario)))
+                          : const Icon(Icons.image_outlined, color: AppColors.textoSecundario, size: 28)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      OutlinedButton.icon(
+                        onPressed: _subiendoLogo ? null : _elegirLogo,
+                        icon: _subiendoLogo
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.upload_outlined, size: 16),
+                        label: Text(_subiendoLogo ? 'Subiendo...' : 'Cambiar logo'),
+                        style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+                          side: const BorderSide(color: AppColors.azul))),
+                      const SizedBox(height: 4),
+                      const Text('Aparecerá en cotizaciones y notas de compra',
+                        style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+                    ])),
+                  ]),
+                  const SizedBox(height: 16),
+                  const Text('Color de marca', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 10, runSpacing: 10, children: _coloresDisponibles.map((c) {
+                    final sel = _colorPrimario == c['primario'];
+                    final colorObj = Color(int.parse((c['primario'] as String).replaceFirst('#', '0xFF')));
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        _colorPrimario = c['primario'] as String;
+                        _colorSecundario = c['secundario'] as String;
+                      }),
+                      child: Column(children: [
+                        Container(width: 42, height: 42,
+                          decoration: BoxDecoration(color: colorObj, shape: BoxShape.circle,
+                            border: Border.all(color: sel ? Colors.black : Colors.transparent, width: 2.5)),
+                          child: sel ? const Icon(Icons.check, color: Colors.white, size: 20) : null),
+                        const SizedBox(height: 3),
+                        Text(c['nombre'] as String, style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario)),
+                      ]));
+                  }).toList()),
+                ])),
 
               const SizedBox(height: 20),
 
