@@ -21,6 +21,7 @@ import 'config_screen.dart';
 import 'simulador_screen.dart';
 import 'agenda_screen.dart';
 import 'equipo_screen.dart';
+import 'permisos_screen.dart';
 import 'reportes_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -169,17 +170,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.w700))),
           ],
         ])),
-      _dItem(Icons.people_outline,         'CRM Clientes',        5),
-      _dItem(Icons.inventory_2_outlined,   'Productos y Catálogo',6),
-      _dItem(Icons.warehouse_outlined,     'Inventario Bodega',   7),
-      _dItem(Icons.receipt_long_outlined,  'Gastos y Compras',    8),
-      _dItem(Icons.campaign_outlined,      'Marketing',           9, premium: true),
-      _dItem(Icons.group_outlined,         'Mi equipo',          10),
+      _dItem(Icons.people_outline,         'CRM Clientes',        5, modulo: 'clientes'),
+      _dItem(Icons.inventory_2_outlined,   'Productos y Catálogo',6, modulo: 'productos'),
+      _dItem(Icons.warehouse_outlined,     'Inventario Bodega',   7, modulo: 'inventario'),
+      _dItem(Icons.receipt_long_outlined,  'Gastos y Compras',    8, modulo: 'gastos'),
+      _dItem(Icons.campaign_outlined,      'Marketing',           9, premium: true, modulo: 'marketing'),
+      _dItem(Icons.group_outlined,         'Mi equipo',          10, modulo: 'equipo'),
       const Divider(height: 1),
-      _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11),
-      _dItem(Icons.settings_outlined,      'Configuración',      12),
+      _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11, modulo: 'reportes'),
+      _dItem(Icons.settings_outlined,      'Configuración',      12, modulo: 'config'),
       _dItem(Icons.tune_outlined,          'Config Simulador',   13),
       _dItem(Icons.calculate_outlined,     'Costos del taller',  14),
+      if (AuthService.esAdmin)
+        ListTile(
+          leading: const Icon(Icons.admin_panel_settings_outlined, color: AppColors.textoSecundario, size: 22),
+          title: const Text('Permisos por rol', style: TextStyle(fontSize: 14)),
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const PermisosScreen()));
+          }),
       const Divider(height: 1),
       ListTile(
         leading: const Icon(Icons.logout_outlined, color: AppColors.rojo, size: 22),
@@ -193,9 +202,11 @@ class _HomeScreenState extends State<HomeScreen> {
         }),
     ]));
 
-  Widget _dItem(IconData icon, String label, int idx, {bool premium = false}) {
+  Widget _dItem(IconData icon, String label, int idx, {bool premium = false, String? modulo}) {
     final active = _tab == idx;
-    final bloqueado = premium && !AuthService.esPremiumActivo;
+    final bloqueadoPremium = premium && !AuthService.esPremiumActivo;
+    final sinPermisoRol = modulo != null && !AuthService.tieneAcceso(modulo);
+    final bloqueado = bloqueadoPremium || sinPermisoRol;
     return ListTile(
       leading: Icon(icon,
         color: bloqueado ? AppColors.textoSecundario.withOpacity(0.4)
@@ -209,8 +220,14 @@ class _HomeScreenState extends State<HomeScreen> {
       selectedTileColor: AppColors.azulClaro,
       onTap: () async {
         Navigator.pop(context);
-        if (bloqueado) {
+        if (bloqueadoPremium) {
           await AuthService.exigirPremium(context, funcion: label);
+          return;
+        }
+        if (sinPermisoRol) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('No tienes permiso para ver "$label". Pide a tu administrador que te lo active.'),
+            backgroundColor: AppColors.rojo));
           return;
         }
         setState(() => _tab = idx);
