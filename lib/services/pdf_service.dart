@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -9,6 +10,35 @@ import '../models/models.dart';
 class PdfService {
   static final _fmt = NumberFormat('#,##0.00', 'es_MX');
   static final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
+
+  // Convierte un color hex ('#1a3a5c') a PdfColor. Si no hay valor
+  // configurado o falla, usa el color por defecto (azul HETNA).
+  static PdfColor _colorFromHex(dynamic hex, PdfColor fallback) {
+    if (hex == null || (hex is String && hex.trim().isEmpty)) return fallback;
+    try {
+      final limpio = (hex as String).replaceFirst('#', '');
+      final valor = int.parse('FF$limpio', radix: 16);
+      return PdfColor.fromInt(valor);
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  // Descarga el logo configurado por el taller (logo_url). Si no hay
+  // logo propio o falla la descarga, usa el logo genérico por defecto.
+  static Future<Uint8List> _obtenerLogoBytes(Map<String, dynamic> empresa) async {
+    final logoUrl = empresa['logo_url'] as String?;
+    if (logoUrl != null && logoUrl.trim().isNotEmpty) {
+      try {
+        final res = await http.get(Uri.parse(logoUrl))
+          .timeout(const Duration(seconds: 6));
+        if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+          return res.bodyBytes;
+        }
+      } catch (_) {}
+    }
+    return _logoBytes;
+  }
 
   static const String _logoB64 = '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';
 
@@ -31,11 +61,11 @@ class PdfService {
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
     try {
-      final bytes = _logoBytes;
+      final bytes = await _obtenerLogoBytes(empresa);
       if (bytes.isNotEmpty) logoImage = pw.MemoryImage(bytes);
     } catch (_) {}
 
-    const azul = PdfColor.fromInt(0xFF1a3a5c);
+    final azul = _colorFromHex(empresa['color_primario'], const PdfColor.fromInt(0xFF1a3a5c));
     const azulClaro = PdfColor.fromInt(0xFFe6f1fb);
     const grisClaro = PdfColor.fromInt(0xFFf5f6fa);
     const grisTexto = PdfColor.fromInt(0xFF6B7280);
@@ -174,6 +204,10 @@ class PdfService {
             if (cotizacion.condicionEntrega != null) _cond('Entrega:', _limpiarTexto(cotizacion.condicionEntrega!), grisTexto),
             _cond('Vigencia:', '$vigenciaDias días hábiles', grisTexto),
             if (cotizacion.notas != null && cotizacion.notas!.isNotEmpty) _cond('Notas:', cotizacion.notas!, grisTexto),
+            if ((empresa['leyenda_pdf'] as String?)?.isNotEmpty == true)
+              pw.Padding(padding: const pw.EdgeInsets.only(top: 6),
+                child: pw.Text(_limpiarTexto(empresa['leyenda_pdf']),
+                  style: pw.TextStyle(fontSize: 8, color: grisTexto, fontStyle: pw.FontStyle.italic))),
           ])),
         pw.SizedBox(height: 12),
         // ─── PIE ────────────────────────────
@@ -253,11 +287,11 @@ class PdfService {
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
     try {
-      final bytes = _logoBytes;
+      final bytes = await _obtenerLogoBytes(empresa);
       if (bytes.isNotEmpty) logoImage = pw.MemoryImage(bytes);
     } catch (_) {}
 
-    const azul = PdfColor.fromInt(0xFF1a3a5c);
+    final azul = _colorFromHex(empresa['color_primario'], const PdfColor.fromInt(0xFF1a3a5c));
     const azulClaro = PdfColor.fromInt(0xFFe6f1fb);
     const grisClaro = PdfColor.fromInt(0xFFf5f6fa);
     const grisTexto = PdfColor.fromInt(0xFF6B7280);
@@ -388,11 +422,11 @@ class PdfService {
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
     try {
-      final bytes = _logoBytes;
+      final bytes = await _obtenerLogoBytes(empresa);
       if (bytes.isNotEmpty) logoImage = pw.MemoryImage(bytes);
     } catch (_) {}
 
-    const azul       = PdfColor.fromInt(0xFF1a3a5c);
+    final azul = _colorFromHex(empresa['color_primario'], const PdfColor.fromInt(0xFF1a3a5c));
     const azulClaro  = PdfColor.fromInt(0xFFe6f1fb);
     const grisClaro  = PdfColor.fromInt(0xFFf5f6fa);
     const grisTexto  = PdfColor.fromInt(0xFF6B7280);
@@ -404,7 +438,7 @@ class PdfService {
     final direccionEmpresa = empresa['direccion'] ?? '';
     final correo           = empresa['correo']   ?? '';
     final web              = empresa['sitio_web'] ?? 'hetnacnc.com';
-    final fecha            = _fmtFecha.format(DateTime.now());
+    final fecha            = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
     final clienteNombre    = _limpiarTexto(cotizacion.cliente?.nombreCompleto ?? cotizacion.cliente?.nombre ?? 'Cliente');
     final folio            = folioPedido ?? cotizacion.folio ?? 'N/A';
 

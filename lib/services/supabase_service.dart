@@ -11,11 +11,19 @@ class SupabaseService {
   // ═══════════════════════════════════════════
   static Future<Map<String, dynamic>> getConfiguracion() async {
     try {
-      final res = await _db.from('configuracion_empresa').select().limit(1);
+      final negId = AuthService.negocioId;
+      var query = _db.from('configuracion_empresa').select();
+      if (negId != null) query = query.eq('negocio_id', negId);
+      final res = await query.limit(1);
       final list = res as List;
       if (list.isEmpty) {
-        await _db.from('configuracion_empresa').insert({'nombre_comercial': 'HETNA CNC'});
-        final res2 = await _db.from('configuracion_empresa').select().limit(1);
+        await _db.from('configuracion_empresa').insert({
+          'nombre_comercial': 'HETNA CNC',
+          if (negId != null) 'negocio_id': negId,
+        });
+        var query2 = _db.from('configuracion_empresa').select();
+        if (negId != null) query2 = query2.eq('negocio_id', negId);
+        final res2 = await query2.limit(1);
         return (res2 as List).first as Map<String, dynamic>;
       }
       return list.first as Map<String, dynamic>;
@@ -26,7 +34,10 @@ class SupabaseService {
 
   static Future<void> guardarConfiguracion(Map<String, dynamic> datos) async {
     try {
-      final res = await _db.from('configuracion_empresa').select('id').limit(1);
+      final negId = AuthService.negocioId;
+      var query = _db.from('configuracion_empresa').select('id');
+      if (negId != null) query = query.eq('negocio_id', negId);
+      final res = await query.limit(1);
       final list = res as List;
       if (list.isNotEmpty) {
         final id = (list.first as Map<String, dynamic>)['id'];
@@ -34,11 +45,29 @@ class SupabaseService {
             .update(datos)
             .eq('id', id);
       } else {
-        await _db.from('configuracion_empresa').insert(datos);
+        await _db.from('configuracion_empresa').insert({
+          ...datos,
+          if (negId != null) 'negocio_id': negId,
+        });
       }
     } catch (e) {
       // Ignorar errores de schema cache — los datos se guardan igual
       print('guardarConfiguracion: $e');
+    }
+  }
+
+  // ── Subir logo del taller a Supabase Storage, devuelve la URL pública ──
+  static Future<String?> subirLogo(Uint8List bytes, String extension) async {
+    try {
+      final negId = AuthService.negocioId ?? 'default';
+      final path = '$negId/logo.$extension';
+      await _db.storage.from('logos').uploadBinary(
+        path, bytes,
+        fileOptions: const FileOptions(upsert: true));
+      return _db.storage.from('logos').getPublicUrl(path);
+    } catch (e) {
+      print('subirLogo error: $e');
+      return null;
     }
   }
 
