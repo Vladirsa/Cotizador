@@ -88,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _btn(1, Icons.notifications_outlined, 'Alertas', badge: _alertas),
       _btn(2, Icons.description_outlined, 'Cotizar'),
       _btn(3, Icons.local_shipping_outlined, 'Avances'),
-      _btn(4, Icons.calculate_outlined, 'Simular'),
+      _btn(4, Icons.calculate_outlined, 'Simular', premium: true),
       // Botón Más
       Expanded(child: Builder(builder: (ctx) => GestureDetector(
         onTap: () => Scaffold.of(ctx).openDrawer(),
@@ -104,45 +104,76 @@ class _HomeScreenState extends State<HomeScreen> {
     ]))),
   );
 
-  Widget _btn(int idx, IconData icon, String label, {int badge = 0}) {
+  Widget _btn(int idx, IconData icon, String label, {int badge = 0, bool premium = false}) {
     final active = idx == _tab;
+    final bloqueado = premium && !AuthService.esPremiumActivo;
     return Expanded(child: GestureDetector(
-      onTap: () { setState(() => _tab = idx); if (idx == 1) _cargarAlertas(); },
+      onTap: () async {
+        if (bloqueado) {
+          await AuthService.exigirPremium(context, funcion: label);
+          return;
+        }
+        setState(() => _tab = idx);
+        if (idx == 1) _cargarAlertas();
+      },
       behavior: HitTestBehavior.opaque,
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Stack(clipBehavior: Clip.none, children: [
-          Icon(icon, size: 22, color: active ? AppColors.azul : AppColors.textoSecundario),
+          Icon(icon, size: 22, color: bloqueado
+            ? AppColors.textoSecundario.withOpacity(0.4)
+            : (active ? AppColors.azul : AppColors.textoSecundario)),
           if (badge > 0) Positioned(top: -4, right: -6,
             child: Container(width: 16, height: 16,
               decoration: const BoxDecoration(color: AppColors.rojo, shape: BoxShape.circle),
               child: Center(child: Text('$badge',
                 style: const TextStyle(color: Colors.white, fontSize: 9))))),
+          if (bloqueado) const Positioned(bottom: -2, right: -4,
+            child: Icon(Icons.lock, size: 10, color: Colors.amber)),
         ]),
         const SizedBox(height: 2),
         Text(label, style: TextStyle(fontSize: 9,
-          color: active ? AppColors.azul : AppColors.textoSecundario,
+          color: bloqueado
+            ? AppColors.textoSecundario.withOpacity(0.4)
+            : (active ? AppColors.azul : AppColors.textoSecundario),
           fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
       ])));
   }
 
   Widget _drawer() => Drawer(
     child: ListView(padding: EdgeInsets.zero, children: [
-      Container(height: 110, decoration: const BoxDecoration(color: AppColors.azul),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Container(
+        decoration: const BoxDecoration(color: AppColors.azul),
+        padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('HETNA CNC',
             style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
           Text(AuthService.nombreUsuario ?? 'Usuario',
             style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
           Text(AuthService.rol ?? '',
             style: const TextStyle(color: Colors.white60, fontSize: 11)),
+          // Aviso de plan / trial
+          if (AuthService.plan == 'trial' && !AuthService.trialVencido) ...[
+            const SizedBox(height: 8),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(20)),
+              child: Text('🎁 Prueba: ${AuthService.diasTrialRestantes} días restantes',
+                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600))),
+          ],
+          if (AuthService.trialVencido) ...[
+            const SizedBox(height: 8),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(color: Colors.amber.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(20)),
+              child: const Text('⏰ Prueba vencida — actualiza tu plan',
+                style: TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.w700))),
+          ],
         ])),
       _dItem(Icons.people_outline,         'CRM Clientes',        5),
       _dItem(Icons.inventory_2_outlined,   'Productos y Catálogo',6),
       _dItem(Icons.warehouse_outlined,     'Inventario Bodega',   7),
       _dItem(Icons.receipt_long_outlined,  'Gastos y Compras',    8),
-      _dItem(Icons.campaign_outlined,      'Marketing',           9),
+      _dItem(Icons.campaign_outlined,      'Marketing',           9, premium: true),
       _dItem(Icons.group_outlined,         'Mi equipo',          10),
       const Divider(height: 1),
       _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11),
@@ -162,17 +193,28 @@ class _HomeScreenState extends State<HomeScreen> {
         }),
     ]));
 
-  Widget _dItem(IconData icon, String label, int idx) {
+  Widget _dItem(IconData icon, String label, int idx, {bool premium = false}) {
     final active = _tab == idx;
+    final bloqueado = premium && !AuthService.esPremiumActivo;
     return ListTile(
       leading: Icon(icon,
-        color: active ? AppColors.azul : AppColors.textoSecundario, size: 22),
+        color: bloqueado ? AppColors.textoSecundario.withOpacity(0.4)
+          : (active ? AppColors.azul : AppColors.textoSecundario), size: 22),
       title: Text(label, style: TextStyle(fontSize: 14,
-        color: active ? AppColors.azul : Colors.black,
+        color: bloqueado ? AppColors.textoSecundario.withOpacity(0.4)
+          : (active ? AppColors.azul : Colors.black),
         fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
+      trailing: bloqueado ? const Icon(Icons.lock, size: 16, color: Colors.amber) : null,
       selected: active,
       selectedTileColor: AppColors.azulClaro,
-      onTap: () { Navigator.pop(context); setState(() => _tab = idx); });
+      onTap: () async {
+        Navigator.pop(context);
+        if (bloqueado) {
+          await AuthService.exigirPremium(context, funcion: label);
+          return;
+        }
+        setState(() => _tab = idx);
+      });
   }
 }
 
