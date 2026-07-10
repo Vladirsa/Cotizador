@@ -33,6 +33,32 @@ jobs:
           MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
           grep -q "INTERNET" $MANIFEST || sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' $MANIFEST
           cat $MANIFEST
+      - name: Add Deep Link intent-filter (recuperar contraseña)
+        run: |
+          MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
+          python3 - <<'PYEOF'
+          import re
+          path = "tmp_app/android/app/src/main/AndroidManifest.xml"
+          with open(path) as f:
+              content = f.read()
+          deep_link = (
+              '        <intent-filter>\n'
+              '            <action android:name="android.intent.action.VIEW" />\n'
+              '            <category android:name="android.intent.category.DEFAULT" />\n'
+              '            <category android:name="android.intent.category.BROWSABLE" />\n'
+              '            <data android:scheme="com.hetnacnc.app" android:host="reset-callback" />\n'
+              '        </intent-filter>\n'
+          )
+          if 'reset-callback' not in content:
+              # Insertar justo antes del cierre de </activity>
+              content = content.replace('</activity>', deep_link + '    </activity>', 1)
+              with open(path, 'w') as f:
+                  f.write(content)
+              print("Deep link intent-filter agregado")
+          else:
+              print("Deep link ya existia, no se duplico")
+          PYEOF
+          cat $MANIFEST
       - name: Inject HETNA CNC App Icon
         run: |
           mkdir -p tmp_app/android/app/src/main/res/mipmap-mdpi
