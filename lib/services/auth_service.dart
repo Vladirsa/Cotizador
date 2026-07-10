@@ -1,5 +1,6 @@
 // lib/services/auth_service.dart
 // HETNA CNC — Autenticación y roles con Supabase Auth
+import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AuthService {
@@ -13,10 +14,32 @@ class AuthService {
   // ── Datos del negocio/rol en memoria ──────────────────
   static String? _negocioId;
   static String? _rol;
+  static String? _plan;
+  static DateTime? _trialHasta;
   static String? _nombreUsuario;
 
   static String? get negocioId     => _negocioId;
   static String? get rol           => _rol;
+  static String? get plan          => _plan;
+
+  // ── Sistema de planes: master/premium siempre activo, trial mientras
+  //    no venza, gratis o trial vencido = funciones limitadas ──
+  static bool get esPremiumActivo {
+    if (_plan == 'master' || _plan == 'premium') return true;
+    if (_plan == 'trial' && _trialHasta != null) {
+      return DateTime.now().isBefore(_trialHasta!);
+    }
+    return false;
+  }
+
+  static bool get trialVencido =>
+    _plan == 'trial' && _trialHasta != null && DateTime.now().isAfter(_trialHasta!);
+
+  static int get diasTrialRestantes {
+    if (_plan != 'trial' || _trialHasta == null) return 0;
+    final dias = _trialHasta!.difference(DateTime.now()).inDays;
+    return dias < 0 ? 0 : dias;
+  }
   static String? get nombreUsuario => _nombreUsuario;
 
   static bool get esAdmin      => _rol == 'administrador' || _rol == 'super_admin';
@@ -71,6 +94,24 @@ class AuthService {
         _rol           = data['rol'] as String?;
         _nombreUsuario = data['nombre'] as String?;
       }
+
+      // Cargar el plan del taller (master/trial/gratis/premium) + vencimiento
+      if (_negocioId != null) {
+        try {
+          final negocio = await _sb.from('negocios')
+            .select('plan, trial_hasta')
+            .eq('id', _negocioId!)
+            .maybeSingle();
+          if (negocio != null) {
+            _plan = negocio['plan'] as String?;
+            _trialHasta = negocio['trial_hasta'] != null
+              ? DateTime.tryParse(negocio['trial_hasta'])
+              : null;
+          }
+        } catch (e) {
+          print('AuthService: error cargando plan: $e');
+        }
+      }
     } catch (e) {
       print('AuthService._cargarPerfil error: $e');
     }
@@ -93,7 +134,35 @@ class AuthService {
     _negocioId     = null;
     _rol           = null;
     _nombreUsuario = null;
+    _plan          = null;
+    _trialHasta    = null;
     await _sb.auth.signOut();
+  }
+
+  // ── Verifica si puede usar una función premium.
+  //    Si no puede, muestra un aviso con opción de continuar como está.
+  //    Devuelve true si puede continuar (premium activo). ──
+  static Future<bool> exigirPremium(BuildContext context, {String funcion = 'esta función'}) async {
+    if (esPremiumActivo) return true;
+
+    final esTrialVencido = trialVencido;
+    await showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: Row(children: [
+        const Icon(Icons.lock_outline, color: Colors.amber),
+        const SizedBox(width: 8),
+        const Expanded(child: Text('Función Premium', style: TextStyle(fontSize: 16))),
+      ]),
+      content: Text(esTrialVencido
+        ? 'Tu prueba gratuita de 1 mes terminó. Para seguir usando $funcion, actualiza tu plan.'
+        : 'Para usar $funcion necesitas el plan Premium.'),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(ctx),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade700),
+          child: const Text('Ver planes', style: TextStyle(color: Colors.white))),
+      ]));
+    return false;
   }
 
   // ── Cambiar contraseña ─────────────────────────────────
