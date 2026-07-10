@@ -21,13 +21,11 @@ class CotizarScreen extends StatefulWidget {
 
 class _CotizarScreenState extends State<CotizarScreen> with SingleTickerProviderStateMixin {
   late TabController _tabs;
-
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 3, vsync: this);
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -56,7 +54,7 @@ class _CotizarScreenState extends State<CotizarScreen> with SingleTickerProvider
 }
 
 // ═══════════════════════════════════════════
-// LISTA DE COTIZACIONES
+// LISTA DE COTIZACIONES — con búsqueda + filtro de fechas
 // ═══════════════════════════════════════════
 class _ListaCotizaciones extends StatefulWidget {
   @override
@@ -67,8 +65,10 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
   List<Cotizacion> _cotizaciones = [];
   bool _cargando = true;
   String _filtro = 'Todos';
+  String _busqueda = '';
+  DateTimeRange? _rangoFechas;
+  final _busquedaCtrl = TextEditingController();
   final _fmt = NumberFormat('\$#,##0', 'es_MX');
-
   final _estados = ['Todos', 'Borrador', 'Enviada', 'Aprobada', 'Pedido', 'Vencida'];
   final _colores = {
     'Borrador': Colors.grey, 'Enviada': Color(0xFF185fa5),
@@ -79,11 +79,13 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
   @override
   void initState() { super.initState(); _cargar(); }
 
+  @override
+  void dispose() { _busquedaCtrl.dispose(); super.dispose(); }
+
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
       final cots = await SupabaseService.getCotizaciones();
-      // Para cada cotización sin items, cargar sus items para mostrar monto
       for (final c in cots) {
         if (c.items.isEmpty && c.id != null && c.total == 0) {
           final items = await SupabaseService.getCotizacionItems(c.id!);
@@ -94,14 +96,88 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
     } catch (_) { if (mounted) setState(() => _cargando = false); }
   }
 
-  List<Cotizacion> get _filtradas => _filtro == 'Todos'
-    ? _cotizaciones
-    : _cotizaciones.where((c) => c.estado == _filtro).toList();
+  List<Cotizacion> get _filtradas {
+    var lista = _filtro == 'Todos'
+      ? _cotizaciones
+      : _cotizaciones.where((c) => c.estado == _filtro).toList();
+
+    if (_busqueda.trim().isNotEmpty) {
+      final q = _busqueda.trim().toLowerCase();
+      lista = lista.where((c) {
+        final nombre = (c.cliente?.nombre ?? '').toLowerCase();
+        final empresa = (c.cliente?.empresa ?? '').toLowerCase();
+        final folio = (c.folio ?? '').toLowerCase();
+        return nombre.contains(q) || empresa.contains(q) || folio.contains(q);
+      }).toList();
+    }
+
+    if (_rangoFechas != null) {
+      lista = lista.where((c) {
+        if (c.createdAt == null) return false;
+        final fecha = DateTime(c.createdAt!.year, c.createdAt!.month, c.createdAt!.day);
+        final desde = DateTime(_rangoFechas!.start.year, _rangoFechas!.start.month, _rangoFechas!.start.day);
+        final hasta = DateTime(_rangoFechas!.end.year, _rangoFechas!.end.month, _rangoFechas!.end.day);
+        return !fecha.isBefore(desde) && !fecha.isAfter(hasta);
+      }).toList();
+    }
+
+    return lista;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Column(children: [
-      // Filtros
+      Container(color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+        child: Row(children: [
+          Expanded(child: TextField(
+            controller: _busquedaCtrl,
+            onChanged: (v) => setState(() => _busqueda = v),
+            decoration: InputDecoration(
+              hintText: 'Buscar por cliente o folio...',
+              hintStyle: const TextStyle(fontSize: 12),
+              prefixIcon: const Icon(Icons.search, size: 18),
+              suffixIcon: _busqueda.isNotEmpty
+                ? IconButton(icon: const Icon(Icons.close, size: 16),
+                    onPressed: () => setState(() { _busqueda = ''; _busquedaCtrl.clear(); }))
+                : null,
+              isDense: true, filled: true, fillColor: AppColors.gris,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none)),
+            style: const TextStyle(fontSize: 12))),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () async {
+              final rango = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2023),
+                lastDate: DateTime.now().add(const Duration(days: 365)),
+                initialDateRange: _rangoFechas,
+                locale: const Locale('es', 'MX'));
+              if (rango != null) setState(() => _rangoFechas = rango);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _rangoFechas != null ? AppColors.azul : AppColors.gris,
+                borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.date_range,
+                size: 18, color: _rangoFechas != null ? Colors.white : AppColors.textoSecundario))),
+          if (_rangoFechas != null) ...[
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => setState(() => _rangoFechas = null),
+              child: const Icon(Icons.close, size: 16, color: AppColors.rojo)),
+          ],
+        ])),
+      if (_rangoFechas != null)
+        Container(width: double.infinity, color: Colors.white,
+          padding: const EdgeInsets.only(left: 12, right: 12, bottom: 6),
+          child: Text(
+            '${DateFormat('dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat('dd/MM/yy').format(_rangoFechas!.end)}',
+            style: const TextStyle(fontSize: 10, color: AppColors.azul, fontWeight: FontWeight.w600))),
+
       Container(color: Colors.white, padding: const EdgeInsets.all(10),
         child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children:
           _estados.map((e) {
@@ -121,7 +197,6 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
                   color: activo ? Colors.white : AppColors.textoSecundario,
                   fontWeight: activo ? FontWeight.w600 : FontWeight.normal))));
           }).toList()))),
-
       Expanded(child: _cargando
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(onRefresh: _cargar, child: _filtradas.isEmpty
@@ -138,25 +213,22 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
 }
 
 // ═══════════════════════════════════════════
-// TARJETA DE COTIZACIÓN
+// TARJETA DE COTIZACIÓN — con borrar disponible en todos los estados
 // ═══════════════════════════════════════════
 class _TarjetaCotizacion extends StatelessWidget {
   final Cotizacion cotizacion;
   final Map<String, Color> colores;
   final VoidCallback onActualizar;
   const _TarjetaCotizacion({required this.cotizacion, required this.colores, required this.onActualizar});
-
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final color = colores[cotizacion.estado] ?? Colors.grey;
     final nombre = cotizacion.cliente?.nombre ?? cotizacion.cliente?.empresa ?? 'Sin cliente';
-    // Calcular monto real
     final montoItems = cotizacion.items.fold(0.0, (s, i) => s + i.subtotal);
     final monto = cotizacion.total > 0 ? cotizacion.total
       : montoItems > 0 ? montoItems * 1.16
       : 0.0;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -168,7 +240,6 @@ class _TarjetaCotizacion extends StatelessWidget {
           right: BorderSide(color: AppColors.grisBorde, width: 0.5),
           bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
       child: Column(children: [
-        // Info principal
         Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(nombre, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
@@ -188,15 +259,16 @@ class _TarjetaCotizacion extends StatelessWidget {
             if (cotizacion.items.isNotEmpty)
               Text('${cotizacion.items.length} producto${cotizacion.items.length > 1 ? "s" : ""}',
                 style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => _eliminarCotizacion(context),
+              child: const Icon(Icons.delete_outline, size: 18, color: AppColors.rojo)),
           ]),
         ])),
-
-        // Botones de acción
         Container(
           padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           child: Column(children: [
             Row(children: [
-              // EDITAR — disponible en Borrador y Pedido
               if (cotizacion.estado == 'Borrador' || cotizacion.estado == 'Pedido')
                 Expanded(child: ElevatedButton.icon(
                   onPressed: () => _editarCotizacion(context),
@@ -207,7 +279,6 @@ class _TarjetaCotizacion extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 8)))),
               if (cotizacion.estado == 'Borrador' || cotizacion.estado == 'Pedido')
                 const SizedBox(width: 6),
-              // Cambiar estado
               if (cotizacion.estado == 'Borrador')
                 ElevatedButton(
                   onPressed: () => _cambiarEstado(context, 'Enviada'),
@@ -230,10 +301,8 @@ class _TarjetaCotizacion extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                   child: const Text('→ Pedido', style: TextStyle(fontSize: 11, color: Colors.white)))),
             ]),
-            // Botón ELIMINAR y PDF para Borrador
             if (cotizacion.estado == 'Borrador') ...[
               const SizedBox(height: 6),
-              // Botón Editar prominente para Borrador
               SizedBox(width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () => _editarCotizacion(context),
@@ -244,20 +313,8 @@ class _TarjetaCotizacion extends StatelessWidget {
                     backgroundColor: AppColors.azul,
                     padding: const EdgeInsets.symmetric(vertical: 10)))),
               const SizedBox(height: 6),
-              Row(children: [
-                Expanded(child: OutlinedButton.icon(
-                  onPressed: () => _eliminarCotizacion(context),
-                  icon: const Icon(Icons.delete_outline, size: 14, color: AppColors.rojo),
-                  label: const Text('Eliminar', style: TextStyle(fontSize: 11, color: AppColors.rojo)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.rojo,
-                    side: const BorderSide(color: AppColors.rojo),
-                    padding: const EdgeInsets.symmetric(vertical: 8)))),
-                const SizedBox(width: 6),
-                Expanded(child: _BtnPdfWA(cotizacion: cotizacion)),
-              ]),
+              _BtnPdfWA(cotizacion: cotizacion),
             ],
-            // Botón PDF WA para estados no-Borrador
             if (cotizacion.estado != 'Borrador') ...[
               const SizedBox(height: 6),
               SizedBox(width: double.infinity,
@@ -291,7 +348,6 @@ class _TarjetaCotizacion extends StatelessWidget {
 
   Future<void> _convertirPedido(BuildContext context) async {
     try {
-      // Si la cotización no tiene items cargados, cargarlos primero
       Cotizacion cotConItems = cotizacion;
       if (cotizacion.items.isEmpty && cotizacion.id != null) {
         final items = await SupabaseService.getCotizacionItems(cotizacion.id!);
@@ -335,7 +391,6 @@ class _TarjetaCotizacion extends StatelessWidget {
         ]));
     if (confirmar == true) {
       try {
-        // Primero eliminar pedido vinculado si existe
         if (tienePedido && cotizacion.id != null) {
           await SupabaseService.eliminarPedidoPorCotizacion(cotizacion.id!);
         }
@@ -377,8 +432,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   String _notas = '';
   bool _generando = false;
   bool _guardando = false;
-  String _busquedaContacto = '';
-
+  DateTime _fechaCotizacion = DateTime.now();
   bool get _esEdicion => widget.cotizacionEditar != null;
   double get _subtotal => _items.fold(0, (s, i) => s + i.subtotal);
   double get _montoDescuento => _subtotal * _descuentoPct / 100;
@@ -386,7 +440,6 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   double get _montoIva => _aplicaIva ? _baseIva * _ivaPct / 100 : 0;
   double get _total => _baseIva + _montoIva + _costoEnvio;
   bool get _puedeAccionar => _items.isNotEmpty && _cliente != null;
-
   final _metodosPago = ['50% anticipo / 50% entrega', 'Pago total anticipado', 'Crédito 30 días', 'Transferencia bancaria'];
   final _condiciones = ['LAB — En planta HETNA', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
@@ -434,6 +487,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _metodoPago = c.metodoPago ?? '50% anticipo / 50% entrega';
       _condicionEntrega = c.condicionEntrega ?? 'LAB — En planta HETNA';
       _notas = c.notas ?? '';
+      if (c.createdAt != null) _fechaCotizacion = c.createdAt!;
       if (_items.isEmpty && c.id != null) {
         SupabaseService.getCotizacionItems(c.id!).then((items) {
           if (mounted) setState(() => _items = items);
@@ -446,7 +500,6 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0.00', 'es_MX');
     return ListView(padding: const EdgeInsets.all(14), children: [
-
       if (_esEdicion)
         Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8)),
@@ -456,8 +509,6 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             Text('Editando: ${widget.cotizacionEditar!.folio ?? "cotización"}',
               style: const TextStyle(fontSize: 12, color: AppColors.ambar, fontWeight: FontWeight.w600)),
           ])),
-
-      // ─── Cliente ───
       _bloque('Cliente', Icons.person_outline, _cliente == null
         ? Column(children: [
             ElevatedButton.icon(onPressed: _seleccionarCliente,
@@ -473,8 +524,27 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             title: Text(_cliente!.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             subtitle: Text(_cliente!.tipoCliente),
             trailing: TextButton(onPressed: _seleccionarCliente, child: const Text('Cambiar')))),
-
-      // ─── Productos ───
+      _bloque('Fecha de cotización', Icons.calendar_today_outlined,
+        GestureDetector(
+          onTap: () async {
+            final fecha = await showDatePicker(
+              context: context,
+              initialDate: _fechaCotizacion,
+              firstDate: DateTime(2023),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+              locale: const Locale('es', 'MX'));
+            if (fecha != null) setState(() => _fechaCotizacion = fecha);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.grisBorde)),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text(DateFormat('dd/MM/yyyy').format(_fechaCotizacion),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const Icon(Icons.edit_calendar, size: 16, color: AppColors.azul),
+            ]))),
+      ),
       _bloque('Productos', Icons.inventory_2_outlined, Column(children: [
         if (_items.isEmpty)
           const Padding(padding: EdgeInsets.symmetric(vertical: 8),
@@ -495,8 +565,6 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             icon: const Icon(Icons.add_box_outlined, size: 18), label: const Text('Nuevo rápido'))),
         ]),
       ])),
-
-      // ─── Condiciones ───
       _bloque('Condiciones', Icons.local_shipping_outlined, Column(children: [
         Row(children: [
           Expanded(child: _campo('Tiempo entrega', child: DropdownButtonFormField<String>(
@@ -519,8 +587,6 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           maxLines: 2, style: const TextStyle(fontSize: 13),
           onChanged: (v) => _notas = v)),
       ])),
-
-      // ─── Resumen ───
       _bloque('Resumen financiero', Icons.calculate_outlined, Column(children: [
         Row(children: [
           Expanded(child: _campo('Descuento %', child: TextFormField(
@@ -563,10 +629,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           Text(fmt.format(_total), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.azul)),
         ]),
       ])),
-
       const SizedBox(height: 8),
-
-      // ─── Botones de acción ───
       ElevatedButton.icon(
         onPressed: _puedeAccionar && !_generando ? _generarPDF : null,
         icon: _generando ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
@@ -888,7 +951,6 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     setState(() => _guardando = true);
     try {
       if (_esEdicion) {
-        // Actualizar la cotización existente con estado Pedido, luego convertir
         final cotActualizada = _buildCotizacion(
           id: widget.cotizacionEditar!.id,
           folio: widget.cotizacionEditar!.folio,
@@ -924,7 +986,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     items: _items, estado: estado ?? 'Borrador',
     descuentoPct: _descuentoPct, ivaPct: _aplicaIva ? _ivaPct : 0,
     costoEnvio: _costoEnvio, metodoPago: _metodoPago,
-    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: DateTime.now());
+    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion);
 }
 
 // ═══════════════════════════════════════════
@@ -937,7 +999,6 @@ class _ItemRow extends StatelessWidget {
   final ValueChanged<double> onPrecioChanged;
   const _ItemRow({super.key, required this.item, required this.onEliminar,
     required this.onCantidadChanged, required this.onPrecioChanged});
-
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0.00', 'es_MX');
@@ -999,7 +1060,6 @@ class _SelectorClienteState extends State<_SelectorCliente> {
     : widget.clientes.where((c) =>
         c.nombre.toLowerCase().contains(_busqueda.toLowerCase()) ||
         (c.empresa?.toLowerCase().contains(_busqueda.toLowerCase()) ?? false)).toList();
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1051,14 +1111,12 @@ class _SelectorProducto extends StatefulWidget {
 class _SelectorProductoState extends State<_SelectorProducto> {
   String _busqueda = '';
   String _catFiltro = 'Todas';
-
   List<String> get _categorias {
     final cats = widget.productos
         .map((p) => p.categoriaNombre ?? 'Sin categoría')
         .toSet().toList()..sort();
     return ['Todas', ...cats];
   }
-
   List<Producto> get _filtrados {
     var lista = widget.productos;
     if (_catFiltro != 'Todas') {
@@ -1069,7 +1127,6 @@ class _SelectorProductoState extends State<_SelectorProducto> {
     }
     return lista;
   }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1088,7 +1145,6 @@ class _SelectorProductoState extends State<_SelectorProducto> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
             onChanged: (v) => setState(() => _busqueda = v)),
           const SizedBox(height: 8),
-          // Filtro por categoría
           SizedBox(height: 32,
             child: ListView(scrollDirection: Axis.horizontal, children: _categorias.map((cat) {
               final activo = _catFiltro == cat;
@@ -1141,17 +1197,14 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
   bool _subiendo = false;
   final Set<String> _seleccionados = {};
   final _fmt = NumberFormat('\$#,##0', 'es_MX');
-
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
     _cargar();
   }
-
   @override
   void dispose() { _tabCtrl.dispose(); super.dispose(); }
-
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
@@ -1168,7 +1221,6 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
       });
     } catch (_) { if (mounted) setState(() => _cargando = false); }
   }
-
   Future<void> _subirPdf() async {
     final nombreCtrl = TextEditingController();
     final urlCtrl = TextEditingController();
@@ -1227,7 +1279,6 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
       '📋 *Catálogo HETNA CNC*\n${pdf.nombre}\n\n${pdf.url}\n\n¡Mira nuestros productos y precios! 🪵✨');
     await launchUrl(Uri.parse('https://wa.me/?text=$msg'), mode: LaunchMode.externalApplication);
   }
-
   Future<void> _crearCatalogo() async {
     _seleccionados.clear();
     final nombreCtrl = TextEditingController();
@@ -1252,7 +1303,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
                     style: const TextStyle(fontSize: 13)),
                   const SizedBox(height: 6),
-                  Text('\${_seleccionados.length} productos seleccionados',
+                  Text('${_seleccionados.length} productos seleccionados',
                     style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
                 ])),
               Expanded(child: ListView.builder(
@@ -1268,7 +1319,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                       else _seleccionados.remove(p.id);
                     }),
                     title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                    subtitle: Text('\${_fmt.format(p.precioVenta)} • \${p.categoriaNombre ?? ""}',
+                    subtitle: Text('${_fmt.format(p.precioVenta)} • ${p.categoriaNombre ?? ""}',
                       style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                     activeColor: AppColors.azul, dense: true);
                 })),
@@ -1290,19 +1341,18 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                           content: Text('✅ Lista creada'), backgroundColor: AppColors.verde));
                       } catch (e) {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('Error: \$e'), backgroundColor: AppColors.rojo));
+                          content: Text('Error: $e'), backgroundColor: AppColors.rojo));
                       }
                     },
                     icon: const Icon(Icons.save_outlined, color: Colors.white),
                     label: Text(_seleccionados.isEmpty ? 'Selecciona productos'
-                      : 'Guardar lista (\${_seleccionados.length})',
+                      : 'Guardar lista (${_seleccionados.length})',
                       style: const TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                       disabledBackgroundColor: AppColors.grisBorde,
                       padding: const EdgeInsets.symmetric(vertical: 12))))),
             ])))));
   }
-
   Future<void> _enviarListaWA(Map<String, dynamic> cat) async {
     final ids = List<String>.from(cat['producto_ids'] ?? []);
     final prods = _productos.where((p) => ids.contains(p.id)).toList();
@@ -1319,7 +1369,6 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
     final msg = Uri.encodeComponent(sb.toString());
     launchUrl(Uri.parse('https://wa.me/?text=$msg'), mode: LaunchMode.externalApplication);
   }
-
   @override
   Widget build(BuildContext context) {
     if (_cargando) return const Center(child: CircularProgressIndicator());
@@ -1329,7 +1378,6 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
         indicatorColor: AppColors.azul, labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         tabs: const [Tab(text: 'PDFs'), Tab(text: 'Listas')]),
       Expanded(child: TabBarView(controller: _tabCtrl, children: [
-        // ── TAB PDFs ──
         Column(children: [
           Padding(padding: const EdgeInsets.all(12),
             child: SizedBox(width: double.infinity,
@@ -1368,7 +1416,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                             decoration: BoxDecoration(color: AppColors.rojoClaro, borderRadius: BorderRadius.circular(8)),
                             child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo, size: 20)),
                           title: Text(pdf.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          subtitle: Text('\${pdf.categoria ?? ""} \${pdf.tamanoTexto}',
+                          subtitle: Text('${pdf.categoria ?? ""} ${pdf.tamanoTexto}',
                             style: const TextStyle(fontSize: 10)),
                           trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textoSecundario),
                             onPressed: () async {
@@ -1395,7 +1443,6 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                       ]));
                   }))),
         ]),
-        // ── TAB LISTAS ──
         Column(children: [
           Padding(padding: const EdgeInsets.all(12),
             child: SizedBox(width: double.infinity,
@@ -1432,7 +1479,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                             decoration: BoxDecoration(color: AppColors.azul.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                             child: const Icon(Icons.list_alt, color: AppColors.azul, size: 20)),
                           title: Text(cat['nombre'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          subtitle: Text('\${ids.length} productos', style: const TextStyle(fontSize: 10)),
+                          subtitle: Text('${ids.length} productos', style: const TextStyle(fontSize: 10)),
                           trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textoSecundario),
                             onPressed: () async {
                               await SupabaseService.eliminarCatalogoPersonalizado(cat['id']);
@@ -1466,7 +1513,6 @@ class _BtnPdfWA extends StatefulWidget {
 
 class _BtnPdfWAState extends State<_BtnPdfWA> {
   bool _generando = false;
-
   Future<void> _generar() async {
     setState(() => _generando = true);
     try {
@@ -1493,7 +1539,6 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
     }
     if (mounted) setState(() => _generando = false);
   }
-
   @override
   Widget build(BuildContext context) {
     return ElevatedButton.icon(
@@ -1507,7 +1552,6 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
         backgroundColor: const Color(0xFF25D366),
         padding: const EdgeInsets.symmetric(vertical: 8)));
   }
-
 }
 
 // ── Widget separado para picker de contactos (evita scope anidado) ──
@@ -1521,7 +1565,6 @@ class _ContactosPicker extends StatefulWidget {
 
 class _ContactosPickerState extends State<_ContactosPicker> {
   String _busqueda = '';
-
   @override
   Widget build(BuildContext context) {
     final filtrados = _busqueda.isEmpty
@@ -1529,7 +1572,6 @@ class _ContactosPickerState extends State<_ContactosPicker> {
       : widget.contactos.where((c) =>
           c.displayName.toLowerCase().contains(_busqueda) ||
           c.phones.first.number.contains(_busqueda)).toList();
-
     return DraggableScrollableSheet(
       initialChildSize: 0.85,
       maxChildSize: 0.95,
