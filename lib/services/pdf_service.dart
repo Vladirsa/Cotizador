@@ -309,7 +309,7 @@ class PdfService {
       header: (ctx) => pw.Column(children: [
         pw.Container(
           padding: const pw.EdgeInsets.all(16),
-          decoration: const pw.BoxDecoration(color: azul),
+          decoration: pw.BoxDecoration(color: azul),
           child: pw.Row(children: [
             logoImage != null
               ? pw.Container(
@@ -354,7 +354,7 @@ class PdfService {
           children: [
             // Header
             pw.TableRow(
-              decoration: const pw.BoxDecoration(color: azul),
+              decoration: pw.BoxDecoration(color: azul),
               children: [
                 _celdaHeader('PRODUCTO / DESCRIPCIÓN'),
                 _celdaHeader('CATEGORÍA'),
