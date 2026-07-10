@@ -22,6 +22,10 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   bool _cargando = true;
   double _costoFijoMensual = 0;
   String _periodoDash = 'mes'; // 'dia' | 'semana' | 'mes'
+  String _filtroProduccion = 'Todos'; // filtro clickeable en tab Producción
+  String _busquedaProductos = ''; // búsqueda en tab Productos
+  String _catFiltroProductos = 'Todas'; // filtro de categoría en tab Productos
+  List<Producto> _catalogoProductos = []; // catálogo real, para saber categorías
   // Filtros inventario
   String _filtroCategoria = 'Todas';
   String _filtroStock = 'Todos';
@@ -92,6 +96,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         SupabaseService.getPedidos(),
         _getGastosAmplio(), // últimos 90 días, para filtrar día/semana/mes localmente
         SupabaseService.getMateriales(),
+        SupabaseService.getProductos(), // catálogo real, para categorías en tab Productos
       ]);
       // Costo fijo mensual configurado en "Costos del taller" -> meta de punto de equilibrio
       double costoFijo = 0;
@@ -109,6 +114,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         _pedidos = results[2] as List<Pedido>;
         _gastos = results[3] as List<Map<String, dynamic>>;
         _materiales = results[4] as List<Map<String, dynamic>>;
+        _catalogoProductos = results[5] as List<Producto>;
         _costoFijoMensual = costoFijo;
         _cargando = false;
       });
@@ -743,15 +749,35 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   // TAB 5 — PRODUCCIÓN
   // ══════════════════════════════════════
   Widget _tabProduccion() {
-    final etapas = ['Pedido', 'Pago', 'Produccion', 'Pruebas', 'Entrega', 'Entregado'];
+    // Etapas reales que usa el sistema (coinciden con avances_screen.dart)
+    final etapas = ['Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado'];
+    final etiquetas = {
+      'Pedido': 'Pedido', 'Pago50': 'Pago 50%',
+      'Produccion': 'Producción', 'Pruebas': 'Pruebas',
+      'PagoCompleto': 'Pago 100%', 'Entrega': 'Entrega', 'Entregado': 'Entregado',
+    };
     final coloresEtapa = {
-      'Pedido': AppColors.azul, 'Pago': AppColors.ambar,
+      'Pedido': AppColors.azul, 'Pago50': AppColors.ambar,
       'Produccion': const Color(0xFF7c3aed), 'Pruebas': AppColors.rojo,
+      'PagoCompleto': const Color(0xFF059669),
       'Entrega': AppColors.verde, 'Entregado': AppColors.verde,
     };
 
+    // Lista filtrada según la tarjeta de estado seleccionada
+    final pedidosMostrados = _filtroProduccion == 'Todos'
+      ? _pedidos.where((p) => p.estado != 'Entregado' && p.estado != 'Cancelado').toList()
+      : _pedidos.where((p) => p.estado == _filtroProduccion).toList();
+
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
-      _seccion('ESTADO DE PRODUCCIÓN'),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        _seccion('ESTADO DE PRODUCCIÓN'),
+        if (_filtroProduccion != 'Todos')
+          GestureDetector(
+            onTap: () => setState(() => _filtroProduccion = 'Todos'),
+            child: const Text('Ver todos ✕',
+              style: TextStyle(fontSize: 11, color: AppColors.azul, fontWeight: FontWeight.w600))),
+      ]),
+      // Tarjetas de estado — ahora funcionan como FILTRO al tocarlas
       GridView.count(crossAxisCount: 3, shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1.4,
@@ -759,22 +785,33 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           final count = _pedidos.where((p) => p.estado == e).length;
           final color = coloresEtapa[e] ?? AppColors.azul;
           final monto = _pedidos.where((p) => p.estado == e).fold(0.0, (s, p) => s + (p.total ?? 0));
-          return Container(padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: count > 0 ? color.withOpacity(0.4) : AppColors.grisBorde, width: 0.5)),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text('$count', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: count > 0 ? color : AppColors.textoSecundario)),
-              Text(e == 'Produccion' ? 'Producción' : e, textAlign: TextAlign.center, style: const TextStyle(fontSize: 8, color: AppColors.textoSecundario)),
-              if (monto > 0) Text(_fmt.format(monto), style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.w600)),
-            ]));
+          final seleccionado = _filtroProduccion == e;
+          return GestureDetector(
+            onTap: () => setState(() => _filtroProduccion = seleccionado ? 'Todos' : e),
+            child: Container(padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: seleccionado ? color.withOpacity(0.12) : Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: seleccionado ? color : (count > 0 ? color.withOpacity(0.4) : AppColors.grisBorde),
+                  width: seleccionado ? 1.5 : 0.5)),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text('$count', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: count > 0 ? color : AppColors.textoSecundario)),
+                Text(etiquetas[e] ?? e, textAlign: TextAlign.center, style: const TextStyle(fontSize: 8, color: AppColors.textoSecundario)),
+                if (monto > 0) Text(_fmt.format(monto), style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.w600)),
+              ])));
         }).toList()),
 
       const SizedBox(height: 14),
-      _seccion('PEDIDOS ACTIVOS'),
-      ..._pedidos.where((p) => p.estado != 'Entregado').map((p) => _miniPedido(p)),
-      if (_pedidos.where((p) => p.estado != 'Entregado').isEmpty)
+      _seccion(_filtroProduccion == 'Todos'
+        ? 'PEDIDOS ACTIVOS'
+        : 'PEDIDOS EN "${etiquetas[_filtroProduccion] ?? _filtroProduccion}"'),
+      ...pedidosMostrados.map((p) => _miniPedido(p)),
+      if (pedidosMostrados.isEmpty)
         Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-          child: const Center(child: Text('No hay pedidos activos', style: TextStyle(color: AppColors.textoSecundario)))),
+          child: Center(child: Text(
+            _filtroProduccion == 'Todos' ? 'No hay pedidos activos' : 'No hay pedidos en esta etapa',
+            style: const TextStyle(color: AppColors.textoSecundario)))),
     ]));
   }
 
@@ -931,6 +968,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   // TAB 7 — PRODUCTOS top ventas
   // ══════════════════════════════════════
   Widget _tabProductos() {
+    // Contar ventas por producto (histórico de cotizaciones)
     final conteo = <String, Map<String, dynamic>>{};
     for (final cot in _cotizaciones.where((c) => c.estado == 'Pedido' || c.estado == 'Entregado')) {
       for (final item in cot.items) {
@@ -942,24 +980,88 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         conteo[key]!['total'] = (conteo[key]!['total'] as double) + item.subtotal;
       }
     }
-    final lista = conteo.values.toList()
-      ..sort((a, b) => (b['total'] as double).compareTo(a['total'] as double));
+
+    // Cruzar con el catálogo real para saber la categoría de cada producto
+    final categoriaPorNombre = <String, String>{};
+    for (final p in _catalogoProductos) {
+      categoriaPorNombre[p.nombre] = p.categoriaNombre ?? 'Sin categoría';
+    }
+    final categoriasDisponibles = <String>{'Todas'};
+    for (final key in conteo.keys) {
+      categoriasDisponibles.add(categoriaPorNombre[key] ?? 'Sin categoría');
+    }
+
+    var lista = conteo.values.toList();
+
+    // Filtro por categoría
+    if (_catFiltroProductos != 'Todas') {
+      lista = lista.where((p) =>
+        (categoriaPorNombre[p['nombre']] ?? 'Sin categoría') == _catFiltroProductos).toList();
+    }
+    // Búsqueda por nombre
+    if (_busquedaProductos.trim().isNotEmpty) {
+      final q = _busquedaProductos.trim().toLowerCase();
+      lista = lista.where((p) => (p['nombre'] as String).toLowerCase().contains(q)).toList();
+    }
+
+    lista.sort((a, b) => (b['total'] as double).compareTo(a['total'] as double));
+    final maxTotalGlobal = conteo.values.isEmpty ? 0.0
+      : conteo.values.map((p) => p['total'] as double).reduce((a, b) => a > b ? a : b);
 
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
+      // Búsqueda
+      TextField(
+        onChanged: (v) => setState(() => _busquedaProductos = v),
+        decoration: InputDecoration(
+          hintText: 'Buscar producto...',
+          hintStyle: const TextStyle(fontSize: 12),
+          prefixIcon: const Icon(Icons.search, size: 18),
+          suffixIcon: _busquedaProductos.isNotEmpty
+            ? IconButton(icon: const Icon(Icons.close, size: 16),
+                onPressed: () => setState(() => _busquedaProductos = ''))
+            : null,
+          isDense: true, filled: true, fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: AppColors.grisBorde))),
+        style: const TextStyle(fontSize: 12)),
+      const SizedBox(height: 10),
+      // Filtro por categoría
+      SizedBox(height: 32,
+        child: ListView(scrollDirection: Axis.horizontal,
+          children: categoriasDisponibles.toList().map((cat) {
+            final activo = _catFiltroProductos == cat;
+            return GestureDetector(
+              onTap: () => setState(() => _catFiltroProductos = cat),
+              child: Container(
+                margin: const EdgeInsets.only(right: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: activo ? AppColors.azul : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: activo ? AppColors.azul : AppColors.grisBorde)),
+                child: Text(cat, style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w600,
+                  color: activo ? Colors.white : AppColors.textoSecundario))));
+          }).toList())),
+      const SizedBox(height: 14),
+
       if (lista.isEmpty)
         Container(padding: const EdgeInsets.all(32), alignment: Alignment.center,
-          child: const Column(children: [
-            Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.grisBorde),
-            SizedBox(height: 8),
-            Text('Sin datos de productos vendidos', style: TextStyle(color: AppColors.textoSecundario)),
+          child: Column(children: [
+            const Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.grisBorde),
+            const SizedBox(height: 8),
+            Text(conteo.isEmpty
+              ? 'Sin datos de productos vendidos'
+              : 'Sin resultados con este filtro',
+              style: const TextStyle(color: AppColors.textoSecundario)),
           ]))
       else ...[
-        _seccionInicio('TOP PRODUCTOS POR VENTAS'),
+        _seccionInicio('TOP PRODUCTOS POR VENTAS (${lista.length})'),
         ...lista.asMap().entries.map((e) {
           final i = e.key;
           final p = e.value;
-          final maxTotal = (lista.first['total'] as double);
-          final pct = maxTotal > 0 ? (p['total'] as double) / maxTotal : 0.0;
+          final pct = maxTotalGlobal > 0 ? (p['total'] as double) / maxTotalGlobal : 0.0;
           return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.grisBorde, width: 0.5)),
@@ -971,6 +1073,8 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(p['nombre'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                Text(categoriaPorNombre[p['nombre']] ?? 'Sin categoría',
+                  style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario)),
                 const SizedBox(height: 4),
                 ClipRRect(borderRadius: BorderRadius.circular(3), child: LinearProgressIndicator(
                   value: pct, backgroundColor: AppColors.gris, minHeight: 5,
