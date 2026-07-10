@@ -171,7 +171,7 @@ class PdfService {
             pw.Text('CONDICIONES', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
             pw.SizedBox(height: 6),
             if (cotizacion.metodoPago != null) _cond('Pago:', cotizacion.metodoPago!, grisTexto),
-            if (cotizacion.condicionEntrega != null) _cond('Entrega:', cotizacion.condicionEntrega!, grisTexto),
+            if (cotizacion.condicionEntrega != null) _cond('Entrega:', _limpiarTexto(cotizacion.condicionEntrega!), grisTexto),
             _cond('Vigencia:', '$vigenciaDias días hábiles', grisTexto),
             if (cotizacion.notas != null && cotizacion.notas!.isNotEmpty) _cond('Notas:', cotizacion.notas!, grisTexto),
           ])),
@@ -183,7 +183,7 @@ class PdfService {
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text('¡Gracias por su preferencia!', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text('Estamos para servirle — $nombreEmpresa', style: pw.TextStyle(fontSize: 9, color: blanco70)),
+              pw.Text(_limpiarTexto('Estamos para servirle — $nombreEmpresa'), style: pw.TextStyle(fontSize: 9, color: blanco70)),
             ]),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
               pw.Text(web, style: pw.TextStyle(fontSize: 9, color: PdfColors.white)),
@@ -292,7 +292,7 @@ class PdfService {
               pw.Text(nombreEmpresa,
                 style: pw.TextStyle(color: PdfColors.white,
                   fontSize: 18, fontWeight: pw.FontWeight.bold)),
-              pw.Text('Lista de Precios — $nombreLista',
+              pw.Text(_limpiarTexto('Lista de Precios — $nombreLista'),
                 style: const pw.TextStyle(color: PdfColors.white, fontSize: 11)),
               pw.Text('Fecha: $fecha',
                 style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
@@ -343,7 +343,7 @@ class PdfService {
                           style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
                     ])),
                   pw.Padding(padding: const pw.EdgeInsets.all(8),
-                    child: pw.Text(p.categoriaNombre ?? '—',
+                    child: pw.Text(p.categoriaNombre ?? '-',
                       style: const pw.TextStyle(fontSize: 9, color: grisTexto))),
                   pw.Padding(padding: const pw.EdgeInsets.all(8),
                     child: pw.Text(p.unidadMedida,
