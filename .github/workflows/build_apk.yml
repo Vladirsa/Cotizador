@@ -160,4 +160,4 @@ jobs:
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           local-dir: tmp_app/build/web/
-          server-dir: /domains/hetnacnc.com/public_html/cotizador/
+          server-dir: /home/u949489244/domains/hetnacnc.com/public_html/cotizador/
