@@ -3,6 +3,7 @@
 // HETNA CNC - Punto de entrada
 // ============================================
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -43,7 +44,14 @@ void main() async {
     print('FCM no disponible: \$e');
   }
 
-  await NotificacionesService.inicializar();
+  // flutter_local_notifications no funciona en navegador — solo Android/iOS
+  if (!kIsWeb) {
+    try {
+      await NotificacionesService.inicializar();
+    } catch (e) {
+      print('NotificacionesService no disponible: $e');
+    }
+  }
   runApp(const HetnaCncApp());
 }
 
