@@ -5,6 +5,8 @@
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,6 +16,7 @@ import 'firebase_options.dart';
 import 'services/notificaciones_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/nueva_password_screen.dart';
+import 'services/billing_service.dart';
 
 const supabaseUrl = 'https://ldfmkfbhcbsbecfbzsny.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkZm1rZmJoY2JzYmVjZmJ6c255Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTU5NzEsImV4cCI6MjA5NzI5MTk3MX0.N6KsmCz_HeHdc921VQflXJywgU2ctAON7wLSZViCEc4';
@@ -22,9 +25,36 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 // desde su correo y regresa a la app.
 final ValueNotifier<bool> mostrarRecuperarPass = ValueNotifier(false);
 
+// Idioma actual de la app. Empieza en español; se actualiza desde
+// Configuración y se guarda en el dispositivo para recordarlo.
+final ValueNotifier<Locale> idiomaActual = ValueNotifier(const Locale('es', 'MX'));
+
+Future<void> cambiarIdioma(String codigo) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('idioma', codigo);
+  idiomaActual.value = codigo == 'en' ? const Locale('en') : const Locale('es', 'MX');
+}
+
+Future<void> _cargarIdiomaGuardado() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final codigo = prefs.getString('idioma');
+    if (codigo == 'en') idiomaActual.value = const Locale('en');
+  } catch (_) {}
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+  await _cargarIdiomaGuardado();
+
+  // Google Play Billing — no bloquea el arranque si falla
+  // (ej. no está disponible en Web, o no hay Play Console configurado aún)
+  try {
+    await BillingService.inicializar();
+  } catch (e) {
+    print('BillingService no disponible: $e');
+  }
   await initializeDateFormatting('es_MX', null);
 
   // Escuchar el evento de recuperación de contraseña ANTES de correr la app,
@@ -60,10 +90,13 @@ class HetnaCncApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ValueListenableBuilder<Locale>(
+      valueListenable: idiomaActual,
+      builder: (context, locale, _) => MaterialApp(
       title: 'HETNA CNC',
       debugShowCheckedModeBanner: false,
       localizationsDelegates: const [
+        AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
@@ -71,8 +104,9 @@ class HetnaCncApp extends StatelessWidget {
       supportedLocales: const [
         Locale('es', 'MX'),
         Locale('es'),
+        Locale('en'),
       ],
-      locale: const Locale('es', 'MX'),
+      locale: locale,
       // En pantallas anchas (computadora/web) centra la app dentro de
       // un "marco" con fondo de marca, en vez de estirar el diseño
       // móvil a lo ancho de toda la pantalla — se ve mucho más
@@ -169,7 +203,7 @@ class HetnaCncApp extends StatelessWidget {
         valueListenable: mostrarRecuperarPass,
         builder: (_, mostrar, __) =>
           mostrar ? const NuevaPasswordScreen() : const HomeScreen()),
-    );
+    ));
   }
 }
 
