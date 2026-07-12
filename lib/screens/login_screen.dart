@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
+import '../l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'registro_taller_screen.dart';
@@ -164,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
-                          labelText: 'Correo electrónico',
+                          labelText: AppLocalizations.of(context)!.loginCorreo,
                           prefixIcon: const Icon(Icons.email_outlined,
                             size: 20, color: AppColors.textoSecundario),
                           border: OutlineInputBorder(
@@ -240,16 +241,16 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? const SizedBox(width: 22, height: 22,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
-                            : const Text('Entrar',
-                                style: TextStyle(fontSize: 15,
+                            : Text(AppLocalizations.of(context)!.loginEntrar,
+                                style: const TextStyle(fontSize: 15,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white)))),
 
                       const SizedBox(height: 10),
                       Center(child: TextButton(
                         onPressed: _mostrarRecuperarClave,
-                        child: const Text('¿Olvidaste tu contraseña?',
-                          style: TextStyle(fontSize: 12,
+                        child: Text(AppLocalizations.of(context)!.loginOlvidasteContrasena,
+                          style: const TextStyle(fontSize: 12,
                             color: AppColors.textoSecundario,
                             fontWeight: FontWeight.w600)))),
                     ])),
@@ -267,8 +268,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const RegistroTallerScreen())),
                       icon: const Icon(Icons.store_outlined, color: AppColors.azul, size: 18),
-                      label: const Text('Registrar mi taller',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                      label: Text(AppLocalizations.of(context)!.loginRegistrarTaller,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                           color: AppColors.azul)),
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: AppColors.azul),
@@ -280,8 +281,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const UnirseEquipoScreen())),
                       icon: const Icon(Icons.qr_code_2, color: AppColors.textoSecundario, size: 18),
-                      label: const Text('Tengo un código de invitación',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                      label: Text(AppLocalizations.of(context)!.loginTengoCodigo,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                           color: AppColors.textoSecundario)))),
                   const SizedBox(height: 24),
 

@@ -219,6 +219,42 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
               const SizedBox(height: 20),
 
+              // ── IDIOMA ──
+              _seccion('🌐 IDIOMA / LANGUAGE'),
+              const SizedBox(height: 8),
+              Container(padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                child: ValueListenableBuilder<Locale>(
+                  valueListenable: idiomaActual,
+                  builder: (context, locale, _) => Row(children: [
+                    Expanded(child: GestureDetector(
+                      onTap: () => cambiarIdioma('es'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: locale.languageCode == 'es' ? AppColors.azul : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8)),
+                        child: Text('🇲🇽 Español', textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                            color: locale.languageCode == 'es' ? Colors.white : AppColors.textoPrincipal))))),
+                    Expanded(child: GestureDetector(
+                      onTap: () => cambiarIdioma('en'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: locale.languageCode == 'en' ? AppColors.azul : Colors.transparent,
+                          borderRadius: BorderRadius.circular(8)),
+                        child: Text('🇺🇸 English', textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                            color: locale.languageCode == 'en' ? Colors.white : AppColors.textoPrincipal))))),
+                  ]))),
+              const SizedBox(height: 4),
+              const Text('Cambia el idioma de los menús y botones de la app.',
+                style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+
+              const SizedBox(height: 20),
+
               // ── LOGO Y COLORES DE MARCA ──
               _seccion('🎨 LOGO Y COLORES DE TUS PDFs'),
               const SizedBox(height: 8),
