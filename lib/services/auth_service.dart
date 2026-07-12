@@ -2,6 +2,7 @@
 // HETNA CNC — Autenticación y roles con Supabase Auth
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../screens/premium_screen.dart';
 
 class AuthService {
   static final _sb = Supabase.instance.client;
@@ -86,6 +87,10 @@ class AuthService {
   }
 
   // ── Cargar perfil del usuario (negocio + rol) ──────────
+  // Público — para refrescar el plan/rol desde fuera (ej. después de
+  // una compra exitosa en BillingService)
+  static Future<void> refrescarPerfil() => _cargarPerfil();
+
   static Future<void> _cargarPerfil() async {
     try {
       final uid = usuarioActual?.id;
@@ -254,7 +259,11 @@ class AuthService {
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
         ElevatedButton(
-          onPressed: () => Navigator.pop(ctx),
+          onPressed: () {
+            Navigator.pop(ctx);
+            Navigator.push(context,
+              MaterialPageRoute(builder: (_) => const PremiumScreen()));
+          },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade700),
           child: const Text('Ver planes', style: TextStyle(color: Colors.white))),
       ]));
