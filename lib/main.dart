@@ -110,12 +110,14 @@ class HetnaCncApp extends StatelessWidget {
       // En pantallas anchas (computadora/web) centra la app dentro de
       // un "marco" con fondo de marca, en vez de estirar el diseño
       // móvil a lo ancho de toda la pantalla — se ve mucho más
-      // profesional / ejecutivo.
+      // profesional / ejecutivo. El ancho se adapta a la pantalla
+      // (entre 700 y 1000px) en vez de un tamaño fijo.
       builder: (context, child) {
         if (child == null) return const SizedBox();
         if (!kIsWeb) return child;
         return LayoutBuilder(builder: (context, constraints) {
-          if (constraints.maxWidth <= 700) return child;
+          if (constraints.maxWidth <= 760) return child;
+          final anchoMarco = (constraints.maxWidth * 0.65).clamp(700.0, 1000.0);
           return Container(
             width: double.infinity,
             height: double.infinity,
@@ -125,7 +127,7 @@ class HetnaCncApp extends StatelessWidget {
                 colors: [Color(0xFF0f2438), Color(0xFF1a3a5c)])),
             child: Center(
               child: Container(
-                width: 480,
+                width: anchoMarco,
                 constraints: BoxConstraints(
                   maxHeight: constraints.maxHeight - 48,
                   minHeight: 640,
