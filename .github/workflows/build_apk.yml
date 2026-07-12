@@ -93,7 +93,7 @@ jobs:
             sed -i 's|<application|<uses-permission android:name="android.permission.READ_CONTACTS"/>\n    <application|' $MANIFEST
           echo "=== Verificacion ==="
           grep "compileSdk\|targetSdk" $APPGRADLE
-      - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml && flutter pub get
+      - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml && cp l10n.yaml tmp_app/l10n.yaml && flutter pub get
       - run: flutter pub get
         working-directory: tmp_app
       - run: flutter build apk --release --split-per-abi
@@ -148,7 +148,7 @@ jobs:
           flutter-version: 3.19.6
           channel: stable
       - run: flutter create --org com.hetnacnc --project-name hetna_cnc tmp_app
-      - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml
+      - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml && cp l10n.yaml tmp_app/l10n.yaml
       - run: flutter pub get
         working-directory: tmp_app
       - run: flutter build web --release --base-href /cotizador/
