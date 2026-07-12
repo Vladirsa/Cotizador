@@ -153,6 +153,17 @@ jobs:
         working-directory: tmp_app
       - run: flutter build web --release --base-href /cotizador/
         working-directory: tmp_app
+      - name: Evitar cache vieja del navegador (.htaccess)
+        run: |
+          cat > tmp_app/build/web/.htaccess << 'HTACCESS'
+          <IfModule mod_headers.c>
+            <FilesMatch "\.(html|js|json)$">
+              Header set Cache-Control "no-cache, no-store, must-revalidate"
+              Header set Pragma "no-cache"
+              Header set Expires 0
+            </FilesMatch>
+          </IfModule>
+          HTACCESS
       - name: Deploy a Hostinger (hetnacnc.com/cotizador)
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
