@@ -73,6 +73,40 @@ class HetnaCncApp extends StatelessWidget {
         Locale('es'),
       ],
       locale: const Locale('es', 'MX'),
+      // En pantallas anchas (computadora/web) centra la app dentro de
+      // un "marco" con fondo de marca, en vez de estirar el diseño
+      // móvil a lo ancho de toda la pantalla — se ve mucho más
+      // profesional / ejecutivo.
+      builder: (context, child) {
+        if (child == null) return const SizedBox();
+        if (!kIsWeb) return child;
+        return LayoutBuilder(builder: (context, constraints) {
+          if (constraints.maxWidth <= 700) return child;
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
+                colors: [Color(0xFF0f2438), Color(0xFF1a3a5c)])),
+            child: Center(
+              child: Container(
+                width: 480,
+                constraints: BoxConstraints(
+                  maxHeight: constraints.maxHeight - 48,
+                  minHeight: 640,
+                ),
+                margin: const EdgeInsets.symmetric(vertical: 24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(
+                    color: Colors.black.withOpacity(0.35),
+                    blurRadius: 40, offset: const Offset(0, 20))]),
+                clipBehavior: Clip.antiAlias,
+                child: child)));
+        });
+      },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1a3a5c),
