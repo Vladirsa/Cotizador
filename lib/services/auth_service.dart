@@ -397,19 +397,12 @@ class AuthService {
     try {
       final codigoLimpio = codigo.trim().toUpperCase();
 
-      // 1. Validar que el código existe y no ha sido usado
-      final inv = await _sb.from('invitaciones_equipo')
-        .select().eq('codigo', codigoLimpio).maybeSingle();
+      // 1. Validar el código (función segura, funciona sin sesión iniciada)
+      final validacion = await _sb.rpc('validar_invitacion',
+        params: {'p_codigo': codigoLimpio});
 
-      if (inv == null) {
-        return AuthResult.error('Código de invitación no válido');
-      }
-      if (inv['usado'] == true) {
-        return AuthResult.error('Este código ya fue utilizado');
-      }
-      final expiresAt = DateTime.tryParse(inv['expires_at'] ?? '');
-      if (expiresAt != null && expiresAt.isBefore(DateTime.now())) {
-        return AuthResult.error('Este código de invitación expiró');
+      if (validacion['valido'] != true) {
+        return AuthResult.error(validacion['mensaje'] ?? 'Código de invitación no válido');
       }
 
       // 2. Crear la cuenta en Supabase Auth
@@ -417,25 +410,21 @@ class AuthService {
       if (res.user == null) {
         return AuthResult.error('No se pudo crear la cuenta');
       }
-      final uid = res.user!.id;
 
-      // 3. Vincular al negocio con el rol de la invitación
-      await _sb.from('usuarios_negocio').insert({
-        'user_id'   : uid,
-        'negocio_id': inv['negocio_id'],
-        'rol'       : inv['rol'],
-        'nombre'    : nombre,
-        'correo'    : correo,
-        'activo'    : true,
+      // 3. Canjear el código ya autenticado: vincula al taller y
+      //    marca el código como usado, todo en un paso atómico
+      final canje = await _sb.rpc('canjear_invitacion', params: {
+        'p_codigo': codigoLimpio,
+        'p_nombre': nombre,
+        'p_correo': correo,
       });
 
-      // 4. Marcar invitación como usada
-      await _sb.from('invitaciones_equipo').update({
-        'usado': true,
-        'usado_por': uid,
-      }).eq('id', inv['id']);
+      if (canje['exito'] != true) {
+        return AuthResult.error(canje['mensaje'] ??
+          'La cuenta se creó pero no se pudo vincular al taller. Contacta al administrador.');
+      }
 
-      // 5. Cargar el perfil recién creado en memoria
+      // 4. Cargar el perfil recién creado en memoria
       await _cargarPerfil();
       if (_negocioId == null) {
         return AuthResult.error('La cuenta se creó pero no se pudo vincular al taller. Contacta al administrador.');
