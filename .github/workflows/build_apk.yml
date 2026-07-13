@@ -171,5 +171,5 @@ jobs:
           port: ${{ secrets.HOSTINGER_SSH_PORT }}
           username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
           password: ${{ secrets.HOSTINGER_SSH_PASSWORD }}
-          local_path: tmp_app/build/web/*
+          local_path: tmp_app/build/web
           remote_path: domains/hetnacnc.com/public_html/cotizador
