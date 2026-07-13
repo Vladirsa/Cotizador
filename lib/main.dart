@@ -3,6 +3,7 @@
 // HETNA CNC - Punto de entrada
 // ============================================
 
+import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +17,8 @@ import 'firebase_options.dart';
 import 'services/notificaciones_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/nueva_password_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/auth_service.dart';
 import 'services/billing_service.dart';
 
 const supabaseUrl = 'https://ldfmkfbhcbsbecfbzsny.supabase.co';
@@ -204,7 +207,7 @@ class HetnaCncApp extends StatelessWidget {
       home: ValueListenableBuilder<bool>(
         valueListenable: mostrarRecuperarPass,
         builder: (_, mostrar, __) =>
-          mostrar ? const NuevaPasswordScreen() : const HomeScreen()),
+          mostrar ? const NuevaPasswordScreen() : const AuthGate()),
     ));
   }
 }
@@ -226,4 +229,76 @@ class AppColors {
   static const textoSecundario= Color(0xFF6B7280);
   static const textoPrincipal = Color(0xFF111827);
   static const whatsapp       = Color(0xFF25D366);
+}
+
+// ════════════════════════════════════════════════════════════
+// AuthGate — el "portero" de la app.
+//
+// Antes, la app abría directo en HomeScreen sin revisar si de
+// verdad había una sesión activa. Eso causaba que, cuando Android
+// mata la app en segundo plano (algo normal en celulares con poca
+// memoria) y la vuelves a abrir, la app se veía "deslogueada"
+// aunque Supabase SÍ recordaba la sesión — porque nadie recargaba
+// el negocio/rol/plan del usuario en memoria.
+//
+// AuthGate revisa la sesión real de Supabase cada vez que la app
+// arranca (o cada vez que cambia el estado de sesión), y solo
+// entonces decide: ¿Login o Home?
+// ════════════════════════════════════════════════════════════
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _cargando = true;
+  bool _autenticado = false;
+  StreamSubscription<AuthState>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _revisarSesion();
+
+    // Reacciona en vivo si el usuario inicia o cierra sesión
+    // mientras la app está abierta (sin necesidad de reiniciarla)
+    _sub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.signedIn ||
+          data.event == AuthChangeEvent.tokenRefreshed) {
+        _revisarSesion();
+      }
+      if (data.event == AuthChangeEvent.signedOut) {
+        if (mounted) setState(() { _autenticado = false; _cargando = false; });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _revisarSesion() async {
+    final sesion = Supabase.instance.client.auth.currentSession;
+    if (sesion == null) {
+      if (mounted) setState(() { _autenticado = false; _cargando = false; });
+      return;
+    }
+    // Hay sesión válida de Supabase — recargar negocio/rol/plan
+    // antes de mostrar la app (esto es lo que antes faltaba)
+    await AuthService.refrescarPerfil();
+    if (mounted) setState(() { _autenticado = true; _cargando = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) {
+      return const Scaffold(
+        backgroundColor: AppColors.gris,
+        body: Center(child: CircularProgressIndicator()));
+    }
+    return _autenticado ? const HomeScreen() : const LoginScreen();
+  }
 }
