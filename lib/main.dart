@@ -264,8 +264,14 @@ class _AuthGateState extends State<AuthGate> {
     // Reacciona en vivo si el usuario inicia o cierra sesión
     // mientras la app está abierta (sin necesidad de reiniciarla)
     _sub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
-      if (data.event == AuthChangeEvent.signedIn ||
-          data.event == AuthChangeEvent.tokenRefreshed) {
+      // Muy importante: el enlace de "recuperar contraseña" también
+      // crea una sesión temporal, y eso dispara este mismo stream de
+      // eventos. Si no la ignoramos aquí, el portero cree que es un
+      // login normal y manda a la app en vez de dejar pasar la
+      // pantalla de "Nueva contraseña".
+      if (data.event == AuthChangeEvent.passwordRecovery) return;
+
+      if (data.event == AuthChangeEvent.signedIn) {
         _revisarSesion();
       }
       if (data.event == AuthChangeEvent.signedOut) {
