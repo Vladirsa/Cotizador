@@ -164,12 +164,12 @@ jobs:
             </FilesMatch>
           </IfModule>
           HTACCESS
-      - name: Deploy a Hostinger (hetnacnc.com/cotizador)
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: Deploy a Hostinger via SFTP (hetnacnc.com/cotizador)
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
-          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          local-dir: tmp_app/build/web/
-          server-dir: cotizador/
-          timeout: 300000
+          server: ${{ secrets.HOSTINGER_SSH_HOST }}
+          port: ${{ secrets.HOSTINGER_SSH_PORT }}
+          username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
+          password: ${{ secrets.HOSTINGER_SSH_PASSWORD }}
+          local_path: tmp_app/build/web/*
+          remote_path: /public_html/cotizador
