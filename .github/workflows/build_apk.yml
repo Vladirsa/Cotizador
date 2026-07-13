@@ -172,4 +172,4 @@ jobs:
           username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
           password: ${{ secrets.HOSTINGER_SSH_PASSWORD }}
           local_path: tmp_app/build/web/*
-          remote_path: /public_html/cotizador
+          remote_path: domains/hetnacnc.com/public_html/cotizador
