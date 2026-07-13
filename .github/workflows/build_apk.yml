@@ -172,3 +172,4 @@ jobs:
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
           local-dir: tmp_app/build/web/
           server-dir: cotizador/
+          timeout: 300000
