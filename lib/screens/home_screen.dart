@@ -22,6 +22,7 @@ import 'simulador_screen.dart';
 import 'agenda_screen.dart';
 import 'equipo_screen.dart';
 import 'permisos_screen.dart';
+import 'pedidos_publicos_screen.dart';
 import 'reportes_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -170,6 +171,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.w700))),
           ],
         ])),
+      ListTile(
+        leading: const Icon(Icons.storefront_outlined, color: AppColors.textoSecundario, size: 22),
+        title: const Text('Pedidos de clientes', style: TextStyle(fontSize: 14)),
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const PedidosPublicosScreen()));
+        }),
       _dItem(Icons.people_outline,         'CRM Clientes',        5, modulo: 'clientes'),
       _dItem(Icons.inventory_2_outlined,   'Productos y Catálogo',6, modulo: 'productos'),
       _dItem(Icons.warehouse_outlined,     'Inventario Bodega',   7, modulo: 'inventario'),
