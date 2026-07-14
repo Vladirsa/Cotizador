@@ -36,6 +36,12 @@ class _MarketingScreenState extends State<MarketingScreen>
         title: const Text('Marketing', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () => _mostrarAyudaMarketing(context),
+            icon: const Icon(Icons.help_outline, color: AppColors.azul),
+            tooltip: 'Ayuda'),
+        ],
         bottom: TabBar(
           controller: _tabs,
           labelColor: AppColors.azul,
@@ -57,6 +63,69 @@ class _MarketingScreenState extends State<MarketingScreen>
       ]));
   }
 }
+
+// ══════════════════════════════════════════════════════
+// AYUDA — pantalla completa de Marketing
+// ══════════════════════════════════════════════════════
+void _mostrarAyudaMarketing(BuildContext context) {
+  showModalBottomSheet(
+    context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
+    builder: (_) => DraggableScrollableSheet(
+      initialChildSize: 0.85, minChildSize: 0.5, maxChildSize: 0.95, expand: false,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        child: ListView(controller: scrollCtrl, padding: const EdgeInsets.fromLTRB(20, 12, 20, 30), children: [
+          Center(child: Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          const Text('❓ Cómo funciona Marketing', style: TextStyle(
+            fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.azul)),
+          const SizedBox(height: 8),
+          const Text(
+            'Este módulo te ayuda a mandar mensajes de WhatsApp a varios clientes a la vez, de forma '
+            'organizada y sin saturar tu número (Meta limita cuántos mensajes puedes mandar por día).',
+            style: TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.4)),
+          _bloqueAyudaMkt('📥 Cola de hoy',
+            'Aquí aparecen los mensajes que ya están listos para mandarse hoy — vienen de una Campaña que '
+            'lanzaste. Los revisas uno por uno y confirmas si ya los enviaste. Tiene un límite diario para '
+            'no violar las reglas de WhatsApp Business (mandar demasiados mensajes seguidos puede hacer que '
+            'Meta bloquee tu número).'),
+          _bloqueAyudaMkt('👥 Campañas y Segmento objetivo',
+            'Una Campaña es "a quién le voy a mandar qué mensaje". El "Segmento objetivo" es el grupo de '
+            'clientes que la recibirá — por ejemplo, "Clientes que no han comprado en 30 días" o "Todos los '
+            'clientes activos". Eliges el segmento, eliges la plantilla de mensaje, y defines cuántos '
+            'mensajes por día quieres mandar de esa campaña (para que se reparta en la Cola de varios días '
+            'si el grupo es grande).'),
+          _bloqueAyudaMkt('💬 Plantillas WA y Variables',
+            'Una plantilla es un mensaje pre-escrito que se reutiliza. Puedes meterle variables que se '
+            'rellenan solas con los datos de cada cliente:\n\n'
+            '• *NOMBRE* = se cambia por el nombre del cliente\n'
+            '• *FOLIO* = número de cotización o pedido\n'
+            '• *MONTO* = el precio o total en pesos\n'
+            '• *FECHA* = la fecha actual\n\n'
+            'Por ejemplo: "Hola *NOMBRE*, tu cotización *FOLIO* por *MONTO* sigue disponible" se convierte '
+            'automáticamente en "Hola Juan, tu cotización COT-045 por \$1,200 sigue disponible" para cada '
+            'cliente.'),
+          _bloqueAyudaMkt('🎟️ Cupones',
+            'Códigos de descuento que puedes activar para tus campañas o compartir directamente con '
+            'clientes — por ejemplo un cupón "VERANO10" que da 10% de descuento.'),
+          const SizedBox(height: 8),
+          Container(padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10)),
+            child: const Text('💡 Consejo: empieza con campañas chicas (pocos mensajes al día) para '
+              'probar cómo responden tus clientes, antes de mandar a todo tu segmento de golpe.',
+              style: TextStyle(fontSize: 12, color: AppColors.azul, height: 1.4))),
+        ]))));
+}
+
+Widget _bloqueAyudaMkt(String titulo, String texto) => Padding(
+  padding: const EdgeInsets.only(top: 18),
+  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(titulo, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
+    const SizedBox(height: 6),
+    Text(texto, style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.45)),
+  ]));
 
 // ══════════════════════════════════════════════
 // TAB 1 — COLA DE MENSAJES DE HOY

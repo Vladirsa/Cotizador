@@ -48,6 +48,10 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
         title: const Text('Configurar simulador',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         actions: [
+          IconButton(
+            onPressed: () => _mostrarAyudaGeneral(),
+            icon: const Icon(Icons.help_outline, color: AppColors.azul),
+            tooltip: 'Ayuda'),
           if (_servicioSel != null)
             TextButton.icon(
               onPressed: _agregarServicio,
@@ -116,6 +120,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
 
       // ── TARIFAS ──
       _seccionCard('💰 Tarifas', cfg.tarifas.values.toList(),
+        ayuda: 'El precio base por unidad de trabajo, por ejemplo "corte por metro" a \$50, o "precio por hora de máquina" a \$300.',
         addLabel: '+ Agregar tarifa',
         onAdd: () => _nuevoItem('tarifa'),
         builder: (_, i) {
@@ -135,6 +140,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       if (cfg.rangos.isNotEmpty || _servicioSel?.nombre.toLowerCase().contains('router') == true)
         _seccionCard('📊 Tabla de rangos (Router)',
           cfg.rangos,
+          ayuda: 'Para cuando el precio cambia según qué tan grande es el trabajo (ej. cortar 1-10 piezas a \$50 c/u, pero 11-50 piezas a \$40 c/u). "Índice desde/hasta" son los límites del rango.',
           addLabel: '+ Agregar rango',
           onAdd: () => _nuevoRango(),
           builder: (_, i) {
@@ -161,6 +167,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       if (cfg.tipos.isNotEmpty)
         _seccionCard('🔨 Tipos de trabajo',
           cfg.tipos,
+          ayuda: 'Variantes dentro del servicio (ej. "Corte simple", "Relieve 3D"). El Factor de complejidad multiplica el precio base: 1.0 = normal, 1.5 = 50% más caro, 3.0 = el triple.',
           addLabel: '+ Agregar tipo',
           onAdd: () => _nuevoTipo(),
           builder: (_, i) {
@@ -174,6 +181,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       if (cfg.acabados.isNotEmpty)
         _seccionCard('✨ Acabados',
           cfg.acabados,
+          ayuda: 'Terminados opcionales que el cliente puede elegir y suman un costo fijo (ej. "Barniz", "Pintura", "Pulido").',
           addLabel: '+ Agregar acabado',
           onAdd: () => _nuevoExtra('sim_acabados', 'Acabado'),
           builder: (_, i) {
@@ -193,6 +201,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       if (cfg.extras.isNotEmpty)
         _seccionCard('🎁 Extras',
           cfg.extras,
+          ayuda: 'Cargos adicionales opcionales que no son de terminado (ej. "Entrega urgente", "Diseño personalizado"). Pueden ser precio fijo, porcentaje, o por pieza.',
           addLabel: '+ Agregar extra',
           onAdd: () => _nuevoExtra('sim_extras', 'Extra'),
           builder: (_, i) {
@@ -215,6 +224,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
     required Widget Function(BuildContext, int) builder,
     required String addLabel,
     required VoidCallback onAdd,
+    String? ayuda,
   }) => Container(
     decoration: BoxDecoration(
       color: Colors.white, borderRadius: BorderRadius.circular(12),
@@ -222,8 +232,14 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(titulo, style: const TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
+          Row(children: [
+            Text(titulo, style: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
+            if (ayuda != null) GestureDetector(
+              onTap: () => _mostrarAyuda(titulo, ayuda),
+              child: Padding(padding: const EdgeInsets.only(left: 6),
+                child: Icon(Icons.help_outline, size: 16, color: AppColors.textoSecundario.withOpacity(0.7)))),
+          ]),
           GestureDetector(
             onTap: onAdd,
             child: Container(
@@ -240,6 +256,83 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
         itemCount: items.length,
         separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.grisBorde),
         itemBuilder: builder),
+    ]));
+
+  // ── AYUDA: diálogo corto por sección ────────────────
+  void _mostrarAyuda(String titulo, String texto) {
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: Row(children: [
+        const Icon(Icons.help_outline, color: AppColors.azul, size: 20),
+        const SizedBox(width: 8),
+        Expanded(child: Text(titulo, style: const TextStyle(fontSize: 15))),
+      ]),
+      content: Text(texto, style: const TextStyle(fontSize: 13, height: 1.4)),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendido'))]));
+  }
+
+  // ── AYUDA: pantalla completa del Simulador ──────────
+  void _mostrarAyudaGeneral() {
+    showModalBottomSheet(
+      context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.85, minChildSize: 0.5, maxChildSize: 0.95, expand: false,
+        builder: (_, scrollCtrl) => Container(
+          decoration: const BoxDecoration(color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          child: ListView(controller: scrollCtrl, padding: const EdgeInsets.fromLTRB(20, 12, 20, 30), children: [
+            Center(child: Container(width: 36, height: 4,
+              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 16),
+            const Text('❓ Cómo funciona el Simulador', style: TextStyle(
+              fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.azul)),
+            const SizedBox(height: 8),
+            const Text(
+              'El Simulador calcula un precio sugerido para un trabajo, combinando lo que tú configuras aquí '
+              '(tarifas, tipos de trabajo) con las medidas que captura tu vendedor al cotizar. Aquí abajo se '
+              'explica cada sección para que sepas qué llenar.',
+              style: TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.4)),
+            _bloqueAyuda('💰 Tarifas',
+              'El precio base por unidad de trabajo. Por ejemplo, "corte por metro" a \$50, o "precio por hora de '
+              'máquina" a \$300. Cada servicio (Router, Herrería, Láser, etc.) tiene sus propias tarifas.'),
+            _bloqueAyuda('🔨 Tipos de trabajo y Factor de complejidad',
+              'Un "tipo de trabajo" es una variante dentro del servicio — por ejemplo, dentro de Router puedes '
+              'tener "Corte simple", "Relieve 3D", "Escultura". El Factor de complejidad multiplica el precio '
+              'base según qué tan difícil es ese trabajo comparado con lo más sencillo:\n\n'
+              '• Factor 1.0 = trabajo normal, sin ajuste (corte simple)\n'
+              '• Factor 1.5 = 50% más caro que lo normal\n'
+              '• Factor 3.0 = el triple de precio (por ejemplo, relieve 3D, que tarda más y desgasta más la '
+              'herramienta)\n\n'
+              'Regla simple: entre más tiempo, cuidado o desgaste de herramienta necesite un trabajo, más alto '
+              'debe ser su factor.'),
+            _bloqueAyuda('📊 Tabla de rangos',
+              'Se usa cuando el precio no es siempre el mismo por unidad, sino que cambia según qué tan grande '
+              'es el trabajo — por ejemplo, cortar de 1 a 10 piezas cuesta \$50 cada una, pero de 11 a 50 piezas '
+              'baja a \$40 cada una (por volumen). "Índice desde" e "Índice hasta" son los límites de ese rango '
+              '(ej. desde 1 hasta 10), y "Precio" es lo que aplica dentro de ese rango.'),
+            _bloqueAyuda('✨ Acabados',
+              'Opciones extra de terminado que el cliente puede elegir y que suman un costo fijo al final — '
+              'por ejemplo "Barniz", "Pintura", "Pulido". Se le suman al precio base del trabajo si el cliente '
+              'los pide.'),
+            _bloqueAyuda('🎁 Extras',
+              'Cargos adicionales opcionales que no son de terminado — por ejemplo "Entrega urgente", "Diseño '
+              'personalizado", "Instalación". Pueden ser un precio fijo, un porcentaje del total, o un precio '
+              'por pieza, según cómo lo configures.'),
+            const SizedBox(height: 8),
+            Container(padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10)),
+              child: const Text('💡 Consejo: si no estás seguro de un precio, empieza con un número '
+                'aproximado y ajústalo después de cotizar unos trabajos reales — es más fácil corregir '
+                'que adivinar desde cero.',
+                style: TextStyle(fontSize: 12, color: AppColors.azul, height: 1.4))),
+          ]))));
+  }
+
+  Widget _bloqueAyuda(String titulo, String texto) => Padding(
+    padding: const EdgeInsets.only(top: 18),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(titulo, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
+      const SizedBox(height: 6),
+      Text(texto, style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.45)),
     ]));
 
   // ── ITEM EDITABLE (tarifa con valor numérico) ───────
