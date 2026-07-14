@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'auth_service.dart';
 
 class WhatsAppService {
 
@@ -50,7 +51,7 @@ class WhatsAppService {
 
   // ── ENVIAR VÍA API (siempre del número Business) ────
   // Usa WhatsApp Business API de Meta
-  // Token se guarda en Supabase en configuracion_empresa
+  // Token se guarda en Supabase en configuracion_empresa, POR TALLER
   static Future<bool> enviarViaApi({
     required String numeroDestino,
     required String mensaje,
@@ -59,13 +60,26 @@ class WhatsAppService {
       final n = normalizarNumero(numeroDestino);
       if (n.isEmpty) return false;
 
-      // Obtener token de Supabase
-      final config = await Supabase.instance.client
+      // Obtener token de Supabase — filtrado por el negocio del usuario
+      // actual. Sin este filtro, con más de un taller configurado, la
+      // consulta puede traer el token de OTRO negocio (o tronar por
+      // duplicados) en vez del propio.
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) {
+        return abrirChat(numero: numeroDestino, mensaje: mensaje);
+      }
+
+      final rows = await Supabase.instance.client
         .from('configuracion_empresa')
         .select('whatsapp_token')
-        .maybeSingle();
+        .eq('negocio_id', negocioId)
+        .limit(1);
 
-      final token = config?['whatsapp_token'] as String?;
+      final list = rows as List;
+      final token = list.isNotEmpty
+        ? list.first['whatsapp_token'] as String?
+        : null;
+
       if (token == null || token.isEmpty) {
         // Si no hay token, abrir app normalmente
         return abrirChat(numero: numeroDestino, mensaje: mensaje);
@@ -99,6 +113,11 @@ class WhatsAppService {
   // ── LEER PLANTILLA DESDE SUPABASE ──────────────────
   // Lee el mensaje personalizado del taller desde la BD
   // Si no hay plantilla, usa el mensaje por defecto del código
+  //
+  // NOTA: plantillas_wa no se tocó en este fix porque no estaba en el
+  // reporte del punto 9 (whatsapp_service.dart no filtraba SOLO en
+  // configuracion_empresa). Si plantillas_wa también necesita filtro
+  // por negocio_id, avísame y lo corregimos aparte.
   static Future<String> getPlantilla({
     required String tipo,
     required String nombreCliente,
@@ -146,12 +165,18 @@ class WhatsAppService {
   // ── LEER NÚMERO DEL TALLER DESDE SUPABASE ───────────
   static Future<String> getNumeroTaller() async {
     try {
-      final data = await Supabase.instance.client
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) return '2461217072';
+
+      final rows = await Supabase.instance.client
         .from('configuracion_empresa')
         .select('whatsapp_numero, whatsapp_modo')
-        .maybeSingle();
-      if (data != null && data['whatsapp_numero'] != null) {
-        return data['whatsapp_numero'] as String;
+        .eq('negocio_id', negocioId)
+        .limit(1);
+
+      final list = rows as List;
+      if (list.isNotEmpty && list.first['whatsapp_numero'] != null) {
+        return list.first['whatsapp_numero'] as String;
       }
     } catch (_) {}
     return '2461217072'; // default HETNA CNC
@@ -159,11 +184,19 @@ class WhatsAppService {
 
   static Future<String> getModoEnvio() async {
     try {
-      final data = await Supabase.instance.client
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) return 'app';
+
+      final rows = await Supabase.instance.client
         .from('configuracion_empresa')
         .select('whatsapp_modo')
-        .maybeSingle();
-      return data?['whatsapp_modo'] as String? ?? 'app';
+        .eq('negocio_id', negocioId)
+        .limit(1);
+
+      final list = rows as List;
+      return list.isNotEmpty
+        ? (list.first['whatsapp_modo'] as String? ?? 'app')
+        : 'app';
     } catch (_) { return 'app'; }
   }
 
