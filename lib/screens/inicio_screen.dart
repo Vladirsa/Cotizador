@@ -395,7 +395,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const SizedBox(height: 8),
       GridView.count(crossAxisCount: 2, shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 1.6,
+        crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 2.6,
         children: [
           _statCard('Cotizaciones', '${_cotizaciones.length}', AppColors.azul, Icons.description_outlined),
           _statCard('Pedidos activos', '$pedidosActivos', const Color(0xFF7c3aed), Icons.local_shipping_outlined),
@@ -1118,12 +1118,17 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   Widget _statCard(String label, String valor, Color color, IconData icon) => Container(
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-    padding: const EdgeInsets.all(12),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      Icon(icon, color: color, size: 20),
-      const SizedBox(height: 8),
-      Text(valor, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: color)),
-      Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    child: Row(children: [
+      Container(width: 38, height: 38,
+        decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+        child: Icon(icon, color: color, size: 20)),
+      const SizedBox(width: 10),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Text(valor, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
+          maxLines: 1, overflow: TextOverflow.ellipsis),
+      ])),
     ]));
 
   Widget _miniPedido(Pedido p) {
@@ -1194,14 +1199,15 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       ])));
 
   Widget _kpiCard2(String label, String valor, Color color, IconData icon) => Container(
-    padding: const EdgeInsets.all(10),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(icon, color: color, size: 18),
-      const SizedBox(height: 6),
-      Text(valor, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color)),
-      Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+      const SizedBox(height: 8),
+      Text(valor, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: color)),
+      Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
+        maxLines: 1, overflow: TextOverflow.ellipsis),
     ]));
 
   Widget _seccionInicio(String t) => Padding(padding: const EdgeInsets.only(bottom: 8, top: 4),
