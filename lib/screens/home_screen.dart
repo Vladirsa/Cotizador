@@ -172,10 +172,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ])),
       ListTile(
-        leading: const Icon(Icons.storefront_outlined, color: AppColors.textoSecundario, size: 22),
-        title: const Text('Pedidos de clientes', style: TextStyle(fontSize: 14)),
-        onTap: () {
+        leading: Icon(Icons.storefront_outlined,
+          color: !AuthService.esPremiumActivo
+            ? AppColors.textoSecundario.withOpacity(0.4) : AppColors.textoSecundario, size: 22),
+        title: Text('Pedidos de clientes', style: TextStyle(fontSize: 14,
+          color: !AuthService.esPremiumActivo ? AppColors.textoSecundario.withOpacity(0.4) : null)),
+        trailing: !AuthService.esPremiumActivo ? const Icon(Icons.lock, size: 16, color: Colors.amber) : null,
+        onTap: () async {
           Navigator.pop(context);
+          if (!AuthService.esPremiumActivo) {
+            await AuthService.exigirPremium(context, funcion: 'Pedidos de clientes');
+            return;
+          }
           Navigator.push(context, MaterialPageRoute(builder: (_) => const PedidosPublicosScreen()));
         }),
       _dItem(Icons.people_outline,         'CRM Clientes',        5, modulo: 'clientes'),
@@ -185,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _dItem(Icons.campaign_outlined,      'Marketing',           9, premium: true, modulo: 'marketing'),
       _dItem(Icons.group_outlined,         'Mi equipo',          10, modulo: 'equipo'),
       const Divider(height: 1),
-      _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11, modulo: 'reportes'),
+      _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11, premium: true, modulo: 'reportes'),
       _dItem(Icons.settings_outlined,      'Configuración',      12, modulo: 'config'),
       _dItem(Icons.tune_outlined,          'Config Simulador',   13),
       _dItem(Icons.calculate_outlined,     'Costos del taller',  14),
