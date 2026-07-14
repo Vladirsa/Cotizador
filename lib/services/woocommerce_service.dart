@@ -20,6 +20,20 @@ class WooCommerceService {
   static final _sb = Supabase.instance.client;
 
   // URL de la función que recibe la autorización automática
+  //
+  // ⚠️ El slug real de la función desplegada es "clever-worker", NO
+  // "woocommerce-callback". El dashboard de Supabase permite cambiar
+  // el nombre VISUAL de una función sin cambiar la ruta real de
+  // invocación — por eso en el dashboard se ve como
+  // "woocommerce-callback" pero la URL sigue siendo /clever-worker.
+  // Si en algún momento se vuelve a desplegar esta función con el
+  // nombre correcto de carpeta (woocommerce-callback), hay que
+  // actualizar esta constante de vuelta.
+  //
+  // ⚠️ TAMBIÉN VERIFICAR: confirma el Project URL exacto en
+  // Supabase → Settings → API antes de compilar. El de abajo es el
+  // que aparecía en el código original — solo lo dejé igual porque
+  // aún no confirmas si el ID de proyecto es correcto.
   static const _callbackUrl =
     'https://ldfmkfbhcbsbecfbzsny.supabase.co/functions/v1/woocommerce-callback';
 
