@@ -876,24 +876,33 @@ class _AgendaBodyState extends State<AgendaBody>
   Widget _tabCalendario() => Column(children: [
     // Nav mes
     Container(color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        IconButton(icon: const Icon(Icons.chevron_left, color: AppColors.azul),
+        IconButton(icon: const Icon(Icons.chevron_left, color: AppColors.azul, size: 26),
           onPressed: () { setState(() => _mesActual = DateTime(_mesActual.year, _mesActual.month - 1)); _cargar(); }),
         GestureDetector(
           onTap: () { setState(() { _mesActual = DateTime.now(); _diaSeleccionado = DateTime.now(); }); _cargar(); },
           child: Text(_fmtMes.format(_mesActual).toUpperCase(),
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul))),
-        IconButton(icon: const Icon(Icons.chevron_right, color: AppColors.azul),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.azul,
+              letterSpacing: 0.5))),
+        IconButton(icon: const Icon(Icons.chevron_right, color: AppColors.azul, size: 26),
           onPressed: () { setState(() => _mesActual = DateTime(_mesActual.year, _mesActual.month + 1)); _cargar(); }),
       ])),
     // Días semana
-    Container(color: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    Container(color: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(children: ['L','M','X','J','V','S','D'].map((d) =>
-        Expanded(child: Center(child: Text(d, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-          color: d=='D'||d=='S' ? AppColors.rojo.withOpacity(0.6) : AppColors.textoSecundario))))).toList())),
-    Container(color: Colors.white, child: _buildGrilla()),
-    Expanded(child: _eventosDelDia()),
+        Expanded(child: Center(child: Text(d, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+          color: d=='D'||d=='S' ? AppColors.rojo.withOpacity(0.7) : AppColors.textoSecundario))))).toList())),
+    // Todo lo de abajo (cuadrícula completa + lista del día) vive dentro
+    // de UN SOLO scroll — así el mes NUNCA se corta, sin importar
+    // cuántas semanas tenga o qué tan chica sea la pantalla.
+    Expanded(child: SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      child: Column(children: [
+        Container(color: Colors.white, child: _buildGrilla()),
+        const Divider(height: 1, color: AppColors.grisBorde),
+        _eventosDelDia(),
+      ]))),
   ]);
 
   Widget _buildGrilla() {
@@ -903,50 +912,87 @@ class _AgendaBodyState extends State<AgendaBody>
     final filas = ((offset + diasEnMes) / 7).ceil();
     final porDia = _eventosPorDia;
     final hoy = DateTime.now();
-    return GridView.builder(
-      shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 1.1),
-      itemCount: filas * 7,
-      itemBuilder: (_, idx) {
-        final diaNum = idx - offset + 1;
-        if (diaNum < 1 || diaNum > diasEnMes) return const SizedBox();
-        final fecha = DateTime(_mesActual.year, _mesActual.month, diaNum);
-        final esHoy = fecha.day==hoy.day && fecha.month==hoy.month && fecha.year==hoy.year;
-        final esSel = fecha.day==_diaSeleccionado.day && fecha.month==_diaSeleccionado.month && fecha.year==_diaSeleccionado.year;
-        final eventos = porDia[diaNum] ?? [];
-        final tieneVencidos = eventos.any((e) => !e.completado && e.fechaInicio.isBefore(DateTime.now()));
-        return GestureDetector(
-          onTap: () => _seleccionarDia(fecha),
-          child: Container(
-            margin: const EdgeInsets.all(1),
-            decoration: BoxDecoration(
-              color: esSel ? AppColors.azul : esHoy ? AppColors.azulClaro : Colors.transparent,
-              borderRadius: BorderRadius.circular(6)),
-            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text('$diaNum', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                color: esSel ? Colors.white : esHoy ? AppColors.azul : AppColors.textoPrincipal)),
-              if (eventos.isNotEmpty) Container(width: 4, height: 4,
-                decoration: BoxDecoration(
-                  color: tieneVencidos ? (esSel ? Colors.white : AppColors.rojo) : (esSel ? Colors.white70 : AppColors.naranja),
-                  shape: BoxShape.circle)),
-            ])));
-      });
+    // Altura fija por fila — con esto la cuadrícula SIEMPRE mide lo que
+    // necesita (5 o 6 filas según el mes) y, como ahora vive dentro de
+    // un SingleChildScrollView, nunca se recorta: si no cabe en la
+    // pantalla, simplemente se puede bajar con scroll.
+    const alturaFila = 52.0;
+    return SizedBox(
+      height: filas * alturaFila,
+      child: GridView.builder(
+        shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 7, mainAxisExtent: alturaFila),
+        itemCount: filas * 7,
+        itemBuilder: (_, idx) {
+          final diaNum = idx - offset + 1;
+          if (diaNum < 1 || diaNum > diasEnMes) return const SizedBox();
+          final fecha = DateTime(_mesActual.year, _mesActual.month, diaNum);
+          final esHoy = fecha.day==hoy.day && fecha.month==hoy.month && fecha.year==hoy.year;
+          final esSel = fecha.day==_diaSeleccionado.day && fecha.month==_diaSeleccionado.month && fecha.year==_diaSeleccionado.year;
+          final eventos = porDia[diaNum] ?? [];
+          final tieneVencidos = eventos.any((e) => !e.completado && e.fechaInicio.isBefore(DateTime.now()));
+          final colorInsignia = tieneVencidos ? AppColors.rojo : AppColors.ambar;
+          return GestureDetector(
+            onTap: () => _seleccionarDia(fecha),
+            child: Container(
+              margin: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: esSel ? AppColors.azul : esHoy ? AppColors.azulClaro : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                border: esHoy && !esSel ? Border.all(color: AppColors.azul, width: 1) : null),
+              child: Stack(alignment: Alignment.center, children: [
+                Text('$diaNum', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                  color: esSel ? Colors.white : esHoy ? AppColors.azul : AppColors.textoPrincipal)),
+                // Insignia con el número de eventos del día — junta en
+                // un solo elemento el "punto de color" (rojo=vencido,
+                // ámbar=pendiente) y la cantidad, sin saturar la celda.
+                if (eventos.isNotEmpty) Positioned(
+                  top: 2, right: 2,
+                  child: Container(
+                    width: 16, height: 16,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: esSel ? Colors.white : colorInsignia,
+                      shape: BoxShape.circle,
+                      border: esSel ? Border.all(color: colorInsignia, width: 1.5) : null),
+                    child: Text('${eventos.length}', style: TextStyle(
+                      fontSize: 9, fontWeight: FontWeight.w800,
+                      color: esSel ? colorInsignia : Colors.white)))),
+              ])));
+        }));
   }
 
   Widget _eventosDelDia() {
     final esTitulo = _fmtFecha.format(_diaSeleccionado);
-    return Container(color: AppColors.gris, child: Column(children: [
-      Padding(padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text(esTitulo, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.azul)),
-          Text('${_eventosDia.length} evento(s)', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-        ])),
-      Expanded(child: _eventosDia.isEmpty
-        ? const Center(child: Text('Sin eventos', style: TextStyle(color: AppColors.textoSecundario, fontSize: 12)))
-        : ListView(padding: const EdgeInsets.symmetric(horizontal: 10),
-            children: _eventosDia.map((e) => _cardEvento(e)).toList())),
-    ]));
+    return Container(
+      // Alto mínimo generoso para que se sienta como una sección propia
+      // aunque el día tenga pocos o ningún evento — todo dentro del
+      // scroll general, así siempre es alcanzable bajando la pantalla.
+      constraints: const BoxConstraints(minHeight: 180),
+      color: AppColors.gris,
+      child: Column(children: [
+        Padding(padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
+          child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Text(esTitulo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.azul)),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(20)),
+              child: Text('${_eventosDia.length} evento(s)',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.azul))),
+          ])),
+        _eventosDia.isEmpty
+          ? const Padding(padding: EdgeInsets.symmetric(vertical: 30),
+              child: Center(child: Text('Sin eventos este día',
+                style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
+          : ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: _eventosDia.length,
+              itemBuilder: (_, i) => _cardEvento(_eventosDia[i])),
+        const SizedBox(height: 16),
+      ]));
   }
 
   Widget _tabHoy() {
@@ -1008,19 +1054,19 @@ class _AgendaBodyState extends State<AgendaBody>
             Text(e.tipoEmoji, style: const TextStyle(fontSize: 18)),
             const SizedBox(width: 8),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(e.titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+              Text(e.titulo, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
                 color: e.completado ? AppColors.textoSecundario : AppColors.textoPrincipal,
                 decoration: e.completado ? TextDecoration.lineThrough : null),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
               if (e.clienteNombre != null)
-                Text(e.clienteNombre!, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-              Container(margin: const EdgeInsets.only(top: 3),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                Text(e.clienteNombre!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+              Container(margin: const EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(color: sem.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text(e.semaforoLabel, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: sem))),
+                child: Text(e.semaforoLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: sem))),
             ])),
             if (e.monto > 0) Text(_fmt.format(e.monto),
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.azul)),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.azul)),
             if (!e.completado) GestureDetector(
               onTap: () async { await AgendaService.completarEvento(e.id); _cargar(); },
               child: Container(width: 28, height: 28, margin: const EdgeInsets.only(left: 6),
