@@ -12,10 +12,65 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:uuid/uuid.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'auth_service.dart';
 
 class WooCommerceService {
   static final _sb = Supabase.instance.client;
+
+  // URL de la función que recibe la autorización automática
+  static const _callbackUrl =
+    'https://ldfmkfbhcbsbecfbzsny.supabase.co/functions/v1/woocommerce-callback';
+
+  // ── CONEXIÓN AUTOMÁTICA (sin copiar/pegar claves) ──────
+  //
+  // 1. Genera un código de un solo uso y lo guarda ligado a este taller
+  // 2. Abre el navegador en la tienda del usuario, donde solo tiene
+  //    que iniciar sesión y apretar "Aprobar"
+  // 3. WooCommerce manda las claves directo a nuestra función, sin
+  //    que el usuario las vea ni las copie
+  static Future<String?> iniciarAutorizacion(String storeUrl) async {
+    final negId = AuthService.negocioId;
+    if (negId == null) return null;
+
+    final urlLimpia = storeUrl.trim().replaceAll(RegExp(r'/$'), '');
+    final token = const Uuid().v4();
+
+    try {
+      await _sb.from('woocommerce_auth_tokens').insert({
+        'token': token,
+        'negocio_id': negId,
+        'store_url': urlLimpia,
+      });
+    } catch (e) {
+      return null;
+    }
+
+    final authUrl = Uri.parse('$urlLimpia/wc-auth/v1/authorize').replace(
+      queryParameters: {
+        'app_name': 'HETNA CNC Cotizador',
+        'scope': 'read',
+        'user_id': token,
+        'return_url': urlLimpia,
+        'callback_url': _callbackUrl,
+      });
+
+    final abierto = await launchUrl(authUrl, mode: LaunchMode.externalApplication);
+    return abierto ? token : null;
+  }
+
+  // Revisa si el usuario ya aprobó la conexión (se llama cuando
+  // regresa a la app y toca "Ya aprobé, verificar")
+  static Future<bool> verificarAutorizacion(String token) async {
+    try {
+      final data = await _sb.from('woocommerce_auth_tokens')
+        .select('usado').eq('token', token).maybeSingle();
+      return data?['usado'] == true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   // Trae la configuración guardada del taller actual
   static Future<Map<String, dynamic>?> obtenerConfig() async {
