@@ -18,8 +18,10 @@ import 'services/notificaciones_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/nueva_password_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/pedido_publico_screen.dart';
 import 'services/auth_service.dart';
 import 'services/billing_service.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 
 const supabaseUrl = 'https://ldfmkfbhcbsbecfbzsny.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxkZm1rZmJoY2JzYmVjZmJ6c255Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MTU5NzEsImV4cCI6MjA5NzI5MTk3MX0.N6KsmCz_HeHdc921VQflXJywgU2ctAON7wLSZViCEc4';
@@ -48,6 +50,7 @@ Future<void> _cargarIdiomaGuardado() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (kIsWeb) usePathUrlStrategy();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await _cargarIdiomaGuardado();
 
@@ -98,6 +101,17 @@ class HetnaCncApp extends StatelessWidget {
       builder: (context, locale, _) => MaterialApp(
       title: 'HETNA CNC',
       debugShowCheckedModeBanner: false,
+      // Captura enlaces públicos tipo /pedido/{slug-del-taller} para
+      // que un cliente pueda hacer su pedido SIN necesitar cuenta ni
+      // pasar por el AuthGate normal de la app.
+      onGenerateRoute: (settings) {
+        final uri = Uri.parse(settings.name ?? '/');
+        if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'pedido') {
+          final slug = uri.pathSegments[1];
+          return MaterialPageRoute(builder: (_) => PedidoPublicoScreen(slug: slug));
+        }
+        return null;
+      },
       localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
