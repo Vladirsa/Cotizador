@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
+import '../services/woocommerce_service.dart';
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({super.key});
@@ -252,6 +253,13 @@ class _ConfigScreenState extends State<ConfigScreen> {
               const SizedBox(height: 4),
               const Text('Cambia el idioma de los menús y botones de la app.',
                 style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+
+              const SizedBox(height: 20),
+
+              // ── WOOCOMMERCE ──
+              _seccion('🛍️ SINCRONIZAR CON TU TIENDA WOOCOMMERCE'),
+              const SizedBox(height: 8),
+              _CardWooCommerce(),
 
               const SizedBox(height: 20),
 
@@ -830,5 +838,123 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
             ]);
           }).toList())),
     ]);
+  }
+}
+
+// ── Tarjeta de configuración de WooCommerce ─────────────
+class _CardWooCommerce extends StatefulWidget {
+  @override
+  State<_CardWooCommerce> createState() => _CardWooCommerceState();
+}
+
+class _CardWooCommerceState extends State<_CardWooCommerce> {
+  final _urlCtrl = TextEditingController();
+  final _keyCtrl = TextEditingController();
+  final _secretCtrl = TextEditingController();
+  bool _cargando = true;
+  bool _probando = false;
+  bool _sincronizando = false;
+  String? _resultadoPrueba;
+  bool _resultadoOk = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargar();
+  }
+
+  Future<void> _cargar() async {
+    final config = await WooCommerceService.obtenerConfig();
+    if (config != null) {
+      _urlCtrl.text = config['woocommerce_url'] ?? '';
+      _keyCtrl.text = config['woocommerce_consumer_key'] ?? '';
+      _secretCtrl.text = config['woocommerce_consumer_secret'] ?? '';
+    }
+    if (mounted) setState(() => _cargando = false);
+  }
+
+  Future<void> _guardarYProbar() async {
+    if (_urlCtrl.text.trim().isEmpty) return;
+    setState(() { _probando = true; _resultadoPrueba = null; });
+
+    final errorGuardar = await WooCommerceService.guardarConfig(
+      url: _urlCtrl.text, consumerKey: _keyCtrl.text, consumerSecret: _secretCtrl.text);
+    if (errorGuardar != null) {
+      setState(() { _resultadoPrueba = errorGuardar; _resultadoOk = false; _probando = false; });
+      return;
+    }
+
+    final errorConexion = await WooCommerceService.probarConexion(
+      url: _urlCtrl.text, consumerKey: _keyCtrl.text, consumerSecret: _secretCtrl.text);
+    setState(() {
+      _resultadoOk = errorConexion == null;
+      _resultadoPrueba = errorConexion ?? '✅ Conexión exitosa';
+      _probando = false;
+    });
+  }
+
+  Future<void> _sincronizarAhora() async {
+    setState(() => _sincronizando = true);
+    final resultado = await WooCommerceService.sincronizar();
+    setState(() => _sincronizando = false);
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(resultado),
+      backgroundColor: resultado.startsWith('✅') ? AppColors.verde : AppColors.rojo));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cargando) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return Container(padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Trae automáticamente tus productos desde tu tienda WooCommerce.',
+          style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        const SizedBox(height: 4),
+        const Text('WordPress → WooCommerce → Ajustes → Avanzado → API REST → Agregar clave (permiso: Lectura)',
+          style: TextStyle(fontSize: 10, color: AppColors.azul, fontStyle: FontStyle.italic)),
+        const SizedBox(height: 12),
+        TextField(controller: _urlCtrl,
+          decoration: const InputDecoration(labelText: 'URL de tu tienda',
+            hintText: 'https://hetnacnc.com', isDense: true, border: OutlineInputBorder())),
+        const SizedBox(height: 10),
+        TextField(controller: _keyCtrl,
+          decoration: const InputDecoration(labelText: 'Consumer Key',
+            hintText: 'ck_xxxxxxxxxxxx', isDense: true, border: OutlineInputBorder())),
+        const SizedBox(height: 10),
+        TextField(controller: _secretCtrl, obscureText: true,
+          decoration: const InputDecoration(labelText: 'Consumer Secret',
+            hintText: 'cs_xxxxxxxxxxxx', isDense: true, border: OutlineInputBorder())),
+        const SizedBox(height: 12),
+
+        if (_resultadoPrueba != null) ...[
+          Container(padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: _resultadoOk ? AppColors.verdeClaro : AppColors.rojoClaro,
+              borderRadius: BorderRadius.circular(8)),
+            child: Text(_resultadoPrueba!, style: TextStyle(fontSize: 12,
+              color: _resultadoOk ? AppColors.verde : AppColors.rojo))),
+          const SizedBox(height: 10),
+        ],
+
+        Row(children: [
+          Expanded(child: OutlinedButton(
+            onPressed: _probando ? null : _guardarYProbar,
+            child: _probando
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Guardar y probar conexión'))),
+          const SizedBox(width: 8),
+          Expanded(child: ElevatedButton(
+            onPressed: (_resultadoOk && !_sincronizando) ? _sincronizarAhora : null,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
+            child: _sincronizando
+              ? const SizedBox(width: 14, height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Sincronizar ahora', style: TextStyle(color: Colors.white)))),
+        ]),
+      ]));
   }
 }
