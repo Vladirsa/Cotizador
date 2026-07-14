@@ -151,7 +151,7 @@ jobs:
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml && cp l10n.yaml tmp_app/l10n.yaml
       - run: flutter pub get
         working-directory: tmp_app
-      - run: flutter build web --release --base-href /cotizador/
+      - run: flutter build web --release --base-href /cotizador/ --pwa-strategy=none
         working-directory: tmp_app
       - name: Evitar cache vieja del navegador (.htaccess)
         run: |
