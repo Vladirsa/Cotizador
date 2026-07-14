@@ -153,6 +153,13 @@ jobs:
         working-directory: tmp_app
       - run: flutter build web --release --base-href /cotizador/ --pwa-strategy=none
         working-directory: tmp_app
+      - name: Usar el ícono personalizado "Cotizador"
+        run: |
+          cp branding/icons/Icon-192.png tmp_app/build/web/icons/Icon-192.png
+          cp branding/icons/Icon-512.png tmp_app/build/web/icons/Icon-512.png
+          cp branding/icons/Icon-maskable-192.png tmp_app/build/web/icons/Icon-maskable-192.png
+          cp branding/icons/Icon-maskable-512.png tmp_app/build/web/icons/Icon-maskable-512.png
+          cp branding/icons/favicon.png tmp_app/build/web/favicon.png
       - name: Evitar cache vieja del navegador (.htaccess)
         run: |
           cat > tmp_app/build/web/.htaccess << 'HTACCESS'
