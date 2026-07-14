@@ -114,10 +114,10 @@ class WhatsAppService {
   // Lee el mensaje personalizado del taller desde la BD
   // Si no hay plantilla, usa el mensaje por defecto del código
   //
-  // NOTA: plantillas_wa no se tocó en este fix porque no estaba en el
-  // reporte del punto 9 (whatsapp_service.dart no filtraba SOLO en
-  // configuracion_empresa). Si plantillas_wa también necesita filtro
-  // por negocio_id, avísame y lo corregimos aparte.
+  // Filtrado por negocio_id: sin esto, con más de un taller usando
+  // plantillas personalizadas, un taller podía recibir el mensaje
+  // guardado por OTRO taller (o tronar si dos negocios usan el mismo
+  // tipo/categoria y .maybeSingle() encuentra más de una fila).
   static Future<String> getPlantilla({
     required String tipo,
     required String nombreCliente,
@@ -127,12 +127,19 @@ class WhatsAppService {
     String? telefono,
   }) async {
     try {
-      final data = await Supabase.instance.client
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) throw Exception('sin negocio activo');
+
+      final rows = await Supabase.instance.client
         .from('plantillas_wa')
         .select('mensaje, cuerpo, tipo, categoria')
+        .eq('negocio_id', negocioId)
         .eq('activo', true)
         .or('tipo.eq.$tipo,categoria.eq.$tipo')
-        .maybeSingle();
+        .limit(1);
+
+      final list = rows as List;
+      final data = list.isNotEmpty ? list.first as Map<String, dynamic> : null;
 
       if (data != null) {
         // usar mensaje (nuevo) o cuerpo (columna original)
