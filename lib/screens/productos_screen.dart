@@ -357,6 +357,30 @@ class _FormProductoState extends State<_FormProducto> {
     ]));
 
   Future<void> _elegirImagen() async {
+    // Límite de plan Gratis: 5 productos con foto. Solo aplica cuando
+    // este producto TODAVÍA no tiene imagen — reemplazar una foto que
+    // ya tenía este mismo producto no cuenta como "nueva", así que
+    // siempre se permite.
+    final yaTeniaImagen = _imagenUrl != null && _imagenUrl!.isNotEmpty;
+    if (!AuthService.esPremiumActivo && !yaTeniaImagen) {
+      final negId = AuthService.negocioId;
+      if (negId != null) {
+        try {
+          final conFoto = await Supabase.instance.client
+            .from('productos')
+            .select('id')
+            .eq('negocio_id', negId)
+            .not('imagen_url', 'is', null);
+          if ((conFoto as List).length >= 5) {
+            if (mounted) {
+              await AuthService.exigirPremium(context,
+                funcion: 'Fotos de productos (límite de 5 en plan Gratis)');
+            }
+            return;
+          }
+        } catch (_) {}
+      }
+    }
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.image, withData: true);

@@ -5,6 +5,7 @@ import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
 import '../services/pdf_service.dart';
+import '../services/auth_service.dart';
 import 'factura_screen.dart';
 
 class AvancesScreen extends StatefulWidget {
@@ -395,9 +396,16 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             widget.pedido.estado == 'Entrega' ||
             widget.pedido.estado == 'Entregado')
           SizedBox(width: double.infinity, child: ElevatedButton.icon(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => FacturaScreen(pedido: widget.pedido))),
-            icon: const Icon(Icons.receipt_long_outlined, size: 14, color: Colors.white),
+            onPressed: () async {
+              if (!AuthService.esPremiumActivo) {
+                await AuthService.exigirPremium(context, funcion: 'Facturación (CFDI)');
+                return;
+              }
+              Navigator.push(context, MaterialPageRoute(
+                builder: (_) => FacturaScreen(pedido: widget.pedido)));
+            },
+            icon: Icon(AuthService.esPremiumActivo ? Icons.receipt_long_outlined : Icons.lock_outline,
+              size: 14, color: Colors.white),
             label: const Text('Generar factura', style: TextStyle(fontSize: 12, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1a3a5c),
@@ -411,8 +419,14 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
                   backgroundColor: const Color(0xFF25D366), padding: const EdgeInsets.symmetric(vertical: 8)),
                 child: const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)))
             : ElevatedButton.icon(
-                onPressed: _notificarCliente,
-                icon: const Icon(Icons.chat, size: 14, color: Colors.white),
+                onPressed: () async {
+                  if (!AuthService.esPremiumActivo) {
+                    await AuthService.exigirPremium(context, funcion: 'Notificaciones automáticas de WhatsApp');
+                    return;
+                  }
+                  _notificarCliente();
+                },
+                icon: Icon(AuthService.esPremiumActivo ? Icons.chat : Icons.lock_outline, size: 14, color: Colors.white),
                 label: const Text('Notificar WA', style: TextStyle(fontSize: 12, color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF25D366), padding: const EdgeInsets.symmetric(vertical: 8)))),
@@ -516,8 +530,11 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
       final etapaParaNotificar = nueva;
       // Notificar al padre DESPUÉS de capturar referencias
       widget.onActualizar();
-      // Mostrar dialog si tiene WA
-      if (tieneWA && mounted) {
+      // Mostrar dialog automático SOLO si el plan es Premium/Trial —
+      // el aviso automático de "cambiaste de etapa, ¿notificar?" es
+      // justo la parte que se bloquea en plan Gratis; el cliente
+      // puede seguir abriendo WhatsApp manual desde otras pantallas.
+      if (tieneWA && mounted && AuthService.esPremiumActivo) {
         await showDialog(
           context: context,
           barrierDismissible: false,
