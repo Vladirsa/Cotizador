@@ -205,6 +205,14 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppColors.grisBorde, width: 0.5)),
               child: Row(children: [
+                Container(width: 48, height: 48, margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
+                  child: (p['imagen_url'] != null && (p['imagen_url'] as String).isNotEmpty)
+                    ? ClipRRect(borderRadius: BorderRadius.circular(8),
+                        child: Image.network(p['imagen_url'], fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Icon(Icons.inventory_2_outlined,
+                            color: AppColors.textoSecundario, size: 20)))
+                    : const Icon(Icons.inventory_2_outlined, color: AppColors.textoSecundario, size: 20)),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(p['nombre'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   Text('\$${(p['precio_venta'] as num? ?? 0).toStringAsFixed(0)}',

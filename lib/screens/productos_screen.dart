@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../models/models.dart';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
+import '../services/auth_service.dart';
 
 class ProductosScreen extends StatefulWidget {
   const ProductosScreen({super.key});
@@ -232,12 +236,16 @@ class _FormProductoState extends State<_FormProducto> {
   String _unidad = 'Pieza';
   bool _aplicaIva = true;
   bool _guardando = false;
+  String? _imagenUrl;
+  Uint8List? _imagenPreview;
+  bool _subiendoImagen = false;
 
   final _unidades = ['Pieza', 'Metro', 'Lámina', 'Litro', 'Kilogramo', 'Servicio', 'Diseño'];
 
   @override
   void initState() {
     super.initState();
+    _imagenUrl = widget.producto?.imagenUrl;
     _categoriaId = widget.producto?.categoriaId;
     _unidad = widget.producto?.unidadMedida ?? 'Pieza';
     _aplicaIva = widget.producto?.aplicaIva ?? true;
@@ -255,6 +263,28 @@ class _FormProductoState extends State<_FormProducto> {
           : const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w600)))],
       ),
       body: Form(key: _form, child: ListView(padding: const EdgeInsets.all(14), children: [
+        _seccion('Foto del producto'),
+        Center(child: GestureDetector(
+          onTap: _subiendoImagen ? null : _elegirImagen,
+          child: Container(width: 140, height: 140,
+            decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.grisBorde)),
+            child: _subiendoImagen
+              ? const Center(child: CircularProgressIndicator())
+              : _imagenPreview != null
+                ? ClipRRect(borderRadius: BorderRadius.circular(11),
+                    child: Image.memory(_imagenPreview!, fit: BoxFit.cover, width: 140, height: 140))
+                : (_imagenUrl != null && _imagenUrl!.isNotEmpty)
+                  ? ClipRRect(borderRadius: BorderRadius.circular(11),
+                      child: Image.network(_imagenUrl!, fit: BoxFit.cover, width: 140, height: 140,
+                        errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined,
+                          color: AppColors.textoSecundario, size: 32)))
+                  : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.add_a_photo_outlined, color: AppColors.textoSecundario, size: 28),
+                      SizedBox(height: 6),
+                      Text('Agregar foto', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                    ])))),
+        const SizedBox(height: 16),
         _seccion('Información básica'),
         _campo('Nombre del producto *', _nombre, obligatorio: true),
         Row(children: [
@@ -326,6 +356,33 @@ class _FormProductoState extends State<_FormProducto> {
         items: items, onChanged: onChanged),
     ]));
 
+  Future<void> _elegirImagen() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image, withData: true);
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      final bytes = file.bytes;
+      if (bytes == null) return;
+
+      setState(() { _imagenPreview = bytes; _subiendoImagen = true; });
+
+      final negId = AuthService.negocioId ?? 'default';
+      final ext = (file.extension ?? 'jpg').toLowerCase();
+      final path = '$negId/${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+      await Supabase.instance.client.storage.from('productos')
+        .uploadBinary(path, bytes, fileOptions: const FileOptions(upsert: true));
+      final url = Supabase.instance.client.storage.from('productos').getPublicUrl(path);
+
+      setState(() { _imagenUrl = url; _subiendoImagen = false; });
+    } catch (e) {
+      setState(() => _subiendoImagen = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error al subir foto: $e'), backgroundColor: AppColors.rojo));
+    }
+  }
+
   Future<void> _guardar() async {
     if (!_form.currentState!.validate()) return;
     setState(() => _guardando = true);
@@ -344,6 +401,7 @@ class _FormProductoState extends State<_FormProducto> {
         stockDisponible: int.tryParse(_stock.text) ?? 0,
         stockMinimo: int.tryParse(_stockMin.text) ?? 1,
         ubicacionFisica: null,
+        imagenUrl: _imagenUrl,
       );
       if (widget.producto == null) {
         await SupabaseService.crearProducto(producto);
