@@ -962,7 +962,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, childAspectRatio: 1.4,
+                  crossAxisCount: 2, childAspectRatio: 1.85,
                   crossAxisSpacing: 10, mainAxisSpacing: 10),
                 itemCount: _servicios.length + 1,
                 itemBuilder: (_, i) {
@@ -1026,9 +1026,10 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
               child: Column(mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center, children: [
-                Text(s.emoji, style: const TextStyle(fontSize: 32),
-                  textAlign: TextAlign.center),
-                const SizedBox(height: 8),
+                Container(width: 46, height: 46,
+                  decoration: BoxDecoration(color: AppColors.azulClaro, shape: BoxShape.circle),
+                  child: Center(child: Text(s.emoji, style: const TextStyle(fontSize: 24)))),
+                const SizedBox(height: 6),
                 Text(s.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
                   color: AppColors.azul), textAlign: TextAlign.center),
                 if (s.descripcion != null) Padding(
