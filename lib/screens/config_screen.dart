@@ -848,10 +848,16 @@ class _CardWooCommerce extends StatefulWidget {
 }
 
 class _CardWooCommerceState extends State<_CardWooCommerce> {
+  final _urlAutoCtrl = TextEditingController();
   final _urlCtrl = TextEditingController();
   final _keyCtrl = TextEditingController();
   final _secretCtrl = TextEditingController();
   bool _cargando = true;
+  bool _conectado = false;
+  bool _conectandoAuto = false;
+  bool _esperandoAprobacion = false;
+  String? _tokenPendiente;
+  bool _mostrarManual = false;
   bool _probando = false;
   bool _sincronizando = false;
   String? _resultadoPrueba;
@@ -865,14 +871,57 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
 
   Future<void> _cargar() async {
     final config = await WooCommerceService.obtenerConfig();
-    if (config != null) {
+    if (config != null && (config['woocommerce_url'] as String?)?.isNotEmpty == true) {
       _urlCtrl.text = config['woocommerce_url'] ?? '';
       _keyCtrl.text = config['woocommerce_consumer_key'] ?? '';
       _secretCtrl.text = config['woocommerce_consumer_secret'] ?? '';
+      _conectado = true;
+      _resultadoOk = true;
     }
     if (mounted) setState(() => _cargando = false);
   }
 
+  // ── Conexión automática — el usuario solo aprueba, sin copiar nada ──
+  Future<void> _conectarAutomatico() async {
+    if (_urlAutoCtrl.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Escribe la URL de tu tienda'), backgroundColor: AppColors.rojo));
+      return;
+    }
+    setState(() => _conectandoAuto = true);
+    final token = await WooCommerceService.iniciarAutorizacion(_urlAutoCtrl.text);
+    setState(() {
+      _conectandoAuto = false;
+      if (token != null) {
+        _tokenPendiente = token;
+        _esperandoAprobacion = true;
+      }
+    });
+    if (token == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('No se pudo abrir la página de autorización'),
+        backgroundColor: AppColors.rojo));
+    }
+  }
+
+  Future<void> _verificarAprobacion() async {
+    if (_tokenPendiente == null) return;
+    setState(() => _conectandoAuto = true);
+    final aprobado = await WooCommerceService.verificarAutorizacion(_tokenPendiente!);
+    setState(() => _conectandoAuto = false);
+    if (aprobado) {
+      setState(() => _esperandoAprobacion = false);
+      await _cargar();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('✅ ¡Tienda conectada!'), backgroundColor: AppColors.verde));
+    } else {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Todavía no se ha aprobado. Termina el paso en tu navegador primero.'),
+        backgroundColor: AppColors.ambar));
+    }
+  }
+
+  // ── Conexión manual (respaldo, por si la automática no aplica) ──
   Future<void> _guardarYProbar() async {
     if (_urlCtrl.text.trim().isEmpty) return;
     setState(() { _probando = true; _resultadoPrueba = null; });
@@ -888,6 +937,7 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
       url: _urlCtrl.text, consumerKey: _keyCtrl.text, consumerSecret: _secretCtrl.text);
     setState(() {
       _resultadoOk = errorConexion == null;
+      _conectado = _resultadoOk;
       _resultadoPrueba = errorConexion ?? '✅ Conexión exitosa';
       _probando = false;
     });
@@ -907,54 +957,126 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
     if (_cargando) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    // Si ya está conectado (por cualquiera de los 2 métodos), mostrar
+    // solo el estado + botón de sincronizar
+    if (_conectado) {
+      return Container(padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.verde.withOpacity(0.4))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.check_circle, color: AppColors.verde, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: Text('Conectado a: ${_urlCtrl.text}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+            TextButton(
+              onPressed: () => setState(() { _conectado = false; _resultadoOk = false; }),
+              child: const Text('Cambiar', style: TextStyle(fontSize: 11))),
+          ]),
+          const SizedBox(height: 10),
+          SizedBox(width: double.infinity, child: ElevatedButton(
+            onPressed: _sincronizando ? null : _sincronizarAhora,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
+            child: _sincronizando
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Sincronizar productos ahora', style: TextStyle(color: Colors.white)))),
+        ]));
+    }
+
     return Container(padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Trae automáticamente tus productos desde tu tienda WooCommerce.',
           style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-        const SizedBox(height: 4),
-        const Text('WordPress → WooCommerce → Ajustes → Avanzado → API REST → Agregar clave (permiso: Lectura)',
-          style: TextStyle(fontSize: 10, color: AppColors.azul, fontStyle: FontStyle.italic)),
-        const SizedBox(height: 12),
-        TextField(controller: _urlCtrl,
-          decoration: const InputDecoration(labelText: 'URL de tu tienda',
-            hintText: 'https://hetnacnc.com', isDense: true, border: OutlineInputBorder())),
-        const SizedBox(height: 10),
-        TextField(controller: _keyCtrl,
-          decoration: const InputDecoration(labelText: 'Consumer Key',
-            hintText: 'ck_xxxxxxxxxxxx', isDense: true, border: OutlineInputBorder())),
-        const SizedBox(height: 10),
-        TextField(controller: _secretCtrl, obscureText: true,
-          decoration: const InputDecoration(labelText: 'Consumer Secret',
-            hintText: 'cs_xxxxxxxxxxxx', isDense: true, border: OutlineInputBorder())),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
 
-        if (_resultadoPrueba != null) ...[
-          Container(padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: _resultadoOk ? AppColors.verdeClaro : AppColors.rojoClaro,
-              borderRadius: BorderRadius.circular(8)),
-            child: Text(_resultadoPrueba!, style: TextStyle(fontSize: 12,
-              color: _resultadoOk ? AppColors.verde : AppColors.rojo))),
+        if (!_esperandoAprobacion) ...[
+          const Text('Solo escribe tu dirección — te llevaremos a tu propia tienda',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.azul)),
+          const SizedBox(height: 8),
+          TextField(controller: _urlAutoCtrl,
+            decoration: const InputDecoration(labelText: 'URL de tu tienda',
+              hintText: 'https://mitienda.com', isDense: true, border: OutlineInputBorder())),
           const SizedBox(height: 10),
+          SizedBox(width: double.infinity, child: ElevatedButton.icon(
+            onPressed: _conectandoAuto ? null : _conectarAutomatico,
+            icon: _conectandoAuto
+              ? const SizedBox(width: 14, height: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.link, color: Colors.white, size: 18),
+            label: const Text('Conectar mi tienda', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+              padding: const EdgeInsets.symmetric(vertical: 12)))),
+        ] else ...[
+          Container(padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('1. Se abrió tu tienda en el navegador',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              const Text('2. Inicia sesión si te lo pide',
+                style: TextStyle(fontSize: 12)),
+              const Text('3. Toca "Aprobar" cuando te lo muestre WooCommerce',
+                style: TextStyle(fontSize: 12)),
+              const Text('4. Regresa aquí y toca el botón de abajo',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ])),
+          const SizedBox(height: 10),
+          SizedBox(width: double.infinity, child: ElevatedButton(
+            onPressed: _conectandoAuto ? null : _verificarAprobacion,
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde),
+            child: _conectandoAuto
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Ya aprobé, verificar conexión', style: TextStyle(color: Colors.white)))),
+          TextButton(
+            onPressed: () => setState(() => _esperandoAprobacion = false),
+            child: const Text('Cancelar', style: TextStyle(fontSize: 11))),
         ],
 
-        Row(children: [
-          Expanded(child: OutlinedButton(
+        const SizedBox(height: 14),
+        GestureDetector(
+          onTap: () => setState(() => _mostrarManual = !_mostrarManual),
+          child: Text(_mostrarManual ? '▲ Ocultar conexión manual' : '▼ ¿Prefieres ingresar las claves tú mismo?',
+            style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario,
+              decoration: TextDecoration.underline))),
+
+        if (_mostrarManual) ...[
+          const SizedBox(height: 10),
+          const Text('WordPress → WooCommerce → Ajustes → Avanzado → API REST → Agregar clave',
+            style: TextStyle(fontSize: 10, color: AppColors.azul, fontStyle: FontStyle.italic)),
+          const SizedBox(height: 8),
+          TextField(controller: _urlCtrl,
+            decoration: const InputDecoration(labelText: 'URL de tu tienda',
+              hintText: 'https://mitienda.com', isDense: true, border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          TextField(controller: _keyCtrl,
+            decoration: const InputDecoration(labelText: 'Consumer Key',
+              hintText: 'ck_xxxxxxxxxxxx', isDense: true, border: OutlineInputBorder())),
+          const SizedBox(height: 10),
+          TextField(controller: _secretCtrl, obscureText: true,
+            decoration: const InputDecoration(labelText: 'Consumer Secret',
+              hintText: 'cs_xxxxxxxxxxxx', isDense: true, border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+
+          if (_resultadoPrueba != null) ...[
+            Container(padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _resultadoOk ? AppColors.verdeClaro : AppColors.rojoClaro,
+                borderRadius: BorderRadius.circular(8)),
+              child: Text(_resultadoPrueba!, style: TextStyle(fontSize: 12,
+                color: _resultadoOk ? AppColors.verde : AppColors.rojo))),
+            const SizedBox(height: 10),
+          ],
+
+          SizedBox(width: double.infinity, child: OutlinedButton(
             onPressed: _probando ? null : _guardarYProbar,
             child: _probando
               ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
               : const Text('Guardar y probar conexión'))),
-          const SizedBox(width: 8),
-          Expanded(child: ElevatedButton(
-            onPressed: (_resultadoOk && !_sincronizando) ? _sincronizarAhora : null,
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-            child: _sincronizando
-              ? const SizedBox(width: 14, height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Sincronizar ahora', style: TextStyle(color: Colors.white)))),
-        ]),
+        ],
       ]));
   }
 }
