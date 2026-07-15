@@ -245,28 +245,6 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
   String get _etiquetaActual => widget.etiquetas[widget.pedido.estado] ?? widget.pedido.estado;
   String? get _siguienteEtapa => _idx < widget.etapas.length - 1 ? widget.etapas[_idx + 1] : null;
 
-  String _mensajeWA(String etapa) {
-    final nombre = widget.pedido.cliente?.nombre ?? 'Cliente';
-    final folio = widget.pedido.folio;
-    final fmt = NumberFormat('\$#,##0', 'es_MX');
-    final total = widget.pedido.total ?? 0;
-    final anticipo = total / 2;
-    final restante = total - anticipo;
-    final montoTotal = total > 0 ? fmt.format(total) : '';
-    final montoAnticipo = total > 0 ? fmt.format(anticipo) : '';
-    final montoRestante = total > 0 ? fmt.format(restante) : '';
-    switch (etapa) {
-      case 'Pago50': return '¡Hola $nombre! ✅ Recibimos tu anticipo del 50%${montoAnticipo.isNotEmpty ? " ($montoAnticipo)" : ""} del pedido *$folio*. ¡Empezamos a producir! 🔧\n\nRecuerda que el saldo restante${montoRestante.isNotEmpty ? " de *$montoRestante*" : ""} se liquida antes de la entrega. — *HETNA CNC*';
-      case 'Produccion': return '¡Hola $nombre! 🔧 Tu pedido *$folio* está en producción. Te avisamos cuando esté listo. — *HETNA CNC*';
-      case 'Pruebas': return '¡Hola $nombre! 🔍 Tu pedido *$folio* está en control de calidad. ¡Casi listo! — *HETNA CNC*';
-      case 'PagoCompleto': return '¡Hola $nombre! 💳 Tu pedido *$folio* está listo. Para entregarlo necesitamos el pago del saldo restante${montoRestante.isNotEmpty ? " de *$montoRestante*" : ""}. ¿Cuándo puedes realizarlo? — *HETNA CNC*';
-      case 'Entrega': return '¡Hola $nombre! 📦 Tu pedido *$folio* está *LISTO para entrega*. ¿Cuándo coordinamos? — *HETNA CNC*';
-      case 'Entregado': return '¡Hola $nombre! 🎉 Tu pedido *$folio* fue entregado. ¡Gracias por confiar en *HETNA CNC*! Si necesitas algo más, con gusto te atendemos. 😊';
-      case 'Cancelado': return 'Hola $nombre, te confirmamos que tu pedido *$folio* fue cancelado. Si tienes dudas o quieres retomarlo más adelante, contáctanos. — *HETNA CNC*';
-      default: return '¡Hola $nombre! Tu pedido *$folio* está en proceso. — *HETNA CNC*';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0', 'es_MX');
@@ -565,7 +543,12 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
   Future<void> _notificarCliente({String? etapa}) async {
     setState(() => _enviandoWA = true);
     try {
-      final msg = _mensajeWA(etapa ?? widget.pedido.estado);
+      final msg = await WhatsAppService.getPlantillaAvance(
+        etapa: etapa ?? widget.pedido.estado,
+        nombreCliente: widget.pedido.cliente?.nombre ?? 'Cliente',
+        folio: widget.pedido.folio,
+        montoTotal: widget.pedido.total,
+      );
       await WhatsAppService.abrirChat(numero: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
     } finally {
       if (mounted) setState(() => _enviandoWA = false);
