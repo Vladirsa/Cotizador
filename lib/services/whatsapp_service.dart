@@ -2,6 +2,7 @@
 // HETNA CNC — Servicio WhatsApp
 // Usa WhatsApp Business API para enviar desde el número correcto
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,27 +27,40 @@ class WhatsAppService {
   }
 
   // ── ABRIR CHAT (abre WhatsApp del cliente) ───────────
-  // Esto siempre abre la app de WhatsApp en el celular
-  // El usuario debe seleccionar manualmente el número Business
+  // En Android, cuando hay más de una app de WhatsApp instalada
+  // (WhatsApp normal + WhatsApp Business), el enlace genérico
+  // "wa.me" deja que el sistema operativo decida cuál abrir — y
+  // normalmente elige el WhatsApp normal, no el Business, sin
+  // importar qué número tenga cada uno. Por eso forzamos primero
+  // el paquete específico de WhatsApp Business (com.whatsapp.w4b);
+  // solo si eso falla (o en Web, donde no aplica) usamos el enlace
+  // genérico wa.me como respaldo.
   static Future<bool> abrirChat({
     required String numero,
     required String mensaje,
   }) async {
     final n = normalizarNumero(numero);
     if (n.isEmpty) return false;
+
+    if (!kIsWeb) {
+      try {
+        final uriBusiness = Uri.parse(
+          'intent://send?phone=$n&text=${Uri.encodeComponent(mensaje)}'
+          '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end');
+        final abierto = await launchUrl(uriBusiness, mode: LaunchMode.externalApplication);
+        if (abierto) return true;
+      } catch (_) {
+        // WhatsApp Business no instalado, o el intent falló —
+        // seguimos al respaldo de abajo.
+      }
+    }
+
     try {
       final uri = Uri.parse(
         'https://wa.me/$n?text=${Uri.encodeComponent(mensaje)}');
       await launchUrl(uri, mode: LaunchMode.externalApplication);
       return true;
-    } catch (_) {
-      try {
-        final uri2 = Uri.parse(
-          'intent://send/$n#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end');
-        await launchUrl(uri2, mode: LaunchMode.externalApplication);
-        return true;
-      } catch (_) { return false; }
-    }
+    } catch (_) { return false; }
   }
 
   // ── ENVIAR VÍA API (siempre del número Business) ────
@@ -207,6 +221,62 @@ class WhatsAppService {
     } catch (_) { return 'app'; }
   }
 
+  // ── LEER PLANTILLA DE AVANCE DESDE SUPABASE ─────────
+  // Mensajes de "tu pedido cambió de etapa". Ahora se pueden editar
+  // desde Más → Marketing → Plantillas WA, guardando una plantilla con
+  // tipo/categoría "avance_<etapa>" en minúsculas — las etapas reales
+  // son: Pago50, Produccion, Pruebas, PagoCompleto, Entrega, Entregado,
+  // Cancelado (ej. "avance_pago50", "avance_produccion"). Variables
+  // disponibles además de las de siempre: *MONTO* (total), *ANTICIPO*
+  // (50%), *RESTANTE* (lo que falta). Si no existe plantilla
+  // personalizada, cae al mensaje por defecto de mensajeAvance().
+  static Future<String> getPlantillaAvance({
+    required String etapa,
+    required String nombreCliente,
+    required String folio,
+    double? montoTotal,
+    String? empresa,
+  }) async {
+    try {
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) throw Exception('sin negocio activo');
+      final claveEtapa = 'avance_${etapa.toLowerCase()}';
+
+      final rows = await Supabase.instance.client
+        .from('plantillas_wa')
+        .select('mensaje, cuerpo, tipo, categoria')
+        .eq('negocio_id', negocioId)
+        .eq('activo', true)
+        .or('tipo.eq.$claveEtapa,categoria.eq.$claveEtapa')
+        .limit(1);
+
+      final list = rows as List;
+      if (list.isNotEmpty) {
+        final data = list.first as Map<String, dynamic>;
+        final rawMsg = data['mensaje'] as String? ?? data['cuerpo'] as String? ?? '';
+        if (rawMsg.isNotEmpty) {
+          final total = montoTotal ?? 0;
+          final anticipo = total / 2;
+          final restante = total - anticipo;
+          var msg = rawMsg;
+          msg = msg.replaceAll('*NOMBRE*', nombreCliente);
+          msg = msg.replaceAll('*FOLIO*', folio);
+          msg = msg.replaceAll('*MONTO*', total > 0 ? '\$${total.toStringAsFixed(2)}' : '');
+          msg = msg.replaceAll('*ANTICIPO*', total > 0 ? '\$${anticipo.toStringAsFixed(2)}' : '');
+          msg = msg.replaceAll('*RESTANTE*', total > 0 ? '\$${restante.toStringAsFixed(2)}' : '');
+          msg = msg.replaceAll('*EMPRESA*', empresa ?? 'HETNA CNC');
+          msg = msg.replaceAll('*FECHA*', DateTime.now().toString().substring(0, 10));
+          return msg;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback: mensaje por defecto (el que ya existía)
+    return mensajeAvance(
+      nombreCliente: nombreCliente, folio: folio, etapa: etapa,
+      total: montoTotal, empresa: empresa);
+  }
+
   static String mensajeSeguimiento({
     required String nombreCliente,
     required String tipo,
@@ -327,6 +397,9 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
   }
 
   // ── Mensajes de avance de pedido ─────────────────────
+  // Mensajes por defecto de avance de pedido. Etapas reales usadas en
+  // la app: Pago50, Produccion, Pruebas, PagoCompleto, Entrega,
+  // Entregado, Cancelado.
   static String mensajeAvance({
     required String nombreCliente,
     required String folio,
@@ -335,19 +408,28 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     String? empresa,
   }) {
     final biz = empresa ?? 'HETNA CNC';
+    final montoTotal = total ?? 0;
+    final anticipo = montoTotal / 2;
+    final restante = montoTotal - anticipo;
+    final txtAnticipo = montoTotal > 0 ? ' (\$${anticipo.toStringAsFixed(2)})' : '';
+    final txtRestante = montoTotal > 0 ? ' de \$${restante.toStringAsFixed(2)}' : '';
     switch (etapa) {
-      case 'Pago':
-        return '¡Hola *$nombreCliente*! ✅ Confirmamos tu pago del pedido *$folio*. Ya estamos listos para comenzar. 🔧 — *$biz*';
+      case 'Pago50':
+        return '¡Hola $nombreCliente! ✅ Recibimos tu anticipo del 50%$txtAnticipo del pedido *$folio*. ¡Empezamos a producir! 🔧\n\nRecuerda que el saldo restante$txtRestante se liquida antes de la entrega. — *$biz*';
       case 'Produccion':
-        return '¡Hola *$nombreCliente*! 🔧 Tu pedido *$folio* ya está en producción. Te avisamos cuando esté listo. — *$biz*';
+        return '¡Hola $nombreCliente! 🔧 Tu pedido *$folio* está en producción. Te avisamos cuando esté listo. — *$biz*';
       case 'Pruebas':
-        return '¡Hola *$nombreCliente*! 🔍 Tu pedido *$folio* está en control de calidad. ¡Ya casi está listo! — *$biz*';
+        return '¡Hola $nombreCliente! 🔍 Tu pedido *$folio* está en control de calidad. ¡Casi listo! — *$biz*';
+      case 'PagoCompleto':
+        return '¡Hola $nombreCliente! 💳 Tu pedido *$folio* está listo. Para entregarlo necesitamos el pago del saldo restante$txtRestante. ¿Cuándo puedes realizarlo? — *$biz*';
       case 'Entrega':
-        return '¡Hola *$nombreCliente*! 📦 Tu pedido *$folio* está *LISTO*. ¿Cuándo coordinamos la entrega? — *$biz*';
+        return '¡Hola $nombreCliente! 📦 Tu pedido *$folio* está *LISTO para entrega*. ¿Cuándo coordinamos? — *$biz*';
       case 'Entregado':
-        return '¡Hola *$nombreCliente*! 🎉 Tu pedido *$folio* fue entregado exitosamente. ¡Gracias por confiar en *$biz*! Esperamos verte pronto.';
+        return '¡Hola $nombreCliente! 🎉 Tu pedido *$folio* fue entregado. ¡Gracias por confiar en *$biz*! Si necesitas algo más, con gusto te atendemos. 😊';
+      case 'Cancelado':
+        return 'Hola $nombreCliente, te confirmamos que tu pedido *$folio* fue cancelado. Si tienes dudas o quieres retomarlo más adelante, contáctanos. — *$biz*';
       default:
-        return '¡Hola *$nombreCliente*! Tu pedido *$folio* sigue en proceso. — *$biz*';
+        return '¡Hola $nombreCliente! Tu pedido *$folio* está en proceso. — *$biz*';
     }
   }
 
@@ -377,11 +459,10 @@ Incluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo
     required String folio,
     required String etapa,
     DateTime? fechaEstimada,
+    String? empresa,
   }) async {
-    final msg = mensajeAvance(
-      nombreCliente: nombreCliente,
-      folio: folio,
-      etapa: etapa);
+    final msg = await getPlantillaAvance(
+      etapa: etapa, nombreCliente: nombreCliente, folio: folio, empresa: empresa);
     await abrirChat(numero: whatsapp, mensaje: msg);
   }
 
