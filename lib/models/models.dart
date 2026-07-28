@@ -188,7 +188,8 @@ class Producto {
 class CotizacionItem {
   final String? id;
   final String? productoId;
-  final String nombreProducto;
+  String nombreProducto;
+  String? descripcion;
   final String? sku;
   int cantidad;
   double precioUnitario;
@@ -198,6 +199,7 @@ class CotizacionItem {
     this.id,
     this.productoId,
     required this.nombreProducto,
+    this.descripcion,
     this.sku,
     this.cantidad = 1,
     required this.precioUnitario,
@@ -212,6 +214,7 @@ class CotizacionItem {
   factory CotizacionItem.fromProducto(Producto p) => CotizacionItem(
         productoId: p.id,
         nombreProducto: p.nombre,
+        descripcion: p.descripcion,
         sku: p.sku,
         precioUnitario: p.precioVenta,
       );
@@ -220,6 +223,7 @@ class CotizacionItem {
         id: json['id'],
         productoId: json['producto_id'],
         nombreProducto: json['nombre_producto'] ?? '',
+        descripcion: json['descripcion'],
         sku: json['sku'],
         cantidad: json['cantidad'] ?? 1,
         precioUnitario: (json['precio_unitario'] ?? 0).toDouble(),
@@ -231,6 +235,7 @@ class CotizacionItem {
         'cotizacion_id': cotizacionId,
         'producto_id': productoId,
         'nombre_producto': nombreProducto,
+        'descripcion': descripcion,
         'sku': sku,
         'cantidad': cantidad,
         'precio_unitario': precioUnitario,
