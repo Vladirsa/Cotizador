@@ -2466,7 +2466,16 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     IconButton(
       onPressed: () => setState(() { if (_cantidad > 1) { _cantidad--; _resultado = null; } }),
       icon: const Icon(Icons.remove_circle_outline, color: AppColors.azul)),
-    Text('$_cantidad', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+    SizedBox(width: 56, child: TextFormField(
+      key: ValueKey('cant_$_cantidad'),
+      initialValue: '$_cantidad',
+      keyboardType: TextInputType.number,
+      textAlign: TextAlign.center,
+      decoration: const InputDecoration(isDense: true,
+        contentPadding: EdgeInsets.symmetric(vertical: 6)),
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+      onChanged: (v) { final n = int.tryParse(v);
+        if (n != null && n > 0) setState(() { _cantidad = n; _resultado = null; }); })),
     IconButton(
       onPressed: () => setState(() { _cantidad++; _resultado = null; }),
       icon: const Icon(Icons.add_circle_outline, color: AppColors.azul)),
@@ -3061,7 +3070,16 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         IconButton(
           onPressed: () => setState(() { if (_cantidad > 1) { _cantidad--; _resultado = null; } }),
           icon: const Icon(Icons.remove_circle_outline, color: AppColors.azul)),
-        Text('$_cantidad', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        SizedBox(width: 56, child: TextFormField(
+          key: ValueKey('cant2_$_cantidad'),
+          initialValue: '$_cantidad',
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          decoration: const InputDecoration(isDense: true,
+            contentPadding: EdgeInsets.symmetric(vertical: 6)),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          onChanged: (v) { final n = int.tryParse(v);
+            if (n != null && n > 0) setState(() { _cantidad = n; _resultado = null; }); })),
         IconButton(
           onPressed: () => setState(() { _cantidad++; _resultado = null; }),
           icon: const Icon(Icons.add_circle_outline, color: AppColors.azul)),
