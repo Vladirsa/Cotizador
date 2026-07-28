@@ -555,7 +555,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           item: item,
           onEliminar: () => setState(() => _items.remove(item)),
           onCantidadChanged: (v) => setState(() => item.cantidad = v),
-          onPrecioChanged: (v) => setState(() => item.precioUnitario = v))),
+          onPrecioChanged: (v) => setState(() => item.precioUnitario = v),
+          onDetalleChanged: (titulo, desc) => setState(() {
+            item.nombreProducto = titulo;
+            item.descripcion = desc;
+          }))),
         const SizedBox(height: 8),
         Row(children: [
           Expanded(child: ElevatedButton.icon(onPressed: _agregarProducto,
@@ -997,8 +1001,47 @@ class _ItemRow extends StatelessWidget {
   final VoidCallback onEliminar;
   final ValueChanged<int> onCantidadChanged;
   final ValueChanged<double> onPrecioChanged;
+  final void Function(String titulo, String? descripcion) onDetalleChanged;
   const _ItemRow({super.key, required this.item, required this.onEliminar,
-    required this.onCantidadChanged, required this.onPrecioChanged});
+    required this.onCantidadChanged, required this.onPrecioChanged,
+    required this.onDetalleChanged});
+
+  Future<void> _editarDetalle(BuildContext context) async {
+    final tituloCtrl = TextEditingController(text: item.nombreProducto);
+    final descCtrl = TextEditingController(text: item.descripcion ?? '');
+    final ok = await showModalBottomSheet<bool>(context: context,
+      isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Título y descripción', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            const Text('Esto se imprime en el PDF que ve el cliente para esta línea.',
+              style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            const SizedBox(height: 12),
+            TextField(controller: tituloCtrl,
+              decoration: const InputDecoration(labelText: 'Título *', border: OutlineInputBorder())),
+            const SizedBox(height: 8),
+            TextField(controller: descCtrl, maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Descripción (opcional)',
+                hintText: 'Ej. medidas, material, detalles del trabajo...',
+                border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            SizedBox(width: double.infinity, child: ElevatedButton(
+              onPressed: () {
+                if (tituloCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Guardar'))),
+          ]))));
+    if (ok == true) {
+      onDetalleChanged(tituloCtrl.text.trim(),
+        descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0.00', 'es_MX');
@@ -1008,32 +1051,53 @@ class _ItemRow extends StatelessWidget {
       decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Expanded(child: Text(item.nombreProducto,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(child: GestureDetector(
+            onTap: () => _editarDetalle(context),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Flexible(child: Text(item.nombreProducto,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+                const SizedBox(width: 4),
+                const Icon(Icons.edit_outlined, size: 13, color: AppColors.textoSecundario),
+              ]),
+              if (item.descripcion != null && item.descripcion!.isNotEmpty)
+                Padding(padding: const EdgeInsets.only(top: 2),
+                  child: Text(item.descripcion!,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
+                    maxLines: 2, overflow: TextOverflow.ellipsis)),
+            ]))),
           IconButton(icon: const Icon(Icons.close, size: 16, color: AppColors.rojo),
             padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onEliminar),
         ]),
         const SizedBox(height: 6),
         Row(children: [
-          Expanded(child: TextFormField(
+          Expanded(flex: 3, child: TextFormField(
             initialValue: item.precioUnitario.toStringAsFixed(0),
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(prefixText: '\$', labelText: 'Precio unit.', isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6)),
             style: const TextStyle(fontSize: 13),
             onChanged: (v) => onPrecioChanged(double.tryParse(v) ?? item.precioUnitario))),
-          const SizedBox(width: 12),
-          Row(children: [
-            IconButton(icon: const Icon(Icons.remove_circle_outline, size: 22, color: AppColors.rojo),
-              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
-              onPressed: item.cantidad > 1 ? () => onCantidadChanged(item.cantidad - 1) : null),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text('${item.cantidad}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
-            IconButton(icon: const Icon(Icons.add_circle_outline, size: 22, color: AppColors.verde),
-              padding: EdgeInsets.zero, constraints: const BoxConstraints(),
-              onPressed: () => onCantidadChanged(item.cantidad + 1)),
-          ]),
+          const SizedBox(width: 8),
+          IconButton(icon: const Icon(Icons.remove_circle_outline, size: 22, color: AppColors.rojo),
+            padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+            onPressed: item.cantidad > 1 ? () => onCantidadChanged(item.cantidad - 1) : null),
+          SizedBox(width: 52, child: TextFormField(
+            key: ValueKey('cant_${item.productoId}_${item.nombreProducto}_${item.cantidad}'),
+            initialValue: '${item.cantidad}',
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            decoration: const InputDecoration(isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 6)),
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+            onChanged: (v) {
+              final n = int.tryParse(v);
+              if (n != null && n > 0) onCantidadChanged(n);
+            })),
+          IconButton(icon: const Icon(Icons.add_circle_outline, size: 22, color: AppColors.verde),
+            padding: EdgeInsets.zero, constraints: const BoxConstraints(),
+            onPressed: () => onCantidadChanged(item.cantidad + 1)),
           const SizedBox(width: 8),
           Text(fmt.format(item.subtotal),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
