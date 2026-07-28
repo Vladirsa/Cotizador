@@ -160,6 +160,8 @@ class PdfService {
             ...List.generate(cotizacion.items.length, (i) {
               final item = cotizacion.items[i];
               final nombreLimpio = _limpiarTexto(item.nombreProducto);
+              final descLimpia = (item.descripcion != null && item.descripcion!.isNotEmpty)
+                ? _limpiarTexto(item.descripcion!) : null;
               return pw.TableRow(
                 decoration: pw.BoxDecoration(color: i.isEven ? PdfColors.white : grisClaro),
                 children: [
@@ -167,6 +169,10 @@ class PdfService {
                     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                       pw.Text(nombreLimpio,
                         style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+                      if (descLimpia != null)
+                        pw.Padding(padding: const pw.EdgeInsets.only(top: 2),
+                          child: pw.Text(descLimpia,
+                            style: pw.TextStyle(fontSize: 8, color: grisTexto))),
                       if (item.sku != null && item.sku!.isNotEmpty)
                         pw.Text('SKU: ${item.sku}',
                           style: pw.TextStyle(fontSize: 7, color: grisTexto)),
@@ -529,6 +535,8 @@ class PdfService {
             ]),
             ...List.generate(cotizacion.items.length, (i) {
               final item = cotizacion.items[i];
+              final descLimpia = (item.descripcion != null && item.descripcion!.isNotEmpty)
+                ? _limpiarTexto(item.descripcion!) : null;
               return pw.TableRow(
                 decoration: pw.BoxDecoration(color: i.isEven ? PdfColors.white : grisClaro),
                 children: [
@@ -536,6 +544,10 @@ class PdfService {
                     child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                       pw.Text(_limpiarTexto(item.nombreProducto),
                         style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+                      if (descLimpia != null)
+                        pw.Padding(padding: const pw.EdgeInsets.only(top: 2),
+                          child: pw.Text(descLimpia,
+                            style: pw.TextStyle(fontSize: 8, color: grisTexto))),
                       if (item.sku != null && item.sku!.isNotEmpty)
                         pw.Text('SKU: ${item.sku}',
                           style: pw.TextStyle(fontSize: 7, color: grisTexto)),
