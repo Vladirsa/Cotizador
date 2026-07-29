@@ -34,6 +34,28 @@ jobs:
           grep -q "INTERNET" $MANIFEST || sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' $MANIFEST
           cat $MANIFEST
       - name: Add Deep Link intent-filter (recuperar contraseña)
+        - name: Add Package Visibility (WhatsApp / WhatsApp Business)
+        run: |
+          MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
+          python3 - <<'PYEOF'
+          path = "tmp_app/android/app/src/main/AndroidManifest.xml"
+          with open(path) as f:
+              content = f.read()
+          queries = (
+              '    <queries>\n'
+              '        <package android:name="com.whatsapp.w4b" />\n'
+              '        <package android:name="com.whatsapp" />\n'
+              '    </queries>\n'
+          )
+          if '<queries>' not in content:
+              content = content.replace('</manifest>', queries + '</manifest>', 1)
+              with open(path, 'w') as f:
+                  f.write(content)
+              print("Bloque <queries> agregado")
+          else:
+              print("<queries> ya existia, no se duplico")
+          PYEOF
+          cat $MANIFEST
         run: |
           MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
           python3 - <<'PYEOF'
@@ -57,6 +79,28 @@ jobs:
               print("Deep link intent-filter agregado")
           else:
               print("Deep link ya existia, no se duplico")
+          PYEOF
+          cat $MANIFEST
+          - name: Add Package Visibility (WhatsApp / WhatsApp Business)
+        run: |
+          MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
+          python3 - <<'PYEOF'
+          path = "tmp_app/android/app/src/main/AndroidManifest.xml"
+          with open(path) as f:
+              content = f.read()
+          queries = (
+              '    <queries>\n'
+              '        <package android:name="com.whatsapp.w4b" />\n'
+              '        <package android:name="com.whatsapp" />\n'
+              '    </queries>\n'
+          )
+          if '<queries>' not in content:
+              content = content.replace('</manifest>', queries + '</manifest>', 1)
+              with open(path, 'w') as f:
+                  f.write(content)
+              print("Bloque <queries> agregado")
+          else:
+              print("<queries> ya existia, no se duplico")
           PYEOF
           cat $MANIFEST
       - name: Inject HETNA CNC App Icon
