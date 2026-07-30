@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../services/supabase_service.dart';
+import '../services/barcode_service.dart';
 
 class InventarioScreen extends StatefulWidget {
   const InventarioScreen({super.key});
@@ -174,7 +175,29 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
           padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('Agregar material', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
+            Align(alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () async {
+                  final codigo = await BarcodeService.escanear(ctx);
+                  if (codigo == null) return;
+                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                    content: Text('Buscando...'), duration: Duration(seconds: 2)));
+                  final resultado = await BarcodeService.buscarProducto(codigo);
+                  setS(() {
+                    if (resultado?.nombre != null && resultado!.nombre!.isNotEmpty) {
+                      n.text = resultado.nombre!;
+                    }
+                  });
+                  if (resultado == null && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text('No se encontró — llena el nombre a mano'),
+                      backgroundColor: AppColors.ambar));
+                  }
+                },
+                icon: const Icon(Icons.qr_code_scanner, size: 18),
+                label: const Text('Escanear código'))),
+            const SizedBox(height: 2),
             TextField(controller: n, decoration: const InputDecoration(labelText: 'Nombre *', isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8))),
             const SizedBox(height: 6),

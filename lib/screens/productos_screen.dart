@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
+import '../services/barcode_service.dart';
 
 class ProductosScreen extends StatefulWidget {
   const ProductosScreen({super.key});
@@ -286,6 +287,11 @@ class _FormProductoState extends State<_FormProducto> {
                     ])))),
         const SizedBox(height: 16),
         _seccion('Información básica'),
+        Align(alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: _escanearYLlenar,
+            icon: const Icon(Icons.qr_code_scanner, size: 18),
+            label: const Text('Escanear código de barras'))),
         _campo('Nombre del producto *', _nombre, obligatorio: true),
         Row(children: [
           Expanded(child: _campo('SKU / Código', _sku)),
@@ -355,6 +361,38 @@ class _FormProductoState extends State<_FormProducto> {
         hint: const Text('Seleccionar', style: TextStyle(fontSize: 13)),
         items: items, onChanged: onChanged),
     ]));
+
+  Future<void> _escanearYLlenar() async {
+    final codigo = await BarcodeService.escanear(context);
+    if (codigo == null || !mounted) return; // canceló
+
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Buscando producto...'), duration: Duration(seconds: 2)));
+
+    final resultado = await BarcodeService.buscarProducto(codigo);
+    if (!mounted) return;
+
+    if (resultado == null) {
+      // Guardamos al menos el código como SKU — muchos materiales
+      // especializados no van a estar en la base de datos externa,
+      // pero el código escaneado sigue siendo útil para identificarlo.
+      setState(() => _sku.text = codigo);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('No se encontró en la base de datos — se guardó el código como SKU, llena el resto a mano.'),
+        backgroundColor: AppColors.ambar));
+      return;
+    }
+
+    setState(() {
+      _sku.text = codigo;
+      if (resultado.nombre != null && resultado.nombre!.isNotEmpty) _nombre.text = resultado.nombre!;
+      if (resultado.descripcion != null && resultado.descripcion!.isNotEmpty) _descripcion.text = resultado.descripcion!;
+      if (resultado.marca != null && resultado.marca!.isNotEmpty) _marca.text = resultado.marca!;
+      if (resultado.imagenUrl != null && resultado.imagenUrl!.isNotEmpty) _imagenUrl = resultado.imagenUrl;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('✅ Producto encontrado, revisa y ajusta los datos'), backgroundColor: AppColors.verde));
+  }
 
   Future<void> _elegirImagen() async {
     // Límite de plan Gratis: 5 productos con foto. Solo aplica cuando
