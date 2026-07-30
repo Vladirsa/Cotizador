@@ -33,6 +33,12 @@ jobs:
           MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
           grep -q "INTERNET" $MANIFEST || sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <application/' $MANIFEST
           cat $MANIFEST
+      - name: Add Camera Permission (escáner de código de barras)
+        run: |
+          MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
+          grep -q 'android.permission.CAMERA' $MANIFEST || \
+            sed -i 's|<application|<uses-permission android:name="android.permission.CAMERA"/>\n    <uses-feature android:name="android.hardware.camera" android:required="false"/>\n    <application|' $MANIFEST
+          cat $MANIFEST
       - name: Add Package Visibility (WhatsApp / WhatsApp Business)
         run: |
           MANIFEST="tmp_app/android/app/src/main/AndroidManifest.xml"
