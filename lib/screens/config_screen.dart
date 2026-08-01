@@ -42,12 +42,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   ];
 
   // WhatsApp
-  final _waNumeroPrincipalCtrl = TextEditingController(); // número del taller
-  final _waPhoneIdCtrl  = TextEditingController();
-  final _waTokenCtrl    = TextEditingController();
-  final _waVerifyCtrl   = TextEditingController();
-  bool _waActivo        = false;
-  Set<String> _etapasConLiga = {'Produccion', 'Entrega'};
+
 
   // Facturación
   final _apiKeyCtrl   = TextEditingController();
@@ -76,7 +71,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
   @override
   void dispose() {
     _nombreCtrl.dispose(); _telefonoCtrl.dispose(); _correoCtrl.dispose();
-    _waNumeroPrincipalCtrl.dispose();
     _direccionCtrl.dispose(); _rfcCtrl.dispose(); _leyendaCtrl.dispose();
     _apiKeyCtrl.dispose(); _apiUrlCtrl.dispose();
     _rfcEmisorCtrl.dispose(); _serieCtrl.dispose();
@@ -85,7 +79,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   Future<void> _cargar() async {
     final cfg = await SupabaseService.getConfiguracion();
-    final cfgWA = await SupabaseService.getConfigWA();
     setState(() {
       _nombreCtrl.text    = cfg['nombre_comercial'] ?? 'HETNA CNC';
       _telefonoCtrl.text  = cfg['telefono'] ?? '';
@@ -104,14 +97,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _facturaActivo      = cfg['factura_activo'] ?? false;
       _proveedor          = cfg['factura_proveedor'] ?? 'Facturapi';
       _regimenFiscal      = cfg['factura_regimen_fiscal'] ?? '612';
-      // WhatsApp API
-          _waNumeroPrincipalCtrl.text = cfg['whatsapp_numero'] ?? cfg['telefono'] ?? '';
-    _waPhoneIdCtrl.text = cfgWA?['phone_number_id'] ?? '';
-      _waTokenCtrl.text   = cfgWA?['wa_token'] ?? '';
-      _waVerifyCtrl.text  = cfgWA?['verify_token'] ?? 'hetna_cnc_webhook_2026';
-      _waActivo           = cfgWA?['activo'] ?? false;
-      final etapasGuardadas = (cfg['etapas_con_liga_seguimiento'] as List?)?.cast<String>();
-      if (etapasGuardadas != null) _etapasConLiga = etapasGuardadas.toSet();
       _cargando = false;
     });
   }
@@ -167,17 +152,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'factura_activo'        : _facturaActivo,
         'factura_proveedor'     : _proveedor,
         'factura_regimen_fiscal': _regimenFiscal,
-        'etapas_con_liga_seguimiento': _etapasConLiga.toList(),
       });
-      // Guardar config WhatsApp API
-      if (_waPhoneIdCtrl.text.isNotEmpty || _waTokenCtrl.text.isNotEmpty) {
-        await SupabaseService.guardarConfigWA({
-          'phone_number_id': _waPhoneIdCtrl.text.trim(),
-          'wa_token'       : _waTokenCtrl.text.trim(),
-          'verify_token'   : _waVerifyCtrl.text.trim(),
-          'activo'         : _waActivo,
-        });
-      }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('✅ Configuración guardada'),
         backgroundColor: AppColors.verde));
@@ -221,42 +196,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _campo(_direccionCtrl, 'Dirección', Icons.location_on_outlined, lineas: 2),
               _campo(_leyendaCtrl, 'Leyenda en PDF', Icons.notes_outlined, lineas: 2,
                 hint: 'Ej: Garantía 6 meses en productos de madera'),
-
-              const SizedBox(height: 20),
-
-              // ── IDIOMA ──
-              _seccion('🌐 IDIOMA / LANGUAGE'),
-              const SizedBox(height: 8),
-              Container(padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-                child: ValueListenableBuilder<Locale>(
-                  valueListenable: idiomaActual,
-                  builder: (context, locale, _) => Row(children: [
-                    Expanded(child: GestureDetector(
-                      onTap: () => cambiarIdioma('es'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: locale.languageCode == 'es' ? AppColors.azul : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8)),
-                        child: Text('🇲🇽 Español', textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                            color: locale.languageCode == 'es' ? Colors.white : AppColors.textoPrincipal))))),
-                    Expanded(child: GestureDetector(
-                      onTap: () => cambiarIdioma('en'),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: locale.languageCode == 'en' ? AppColors.azul : Colors.transparent,
-                          borderRadius: BorderRadius.circular(8)),
-                        child: Text('🇺🇸 English', textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                            color: locale.languageCode == 'en' ? Colors.white : AppColors.textoPrincipal))))),
-                  ]))),
-              const SizedBox(height: 4),
-              const Text('Cambia el idioma de los menús y botones de la app.',
-                style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
 
               const SizedBox(height: 20),
 
@@ -334,127 +273,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _CategoriasWidget(),
 
               const SizedBox(height: 20),
-
-              // ── WHATSAPP BUSINESS API ──
-              _seccion('📱 WHATSAPP BUSINESS API'),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-                child: Column(children: [
-                  Row(children: [
-                    Container(width: 36, height: 36,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF25D366).withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8)),
-                      child: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('Detección automática de clientes',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      const Text('Cuando alguien te escriba por WA, se agrega automáticamente como cliente potencial',
-                        style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                    ])),
-                    Switch(
-                      value: _waActivo,
-                      activeColor: const Color(0xFF25D366),
-                      onChanged: (v) => setState(() => _waActivo = v)),
-                  ]),
-                  const SizedBox(height: 12),
-                  // NÚMERO DE WHATSAPP DEL TALLER (para enviar todos los mensajes)
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFe7f8ee),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF25D366).withOpacity(0.3))),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Row(children: [
-                        Icon(Icons.chat_outlined, size: 16, color: Color(0xFF25D366)),
-                        SizedBox(width: 6),
-                        Text('Número de WhatsApp del taller',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                            color: Color(0xFF128C7E))),
-                      ]),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Este número se usa para enviar cotizaciones, alertas y mensajes de seguimiento.',
-                        style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: _waNumeroPrincipalCtrl,
-                        keyboardType: TextInputType.phone,
-                        decoration: const InputDecoration(
-                          labelText: 'Número (10 dígitos, sin +52)',
-                          hintText: '2461217072',
-                          prefixText: '+52 ',
-                          prefixIcon: Icon(Icons.phone_outlined, size: 18),
-                          border: OutlineInputBorder(),
-                          isDense: true)),
-                    ])),
-                  const SizedBox(height: 12),
-                  if (_waActivo) ...[
-                    const SizedBox(height: 12),
-                    const Divider(height: 1),
-                    const SizedBox(height: 12),
-                    _campoPassword(_waTokenCtrl, 'Access Token de Meta', Icons.key_outlined,
-                      hint: 'EAAxxxxxxxxxxxxxxxx'),
-                    _campo(_waPhoneIdCtrl, 'Phone Number ID', Icons.phone_outlined,
-                      hint: '1234567890123456'),
-                    _campo(_waVerifyCtrl, 'Verify Token (webhook)', Icons.verified_outlined,
-                      hint: 'hetna_cnc_webhook_2026'),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.azulClaro,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.azul.withOpacity(0.2))),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        const Row(children: [
-                          Icon(Icons.info_outline, size: 14, color: AppColors.azul),
-                          SizedBox(width: 6),
-                          Text('URL del Webhook para Meta',
-                            style: TextStyle(fontSize: 12, color: AppColors.azul, fontWeight: FontWeight.w600)),
-                        ]),
-                        const SizedBox(height: 6),
-                        SelectableText(
-                          'https://ldfmkfbhcbsbecfbzsny.supabase.co/functions/v1/whatsapp-webhook',
-                          style: const TextStyle(fontSize: 10, color: AppColors.azul, fontFamily: 'monospace')),
-                        const SizedBox(height: 4),
-                        const Text('Pega esta URL en Meta for Developers → WhatsApp → Configuración → Webhook',
-                          style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-                      ])),
-                    const SizedBox(height: 16),
-                    const Text('Página de estatus del pedido',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
-                    const SizedBox(height: 4),
-                    const Text('Elige en qué etapas se incluye la liga para que el cliente vea el '
-                      'estatus de su pedido y pueda dejar comentarios.',
-                      style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                    const SizedBox(height: 8),
-                    Wrap(spacing: 8, runSpacing: 8, children: [
-                      {'key': 'Pago50', 'label': 'Anticipo recibido'},
-                      {'key': 'Produccion', 'label': 'En producción'},
-                      {'key': 'Pruebas', 'label': 'Control de calidad'},
-                      {'key': 'PagoCompleto', 'label': 'Listo, falta pago'},
-                      {'key': 'Entrega', 'label': 'Listo para entrega'},
-                      {'key': 'Entregado', 'label': 'Entregado'},
-                    ].map((e) {
-                      final key = e['key']!;
-                      final activo = _etapasConLiga.contains(key);
-                      return FilterChip(
-                        label: Text(e['label']!, style: const TextStyle(fontSize: 11)),
-                        selected: activo,
-                        selectedColor: AppColors.azulClaro,
-                        checkmarkColor: AppColors.azul,
-                        onSelected: (v) => setState(() {
-                          if (v) { _etapasConLiga.add(key); } else { _etapasConLiga.remove(key); }
-                        }));
-                    }).toList()),
-                  ],
-                ])),
 
               const SizedBox(height: 20),
 
