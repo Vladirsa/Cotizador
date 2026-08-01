@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -24,14 +25,21 @@ class WhatsAppService {
   }
 
   // ── Intentar SOLO WhatsApp Business (sin respaldo) ───
+  // Canal nativo (MainActivity.kt) — evita el truco de armar una URL
+  // "intent://...#Intent;...;end" y parsearla con Uri.parse(), que
+  // Dart interpreta mal (no es una URI estándar) y por eso fallaba
+  // en silencio, cayendo siempre al WhatsApp normal.
+  static const _channelWA = MethodChannel('com.hetnacnc.app/whatsapp_share');
+
   static Future<bool> _abrirWhatsAppBusiness(String numero, String mensaje) async {
     final n = normalizarNumero(numero);
     if (n.isEmpty) return false;
+    if (kIsWeb) return false; // el canal nativo solo existe en Android
     try {
-      final uri = Uri.parse(
-        'intent://send?phone=$n&text=${Uri.encodeComponent(mensaje)}'
-        '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end');
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final ok = await _channelWA.invokeMethod('abrirWhatsAppTexto', {
+        'numero': n, 'mensaje': mensaje, 'paquete': 'com.whatsapp.w4b',
+      });
+      return ok == true;
     } catch (_) { return false; }
   }
 
