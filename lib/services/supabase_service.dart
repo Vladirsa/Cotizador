@@ -995,21 +995,32 @@ class SupabaseService {
     } catch (_) { return []; }
   }
 
-  // Configuración de WhatsApp
+  // Configuración de WhatsApp — filtrado por negocio_id, no por
+  // "activo" (antes buscaba/actualizaba por activo=true, así que si
+  // el interruptor estaba apagado, el UPDATE no encontraba ninguna
+  // fila que tocar y "guardaba" sin guardar nada de verdad).
   static Future<Map<String, dynamic>?> getConfigWA() async {
     try {
-      final res = await _db.from('config_whatsapp')
-          .select().eq('activo', true).maybeSingle();
-      return res as Map<String, dynamic>?;
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) return null;
+      final rows = await _db.from('config_whatsapp')
+          .select().eq('negocio_id', negocioId).limit(1);
+      final list = rows as List;
+      return list.isNotEmpty ? list.first as Map<String, dynamic> : null;
     } catch (_) { return null; }
   }
 
   static Future<void> guardarConfigWA(Map<String, dynamic> datos) async {
-    final existing = await _db.from('config_whatsapp').select().limit(1);
-    if ((existing as List).isEmpty) {
-      await _db.from('config_whatsapp').insert(datos);
+    final negocioId = AuthService.negocioId;
+    if (negocioId == null) throw Exception('Sin negocio activo');
+    final existing = await _db.from('config_whatsapp')
+      .select('id').eq('negocio_id', negocioId).limit(1);
+    final list = existing as List;
+    if (list.isEmpty) {
+      await _db.from('config_whatsapp').insert({...datos, 'negocio_id': negocioId});
     } else {
-      await _db.from('config_whatsapp').update(datos).eq('activo', true);
+      await _db.from('config_whatsapp').update(datos)
+        .eq('id', (list.first as Map)['id']);
     }
   }
 
