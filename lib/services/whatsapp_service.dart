@@ -357,33 +357,7 @@ class WhatsAppService {
         nombreCliente: nombreCliente, folio: folio, etapa: etapa,
         total: montoTotal, empresa: empresa);
     }
-
-    // Agregar la liga de seguimiento SOLO si el taller configuró esta
-    // etapa para incluirla (Configuración → WhatsApp Business →
-    // "Etapas que mandan liga de seguimiento").
-    if (pedidoId != null) {
-      final llevaLiga = await _etapaLlevaLiga(etapa);
-      if (llevaLiga) {
-        msgFinal = '$msgFinal\n\n📲 Sigue tu pedido aquí:\nhttps://hetnacnc.com/cotizador/estado/$pedidoId';
-      }
-    }
     return msgFinal;
-  }
-
-  static Future<bool> _etapaLlevaLiga(String etapa) async {
-    try {
-      final negocioId = AuthService.negocioId;
-      if (negocioId == null) return false;
-      final rows = await Supabase.instance.client
-        .from('configuracion_empresa')
-        .select('etapas_con_liga_seguimiento')
-        .eq('negocio_id', negocioId)
-        .limit(1);
-      final list = rows as List;
-      if (list.isEmpty) return false;
-      final etapas = (list.first as Map<String, dynamic>)['etapas_con_liga_seguimiento'] as List?;
-      return etapas != null && etapas.contains(etapa);
-    } catch (_) { return false; }
   }
 
   static String mensajeSeguimiento({
