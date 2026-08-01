@@ -503,35 +503,18 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
       await SupabaseService.actualizarEtapaPedido(widget.pedido.id!, nueva);
       // Guardar referencia al navigator y context ANTES de llamar onActualizar
       final tieneWA = mounted && (widget.pedido.cliente?.whatsappNumero ?? '').isNotEmpty;
-      final etiqueta = widget.etiquetas[nueva] ?? nueva;
-      final clienteNombre = widget.pedido.cliente?.nombre ?? '';
       final etapaParaNotificar = nueva;
       // Notificar al padre DESPUÉS de capturar referencias
       widget.onActualizar();
-      // Mostrar dialog automático SOLO si el plan es Premium/Trial —
-      // el aviso automático de "cambiaste de etapa, ¿notificar?" es
-      // justo la parte que se bloquea en plan Gratis; el cliente
-      // puede seguir abriendo WhatsApp manual desde otras pantallas.
+      // Notificación 100% AUTOMÁTICA vía WhatsApp Business API — solo
+      // si el plan es Premium/Trial (esta parte es justo lo que se
+      // bloquea en plan Gratis). Ya no se pregunta "¿notificar?": se
+      // manda solo, en silencio, sin abrir la app de WhatsApp. Si el
+      // taller no configuró su token de la API (Configuración →
+      // WhatsApp Business), enviarViaApi() cae automáticamente al
+      // método manual (abre WhatsApp) como respaldo.
       if (tieneWA && mounted && AuthService.esPremiumActivo) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogCtx) => AlertDialog(
-            title: Text('→ $etiqueta'),
-            content: Text('¿Notificar a $clienteNombre por WhatsApp?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogCtx).pop(),
-                child: const Text('No')),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  Navigator.of(dialogCtx).pop();
-                  await _notificarCliente(etapa: etapaParaNotificar);
-                },
-                icon: const Icon(Icons.chat, size: 14, color: Colors.white),
-                label: const Text('Sí, notificar', style: TextStyle(color: Colors.white)),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
-            ]));
+        await _notificarCliente(etapa: etapaParaNotificar);
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -550,7 +533,25 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         montoTotal: widget.pedido.total,
         pedidoId: widget.pedido.id,
       );
-      await WhatsAppService.abrirChat(numero: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
+      final resultado = await WhatsAppService.enviarViaApiDetallado(
+        numeroDestino: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
+      if (mounted) {
+        final exito = resultado['exito'] as bool;
+        final viaApi = resultado['viaApi'] as bool;
+        final detalle = resultado['detalle'] as String?;
+        String texto;
+        if (exito && viaApi) {
+          texto = '✅ Cliente notificado por WhatsApp automáticamente';
+        } else if (exito && !viaApi) {
+          texto = '📱 Se abrió WhatsApp manual (${detalle ?? "sin detalle"})';
+        } else {
+          texto = '❌ No se pudo enviar: ${detalle ?? "error desconocido"}';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(texto, style: const TextStyle(fontSize: 12)),
+          backgroundColor: exito ? (viaApi ? AppColors.verde : AppColors.ambar) : AppColors.rojo,
+          duration: const Duration(seconds: 6)));
+      }
     } finally {
       if (mounted) setState(() => _enviandoWA = false);
     }
