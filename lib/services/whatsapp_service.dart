@@ -236,7 +236,9 @@ class WhatsAppService {
     required String folio,
     double? montoTotal,
     String? empresa,
+    String? pedidoId,
   }) async {
+    String msgFinal;
     try {
       final negocioId = AuthService.negocioId;
       if (negocioId == null) throw Exception('sin negocio activo');
@@ -266,15 +268,49 @@ class WhatsAppService {
           msg = msg.replaceAll('*RESTANTE*', total > 0 ? '\$${restante.toStringAsFixed(2)}' : '');
           msg = msg.replaceAll('*EMPRESA*', empresa ?? 'HETNA CNC');
           msg = msg.replaceAll('*FECHA*', DateTime.now().toString().substring(0, 10));
-          return msg;
+          msgFinal = msg;
+        } else {
+          msgFinal = mensajeAvance(
+            nombreCliente: nombreCliente, folio: folio, etapa: etapa,
+            total: montoTotal, empresa: empresa);
         }
+      } else {
+        msgFinal = mensajeAvance(
+          nombreCliente: nombreCliente, folio: folio, etapa: etapa,
+          total: montoTotal, empresa: empresa);
       }
-    } catch (_) {}
+    } catch (_) {
+      msgFinal = mensajeAvance(
+        nombreCliente: nombreCliente, folio: folio, etapa: etapa,
+        total: montoTotal, empresa: empresa);
+    }
 
-    // Fallback: mensaje por defecto (el que ya existía)
-    return mensajeAvance(
-      nombreCliente: nombreCliente, folio: folio, etapa: etapa,
-      total: montoTotal, empresa: empresa);
+    // Agregar la liga de seguimiento SOLO si el taller configuró esta
+    // etapa para incluirla (Configuración → WhatsApp Business →
+    // "Etapas que mandan liga de seguimiento").
+    if (pedidoId != null) {
+      final llevaLiga = await _etapaLlevaLiga(etapa);
+      if (llevaLiga) {
+        msgFinal = '$msgFinal\n\n📲 Sigue tu pedido aquí:\nhttps://hetnacnc.com/cotizador/estado/$pedidoId';
+      }
+    }
+    return msgFinal;
+  }
+
+  static Future<bool> _etapaLlevaLiga(String etapa) async {
+    try {
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) return false;
+      final rows = await Supabase.instance.client
+        .from('configuracion_empresa')
+        .select('etapas_con_liga_seguimiento')
+        .eq('negocio_id', negocioId)
+        .limit(1);
+      final list = rows as List;
+      if (list.isEmpty) return false;
+      final etapas = (list.first as Map<String, dynamic>)['etapas_con_liga_seguimiento'] as List?;
+      return etapas != null && etapas.contains(etapa);
+    } catch (_) { return false; }
   }
 
   static String mensajeSeguimiento({
@@ -460,9 +496,11 @@ Incluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo
     required String etapa,
     DateTime? fechaEstimada,
     String? empresa,
+    String? pedidoId,
   }) async {
     final msg = await getPlantillaAvance(
-      etapa: etapa, nombreCliente: nombreCliente, folio: folio, empresa: empresa);
+      etapa: etapa, nombreCliente: nombreCliente, folio: folio,
+      empresa: empresa, pedidoId: pedidoId);
     await abrirChat(numero: whatsapp, mensaje: msg);
   }
 

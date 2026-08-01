@@ -384,6 +384,74 @@ class SupabaseService {
   }
 
   // ═══════════════════════════════════════════
+  // ESTADO PÚBLICO DEL PEDIDO (el cliente lo ve sin cuenta)
+  // ═══════════════════════════════════════════
+
+  // Trae folio/estado/línea de tiempo/fotos de UN pedido — usa la
+  // función SECURITY DEFINER de Supabase, así que funciona sin sesión
+  // (el cliente entra desde una liga, no con cuenta).
+  static Future<Map<String, dynamic>?> getEstadoPedidoPublico(String pedidoId) async {
+    try {
+      final res = await _db.rpc('pedido_estado_publico', params: {'p_pedido_id': pedidoId});
+      if (res == null) return null;
+      final data = res as Map<String, dynamic>;
+      if (data['error'] != null) return null;
+      return data;
+    } catch (_) { return null; }
+  }
+
+  // El cliente deja un comentario/pregunta desde la página pública
+  static Future<bool> agregarPreguntaPedido(
+      String pedidoId, String pregunta, {String? nombre}) async {
+    try {
+      await _db.rpc('pedido_agregar_pregunta', params: {
+        'p_pedido_id': pedidoId, 'p_pregunta': pregunta, 'p_nombre': nombre,
+      });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // ── Lado ADMIN (dentro de la app) ──────────────────
+
+  // Sube una foto de avance a Storage y la registra en pedido_fotos
+  static Future<String?> subirFotoAvancePedido(
+      String pedidoId, String negocioId, Uint8List bytes, String etapa) async {
+    try {
+      final nombreArchivo = 'pedido_fotos/$negocioId/$pedidoId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await _db.storage.from('pedido-fotos').uploadBinary(nombreArchivo, bytes,
+        fileOptions: const FileOptions(contentType: 'image/jpeg'));
+      final url = _db.storage.from('pedido-fotos').getPublicUrl(nombreArchivo);
+      await _db.from('pedido_fotos').insert({
+        'pedido_id': pedidoId, 'negocio_id': negocioId, 'url': url, 'etapa': etapa,
+      });
+      return url;
+    } catch (_) { return null; }
+  }
+
+  static Future<List<Map<String, dynamic>>> getFotosPedido(String pedidoId) async {
+    try {
+      final res = await _db.from('pedido_fotos').select()
+        .eq('pedido_id', pedidoId).order('created_at');
+      return (res as List).cast<Map<String, dynamic>>();
+    } catch (_) { return []; }
+  }
+
+  // Preguntas pendientes de responder — para mostrar un aviso al admin
+  static Future<List<Map<String, dynamic>>> getPreguntasPendientes(String negocioId) async {
+    try {
+      final res = await _db.from('preguntas_pedido').select('*, pedidos(folio)')
+        .eq('negocio_id', negocioId).eq('respondida', false).order('created_at', ascending: false);
+      return (res as List).cast<Map<String, dynamic>>();
+    } catch (_) { return []; }
+  }
+
+  static Future<void> marcarPreguntaRespondida(String preguntaId) async {
+    try {
+      await _db.from('preguntas_pedido').update({'respondida': true}).eq('id', preguntaId);
+    } catch (_) {}
+  }
+
+  // ═══════════════════════════════════════════
   // ALERTAS
   // ═══════════════════════════════════════════
   static Future<List<Alerta>> getAlertasPendientes() async {
