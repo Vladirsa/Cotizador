@@ -10,11 +10,6 @@ import 'auth_service.dart';
 
 class WhatsAppService {
 
-  // ── Número Business HETNA CNC ───────────────────────
-  // Solo este número está vinculado con Meta Business API
-  static const String _phoneNumberId = '110027521820458';
-  static const String _businessNumero = '522461217072';
-
   // ── Normalizar número del CLIENTE ───────────────────
   static String normalizarNumero(String numero) {
     var n = numero.replaceAll(RegExp(r'[^0-9]'), '');
@@ -74,33 +69,40 @@ class WhatsAppService {
       final n = normalizarNumero(numeroDestino);
       if (n.isEmpty) return false;
 
-      // Obtener token de Supabase — filtrado por el negocio del usuario
-      // actual. Sin este filtro, con más de un taller configurado, la
-      // consulta puede traer el token de OTRO negocio (o tronar por
-      // duplicados) en vez del propio.
+      // Obtener credenciales de Supabase — filtrado por el negocio del
+      // usuario actual, de la tabla REAL donde Configuración las
+      // guarda (config_whatsapp), no de configuracion_empresa. Antes
+      // esto leía de un lugar que Configuración nunca escribía, por
+      // eso guardar el token ahí nunca hacía nada.
       final negocioId = AuthService.negocioId;
       if (negocioId == null) {
         return abrirChat(numero: numeroDestino, mensaje: mensaje);
       }
 
       final rows = await Supabase.instance.client
-        .from('configuracion_empresa')
-        .select('whatsapp_token')
+        .from('config_whatsapp')
+        .select('phone_number_id, wa_token, activo')
         .eq('negocio_id', negocioId)
         .limit(1);
 
       final list = rows as List;
-      final token = list.isNotEmpty
-        ? list.first['whatsapp_token'] as String?
-        : null;
+      if (list.isEmpty) {
+        return abrirChat(numero: numeroDestino, mensaje: mensaje);
+      }
 
-      if (token == null || token.isEmpty) {
-        // Si no hay token, abrir app normalmente
+      final config = list.first as Map<String, dynamic>;
+      final activo = config['activo'] as bool? ?? false;
+      final token = config['wa_token'] as String?;
+      final phoneNumberId = config['phone_number_id'] as String?;
+
+      if (!activo || token == null || token.isEmpty ||
+          phoneNumberId == null || phoneNumberId.isEmpty) {
+        // Sin configurar (o desactivado) — abrir app normalmente
         return abrirChat(numero: numeroDestino, mensaje: mensaje);
       }
 
       final res = await http.post(
-        Uri.parse('https://graph.facebook.com/v17.0/$_phoneNumberId/messages'),
+        Uri.parse('https://graph.facebook.com/v17.0/$phoneNumberId/messages'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
