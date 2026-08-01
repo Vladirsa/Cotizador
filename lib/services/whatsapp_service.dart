@@ -3,10 +3,12 @@
 // Usa WhatsApp Business API para enviar desde el número correcto
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
+import '../main.dart';
 
 class WhatsAppService {
 
@@ -21,41 +23,95 @@ class WhatsAppService {
     return n;
   }
 
-  // ── ABRIR CHAT (abre WhatsApp del cliente) ───────────
-  // En Android, cuando hay más de una app de WhatsApp instalada
-  // (WhatsApp normal + WhatsApp Business), el enlace genérico
-  // "wa.me" deja que el sistema operativo decida cuál abrir — y
-  // normalmente elige el WhatsApp normal, no el Business, sin
-  // importar qué número tenga cada uno. Por eso forzamos primero
-  // el paquete específico de WhatsApp Business (com.whatsapp.w4b);
-  // solo si eso falla (o en Web, donde no aplica) usamos el enlace
-  // genérico wa.me como respaldo.
+  // ── Intentar SOLO WhatsApp Business (sin respaldo) ───
+  static Future<bool> _abrirWhatsAppBusiness(String numero, String mensaje) async {
+    final n = normalizarNumero(numero);
+    if (n.isEmpty) return false;
+    try {
+      final uri = Uri.parse(
+        'intent://send?phone=$n&text=${Uri.encodeComponent(mensaje)}'
+        '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end');
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) { return false; }
+  }
+
+  // ── Enlace genérico (deja que el sistema decida cuál app) ──
+  static Future<bool> _abrirWhatsAppGenerico(String numero, String mensaje) async {
+    final n = normalizarNumero(numero);
+    if (n.isEmpty) return false;
+    try {
+      final uri = Uri.parse(
+        'https://wa.me/$n?text=${Uri.encodeComponent(mensaje)}');
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) { return false; }
+  }
+
+  // ── ABRIR CHAT (sin preguntar) ───────────────────────
+  // Se usa internamente como respaldo automático (ej. cuando falla el
+  // envío por API). Intenta WhatsApp Business primero, y si falla,
+  // cae al enlace genérico.
   static Future<bool> abrirChat({
     required String numero,
     required String mensaje,
   }) async {
-    final n = normalizarNumero(numero);
-    if (n.isEmpty) return false;
-
     if (!kIsWeb) {
-      try {
-        final uriBusiness = Uri.parse(
-          'intent://send?phone=$n&text=${Uri.encodeComponent(mensaje)}'
-          '#Intent;scheme=whatsapp;package=com.whatsapp.w4b;end');
-        final abierto = await launchUrl(uriBusiness, mode: LaunchMode.externalApplication);
-        if (abierto) return true;
-      } catch (_) {
-        // WhatsApp Business no instalado, o el intent falló —
-        // seguimos al respaldo de abajo.
-      }
+      final ok = await _abrirWhatsAppBusiness(numero, mensaje);
+      if (ok) return true;
     }
+    return _abrirWhatsAppGenerico(numero, mensaje);
+  }
 
-    try {
-      final uri = Uri.parse(
-        'https://wa.me/$n?text=${Uri.encodeComponent(mensaje)}');
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      return true;
-    } catch (_) { return false; }
+  // ── ABRIR CHAT CON SELECTOR (deja elegir al usuario) ─
+  // El número siempre es el del CLIENTE (a quién se le escribe) — la
+  // elección de "WhatsApp Business" / "Otra app" solo decide CON QUÉ
+  // app de tu celular se abre esa conversación, nunca cambia a quién
+  // se le manda el mensaje.
+  static Future<void> abrirChatConSelector(BuildContext context, {
+    required String numero,
+    required String mensaje,
+  }) async {
+    if (kIsWeb) {
+      // En web no hay apps que elegir — usar el enlace normal directo
+      await _abrirWhatsAppGenerico(numero, mensaje);
+      return;
+    }
+    await showModalBottomSheet(context: context, backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Center(child: Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          const Text('¿Con cuál WhatsApp quieres escribirle?',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await _abrirWhatsAppBusiness(numero, mensaje);
+              if (!ok && ctx.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('No se encontró WhatsApp Business — usa "Otra app"'),
+                  backgroundColor: AppColors.ambar));
+              }
+            },
+            icon: const Icon(Icons.chat, color: Colors.white),
+            label: const Text('WhatsApp Business', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
+              padding: const EdgeInsets.symmetric(vertical: 12)))),
+          const SizedBox(height: 10),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await _abrirWhatsAppGenerico(numero, mensaje);
+            },
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('Otra app'),
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)))),
+          const SizedBox(height: 8),
+        ])));
   }
 
   // ── ENVIAR VÍA API (siempre del número Business) ────
