@@ -61,6 +61,77 @@ class WhatsAppService {
   // ── ENVIAR VÍA API (siempre del número Business) ────
   // Usa WhatsApp Business API de Meta
   // Token se guarda en Supabase en configuracion_empresa, POR TALLER
+  // Regresa un mapa: {'exito': bool, 'viaApi': bool, 'detalle': String?}
+  // 'detalle' trae el motivo exacto cuando algo falla, para poder
+  // mostrarlo en pantalla y diagnosticar sin necesitar logs del celular.
+  static Future<Map<String, dynamic>> enviarViaApiDetallado({
+    required String numeroDestino,
+    required String mensaje,
+  }) async {
+    try {
+      final n = normalizarNumero(numeroDestino);
+      if (n.isEmpty) return {'exito': false, 'viaApi': false, 'detalle': 'Número de destino vacío o inválido'};
+
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) {
+        final ok = await abrirChat(numero: numeroDestino, mensaje: mensaje);
+        return {'exito': ok, 'viaApi': false, 'detalle': 'Sin negocio activo en sesión'};
+      }
+
+      final rows = await Supabase.instance.client
+        .from('config_whatsapp')
+        .select('phone_number_id, wa_token, activo')
+        .eq('negocio_id', negocioId)
+        .limit(1);
+
+      final list = rows as List;
+      if (list.isEmpty) {
+        final ok = await abrirChat(numero: numeroDestino, mensaje: mensaje);
+        return {'exito': ok, 'viaApi': false, 'detalle': 'No hay fila de configuración en config_whatsapp para este negocio'};
+      }
+
+      final config = list.first as Map<String, dynamic>;
+      final activo = config['activo'] as bool? ?? false;
+      final token = config['wa_token'] as String?;
+      final phoneNumberId = config['phone_number_id'] as String?;
+
+      if (!activo) {
+        final ok = await abrirChat(numero: numeroDestino, mensaje: mensaje);
+        return {'exito': ok, 'viaApi': false, 'detalle': 'El interruptor "Activo" está apagado en la base de datos'};
+      }
+      if (token == null || token.isEmpty) {
+        final ok = await abrirChat(numero: numeroDestino, mensaje: mensaje);
+        return {'exito': ok, 'viaApi': false, 'detalle': 'Falta el token'};
+      }
+      if (phoneNumberId == null || phoneNumberId.isEmpty) {
+        final ok = await abrirChat(numero: numeroDestino, mensaje: mensaje);
+        return {'exito': ok, 'viaApi': false, 'detalle': 'Falta el Phone Number ID'};
+      }
+
+      final res = await http.post(
+        Uri.parse('https://graph.facebook.com/v17.0/$phoneNumberId/messages'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'messaging_product': 'whatsapp',
+          'to': n,
+          'type': 'text',
+          'text': {'body': mensaje},
+        }));
+
+      if (res.statusCode == 200) {
+        return {'exito': true, 'viaApi': true, 'detalle': null};
+      }
+      // Meta regresa el motivo exacto en el cuerpo — lo mostramos tal cual
+      return {'exito': false, 'viaApi': true, 'detalle': 'Meta respondió ${res.statusCode}: ${res.body}'};
+    } catch (e) {
+      final ok = await abrirChat(numero: numeroDestino, mensaje: mensaje);
+      return {'exito': ok, 'viaApi': false, 'detalle': 'Excepción: $e'};
+    }
+  }
+
   static Future<bool> enviarViaApi({
     required String numeroDestino,
     required String mensaje,
