@@ -465,7 +465,8 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         cotizacion: cot,
         empresa: cfg,
         folioPedido: pedido.folio);
-      await PdfService.compartirPdf(bytes, 'nota_compra_${pedido.folio ?? "nota"}.pdf');
+      if (mounted) await PdfService.mostrarOpcionesEnvio(
+        context, bytes, 'nota_compra_${pedido.folio ?? "nota"}.pdf');
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));

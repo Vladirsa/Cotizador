@@ -1596,7 +1596,7 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
       final cfg = await SupabaseService.getConfiguracion();
       final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg);
       final folio = cot.folio ?? 'cotizacion';
-      await PdfService.compartirPdf(bytes, '$folio.pdf');
+      if (mounted) await PdfService.mostrarOpcionesEnvio(context, bytes, '$folio.pdf');
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al generar PDF: $e'), backgroundColor: AppColors.rojo));
