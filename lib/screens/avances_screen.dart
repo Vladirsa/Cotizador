@@ -501,21 +501,9 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     setState(() => _cambiando = true);
     try {
       await SupabaseService.actualizarEtapaPedido(widget.pedido.id!, nueva);
-      // Guardar referencia al navigator y context ANTES de llamar onActualizar
-      final tieneWA = mounted && (widget.pedido.cliente?.whatsappNumero ?? '').isNotEmpty;
-      final etapaParaNotificar = nueva;
-      // Notificar al padre DESPUÉS de capturar referencias
       widget.onActualizar();
-      // Notificación 100% AUTOMÁTICA vía WhatsApp Business API — solo
-      // si el plan es Premium/Trial (esta parte es justo lo que se
-      // bloquea en plan Gratis). Ya no se pregunta "¿notificar?": se
-      // manda solo, en silencio, sin abrir la app de WhatsApp. Si el
-      // taller no configuró su token de la API (Configuración →
-      // WhatsApp Business), enviarViaApi() cae automáticamente al
-      // método manual (abre WhatsApp) como respaldo.
-      if (tieneWA && mounted && AuthService.esPremiumActivo) {
-        await _notificarCliente(etapa: etapaParaNotificar);
-      }
+      // Sin notificación automática por ahora — usa el botón manual
+      // "Notificar WA" cuando quieras avisarle al cliente.
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     } finally {
@@ -533,25 +521,11 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         montoTotal: widget.pedido.total,
         pedidoId: widget.pedido.id,
       );
-      final resultado = await WhatsAppService.enviarViaApiDetallado(
-        numeroDestino: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
-      if (mounted) {
-        final exito = resultado['exito'] as bool;
-        final viaApi = resultado['viaApi'] as bool;
-        final detalle = resultado['detalle'] as String?;
-        String texto;
-        if (exito && viaApi) {
-          texto = '✅ Cliente notificado por WhatsApp automáticamente';
-        } else if (exito && !viaApi) {
-          texto = '📱 Se abrió WhatsApp manual (${detalle ?? "sin detalle"})';
-        } else {
-          texto = '❌ No se pudo enviar: ${detalle ?? "error desconocido"}';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(texto, style: const TextStyle(fontSize: 12)),
-          backgroundColor: exito ? (viaApi ? AppColors.verde : AppColors.ambar) : AppColors.rojo,
-          duration: const Duration(seconds: 6)));
-      }
+      // Simple y confiable: abre WhatsApp con el mensaje listo. Sin
+      // API, sin depender de la configuración de Meta — tú apruebas
+      // y mandas cada mensaje manualmente.
+      await WhatsAppService.abrirChat(
+        numero: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
     } finally {
       if (mounted) setState(() => _enviandoWA = false);
     }
