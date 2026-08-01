@@ -522,10 +522,8 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         montoTotal: widget.pedido.total,
         pedidoId: widget.pedido.id,
       );
-      // Simple y confiable: abre WhatsApp con el mensaje listo. Sin
-      // API, sin depender de la configuración de Meta — tú apruebas
-      // y mandas cada mensaje manualmente.
-      await WhatsAppService.abrirChat(
+      // Deja elegir con cuál WhatsApp mandarlo (Business u otra app).
+      if (mounted) await WhatsAppService.abrirChatConSelector(context,
         numero: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
     } finally {
       if (mounted) setState(() => _enviandoWA = false);

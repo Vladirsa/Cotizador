@@ -918,7 +918,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final itemsTexto = _items.map((i) => '• ${i.nombreProducto} x${i.cantidad} = ${fmt.format(i.subtotal)}').join('\n');
     final msg = '¡Hola ${_cliente!.nombre}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n$itemsTexto\n\nSubtotal: ${fmt.format(_baseIva)}${_aplicaIva ? "\nIVA ${_ivaPct.toInt()}%: ${fmt.format(_montoIva)}" : ""}\n*TOTAL: ${fmt.format(_total)}*\n\nTiempo de entrega: $_tiempoEntrega\nMétodo de pago: $_metodoPago\n\n¿Te parece bien? 😊 — *HETNA CNC*';
-    await WhatsAppService.abrirChat(numero: _cliente!.whatsappNumero, mensaje: msg);
+    if (mounted) await WhatsAppService.abrirChatConSelector(context,
+      numero: _cliente!.whatsappNumero, mensaje: msg);
   }
 
   Future<void> _guardar() async {
