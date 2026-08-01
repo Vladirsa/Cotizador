@@ -163,6 +163,21 @@ jobs:
                           } catch (e: Exception) {
                               result.error("ERROR", e.message, null)
                           }
+                      } else if (call.method == "abrirWhatsAppTexto") {
+                          val numero = call.argument<String>("numero")
+                          val mensaje = call.argument<String>("mensaje") ?: ""
+                          val paquete = call.argument<String>("paquete") ?: "com.whatsapp.w4b"
+                          try {
+                              val intent = Intent(Intent.ACTION_VIEW).apply {
+                                  data = Uri.parse("https://api.whatsapp.com/send?phone=" + numero + "&text=" + Uri.encode(mensaje))
+                                  setPackage(paquete)
+                                  addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                              }
+                              startActivity(intent)
+                              result.success(true)
+                          } catch (e: Exception) {
+                              result.error("ERROR", e.message, null)
+                          }
                       } else {
                           result.notImplemented()
                       }
