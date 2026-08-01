@@ -19,6 +19,7 @@ import 'screens/home_screen.dart';
 import 'screens/nueva_password_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/pedido_publico_screen.dart';
+import 'screens/pedido_estado_screen.dart';
 import 'services/auth_service.dart';
 import 'services/billing_service.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -109,6 +110,10 @@ class HetnaCncApp extends StatelessWidget {
         if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'pedido') {
           final slug = uri.pathSegments[1];
           return MaterialPageRoute(builder: (_) => PedidoPublicoScreen(slug: slug));
+        }
+        if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'estado') {
+          final pedidoId = uri.pathSegments[1];
+          return MaterialPageRoute(builder: (_) => PedidoEstadoScreen(pedidoId: pedidoId));
         }
         return null;
       },
