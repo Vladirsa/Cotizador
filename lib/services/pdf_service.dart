@@ -1,11 +1,16 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
+import '../main.dart';
 
 class PdfService {
   static final _fmt = NumberFormat('#,##0.00', 'es_MX');
@@ -52,6 +57,71 @@ class PdfService {
 
   static Future<void> compartirPdf(Uint8List bytes, String nombre) async {
     await Printing.sharePdf(bytes: bytes, filename: nombre);
+  }
+
+  static const _channelWA = MethodChannel('com.hetnacnc.app/whatsapp_share');
+
+  // Envía el PDF DIRECTO a WhatsApp Business (sin pasar por el menú
+  // genérico de Android) — usa un canal nativo (MainActivity.kt) que
+  // arma el Intent con el paquete forzado. Si WhatsApp Business no
+  // está instalado, regresa false y se puede caer al menú normal.
+  static Future<bool> compartirPdfWhatsAppBusiness(Uint8List bytes, String nombre) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$nombre');
+      await file.writeAsBytes(bytes);
+      final ok = await _channelWA.invokeMethod('compartirWhatsAppBusiness', {
+        'filePath': file.path,
+        'paquete': 'com.whatsapp.w4b',
+      });
+      return ok == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Muestra un selector simple: "WhatsApp Business" (directo, forzado)
+  // u "Otra app" (el menú normal de Android, para cualquier otra cosa
+  // — correo, Drive, la otra app de WhatsApp, etc.)
+  static Future<void> mostrarOpcionesEnvio(
+      BuildContext context, Uint8List bytes, String nombre) async {
+    await showModalBottomSheet(context: context, backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Center(child: Container(width: 36, height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          const Text('¿Cómo quieres enviarlo?',
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final ok = await compartirPdfWhatsAppBusiness(bytes, nombre);
+              if (!ok && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('No se encontró WhatsApp Business instalado — usa "Otra app"'),
+                  backgroundColor: AppColors.ambar));
+              }
+            },
+            icon: const Icon(Icons.chat, color: Colors.white),
+            label: const Text('WhatsApp Business', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
+              padding: const EdgeInsets.symmetric(vertical: 12)))),
+          const SizedBox(height: 10),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await compartirPdf(bytes, nombre);
+            },
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('Otra app'),
+            style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)))),
+          const SizedBox(height: 8),
+        ])));
   }
 
   static Future<Uint8List> generarCotizacion({
