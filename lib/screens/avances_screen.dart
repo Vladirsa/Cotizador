@@ -548,6 +548,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         nombreCliente: widget.pedido.cliente?.nombre ?? 'Cliente',
         folio: widget.pedido.folio,
         montoTotal: widget.pedido.total,
+        pedidoId: widget.pedido.id,
       );
       await WhatsAppService.abrirChat(numero: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
     } finally {

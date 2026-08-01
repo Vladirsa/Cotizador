@@ -47,6 +47,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _waTokenCtrl    = TextEditingController();
   final _waVerifyCtrl   = TextEditingController();
   bool _waActivo        = false;
+  Set<String> _etapasConLiga = {'Produccion', 'Entrega'};
 
   // Facturación
   final _apiKeyCtrl   = TextEditingController();
@@ -109,6 +110,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _waTokenCtrl.text   = cfgWA?['wa_token'] ?? '';
       _waVerifyCtrl.text  = cfgWA?['verify_token'] ?? 'hetna_cnc_webhook_2026';
       _waActivo           = cfgWA?['activo'] ?? false;
+      final etapasGuardadas = (cfg['etapas_con_liga_seguimiento'] as List?)?.cast<String>();
+      if (etapasGuardadas != null) _etapasConLiga = etapasGuardadas.toSet();
       _cargando = false;
     });
   }
@@ -164,6 +167,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'factura_activo'        : _facturaActivo,
         'factura_proveedor'     : _proveedor,
         'factura_regimen_fiscal': _regimenFiscal,
+        'etapas_con_liga_seguimiento': _etapasConLiga.toList(),
       });
       // Guardar config WhatsApp API
       if (_waPhoneIdCtrl.text.isNotEmpty || _waTokenCtrl.text.isNotEmpty) {
@@ -422,6 +426,33 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         const Text('Pega esta URL en Meta for Developers → WhatsApp → Configuración → Webhook',
                           style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
                       ])),
+                    const SizedBox(height: 16),
+                    const Text('Página de estatus del pedido',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
+                    const SizedBox(height: 4),
+                    const Text('Elige en qué etapas se incluye la liga para que el cliente vea el '
+                      'estatus de su pedido y pueda dejar comentarios.',
+                      style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                    const SizedBox(height: 8),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      {'key': 'Pago50', 'label': 'Anticipo recibido'},
+                      {'key': 'Produccion', 'label': 'En producción'},
+                      {'key': 'Pruebas', 'label': 'Control de calidad'},
+                      {'key': 'PagoCompleto', 'label': 'Listo, falta pago'},
+                      {'key': 'Entrega', 'label': 'Listo para entrega'},
+                      {'key': 'Entregado', 'label': 'Entregado'},
+                    ].map((e) {
+                      final key = e['key']!;
+                      final activo = _etapasConLiga.contains(key);
+                      return FilterChip(
+                        label: Text(e['label']!, style: const TextStyle(fontSize: 11)),
+                        selected: activo,
+                        selectedColor: AppColors.azulClaro,
+                        checkmarkColor: AppColors.azul,
+                        onSelected: (v) => setState(() {
+                          if (v) { _etapasConLiga.add(key); } else { _etapasConLiga.remove(key); }
+                        }));
+                    }).toList()),
                   ],
                 ])),
 
