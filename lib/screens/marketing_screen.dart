@@ -945,6 +945,28 @@ class _PlantillasTabState extends State<_PlantillasTab> {
     'Seguimiento': AppColors.rojo,
   };
 
+  // Los "tipos" específicos que el código busca automáticamente. Sin
+  // elegir uno de estos, la plantilla queda como texto de referencia
+  // general (útil para campañas manuales) pero NUNCA se dispara sola.
+  final _tiposAutomaticos = <String, String>{
+    '': 'Ninguno (plantilla de uso general / campañas)',
+    'seguimiento_dia3': 'Seguimiento — Día 3 sin respuesta',
+    'seguimiento_dia5': 'Seguimiento — Día 5 sin respuesta',
+    'seguimiento_dia7': 'Seguimiento — Día 7 sin respuesta',
+    'post_entrega': 'Seguimiento — Después de entregar',
+    'pago_anticipo_pendiente': 'Seguimiento — Anticipo pendiente',
+    'pago_final_pendiente': 'Seguimiento — Pago final pendiente',
+    'cliente_interesado': 'Seguimiento — Cliente interesado',
+    'produccion_sin_avance': 'Seguimiento — Producción sin avance',
+    'avance_pago50': 'Avance de pedido — Pago 50% recibido',
+    'avance_produccion': 'Avance de pedido — Entró a producción',
+    'avance_pruebas': 'Avance de pedido — En control de calidad',
+    'avance_pagocompleto': 'Avance de pedido — Listo, falta pago',
+    'avance_entrega': 'Avance de pedido — Listo para entrega',
+    'avance_entregado': 'Avance de pedido — Entregado',
+    'avance_cancelado': 'Avance de pedido — Cancelado',
+  };
+
   @override
   void initState() { super.initState(); _cargar(); }
 
@@ -960,6 +982,8 @@ class _PlantillasTabState extends State<_PlantillasTab> {
     final tituloCtrl = TextEditingController(text: plantilla?['titulo'] as String? ?? '');
     final cuerpoCtrl = TextEditingController(text: plantilla?['cuerpo'] as String? ?? '');
     String cat = plantilla?['categoria'] as String? ?? 'General';
+    String tipoSel = plantilla?['tipo'] as String? ?? '';
+    if (!_tiposAutomaticos.containsKey(tipoSel)) tipoSel = '';
 
     final ok = await showModalBottomSheet<bool>(context: context,
       isScrollControlled: true, backgroundColor: Colors.transparent,
@@ -969,7 +993,7 @@ class _PlantillasTabState extends State<_PlantillasTab> {
             decoration: const BoxDecoration(color: Colors.white,
               borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
             padding: const EdgeInsets.all(16),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
+            child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Text(plantilla == null ? 'Nueva plantilla' : 'Editar plantilla',
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
@@ -984,13 +1008,27 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                 items: _categorias.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (v) => setS(() => cat = v!)),
               const SizedBox(height: 8),
+              DropdownButtonFormField<String>(value: tipoSel,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: '¿Para qué mensaje automático es? (opcional)',
+                  border: OutlineInputBorder()),
+                items: _tiposAutomaticos.entries.map((e) => DropdownMenuItem(
+                  value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 12)))).toList(),
+                onChanged: (v) => setS(() => tipoSel = v ?? '')),
+              const SizedBox(height: 4),
+              const Text('Si eliges una opción distinta a "Ninguno", este mensaje reemplaza el texto '
+                'por defecto justo en ese momento automático (ej. cuando el pedido pasa a producción).',
+                style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+              const SizedBox(height: 8),
               TextField(controller: cuerpoCtrl, maxLines: 4,
                 decoration: const InputDecoration(
                   labelText: 'Mensaje',
                   hintText: 'Variables: escribe NOMBRE FOLIO MONTO FECHA en mayúsculas rodeadas de *',
                   border: OutlineInputBorder())),
               const SizedBox(height: 4),
-              const Text('Variables: *NOMBRE* *FOLIO* *MONTO* *FECHA* (en mayúsculas entre asteriscos)',
+              const Text('Variables: *NOMBRE* *FOLIO* *MONTO* *FECHA* — y en mensajes de avance también '
+                '*ANTICIPO* y *RESTANTE* (en mayúsculas entre asteriscos)',
                 style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
               const SizedBox(height: 12),
               SizedBox(width: double.infinity,
@@ -1000,6 +1038,7 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                     final titulo = tituloCtrl.text.trim();
                     final cuerpo = cuerpoCtrl.text.trim();
                     final categoria = cat;
+                    final tipo = tipoSel;
                     if (titulo.isEmpty || cuerpo.isEmpty) {
                       ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
                         content: Text('Completa el título y el mensaje')));
@@ -1012,6 +1051,8 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                         'titulo'   : titulo,
                         'cuerpo'   : cuerpo,
                         'categoria': categoria,
+                        'tipo'     : tipo.isEmpty ? null : tipo,
+                        'activo'   : true,
                       });
                       await _cargar();
                       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -1023,7 +1064,7 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
                   child: const Text('Guardar', style: TextStyle(color: Colors.white)))),
-            ])))));
+            ]))))));
 
     if (ok != true) return;
     // Lógica ya ejecutada dentro del onPressed arriba
