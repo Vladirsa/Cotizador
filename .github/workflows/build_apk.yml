@@ -87,6 +87,90 @@ jobs:
               print("Deep link ya existia, no se duplico")
           PYEOF
           cat $MANIFEST
+      - name: Add FileProvider (compartir PDF con WhatsApp Business)
+        run: |
+          mkdir -p tmp_app/android/app/src/main/res/xml
+          cat > tmp_app/android/app/src/main/res/xml/file_paths.xml << 'XMLEOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths>
+              <cache-path name="pdfs" path="." />
+          </paths>
+          XMLEOF
+          python3 - <<'PYEOF'
+          path = "tmp_app/android/app/src/main/AndroidManifest.xml"
+          with open(path) as f:
+              content = f.read()
+          provider = (
+              '        <provider\n'
+              '            android:name="androidx.core.content.FileProvider"\n'
+              '            android:authorities="${applicationId}.fileprovider"\n'
+              '            android:exported="false"\n'
+              '            android:grantUriPermissions="true">\n'
+              '            <meta-data\n'
+              '                android:name="android.support.FILE_PROVIDER_PATHS"\n'
+              '                android:resource="@xml/file_paths" />\n'
+              '        </provider>\n'
+          )
+          if 'fileprovider' not in content:
+              content = content.replace('</application>', provider + '    </application>', 1)
+              with open(path, 'w') as f:
+                  f.write(content)
+              print("FileProvider agregado")
+          else:
+              print("FileProvider ya existia, no se duplico")
+          PYEOF
+          cat tmp_app/android/app/src/main/AndroidManifest.xml
+      - name: Inject MainActivity.kt personalizado (canal WhatsApp Business)
+        run: |
+          MAIN_ACTIVITY=$(find tmp_app/android/app/src/main -name "MainActivity.kt" | head -1)
+          echo "Encontrado: $MAIN_ACTIVITY"
+          PACKAGE_LINE=$(grep '^package ' "$MAIN_ACTIVITY")
+          PACKAGE=${PACKAGE_LINE#package }
+          echo "Paquete detectado: $PACKAGE"
+          cat > "$MAIN_ACTIVITY" << KOTLINEOF
+          package $PACKAGE
+
+          import android.content.Intent
+          import android.net.Uri
+          import androidx.core.content.FileProvider
+          import io.flutter.embedding.android.FlutterActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+          import java.io.File
+
+          class MainActivity: FlutterActivity() {
+              private val CHANNEL = "com.hetnacnc.app/whatsapp_share"
+
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+                      if (call.method == "compartirWhatsAppBusiness") {
+                          val filePath = call.argument<String>("filePath")
+                          val paquete = call.argument<String>("paquete") ?: "com.whatsapp.w4b"
+                          try {
+                              val file = File(filePath!!)
+                              val uri: Uri = FileProvider.getUriForFile(
+                                  this, "\${applicationContext.packageName}.fileprovider", file)
+                              val intent = Intent(Intent.ACTION_SEND).apply {
+                                  type = "application/pdf"
+                                  putExtra(Intent.EXTRA_STREAM, uri)
+                                  setPackage(paquete)
+                                  addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                  addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                              }
+                              startActivity(intent)
+                              result.success(true)
+                          } catch (e: Exception) {
+                              result.error("ERROR", e.message, null)
+                          }
+                      } else {
+                          result.notImplemented()
+                      }
+                  }
+              }
+          }
+          KOTLINEOF
+          cat "$MAIN_ACTIVITY"
       - name: Inject HETNA CNC App Icon
         run: |
           mkdir -p tmp_app/android/app/src/main/res/mipmap-mdpi
