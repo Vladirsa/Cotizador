@@ -28,11 +28,11 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
   static const _incluye = {
     Plan.gratis: [
-      '10 cotizaciones al mes', 'Clientes, productos y avances', 'Alertas y seguimiento por WhatsApp',
+      '10 cotizaciones sencillas al mes', '1 cotización profesional de muestra', 'Clientes, productos y avances', 'Alertas y seguimiento por WhatsApp',
       'Calculadora CNC y Envíos HETNA', '1 usuario',
     ],
     Plan.taller: [
-      'Cotizaciones ilimitadas', 'Simulador de costos con 3 precios', 'Costos de tu taller',
+      'Cotizaciones ilimitadas', 'Cotización profesional (formato internacional, sin marca)', 'Simulador de costos con 3 precios', 'Costos de tu taller',
       'Gastos y compras', 'Avisos de avance por WhatsApp', 'Fotos en productos', '2 usuarios',
     ],
     Plan.pro: [

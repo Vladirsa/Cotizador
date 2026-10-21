@@ -213,6 +213,10 @@ class SupabaseService {
       'dias_habiles': cotizacion.diasHabiles,
       'vigencia_dias': cotizacion.vigenciaDias,
       'notas': cotizacion.notas,
+      // Las columnas tipo/datos_pro solo se mandan en la profesional: así la
+      // cotización sencilla se sigue guardando aunque la base aún no las tenga.
+      if (cotizacion.esProfesional) 'tipo': 'profesional',
+      if (cotizacion.esProfesional) 'datos_pro': cotizacion.datosPro,
     }).select().single();
     final cotId = (resCot as Map<String, dynamic>)['id'] as String;
     if (items.isNotEmpty) {
@@ -305,8 +309,10 @@ class SupabaseService {
     } catch (_) { return []; }
   }
 
+  // incluirTipo: true cuando la cotización es o era profesional (para poder
+  // guardar el cambio de profesional a sencilla y viceversa).
   static Future<void> actualizarCotizacion(
-      Cotizacion cotizacion, List<CotizacionItem> items) async {
+      Cotizacion cotizacion, List<CotizacionItem> items, {bool incluirTipo = false}) async {
     await _db.from('cotizaciones').update({
       'estado': cotizacion.estado,
       'descuento_pct': cotizacion.descuentoPct,
@@ -318,6 +324,8 @@ class SupabaseService {
       'metodo_pago': cotizacion.metodoPago,
       'condicion_entrega': cotizacion.condicionEntrega,
       'notas': cotizacion.notas,
+      if (incluirTipo || cotizacion.esProfesional) 'tipo': cotizacion.tipo,
+      if (incluirTipo || cotizacion.esProfesional) 'datos_pro': cotizacion.datosPro,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('id', cotizacion.id!);
     await _db.from('cotizacion_items').delete().eq('cotizacion_id', cotizacion.id!);
@@ -477,6 +485,18 @@ class SupabaseService {
       'completada': true,
       'fecha_completada': DateTime.now().toIso8601String(),
     }).eq('id', alertaId);
+  }
+
+  // Cotizaciones profesionales que ya hizo el taller (el plan Gratis tiene
+  // una sola de muestra). Si la columna `tipo` aún no existe, regresa 0.
+  static Future<int> contarCotizacionesProfesionales() async {
+    try {
+      var q = _db.from('cotizaciones').select('id').eq('tipo', 'profesional');
+      final neg = AuthService.negocioId;
+      if (neg != null) q = q.eq('negocio_id', neg);
+      final res = await q;
+      return (res as List).length;
+    } catch (_) { return 0; }
   }
 
   // Cotizaciones creadas este mes por el taller (para el límite del plan Gratis)

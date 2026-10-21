@@ -34,6 +34,9 @@ class Planes {
   // Cotizaciones nuevas por mes (null = sin límite). Igual que la web.
   static const limiteCotizacionesGratis = 10;
 
+  // Cotizaciones profesionales de muestra en el plan Gratis (en total, no por mes)
+  static const muestrasProfesionalGratis = 1;
+
   // Usuarios por taller (null = sin límite). Igual que la web.
   static const usuarios = {
     Plan.gratis: 1,
@@ -46,6 +49,7 @@ class Planes {
   static const _modulosPorPlan = <String, Plan>{
     // ── Taller ($299) ──
     'cotizaciones_ilimitadas': Plan.taller, // Gratis: 10 al mes
+    'cotizacion_profesional': Plan.taller,  // Gratis: 1 de muestra
     'simulador': Plan.taller,       // Simulador de costos con 3 precios
     'costos_taller': Plan.taller,   // Costos fijos, máquinas y mano de obra
     'config_simulador': Plan.taller,

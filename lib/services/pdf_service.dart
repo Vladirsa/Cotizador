@@ -128,6 +128,11 @@ class PdfService {
     required Cotizacion cotizacion,
     required Map<String, dynamic> empresa,
   }) async {
+    // La profesional tiene su propio formato; todas las pantallas que generan
+    // el PDF de una cotización pasan por aquí, así que no hay que tocarlas.
+    if (cotizacion.esProfesional) {
+      return generarCotizacionProfesional(cotizacion: cotizacion, empresa: empresa);
+    }
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
     try {
@@ -304,6 +309,321 @@ class PdfService {
     ));
     return pdf.save();
   }
+
+  // ══════════════════════════════════════════
+  // COTIZACIÓN PROFESIONAL — formato internacional
+  // Estructura: encabezado (folio, revisión, vigencia, moneda) · cliente y
+  // proyecto · 1 resumen · 2 alcance (incluye / no incluye) · 3 detalle
+  // técnico · 4 fabricación · 5 propuesta económica · 6 condiciones
+  // comerciales · 7 calidad · 8 aprobación del cliente.
+  // Las secciones sin datos no se imprimen.
+  // ══════════════════════════════════════════
+  static Future<Uint8List> generarCotizacionProfesional({
+    required Cotizacion cotizacion,
+    required Map<String, dynamic> empresa,
+  }) async {
+    final pdf = pw.Document();
+    pw.MemoryImage? logoImage;
+    try {
+      final bytes = await _obtenerLogoBytes(empresa);
+      if (bytes.isNotEmpty) logoImage = pw.MemoryImage(bytes);
+    } catch (_) {}
+
+    final azul = _colorFromHex(empresa['color_primario'], const PdfColor.fromInt(0xFF1a3a5c));
+    const azulClaro = PdfColor.fromInt(0xFFe6f1fb);
+    const grisClaro = PdfColor.fromInt(0xFFf5f6fa);
+    const grisTexto = PdfColor.fromInt(0xFF6B7280);
+    const grisLinea = PdfColor.fromInt(0xFFD1D5DB);
+    const verde = PdfColor.fromInt(0xFF1d9e75);
+    const rojo = PdfColor.fromInt(0xFFB42318);
+
+    final d = cotizacion.datosPro;
+    String v(String k) => _limpiarTexto(((d[k] ?? '') as Object).toString().trim());
+    List<String> lineas(String k) => v(k).split('\n')
+      .map((l) => l.trim().replaceFirst(RegExp(r'^[-*]\s*'), ''))
+      .where((l) => l.isNotEmpty).toList();
+
+    final nombreEmpresa = _limpiarTexto(empresa['nombre_comercial'] ?? 'HETNA CNC');
+    final rfcEmpresa = empresa['rfc'] ?? '';
+    final direccion = _limpiarTexto(empresa['direccion'] ?? '');
+    final tel1 = empresa['telefono1'] ?? '';
+    final correoEmpresa = empresa['correo'] ?? '';
+    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final cliente = cotizacion.cliente;
+    final folio = cotizacion.folio ?? 'COT-${DateTime.now().millisecondsSinceEpoch}';
+    final revision = v('revision').isEmpty ? 'A' : v('revision');
+    final moneda = v('moneda').isEmpty ? 'MXN' : v('moneda');
+    final fecha = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
+    final vigenciaDias = cotizacion.vigenciaDias;
+    final fechaVigencia = _fmtFecha.format(
+      (cotizacion.createdAt ?? DateTime.now()).add(Duration(days: vigenciaDias)));
+    final esMuestra = d['muestra'] == true;
+
+    pw.Widget titulo(String n, String t) => pw.Padding(
+      padding: const pw.EdgeInsets.only(top: 12, bottom: 6),
+      child: pw.Row(children: [
+        pw.Container(width: 18, height: 18, alignment: pw.Alignment.center,
+          decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(3)),
+          child: pw.Text(n, style: pw.TextStyle(fontSize: 9, color: PdfColors.white, fontWeight: pw.FontWeight.bold))),
+        pw.SizedBox(width: 6),
+        pw.Text(t, style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: azul)),
+      ]));
+
+    // Tabla etiqueta / valor con solo los campos llenos
+    pw.Widget datos(List<(String, String)> filas) {
+      final llenas = filas.where((f) => f.$2.isNotEmpty).toList();
+      return pw.Table(
+        border: pw.TableBorder.all(color: grisLinea, width: 0.5),
+        columnWidths: {0: const pw.FixedColumnWidth(150), 1: const pw.FlexColumnWidth()},
+        children: llenas.map((f) => pw.TableRow(children: [
+          pw.Container(color: grisClaro, padding: const pw.EdgeInsets.all(6),
+            child: pw.Text(f.$1, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul))),
+          pw.Padding(padding: const pw.EdgeInsets.all(6),
+            child: pw.Text(f.$2, style: const pw.TextStyle(fontSize: 9))),
+        ])).toList());
+    }
+
+    pw.Widget lista(String encabezado, List<String> items, PdfColor color) => pw.Container(
+      padding: const pw.EdgeInsets.all(8),
+      decoration: pw.BoxDecoration(border: pw.Border.all(color: grisLinea, width: 0.5),
+        borderRadius: pw.BorderRadius.circular(4)),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(encabezado, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: color)),
+        pw.SizedBox(height: 4),
+        if (items.isEmpty) pw.Text('-', style: const pw.TextStyle(fontSize: 9, color: grisTexto)),
+        ...items.map((t) => pw.Padding(padding: const pw.EdgeInsets.only(bottom: 2),
+          child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Text('-  ', style: pw.TextStyle(fontSize: 9, color: color)),
+            pw.Expanded(child: pw.Text(t, style: const pw.TextStyle(fontSize: 9))),
+          ]))),
+      ]));
+
+    final incluye = lineas('incluye');
+    final noIncluye = lineas('no_incluye');
+    final tecnicos = <(String, String)>[
+      ('Material', v('material')), ('Medidas / espesor', v('medidas')),
+      ('Tolerancia general', v('tolerancia')), ('Acabado', v('acabado')),
+      ('Archivo recibido', v('archivo')), ('Norma / especificación', v('norma')),
+    ];
+    final fabricacion = <(String, String)>[
+      ('Proceso', v('proceso')), ('Máquina', v('maquina')),
+      ('Operaciones', v('operaciones')), ('Setups', v('setups')),
+      ('Inspección', v('inspeccion')),
+    ];
+    final hay = (List<(String, String)> l) => l.any((f) => f.$2.isNotEmpty);
+    final comerciales = <(String, String)>[
+      ('Forma de pago', _limpiarTexto(cotizacion.metodoPago ?? '')),
+      ('Tiempo de entrega', v('tiempo_entrega')),
+      ('Lugar de entrega', _limpiarTexto(cotizacion.condicionEntrega ?? '')),
+      ('Vigencia de la oferta', '$vigenciaDias días (hasta $fechaVigencia)'),
+      ('Moneda', moneda),
+      ('Impuestos', cotizacion.ivaPct > 0 ? 'IVA ${cotizacion.ivaPct.toInt()}% incluido en el total' : 'Precios sin IVA'),
+      ('Cambios y cancelaciones', v('cambios')),
+      ('Notas', _limpiarTexto(cotizacion.notas ?? '')),
+    ];
+
+    int n = 0;
+    String sig() => '${++n}';
+
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 36),
+      footer: (ctx) => pw.Container(
+        padding: const pw.EdgeInsets.only(top: 6),
+        decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: grisLinea, width: 0.5))),
+        child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+          pw.Text('$folio  ·  Rev $revision  ·  $nombreEmpresa',
+            style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
+          if (esMuestra)
+            pw.Text('Cotización profesional de muestra · HETNA Taller · hetnacnc.com',
+              style: pw.TextStyle(fontSize: 7, color: azul, fontWeight: pw.FontWeight.bold)),
+          pw.Text('Página ${ctx.pageNumber} de ${ctx.pagesCount}',
+            style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
+        ])),
+      build: (ctx) => [
+        // ─── ENCABEZADO ─────────────────────
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            if (logoImage != null)
+              pw.Image(logoImage, width: 130, height: 38, fit: pw.BoxFit.contain)
+            else
+              pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: azul)),
+            pw.SizedBox(height: 6),
+            pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+            if (rfcEmpresa.isNotEmpty) pw.Text('RFC: $rfcEmpresa', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+            if (direccion.isNotEmpty) pw.Text(direccion, style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+            pw.Text([if (tel1.isNotEmpty) 'Tel: $tel1', if (correoEmpresa.isNotEmpty) correoEmpresa, web].join('  ·  '),
+              style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+          ])),
+          pw.Container(
+            width: 190,
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: azul, width: 1),
+              borderRadius: pw.BorderRadius.circular(4)),
+            child: pw.Column(children: [
+              pw.Container(width: double.infinity, color: azul, padding: const pw.EdgeInsets.all(6),
+                child: pw.Text('COTIZACIÓN', textAlign: pw.TextAlign.center,
+                  style: pw.TextStyle(fontSize: 13, color: PdfColors.white, fontWeight: pw.FontWeight.bold))),
+              pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Column(children: [
+                _filaEnc('Folio', folio, azul), _filaEnc('Revisión', revision, azul),
+                _filaEnc('Fecha', fecha, azul), _filaEnc('Vigente hasta', fechaVigencia, azul),
+                _filaEnc('Moneda', moneda, azul),
+              ])),
+            ])),
+        ]),
+        pw.SizedBox(height: 12),
+
+        // ─── CLIENTE Y PROYECTO ─────────────
+        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Expanded(child: pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(color: grisClaro, borderRadius: pw.BorderRadius.circular(4)),
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('CLIENTE', style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 3),
+              pw.Text(_limpiarTexto(cliente?.nombreCompleto ?? 'Sin cliente'),
+                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: azul)),
+              if (cliente?.rfc != null) pw.Text('RFC: ${cliente!.rfc}', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+              if (cliente?.correo != null) pw.Text(cliente!.correo!, style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+              if (cliente?.telefono != null) pw.Text('Tel: ${cliente!.telefono}', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+            ]))),
+          pw.SizedBox(width: 8),
+          pw.Expanded(child: pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(color: grisClaro, borderRadius: pw.BorderRadius.circular(4)),
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('PROYECTO', style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 3),
+              pw.Text(v('proyecto').isEmpty ? '-' : v('proyecto'),
+                style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: azul)),
+            ]))),
+        ]),
+
+        // ─── 1. RESUMEN ─────────────────────
+        if (v('resumen').isNotEmpty) ...[
+          titulo(sig(), 'RESUMEN'),
+          pw.Text(v('resumen'), style: const pw.TextStyle(fontSize: 9, lineSpacing: 2)),
+        ],
+
+        // ─── 2. ALCANCE ─────────────────────
+        if (incluye.isNotEmpty || noIncluye.isNotEmpty) ...[
+          titulo(sig(), 'ALCANCE DEL TRABAJO'),
+          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Expanded(child: lista('INCLUYE', incluye, verde)),
+            pw.SizedBox(width: 8),
+            pw.Expanded(child: lista('NO INCLUYE', noIncluye, rojo)),
+          ]),
+        ],
+
+        // ─── 3. DETALLE TÉCNICO ─────────────
+        if (hay(tecnicos)) ...[titulo(sig(), 'DETALLE TÉCNICO'), datos(tecnicos)],
+
+        // ─── 4. FABRICACIÓN ─────────────────
+        if (hay(fabricacion)) ...[titulo(sig(), 'ESPECIFICACIONES DE FABRICACIÓN'), datos(fabricacion)],
+
+        // ─── 5. PROPUESTA ECONÓMICA ─────────
+        titulo(sig(), 'PROPUESTA ECONÓMICA ($moneda)'),
+        pw.Table(
+          border: pw.TableBorder.all(color: grisLinea, width: 0.5),
+          columnWidths: {
+            0: const pw.FixedColumnWidth(26),
+            1: const pw.FlexColumnWidth(3.5),
+            2: const pw.FixedColumnWidth(40),
+            3: const pw.FixedColumnWidth(72),
+            4: const pw.FixedColumnWidth(76),
+          },
+          children: [
+            pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
+              _cH('#'), _cH('CONCEPTO'), _cH('CANT.'), _cH('P. UNITARIO'), _cH('IMPORTE'),
+            ]),
+            ...List.generate(cotizacion.items.length, (i) {
+              final item = cotizacion.items[i];
+              final desc = (item.descripcion ?? '').trim();
+              return pw.TableRow(
+                decoration: pw.BoxDecoration(color: i.isEven ? PdfColors.white : grisClaro),
+                children: [
+                  _cD('${i + 1}', center: true),
+                  pw.Padding(padding: const pw.EdgeInsets.all(6),
+                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      pw.Text(_limpiarTexto(item.nombreProducto),
+                        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
+                      if (desc.isNotEmpty) pw.Text(_limpiarTexto(desc), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+                      if (item.sku != null && item.sku!.isNotEmpty)
+                        pw.Text('No. de parte: ${item.sku}', style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
+                    ])),
+                  _cD('${item.cantidad}', center: true),
+                  _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
+                  _cD('\$${_fmt.format(item.subtotal)}', right: true),
+                ]);
+            }),
+          ]),
+        pw.SizedBox(height: 8),
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+          pw.Container(width: 230, child: pw.Column(children: [
+            _tR('Subtotal', '\$${_fmt.format(cotizacion.subtotal)}', grisTexto),
+            if (cotizacion.montoDescuento > 0)
+              _tR('Descuento${cotizacion.descuentoPct > 0 ? " ${cotizacion.descuentoPct.toInt()}%" : ""}',
+                '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
+            if (cotizacion.ivaPct > 0) _tR('IVA ${cotizacion.ivaPct.toInt()}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
+            if (cotizacion.costoEnvio > 0) _tR('Envío', '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
+            pw.Divider(color: azul),
+            pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+              pw.Text('TOTAL $moneda', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
+              pw.Text('\$${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
+            ]),
+          ])),
+        ]),
+
+        // ─── 6. CONDICIONES COMERCIALES ─────
+        titulo(sig(), 'CONDICIONES COMERCIALES'),
+        datos(comerciales),
+
+        // ─── 7. CALIDAD ─────────────────────
+        if (v('calidad').isNotEmpty || v('tolerancia').isNotEmpty) ...[
+          titulo(sig(), 'CONDICIONES TÉCNICAS Y DE CALIDAD'),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(4)),
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              if (v('calidad').isNotEmpty) pw.Text(v('calidad'), style: const pw.TextStyle(fontSize: 9)),
+              if (v('tolerancia').isNotEmpty)
+                pw.Text('Tolerancia general: ${v('tolerancia')}', style: const pw.TextStyle(fontSize: 9)),
+              if ((empresa['leyenda_pdf'] as String?)?.isNotEmpty == true)
+                pw.Padding(padding: const pw.EdgeInsets.only(top: 4),
+                  child: pw.Text(_limpiarTexto(empresa['leyenda_pdf']),
+                    style: pw.TextStyle(fontSize: 8, color: grisTexto, fontStyle: pw.FontStyle.italic))),
+            ])),
+        ],
+
+        // ─── 8. APROBACIÓN ──────────────────
+        titulo(sig(), 'APROBACIÓN DEL CLIENTE'),
+        pw.Text('Al firmar, el cliente acepta el alcance, el precio y las condiciones de esta cotización (folio $folio, revisión $revision).',
+          style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+        pw.SizedBox(height: 26),
+        pw.Row(children: [
+          pw.Expanded(child: _lineaFirma('Nombre y cargo')),
+          pw.SizedBox(width: 14),
+          pw.Expanded(child: _lineaFirma('Firma')),
+          pw.SizedBox(width: 14),
+          pw.Expanded(child: _lineaFirma('Fecha')),
+        ]),
+      ],
+    ));
+    return pdf.save();
+  }
+
+  static pw.Widget _filaEnc(String label, String valor, PdfColor color) => pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+    child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+      pw.Text(label, style: const pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFF6B7280))),
+      pw.Text(valor, style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: color)),
+    ]));
+
+  static pw.Widget _lineaFirma(String etiqueta) => pw.Column(children: [
+    pw.Container(height: 0.8, color: const PdfColor.fromInt(0xFF9CA3AF)),
+    pw.SizedBox(height: 3),
+    pw.Text(etiqueta, style: const pw.TextStyle(fontSize: 8, color: PdfColor.fromInt(0xFF6B7280))),
+  ]);
 
   static pw.Widget _cH(String t) => pw.Padding(padding: const pw.EdgeInsets.all(7),
     child: pw.Text(t, style: pw.TextStyle(fontSize: 9, color: PdfColors.white, fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center));

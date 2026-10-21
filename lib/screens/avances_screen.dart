@@ -444,15 +444,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         cot = cots.where((c) => c.id == pedido.cotizacionId).firstOrNull;
         if (cot != null && cot.items.isEmpty) {
           final items = await SupabaseService.getCotizacionItems(cot.id!);
-          cot = Cotizacion(
-            id: cot.id, folio: cot.folio, cliente: cot.cliente,
-            clienteId: cot.clienteId, estado: cot.estado, items: items,
-            descuentoPct: cot.descuentoPct, descuentoFijo: cot.descuentoFijo,
-            ivaPct: cot.ivaPct, costoEnvio: cot.costoEnvio,
-            metodoPago: cot.metodoPago, condicionEntrega: cot.condicionEntrega,
-            fechaEntrega: cot.fechaEntrega, diasHabiles: cot.diasHabiles,
-            vigenciaDias: cot.vigenciaDias, notas: cot.notas,
-            pdfUrl: cot.pdfUrl, createdAt: cot.createdAt, totalBd: cot.totalBd);
+          cot = cot.copiaConItems(items);
         }
       }
       if (cot == null) {
@@ -543,15 +535,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
       var cotFinal = cot;
       if (cot.items.isEmpty) {
         final items = await SupabaseService.getCotizacionItems(cot.id!);
-        cotFinal = Cotizacion(
-          id: cot.id, folio: cot.folio, cliente: cot.cliente, clienteId: cot.clienteId,
-          estado: cot.estado, items: items,
-          descuentoPct: cot.descuentoPct, descuentoFijo: cot.descuentoFijo,
-          ivaPct: cot.ivaPct, costoEnvio: cot.costoEnvio,
-          metodoPago: cot.metodoPago, condicionEntrega: cot.condicionEntrega,
-          fechaEntrega: cot.fechaEntrega, diasHabiles: cot.diasHabiles,
-          vigenciaDias: cot.vigenciaDias, notas: cot.notas,
-          pdfUrl: cot.pdfUrl, createdAt: cot.createdAt, totalBd: cot.totalBd);
+        cotFinal = cot.copiaConItems(items);
       }
       final cfg = await SupabaseService.getConfiguracion();
       final bytes = await PdfService.generarCotizacion(cotizacion: cotFinal, empresa: cfg);
