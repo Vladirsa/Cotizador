@@ -3,6 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/premium_screen.dart';
+import 'planes.dart';
+export 'planes.dart' show Plan, Planes;
 
 class AuthService {
   static final _sb = Supabase.instance.client;
@@ -25,18 +27,22 @@ class AuthService {
   static String? get rol           => _rol;
   static String? get plan          => _plan;
 
-  // ── Sistema de planes: master/premium siempre activo, trial mientras
-  //    no venza, gratis o trial vencido = funciones limitadas ──
-  static bool get esPremiumActivo {
-    if (_plan == 'master' || _plan == 'premium') return true;
-    if (_plan == 'trial' && _trialHasta != null) {
-      return DateTime.now().isBefore(_trialHasta!);
-    }
-    return false;
-  }
+  // ── Planes: qué abre cada uno está en services/planes.dart.
+  //    Prueba vigente = todo abierto; prueba vencida = Gratis ──
+  static bool get _esPrueba => _plan == 'trial' || _plan == 'prueba';
+
+  // Plan que manda ahora (ver services/planes.dart)
+  static Plan get planActual => Planes.efectivo(_plan,
+    pruebaVigente: _esPrueba && _trialHasta != null && DateTime.now().isBefore(_trialHasta!));
+
+  // ¿El plan del taller abre este módulo? (además del permiso por rol)
+  static bool puede(String modulo) => Planes.abre(planActual, modulo);
+
+  // Compatibilidad: cualquier plan de pago o prueba vigente
+  static bool get esPremiumActivo => planActual.index >= Plan.taller.index;
 
   static bool get trialVencido =>
-    _plan == 'trial' && _trialHasta != null && DateTime.now().isAfter(_trialHasta!);
+    _esPrueba && _trialHasta != null && DateTime.now().isAfter(_trialHasta!);
 
   // Módulos que el usuario actual puede ver.
   // Admin/super_admin siempre ven todo. Si el negocio nunca configuró
@@ -49,7 +55,7 @@ class AuthService {
   }
 
   static int get diasTrialRestantes {
-    if (_plan != 'trial' || _trialHasta == null) return 0;
+    if (!_esPrueba || _trialHasta == null) return 0;
     final dias = _trialHasta!.difference(DateTime.now()).inDays;
     return dias < 0 ? 0 : dias;
   }
@@ -243,19 +249,27 @@ class AuthService {
   // ── Verifica si puede usar una función premium.
   //    Si no puede, muestra un aviso con opción de continuar como está.
   //    Devuelve true si puede continuar (premium activo). ──
-  static Future<bool> exigirPremium(BuildContext context, {String funcion = 'esta función'}) async {
-    if (esPremiumActivo) return true;
+  static Future<bool> exigirPremium(BuildContext context, {String funcion = 'esta función'}) =>
+    exigirModulo(context, 'simulador', funcion: funcion);
+
+  // Si el plan no abre el módulo, avisa qué plan lo abre y lleva a "Ver planes".
+  // Devuelve true si puede continuar.
+  static Future<bool> exigirModulo(BuildContext context, String modulo, {String funcion = 'esta función'}) async {
+    if (puede(modulo)) return true;
+    final requerido = Planes.planMinimo(modulo);
+    final nombre = Planes.nombres[requerido];
+    final precio = Planes.precios[requerido];
 
     final esTrialVencido = trialVencido;
     await showDialog(context: context, builder: (ctx) => AlertDialog(
       title: Row(children: [
         const Icon(Icons.lock_outline, color: Colors.amber),
         const SizedBox(width: 8),
-        const Expanded(child: Text('Función Premium', style: TextStyle(fontSize: 16))),
+        Expanded(child: Text('Disponible en plan $nombre', style: const TextStyle(fontSize: 16))),
       ]),
       content: Text(esTrialVencido
-        ? 'Tu prueba gratuita de 1 mes terminó. Para seguir usando $funcion, actualiza tu plan.'
-        : 'Para usar $funcion necesitas el plan Premium.'),
+        ? 'Tu prueba gratuita terminó. Para seguir usando $funcion activa el plan $nombre (\$$precio al mes).'
+        : 'Para usar $funcion necesitas el plan $nombre (\$$precio al mes).'),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
         ElevatedButton(
