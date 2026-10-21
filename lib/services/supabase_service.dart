@@ -479,6 +479,19 @@ class SupabaseService {
     }).eq('id', alertaId);
   }
 
+  // Cotizaciones creadas este mes por el taller (para el límite del plan Gratis)
+  static Future<int> contarCotizacionesDelMes() async {
+    try {
+      final ahora = DateTime.now();
+      final inicio = DateTime(ahora.year, ahora.month, 1).toIso8601String();
+      var q = _db.from('cotizaciones').select('id').gte('created_at', inicio);
+      final neg = AuthService.negocioId;
+      if (neg != null) q = q.eq('negocio_id', neg);
+      final res = await q;
+      return (res as List).length;
+    } catch (_) { return 0; } // si falla la consulta no se bloquea al taller
+  }
+
   static Future<int> countAlertasPendientes() async {
     try {
       final res = await _db.from('alertas').select('id')
@@ -557,7 +570,7 @@ class SupabaseService {
     try {
       // Se envía negocio_id explícito para no depender del trigger automático
       // (evita error "record new has no field negcio_id" en Supabase)
-      final negId = AuthService.negocioId ?? 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+      final negId = AuthService.negocioId;
       await _db.from('movimientos_inventario').insert({
         'negocio_id': negId,
         'material_id': materialId,

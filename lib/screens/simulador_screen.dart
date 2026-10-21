@@ -7,8 +7,11 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import 'cotizar_screen.dart';
+import '../services/auth_service.dart';
 
-const _negId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+// Taller de la sesión actual (antes estaba fijo y todos los talleres veían los
+// costos del taller HETNA).
+String get _negId => AuthService.negocioId ?? '';
 
 // ══════════════════════════════════════════════════════
 // MODELOS
@@ -1156,7 +1159,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
-                    final negId = Supabase.instance.client.auth.currentUser?.id ?? _negId;
+                    final negId = _negId;
                     final claveGen = nombreCtrl.text.trim().toLowerCase()
                       .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
                       .replaceAll(RegExp(r'^_+|_+\$'), '');
@@ -3512,7 +3515,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
                 child: ElevatedButton.icon(
                   onPressed: () async {
                     if (nombreCtrl.text.trim().isEmpty) return;
-                    final negId2 = Supabase.instance.client.auth.currentUser?.id ?? _negId;
+                    final negId2 = _negId;
                     final f = formulas.firstWhere((f) => f['v'] == formula);
                     await SimuladorDataService.crearTipoTrabajo({
                       'negocio_id': negId2,

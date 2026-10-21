@@ -10,6 +10,8 @@ import '../services/pdf_service.dart';
 import '../services/whatsapp_service.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'simulador_screen.dart';
+import 'envios_screen.dart';
+import '../services/auth_service.dart';
 
 class CotizarScreen extends StatefulWidget {
   final dynamic itemInicial;
@@ -427,6 +429,21 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   double _ivaPct = 16;
   bool _aplicaIva = true;
   double _costoEnvio = 0;
+  int _envioVer = 0;            // cambia para refrescar el campo Envío
+  String? _envioDescripcion;    // paquetería elegida en Envíos HETNA
+
+  Future<void> _cotizarEnvioHetna() async {
+    final r = await Navigator.push<EnvioElegido>(context, MaterialPageRoute(
+      builder: (_) => EnviosScreen(cpDestino: _cliente?.codigoPostal, paraCotizacion: true)));
+    if (r == null || !mounted) return;
+    setState(() {
+      _costoEnvio = r.opcion.precio;
+      _envioDescripcion = r.descripcion;
+      _envioVer++;
+      final linea = 'Envío: ${r.descripcion}';
+      if (!_notas.contains(linea)) _notas = _notas.isEmpty ? linea : '$_notas\n$linea';
+    });
+  }
   String _metodoPago = '50% anticipo / 50% entrega';
   String _condicionEntrega = 'LAB — En planta HETNA';
   String _notas = '';
@@ -585,6 +602,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         ]),
         const SizedBox(height: 8),
         _campo('Notas', child: TextFormField(
+          key: ValueKey('notas_$_envioVer'),
           initialValue: _notas,
           decoration: const InputDecoration(hintText: 'Garantías, condiciones especiales...',
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
@@ -601,13 +619,19 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             onChanged: (v) => setState(() => _descuentoPct = double.tryParse(v) ?? 0)))),
           const SizedBox(width: 8),
           Expanded(child: _campo('Envío', child: TextFormField(
+            key: ValueKey('envio_$_envioVer'),
             initialValue: _costoEnvio > 0 ? _costoEnvio.toStringAsFixed(0) : '',
             decoration: const InputDecoration(hintText: '0', prefixText: '\$',
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             keyboardType: TextInputType.number,
             onChanged: (v) => setState(() => _costoEnvio = double.tryParse(v) ?? 0)))),
         ]),
-        const SizedBox(height: 8),
+        Align(alignment: Alignment.centerRight, child: TextButton.icon(
+          onPressed: _cotizarEnvioHetna,
+          icon: const Icon(Icons.local_shipping_outlined, size: 16, color: AppColors.naranja),
+          label: Text(_envioDescripcion ?? 'Cotizar con Envíos HETNA',
+            style: const TextStyle(fontSize: 12, color: AppColors.naranja)))),
+        const SizedBox(height: 4),
         Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: _aplicaIva ? AppColors.verdeClaro : AppColors.gris,
@@ -922,8 +946,20 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       numero: _cliente!.whatsappNumero, mensaje: msg);
   }
 
+  // Plan Gratis: 10 cotizaciones nuevas al mes (igual que en hetnacnc.com)
+  Future<bool> _hayCupo() async {
+    if (_esEdicion || AuthService.puede('cotizaciones_ilimitadas')) return true;
+    final n = await SupabaseService.contarCotizacionesDelMes();
+    if (n < Planes.limiteCotizacionesGratis) return true;
+    if (!mounted) return false;
+    await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
+      funcion: 'más de ${Planes.limiteCotizacionesGratis} cotizaciones al mes');
+    return false;
+  }
+
   Future<void> _guardar() async {
     if (_cliente == null || _items.isEmpty) return;
+    if (!await _hayCupo()) return;
     setState(() => _guardando = true);
     try {
       if (_esEdicion) {
@@ -953,6 +989,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _convertirPedido() async {
     if (_cliente == null || _items.isEmpty) return;
+    if (!await _hayCupo()) return;
     setState(() => _guardando = true);
     try {
       if (_esEdicion) {

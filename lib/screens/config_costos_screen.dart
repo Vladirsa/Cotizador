@@ -5,8 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
+import '../services/auth_service.dart';
 
-const _negocioId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+String get _negocioId => AuthService.negocioId ?? '';
 
 class ConfigCostosScreen extends StatefulWidget {
   const ConfigCostosScreen({super.key});

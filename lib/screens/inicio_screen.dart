@@ -5,6 +5,10 @@ import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/hetna_api.dart';
+import 'calculadora_cnc_screen.dart';
+import 'envios_screen.dart';
 
 class InicioScreen extends StatefulWidget {
   const InicioScreen({super.key});
@@ -370,6 +374,10 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           ]),
         ])),
 
+      const SizedBox(height: 14),
+
+      // ── Herramientas y ecosistema HETNA ──
+      _accesosHetna(),
       const SizedBox(height: 14),
 
       // ── Alertas rápidas (siempre actuales, no dependen del periodo) ──
@@ -1092,6 +1100,31 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   }
 
   // ═══════════════ WIDGETS COMPARTIDOS ═══════════════
+
+  Widget _accesosHetna() {
+    Widget chip(IconData i, String t, VoidCallback onTap, {bool web = false}) => Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(12), child: Container(
+        width: 84, padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+        child: Column(children: [
+          Icon(i, color: web ? AppColors.azul : AppColors.naranja, size: 22),
+          const SizedBox(height: 4),
+          Text(t, textAlign: TextAlign.center, maxLines: 2,
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+        ]))));
+    void abrir(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
+    void abrirWeb(String u) => launchUrl(Uri.parse(u), mode: LaunchMode.externalApplication);
+    return SizedBox(height: 74, child: ListView(scrollDirection: Axis.horizontal, children: [
+      chip(Icons.precision_manufacturing_outlined, 'Calculadora CNC', () => abrir(const CalculadoraCncScreen())),
+      chip(Icons.local_shipping_outlined, 'Envíos HETNA', () => abrir(const EnviosScreen())),
+      chip(Icons.storefront_outlined, 'Tienda', () => abrirWeb(HetnaApi.urlTienda), web: true),
+      chip(Icons.forum_outlined, 'Foro CNC', () => abrirWeb(HetnaApi.urlForo), web: true),
+      chip(Icons.science_outlined, 'Laboratorio CAM', () => abrirWeb(HetnaApi.urlLaboratorio), web: true),
+      chip(Icons.gavel_outlined, 'Licitaciones', () => abrirWeb(HetnaApi.urlLicitaciones), web: true),
+    ]));
+  }
 
   Widget _heroStat(String label, String valor, Color color) => Expanded(
     child: Column(children: [

@@ -375,14 +375,14 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             widget.pedido.estado == 'Entregado')
           SizedBox(width: double.infinity, child: ElevatedButton.icon(
             onPressed: () async {
-              if (!AuthService.esPremiumActivo) {
-                await AuthService.exigirPremium(context, funcion: 'Facturación (CFDI)');
+              if (!AuthService.puede('facturacion')) {
+                await AuthService.exigirModulo(context, 'facturacion', funcion: 'Facturación (CFDI)');
                 return;
               }
               Navigator.push(context, MaterialPageRoute(
                 builder: (_) => FacturaScreen(pedido: widget.pedido)));
             },
-            icon: Icon(AuthService.esPremiumActivo ? Icons.receipt_long_outlined : Icons.lock_outline,
+            icon: Icon(AuthService.puede('facturacion') ? Icons.receipt_long_outlined : Icons.lock_outline,
               size: 14, color: Colors.white),
             label: const Text('Generar factura', style: TextStyle(fontSize: 12, color: Colors.white)),
             style: ElevatedButton.styleFrom(
