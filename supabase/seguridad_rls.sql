@@ -81,7 +81,7 @@ where e.id = sub.etiqueta_id and e.negocio_id is null;
 
 -- Catálogos personalizados: toman el taller de sus productos
 update catalogos_personalizados cp set negocio_id = (
-  select p.negocio_id from productos p where p.id = any (cp.producto_ids) and p.negocio_id is not null limit 1)
+  select p.negocio_id from productos p where p.id::text = any (cp.producto_ids) and p.negocio_id is not null limit 1)
 where cp.negocio_id is null;
 
 -- Lo que quede sin taller es de antes de la versión multi-taller → HETNA
