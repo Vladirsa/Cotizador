@@ -89,6 +89,42 @@ class HetnaApi {
     '$base/$_region/servicios/envios-hetna/solicitar?c=${Uri.encodeComponent(cotizacionId)}&t=${Uri.encodeComponent(tarifaId)}';
 }
 
+// ═══════════════ Suscripción con Mercado Pago ═══════════════
+// El backend de hetnacnc.com crea la suscripción y, cuando Mercado Pago
+// confirma el pago, cambia el plan del taller. La app sólo abre el enlace.
+class SuscripcionApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-suscripcion';
+
+  static Future<Map<String, dynamic>> _post(String ruta, String token, [Map<String, dynamic>? cuerpo]) async {
+    final r = await http.post(Uri.parse(ruta),
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+      body: jsonEncode(cuerpo ?? {})).timeout(const Duration(seconds: 30));
+    Map<String, dynamic> d = {};
+    try {
+      final j = jsonDecode(utf8.decode(r.bodyBytes));
+      if (j is Map<String, dynamic>) d = j;
+    } catch (_) {}
+    if (r.statusCode != 200) {
+      throw HetnaError((d['error'] ?? d['message'] ?? 'No se pudo completar. Intenta de nuevo.').toString());
+    }
+    return d;
+  }
+
+  /// Devuelve el enlace de Mercado Pago para pagar el plan.
+  static Future<String> crear(String token, String plan, String correoPago) async {
+    final d = await _post(_ruta, token, {'plan': plan, 'correo_pago': correoPago});
+    final url = d['url'] as String?;
+    if (url == null || url.isEmpty) throw HetnaError('Mercado Pago no devolvió el enlace de pago.');
+    return url;
+  }
+
+  /// Revisa en Mercado Pago si ya se pagó y actualiza el plan del taller.
+  static Future<Map<String, dynamic>> verificar(String token) => _post('$_ruta/verificar', token);
+
+  /// Cancela la suscripción; el plan sigue hasta el fin del periodo pagado.
+  static Future<Map<String, dynamic>> cancelar(String token) => _post('$_ruta/cancelar', token);
+}
+
 class HetnaError implements Exception {
   final String mensaje;
   HetnaError(this.mensaje);

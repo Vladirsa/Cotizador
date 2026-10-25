@@ -1,5 +1,6 @@
 // lib/services/auth_service.dart
 // HETNA CNC — Autenticación y roles con Supabase Auth
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/premium_screen.dart';
@@ -9,7 +10,7 @@ export 'planes.dart' show Plan, Planes;
 class AuthService {
   static final _sb = Supabase.instance.client;
 
-  // ── Sesión actual ──────────────────────────────────────
+  // ── Sesión actual ────────────────────────────────────────
   static User? get usuarioActual => _sb.auth.currentUser;
   static bool  get estaLogueado  => usuarioActual != null;
   static Session? get sesion     => _sb.auth.currentSession;
@@ -22,6 +23,27 @@ class AuthService {
   static Set<String> _modulosPermitidos = {};
   static bool _permisosConfigurados = false; // si el admin nunca configuró nada, no bloquear
   static String? _nombreUsuario;
+
+  // Suscripción con Mercado Pago (las escribe sólo el servidor de hetnacnc.com)
+  static String? _planEstado;   // activa | cancelada | pausada
+  static DateTime? _planRenueva; // siguiente cobro
+  static DateTime? _planVence;   // hasta cuándo dura lo pagado si se canceló
+
+  static String? get planEstado    => _planEstado;
+  static DateTime? get planRenueva => _planRenueva;
+  static DateTime? get planVence   => _planVence;
+  static bool get tieneSuscripcion => _planEstado == 'activa';
+
+  // ── A dónde regresa el enlace de los correos ──
+  // Web: la misma página del Cotizador. Android: el enlace abre la app
+  // (el APK ya registra com.hetnacnc.app://reset-callback; Supabase abre la
+  // sesión con cualquier enlace, sea de confirmar correo o de recuperar).
+  // Las dos direcciones deben estar en Supabase > Authentication > URL
+  // Configuration > Redirect URLs.
+  static String get urlRegreso =>
+    kIsWeb ? 'https://hetnacnc.com/cotizador/' : 'com.hetnacnc.app://reset-callback/';
+  static String get urlRecuperar =>
+    kIsWeb ? 'https://hetnacnc.com/cotizador/' : 'com.hetnacnc.app://reset-callback/';
 
   static String? get negocioId     => _negocioId;
   static String? get rol           => _rol;
@@ -86,9 +108,27 @@ class AuthService {
       }
       return AuthResult.ok();
     } on AuthException catch (e) {
+      if (e.message.contains('Email not confirmed')) {
+        return AuthResult.confirmar(
+          'Falta confirmar tu correo. Abre el enlace que te enviamos (revisa también spam) y vuelve a entrar.');
+      }
       return AuthResult.error(_traducirError(e.message));
     } catch (e) {
       return AuthResult.error('Error de conexión. Verifica tu internet.');
+    }
+  }
+
+  // ── Reenviar el correo de confirmación ─────────────────
+  // Devuelve null si se envió, o el mensaje de error.
+  static Future<String?> reenviarConfirmacion(String correo) async {
+    try {
+      await _sb.auth.resend(
+        type: OtpType.signup, email: correo.trim(), emailRedirectTo: urlRegreso);
+      return null;
+    } on AuthException catch (e) {
+      return _traducirError(e.message);
+    } catch (e) {
+      return 'No se pudo reenviar el correo. Intenta de nuevo en un minuto.';
     }
   }
 
@@ -110,7 +150,34 @@ class AuthService {
           .eq('activo', true)
           .order('id', ascending: false)
           .limit(1);
-      final list = rows as List;
+      var list = rows as List;
+
+      // Se unió a un equipo con código, pero tuvo que confirmar su correo
+      // antes de entrar: el código quedó guardado en su cuenta y se canjea
+      // aquí, en su primer inicio de sesión.
+      final pendiente = usuarioActual?.userMetadata?['invitacion'] as String?;
+      if (list.isEmpty && pendiente != null && pendiente.isNotEmpty) {
+        try {
+          final canje = await _sb.rpc('canjear_invitacion', params: {
+            'p_codigo': pendiente,
+            'p_nombre': (usuarioActual?.userMetadata?['nombre'] as String?) ?? '',
+            'p_correo': usuarioActual?.email ?? '',
+          });
+          if (canje is Map && canje['exito'] == true) {
+            await _sb.auth.updateUser(UserAttributes(data: {'invitacion': null}));
+            list = await _sb
+                .from('usuarios_negocio')
+                .select('negocio_id, rol, nombre')
+                .eq('user_id', uid)
+                .eq('activo', true)
+                .order('id', ascending: false)
+                .limit(1) as List;
+          }
+        } catch (e) {
+          print('AuthService: no se pudo canjear la invitación pendiente: $e');
+        }
+      }
+
       if (list.isNotEmpty) {
         final data = list.first as Map<String, dynamic>;
         _negocioId     = data['negocio_id'] as String?;
@@ -133,6 +200,19 @@ class AuthService {
           }
         } catch (e) {
           print('AuthService: error cargando plan: $e');
+        }
+        // Aparte: si todavía no se corre suscripciones_y_correos.sql, estas
+        // columnas no existen y el plan de arriba debe cargar igual.
+        try {
+          final s = await _sb.from('negocios')
+            .select('plan_estado, plan_renueva, plan_vence')
+            .eq('id', _negocioId!)
+            .maybeSingle();
+          _planEstado  = s?['plan_estado'] as String?;
+          _planRenueva = s?['plan_renueva'] != null ? DateTime.tryParse(s!['plan_renueva']) : null;
+          _planVence   = s?['plan_vence'] != null ? DateTime.tryParse(s!['plan_vence']) : null;
+        } catch (_) {
+          _planEstado = null; _planRenueva = null; _planVence = null;
         }
       }
 
@@ -182,6 +262,9 @@ class AuthService {
     _nombreUsuario = null;
     _plan          = null;
     _trialHasta    = null;
+    _planEstado    = null;
+    _planRenueva   = null;
+    _planVence     = null;
     _modulosPermitidos = {};
     _permisosConfigurados = false;
     await _sb.auth.signOut();
@@ -429,9 +512,18 @@ class AuthService {
       }
 
       // 2. Crear la cuenta en Supabase Auth
-      final res = await _sb.auth.signUp(email: correo, password: password);
+      // El código va guardado en la cuenta: si Supabase pide confirmar el
+      // correo, aún no hay sesión para canjearlo; se canjea al primer login.
+      final res = await _sb.auth.signUp(
+        email: correo, password: password,
+        data: {'nombre': nombre, 'invitacion': codigoLimpio},
+        emailRedirectTo: urlRegreso);
       if (res.user == null) {
         return AuthResult.error('No se pudo crear la cuenta');
+      }
+      if (res.session == null) {
+        return AuthResult.confirmar(
+          'Te enviamos un correo a $correo. Ábrelo, toca "Confirmar mi correo" y luego inicia sesión: entrarás directo a tu taller.');
       }
 
       // 3. Canjear el código ya autenticado: vincula al taller y
@@ -494,7 +586,10 @@ class AuthService {
 class AuthResult {
   final bool exito;
   final String? error;
-  const AuthResult._(this.exito, this.error);
-  factory AuthResult.ok()            => const AuthResult._(true, null);
-  factory AuthResult.error(String e) => AuthResult._(false, e);
+  /// La cuenta existe pero falta confirmar el correo (no es un error del usuario)
+  final bool requiereConfirmar;
+  const AuthResult._(this.exito, this.error, [this.requiereConfirmar = false]);
+  factory AuthResult.ok()                => const AuthResult._(true, null);
+  factory AuthResult.error(String e)     => AuthResult._(false, e);
+  factory AuthResult.confirmar(String m) => AuthResult._(false, m, true);
 }
