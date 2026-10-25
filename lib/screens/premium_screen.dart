@@ -3,9 +3,10 @@
 //
 // Cómo se paga:
 // - Si la app viene de Google Play y el producto existe, se usa Google Play.
-// - Si no (APK directo o versión web), suscripción mensual con Mercado Pago:
-//   el backend de hetnacnc.com crea la suscripción, la app abre el enlace de
-//   pago y, cuando Mercado Pago confirma, el servidor cambia `negocios.plan`.
+// - Si no (APK directo o versión web), suscripción mensual con Mercado Pago
+//   (México, MXN) o con PayPal (USD, tarjeta internacional): el backend de
+//   hetnacnc.com crea la suscripción, la app abre el enlace de pago y, cuando
+//   el proveedor confirma, el servidor cambia `negocios.plan`.
 //   "Ya pagué, actualizar" vuelve a revisar el pago por si el aviso tarda.
 // - WhatsApp queda como alternativa (transferencia, factura, dudas).
 // Ojo: si algún día se publica en Google Play, Google no permite mandar a pagar
@@ -26,6 +27,11 @@ class PremiumScreen extends StatefulWidget {
 
 class _PremiumScreenState extends State<PremiumScreen> {
   bool _ocupado = false;
+  // Precios en USD y formas de pago activas, desde hetnacnc.com
+  Map<String, dynamic>? _precios;
+
+  bool get _hayPaypal => _precios?['paypal'] == true;
+  num? _usd(Plan p) => ((_precios?['planes'] as Map?)?[p.name] as Map?)?['usd'] as num?;
 
   static const _incluye = {
     Plan.gratis: [
@@ -48,6 +54,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
   @override
   void initState() {
     super.initState();
+    SuscripcionApi.precios().then((d) {
+      if (mounted) setState(() => _precios = d);
+    }).catchError((_) {});
     BillingService.onError = (msg) {
       if (!mounted) return;
       setState(() => _ocupado = false);
@@ -94,46 +103,77 @@ class _PremiumScreenState extends State<PremiumScreen> {
       return;
     }
 
-    // Mercado Pago pide el correo de la cuenta con la que se va a pagar
-    final correoCtrl = TextEditingController(text: AuthService.usuarioActual?.email ?? '');
-    final eleccion = await showDialog<String>(context: context, builder: (ctx) => AlertDialog(
-      title: Text('Plan ${Planes.nombres[p]} · \$${Planes.precios[p]} al mes'),
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Se cobra cada mes con Mercado Pago (tarjeta de crédito o débito). '
-          'Puedes cancelar cuando quieras y conservas el plan hasta el fin del mes pagado.',
-          style: TextStyle(fontSize: 12, color: AppColors.textoSecundario, height: 1.4)),
-        const SizedBox(height: 14),
-        TextField(controller: correoCtrl, keyboardType: TextInputType.emailAddress,
+    // 1) Forma de pago
+    final usd = _usd(p);
+    final forma = await showDialog<String>(context: context, builder: (ctx) => SimpleDialog(
+      title: Text('Plan ${Planes.nombres[p]}'),
+      children: [
+        _opcionPago(ctx, 'mp', Icons.credit_card, 'Mercado Pago',
+          'México · \$${Planes.precios[p]} MXN al mes · tarjeta de crédito o débito'),
+        if (_hayPaypal && usd != null)
+          _opcionPago(ctx, 'paypal', Icons.public, 'PayPal',
+            'US\$$usd al mes · tarjeta internacional o cuenta PayPal'),
+        _opcionPago(ctx, 'whatsapp', Icons.chat_outlined, 'WhatsApp',
+          'Transferencia, factura o dudas'),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(24, 8, 24, 0),
+          child: Text('Se cobra cada mes. Puedes cancelar cuando quieras y conservas el plan hasta el fin del mes pagado.',
+            style: TextStyle(fontSize: 11, color: AppColors.textoSecundario, height: 1.4))),
+      ]));
+    if (forma == null) return;
+    if (forma == 'whatsapp') return _porWhatsApp(p);
+
+    // 2) Mercado Pago pide el correo de la cuenta con la que se va a pagar
+    var correoPago = '';
+    if (forma == 'mp') {
+      final correoCtrl = TextEditingController(text: AuthService.usuarioActual?.email ?? '');
+      final seguir = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+        title: Text('Mercado Pago · \$${Planes.precios[p]} MXN al mes'),
+        content: TextField(controller: correoCtrl, keyboardType: TextInputType.emailAddress,
           decoration: const InputDecoration(
             labelText: 'Correo de tu cuenta de Mercado Pago',
             helperText: 'Debe ser el mismo con el que entras a Mercado Pago',
             isDense: true, border: OutlineInputBorder())),
-      ]),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, 'whatsapp'),
-          child: const Text('Prefiero WhatsApp')),
-        ElevatedButton(onPressed: () => Navigator.pop(ctx, 'mp'),
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-          child: const Text('Pagar con Mercado Pago', style: TextStyle(color: Colors.white))),
-      ]));
-    final correoPago = correoCtrl.text.trim();
-    correoCtrl.dispose();
-    if (eleccion == 'whatsapp') return _porWhatsApp(p);
-    if (eleccion != 'mp') return;
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
+            child: const Text('Ir a pagar', style: TextStyle(color: Colors.white))),
+        ]));
+      correoPago = correoCtrl.text.trim();
+      correoCtrl.dispose();
+      if (seguir != true) return;
+    }
+    final proveedor = forma == 'paypal' ? 'paypal' : 'mercadopago';
+    final nombreProveedor = forma == 'paypal' ? 'PayPal' : 'Mercado Pago';
 
     setState(() => _ocupado = true);
     try {
-      final url = await SuscripcionApi.crear(token, p.name, correoPago);
+      final url = await SuscripcionApi.crear(token, p.name, correoPago, proveedor: proveedor);
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      _aviso('Cuando termines de pagar en Mercado Pago, toca "Ya pagué — actualizar mi plan".');
+      _aviso('Cuando termines de pagar en $nombreProveedor, toca "Ya pagué — actualizar mi plan".');
     } on HetnaError catch (e) {
       _aviso(e.mensaje, error: true);
     } catch (_) {
-      _aviso('No pudimos abrir Mercado Pago. Revisa tu conexión o escríbenos por WhatsApp.', error: true);
+      _aviso('No pudimos abrir $nombreProveedor. Revisa tu conexión o escríbenos por WhatsApp.', error: true);
     } finally {
       if (mounted) setState(() => _ocupado = false);
     }
   }
+
+  Widget _opcionPago(BuildContext ctx, String valor, IconData icono, String titulo, String detalle) =>
+    SimpleDialogOption(
+      onPressed: () => Navigator.pop(ctx, valor),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+      child: Row(children: [
+        Icon(icono, color: AppColors.azul, size: 22),
+        const SizedBox(width: 14),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(titulo, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 2),
+          Text(detalle, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+        ])),
+      ]));
 
   Future<void> _actualizar() async {
     setState(() => _ocupado = true);
@@ -266,6 +306,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
           if (Planes.precios[p]! > 0)
             const Text(' /mes', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ]),
+        if (_hayPaypal && _usd(p) != null && Planes.precios[p]! > 0)
+          Align(alignment: Alignment.centerRight,
+            child: Text('o US\$${_usd(p)}/mes con PayPal',
+              style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
         const SizedBox(height: 8),
         ...(_incluye[p] ?? []).map((t) => Padding(
           padding: const EdgeInsets.only(bottom: 4),

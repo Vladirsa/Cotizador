@@ -89,9 +89,9 @@ class HetnaApi {
     '$base/$_region/servicios/envios-hetna/solicitar?c=${Uri.encodeComponent(cotizacionId)}&t=${Uri.encodeComponent(tarifaId)}';
 }
 
-// ═══════════════ Suscripción con Mercado Pago ═══════════════
-// El backend de hetnacnc.com crea la suscripción y, cuando Mercado Pago
-// confirma el pago, cambia el plan del taller. La app sólo abre el enlace.
+// ═══════════════ Suscripción con Mercado Pago o PayPal ═══════════════
+// El backend de hetnacnc.com crea la suscripción y, cuando Mercado Pago o
+// PayPal confirman el pago, cambia el plan del taller. La app sólo abre el enlace.
 class SuscripcionApi {
   static const _ruta = '${HetnaApi.base}/api/cotizador-suscripcion';
 
@@ -110,11 +110,23 @@ class SuscripcionApi {
     return d;
   }
 
-  /// Devuelve el enlace de Mercado Pago para pagar el plan.
-  static Future<String> crear(String token, String plan, String correoPago) async {
-    final d = await _post(_ruta, token, {'plan': plan, 'correo_pago': correoPago});
+  /// Precios (MXN con Mercado Pago, USD con PayPal) y qué formas de pago están activas:
+  /// { planes: { taller: { mxn, usd }, ... }, mercadopago: bool, paypal: bool }
+  static Future<Map<String, dynamic>> precios() async {
+    final r = await http.get(Uri.parse(_ruta)).timeout(const Duration(seconds: 15));
+    final j = jsonDecode(utf8.decode(r.bodyBytes));
+    if (r.statusCode != 200 || j is! Map<String, dynamic>) throw HetnaError('No se pudieron cargar los precios.');
+    return j;
+  }
+
+  /// Devuelve el enlace para pagar el plan.
+  /// proveedor: 'mercadopago' (México, MXN) o 'paypal' (USD).
+  static Future<String> crear(String token, String plan, String correoPago, {String proveedor = 'mercadopago'}) async {
+    final d = await _post(_ruta, token, {'plan': plan, 'correo_pago': correoPago, 'proveedor': proveedor});
     final url = d['url'] as String?;
-    if (url == null || url.isEmpty) throw HetnaError('Mercado Pago no devolvió el enlace de pago.');
+    if (url == null || url.isEmpty) {
+      throw HetnaError('${proveedor == 'paypal' ? 'PayPal' : 'Mercado Pago'} no devolvió el enlace de pago.');
+    }
     return url;
   }
 
