@@ -28,6 +28,7 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
   String _passwordConfirm = '';
 
   bool _cargando = false;
+  bool _requiereConfirmar = false; // Supabase pide confirmar el correo antes de entrar
   bool _verPassword = false;
   String? _error;
 
@@ -221,7 +222,7 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
     ]));
 
   // ── PASO 3: CONFIRMACIÓN ─────────────────────────────
-  Widget _paso3Confirmacion() => _wrapPaso(
+  Widget _paso3Confirmacion() => _requiereConfirmar ? _paso3ConfirmarCorreo() : _wrapPaso(
     titulo: '¡Listo!',
     subtitulo: 'Tu taller ha sido creado exitosamente.',
     icon: '🎉',
@@ -263,6 +264,42 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         ])),
       const SizedBox(height: 20),
       _btnPrimario('Entrar a mi taller', _entrarAlApp),
+    ]));
+
+  // ── PASO 3 (con confirmación de correo) ─────────────
+  Widget _paso3ConfirmarCorreo() => _wrapPaso(
+    titulo: '¡Ya casi!',
+    subtitulo: 'Tu taller está creado. Falta confirmar tu correo para entrar.',
+    icon: '📧',
+    child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.azulClaro, borderRadius: BorderRadius.circular(14)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Te enviamos un correo a ${_correo.trim()}',
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.azul)),
+          const SizedBox(height: 10),
+          const Text('1. Ábrelo (si no aparece, revisa spam o promociones).\n'
+            '2. Toca "Confirmar mi correo".\n'
+            '3. Regresa aquí e inicia sesión con tu correo y contraseña.',
+            style: TextStyle(fontSize: 13, height: 1.5)),
+        ])),
+      const SizedBox(height: 16),
+      TextButton.icon(
+        onPressed: _cargando ? null : () async {
+          setState(() => _cargando = true);
+          final error = await AuthService.reenviarConfirmacion(_correo);
+          if (!mounted) return;
+          setState(() => _cargando = false);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(error ?? '✅ Te enviamos otro correo.'),
+            backgroundColor: error == null ? AppColors.verde : AppColors.rojo));
+        },
+        icon: const Icon(Icons.mark_email_unread_outlined, size: 18),
+        label: const Text('No me llegó, reenviar el correo')),
+      const SizedBox(height: 8),
+      _btnPrimario('Ir a iniciar sesión', () => Navigator.of(context).pop()),
     ]));
 
   // ── LÓGICA ───────────────────────────────────────────
@@ -318,7 +355,8 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
       final authResult = await _sb.auth.signUp(
         email: _correo.trim(),
         password: _password,
-        data: {'nombre': _nombreAdmin.trim()});
+        data: {'nombre': _nombreAdmin.trim()},
+        emailRedirectTo: AuthService.urlRegreso);
 
       if (authResult.user == null) {
         setState(() { _error = 'Error al crear la cuenta. Intenta con otro correo.'; _cargando = false; });
@@ -326,6 +364,9 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
       }
 
       final userId = authResult.user!.id;
+      // Con "confirmar correo" activo en Supabase todavía no hay sesión:
+      // el taller se crea igual y el usuario entra después de confirmar.
+      _requiereConfirmar = authResult.session == null;
 
       // 2. Crear negocio + usuario administrador via función SQL
       final result = await _sb.rpc('registrar_taller', params: {
