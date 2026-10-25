@@ -243,7 +243,11 @@ class _PremiumScreenState extends State<PremiumScreen> {
   }
 
   Widget _tarjeta(Plan p, Plan actual) {
-    final esActual = p == actual;
+    // En la prueba todo está abierto (se ve como Industrial), pero el taller
+    // todavía no paga: debe poder contratar cualquier plan de pago.
+    final enPrueba = AuthService.plan == 'trial' || AuthService.plan == 'prueba';
+    final esActual = !enPrueba && p == actual;
+    final puedeContratar = p != Plan.gratis && (enPrueba || p.index > actual.index);
     final destacado = p == Plan.taller;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -273,7 +277,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
         const SizedBox(height: 8),
         if (esActual)
           const Text('✓ Tu plan actual', style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w700))
-        else if (p.index > actual.index)
+        else if (puedeContratar)
           SizedBox(width: double.infinity, height: 42, child: ElevatedButton(
             onPressed: _ocupado ? null : () => _contratar(p),
             style: ElevatedButton.styleFrom(backgroundColor: destacado ? AppColors.naranja : AppColors.azul,
