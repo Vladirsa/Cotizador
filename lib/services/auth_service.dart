@@ -10,7 +10,7 @@ export 'planes.dart' show Plan, Planes;
 class AuthService {
   static final _sb = Supabase.instance.client;
 
-  // ── Sesión actual ──────────────────────────────────────────────────────
+  // ── Sesión actual ────────────────────────────────────────
   static User? get usuarioActual => _sb.auth.currentUser;
   static bool  get estaLogueado  => usuarioActual != null;
   static Session? get sesion     => _sb.auth.currentSession;
@@ -35,11 +35,13 @@ class AuthService {
   static bool get tieneSuscripcion => _planEstado == 'activa';
 
   // ── A dónde regresa el enlace de los correos ──
-  // Web: la misma página del Cotizador. Android: el enlace abre la app.
+  // Web: la misma página del Cotizador. Android: el enlace abre la app
+  // (el APK ya registra com.hetnacnc.app://reset-callback; Supabase abre la
+  // sesión con cualquier enlace, sea de confirmar correo o de recuperar).
   // Las dos direcciones deben estar en Supabase > Authentication > URL
   // Configuration > Redirect URLs.
   static String get urlRegreso =>
-    kIsWeb ? 'https://hetnacnc.com/cotizador/' : 'com.hetnacnc.app://login-callback/';
+    kIsWeb ? 'https://hetnacnc.com/cotizador/' : 'com.hetnacnc.app://reset-callback/';
   static String get urlRecuperar =>
     kIsWeb ? 'https://hetnacnc.com/cotizador/' : 'com.hetnacnc.app://reset-callback/';
 
