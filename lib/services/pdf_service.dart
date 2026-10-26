@@ -459,7 +459,7 @@ class PdfService {
       (_t('Vigencia de la oferta'), _tf('{0} días (hasta {1})', [vigenciaDias, fechaVigencia])),
       (_t('Moneda'), moneda),
       (_t('Impuestos'), cotizacion.ivaPct > 0 ? _tf('IVA {0}% incluido en el total', [pctTexto(cotizacion.ivaPct)]) : _t('Precios sin IVA')),
-      (_t('Cambios y cancelaciones'), v('cambios')),
+      (_t('Cambios y cancelaciones'), _t(v('cambios'))),
       (_t('Notas'), _limpiarTexto(cotizacion.notas ?? '')),
     ];
 
@@ -626,7 +626,7 @@ class PdfService {
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(4)),
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              if (v('calidad').isNotEmpty) pw.Text(v('calidad'), style: const pw.TextStyle(fontSize: 9)),
+              if (v('calidad').isNotEmpty) pw.Text(_t(v('calidad')), style: const pw.TextStyle(fontSize: 9)),
               if (v('tolerancia').isNotEmpty)
                 pw.Text(_tf('Tolerancia general: {0}', [(v('tolerancia'))]), style: const pw.TextStyle(fontSize: 9)),
               if ((empresa['leyenda_pdf'] as String?)?.isNotEmpty == true)
