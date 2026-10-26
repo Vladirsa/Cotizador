@@ -10,6 +10,8 @@ import '../services/pdf_service.dart';
 import '../services/whatsapp_service.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'simulador_screen.dart';
+import 'envios_screen.dart';
+import '../services/auth_service.dart';
 
 class CotizarScreen extends StatefulWidget {
   final dynamic itemInicial;
@@ -351,17 +353,7 @@ class _TarjetaCotizacion extends StatelessWidget {
       Cotizacion cotConItems = cotizacion;
       if (cotizacion.items.isEmpty && cotizacion.id != null) {
         final items = await SupabaseService.getCotizacionItems(cotizacion.id!);
-        cotConItems = Cotizacion(
-          id: cotizacion.id, folio: cotizacion.folio,
-          cliente: cotizacion.cliente, clienteId: cotizacion.clienteId,
-          estado: cotizacion.estado, items: items,
-          descuentoPct: cotizacion.descuentoPct, descuentoFijo: cotizacion.descuentoFijo,
-          ivaPct: cotizacion.ivaPct, costoEnvio: cotizacion.costoEnvio,
-          metodoPago: cotizacion.metodoPago, condicionEntrega: cotizacion.condicionEntrega,
-          fechaEntrega: cotizacion.fechaEntrega, diasHabiles: cotizacion.diasHabiles,
-          vigenciaDias: cotizacion.vigenciaDias, notas: cotizacion.notas,
-          pdfUrl: cotizacion.pdfUrl, createdAt: cotizacion.createdAt,
-          totalBd: cotizacion.totalBd);
+        cotConItems = cotizacion.copiaConItems(items);
       }
       await SupabaseService.convertirEnPedido(cotConItems);
       onActualizar();
@@ -422,11 +414,103 @@ class _NuevaCotizacion extends StatefulWidget {
 
 class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   Cliente? _cliente;
+
+  // ── Cotización profesional (formato internacional) ──
+  String _tipo = 'sencilla';          // 'sencilla' | 'profesional'
+  String _tipoOriginal = 'sencilla';  // tipo con el que se abrió (al editar)
+  bool _muestraGratis = false;        // la única profesional del plan Gratis
+  // (clave en datos_pro, etiqueta, renglones, texto inicial)
+  static const _camposProyecto = [
+    ('proyecto', 'Proyecto / referencia del cliente', 1, ''),
+    ('revision', 'Revisión', 1, 'A'),
+    ('moneda', 'Moneda', 1, 'MXN'),
+    ('resumen', 'Resumen: qué se cotiza y supuestos principales', 3, ''),
+  ];
+  static const _camposAlcance = [
+    ('incluye', 'Incluye (uno por renglón)', 4, ''),
+    ('no_incluye', 'No incluye (uno por renglón)', 4, ''),
+  ];
+  static const _camposTecnicos = [
+    ('material', 'Material', 1, ''),
+    ('medidas', 'Medidas / espesor', 1, ''),
+    ('tolerancia', 'Tolerancia general', 1, ''),
+    ('acabado', 'Acabado', 1, ''),
+    ('archivo', 'Archivo recibido (DXF, STEP, plano...)', 1, ''),
+    ('norma', 'Norma o especificación (si aplica)', 1, ''),
+  ];
+  static const _camposFabricacion = [
+    ('proceso', 'Proceso (ej. router CNC 3 ejes)', 1, ''),
+    ('maquina', 'Máquina', 1, ''),
+    ('operaciones', 'Operaciones (corte, perforado, grabado...)', 2, ''),
+    ('setups', 'Número de setups', 1, ''),
+    ('inspeccion', 'Inspección (calibrador, micrómetro...)', 1, ''),
+  ];
+  static const _camposCondiciones = [
+    ('calidad', 'Condiciones técnicas y de calidad', 3,
+      'Inspección dimensional en cotas críticas antes de la entrega.'),
+    ('cambios', 'Cambios y cancelaciones', 2,
+      'Cambios de diseño o de cantidad después de aprobar pueden modificar precio y tiempo de entrega.'),
+  ];
+  final Map<String, TextEditingController> _pro = {};
+
+  TextEditingController _ctrlPro(String k, String inicial) =>
+    _pro.putIfAbsent(k, () => TextEditingController(text: inicial));
+
+  Map<String, dynamic> _datosPro() {
+    final d = <String, dynamic>{};
+    _pro.forEach((k, c) { if (c.text.trim().isNotEmpty) d[k] = c.text.trim(); });
+    d['tiempo_entrega'] = _tiempoEntrega;
+    if (_muestraGratis) d['muestra'] = true;
+    return d;
+  }
+
+  bool get _eraProfesional => _esEdicion && _tipoOriginal == 'profesional';
+
+  // Gratis: una profesional de muestra. Devuelve true si puede usarla.
+  Future<bool> _permiteProfesional() async {
+    if (AuthService.puede('cotizacion_profesional') || _eraProfesional) return true;
+    final n = await SupabaseService.contarCotizacionesProfesionales();
+    if (n < Planes.muestrasProfesionalGratis) {
+      _muestraGratis = true;
+      return true;
+    }
+    if (!mounted) return false;
+    await AuthService.exigirModulo(context, 'cotizacion_profesional',
+      funcion: 'más cotizaciones profesionales (ya usaste tu muestra gratis)');
+    return false;
+  }
+
+  Future<void> _seleccionarTipo(String tipo) async {
+    if (tipo == _tipo) return;
+    if (tipo == 'profesional' && !await _permiteProfesional()) return;
+    if (mounted) setState(() => _tipo = tipo);
+  }
+
+  @override
+  void dispose() {
+    for (final c in _pro.values) { c.dispose(); }
+    super.dispose();
+  }
   List<CotizacionItem> _items = [];
   double _descuentoPct = 0;
   double _ivaPct = 16;
   bool _aplicaIva = true;
   double _costoEnvio = 0;
+  int _envioVer = 0;            // cambia para refrescar el campo Envío
+  String? _envioDescripcion;    // paquetería elegida en Envíos HETNA
+
+  Future<void> _cotizarEnvioHetna() async {
+    final r = await Navigator.push<EnvioElegido>(context, MaterialPageRoute(
+      builder: (_) => EnviosScreen(cpDestino: _cliente?.codigoPostal, paraCotizacion: true)));
+    if (r == null || !mounted) return;
+    setState(() {
+      _costoEnvio = r.opcion.precio;
+      _envioDescripcion = r.descripcion;
+      _envioVer++;
+      final linea = 'Envío: ${r.descripcion}';
+      if (!_notas.contains(linea)) _notas = _notas.isEmpty ? linea : '$_notas\n$linea';
+    });
+  }
   String _metodoPago = '50% anticipo / 50% entrega';
   String _condicionEntrega = 'LAB — En planta HETNA';
   String _notas = '';
@@ -488,6 +572,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _condicionEntrega = c.condicionEntrega ?? 'LAB — En planta HETNA';
       _notas = c.notas ?? '';
       if (c.createdAt != null) _fechaCotizacion = c.createdAt!;
+      _tipo = c.tipo;
+      _tipoOriginal = c.tipo;
+      _muestraGratis = c.datosPro['muestra'] == true;
+      c.datosPro.forEach((k, v) {
+        if (k == 'tiempo_entrega') {
+          if (_tiempos.contains(v)) _tiempoEntrega = v as String;
+        } else if (v is String) {
+          _ctrlPro(k, '').text = v;
+        }
+      });
       if (_items.isEmpty && c.id != null) {
         SupabaseService.getCotizacionItems(c.id!).then((items) {
           if (mounted) setState(() => _items = items);
@@ -509,6 +603,22 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             Text('Editando: ${widget.cotizacionEditar!.folio ?? "cotización"}',
               style: const TextStyle(fontSize: 12, color: AppColors.ambar, fontWeight: FontWeight.w600)),
           ])),
+      _bloque('Tipo de cotización', Icons.description_outlined, Column(children: [
+        Row(children: [
+          Expanded(child: _opcionTipo('sencilla', 'Sencilla', 'Partidas, condiciones y total')),
+          const SizedBox(width: 8),
+          Expanded(child: _opcionTipo('profesional', 'Profesional ⭐', 'Formato internacional con datos técnicos y firma')),
+        ]),
+        if (_tipo == 'profesional' && _muestraGratis && !AuthService.puede('cotizacion_profesional'))
+          Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8)),
+            child: const Text(
+              'Esta es tu cotización profesional de muestra (plan Gratis). '
+              'Con el plan Taller haces todas las que quieras.',
+              style: TextStyle(fontSize: 11, color: AppColors.ambar, fontWeight: FontWeight.w600))),
+      ])),
       _bloque('Cliente', Icons.person_outline, _cliente == null
         ? Column(children: [
             ElevatedButton.icon(onPressed: _seleccionarCliente,
@@ -569,6 +679,13 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             icon: const Icon(Icons.add_box_outlined, size: 18), label: const Text('Nuevo rápido'))),
         ]),
       ])),
+      if (_tipo == 'profesional') ...[
+        _bloquePro('Proyecto y resumen', Icons.folder_outlined, _camposProyecto),
+        _bloquePro('Alcance', Icons.checklist_outlined, _camposAlcance),
+        _bloquePro('Detalle técnico', Icons.straighten_outlined, _camposTecnicos),
+        _bloquePro('Especificaciones de fabricación', Icons.precision_manufacturing_outlined, _camposFabricacion),
+        _bloquePro('Calidad y cambios', Icons.verified_outlined, _camposCondiciones),
+      ],
       _bloque('Condiciones', Icons.local_shipping_outlined, Column(children: [
         Row(children: [
           Expanded(child: _campo('Tiempo entrega', child: DropdownButtonFormField<String>(
@@ -585,6 +702,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         ]),
         const SizedBox(height: 8),
         _campo('Notas', child: TextFormField(
+          key: ValueKey('notas_$_envioVer'),
           initialValue: _notas,
           decoration: const InputDecoration(hintText: 'Garantías, condiciones especiales...',
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
@@ -601,13 +719,19 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             onChanged: (v) => setState(() => _descuentoPct = double.tryParse(v) ?? 0)))),
           const SizedBox(width: 8),
           Expanded(child: _campo('Envío', child: TextFormField(
+            key: ValueKey('envio_$_envioVer'),
             initialValue: _costoEnvio > 0 ? _costoEnvio.toStringAsFixed(0) : '',
             decoration: const InputDecoration(hintText: '0', prefixText: '\$',
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             keyboardType: TextInputType.number,
             onChanged: (v) => setState(() => _costoEnvio = double.tryParse(v) ?? 0)))),
         ]),
-        const SizedBox(height: 8),
+        Align(alignment: Alignment.centerRight, child: TextButton.icon(
+          onPressed: _cotizarEnvioHetna,
+          icon: const Icon(Icons.local_shipping_outlined, size: 16, color: AppColors.naranja),
+          label: Text(_envioDescripcion ?? 'Cotizar con Envíos HETNA',
+            style: const TextStyle(fontSize: 12, color: AppColors.naranja)))),
+        const SizedBox(height: 4),
         Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: _aplicaIva ? AppColors.verdeClaro : AppColors.gris,
@@ -672,6 +796,41 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       Row(children: [Icon(icon, size: 16, color: AppColors.azul), const SizedBox(width: 6),
         Text(titulo, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.azul))]),
       const SizedBox(height: 10), contenido]));
+
+  Widget _opcionTipo(String valor, String titulo, String desc) {
+    final sel = _tipo == valor;
+    final candado = valor == 'profesional' && !AuthService.puede('cotizacion_profesional');
+    return GestureDetector(
+      onTap: () => _seleccionarTipo(valor),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: sel ? AppColors.azul : Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde, width: sel ? 1.5 : 0.5)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(child: Text(titulo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+              color: sel ? Colors.white : AppColors.textoPrincipal))),
+            if (candado && !sel) const Icon(Icons.lock_outline, size: 14, color: Colors.amber),
+          ]),
+          const SizedBox(height: 2),
+          Text(desc, style: TextStyle(fontSize: 10,
+            color: sel ? Colors.white70 : AppColors.textoSecundario)),
+        ])));
+  }
+
+  Widget _bloquePro(String titulo, IconData icon, List<(String, String, int, String)> campos) =>
+    _bloque(titulo, icon, Column(children: campos.map((f) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextField(
+        controller: _ctrlPro(f.$1, f.$4),
+        maxLines: f.$3,
+        minLines: 1,
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          labelText: f.$2, isDense: true,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))))).toList()));
 
   Widget _campo(String label, {required Widget child}) =>
     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -922,13 +1081,27 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       numero: _cliente!.whatsappNumero, mensaje: msg);
   }
 
+  // Plan Gratis: 10 cotizaciones nuevas al mes (igual que en hetnacnc.com)
+  Future<bool> _hayCupo() async {
+    if (_esEdicion || AuthService.puede('cotizaciones_ilimitadas')) return true;
+    final n = await SupabaseService.contarCotizacionesDelMes();
+    if (n < Planes.limiteCotizacionesGratis) return true;
+    if (!mounted) return false;
+    await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
+      funcion: 'más de ${Planes.limiteCotizacionesGratis} cotizaciones al mes');
+    return false;
+  }
+
   Future<void> _guardar() async {
     if (_cliente == null || _items.isEmpty) return;
+    if (!await _hayCupo()) return;
+    if (_tipo == 'profesional' && !await _permiteProfesional()) return;
     setState(() => _guardando = true);
     try {
       if (_esEdicion) {
         final cot = _buildCotizacion(id: widget.cotizacionEditar!.id, folio: widget.cotizacionEditar!.folio);
-        await SupabaseService.actualizarCotizacion(cot, _items);
+        await SupabaseService.actualizarCotizacion(cot, _items,
+          incluirTipo: _tipoOriginal == 'profesional' || _tipo == 'profesional');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('✅ Cotización actualizada'), backgroundColor: AppColors.verde));
@@ -953,6 +1126,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _convertirPedido() async {
     if (_cliente == null || _items.isEmpty) return;
+    if (!await _hayCupo()) return;
+    if (_tipo == 'profesional' && !await _permiteProfesional()) return;
     setState(() => _guardando = true);
     try {
       if (_esEdicion) {
@@ -960,7 +1135,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           id: widget.cotizacionEditar!.id,
           folio: widget.cotizacionEditar!.folio,
           estado: 'Pedido');
-        await SupabaseService.actualizarCotizacion(cotActualizada, _items);
+        await SupabaseService.actualizarCotizacion(cotActualizada, _items,
+          incluirTipo: _tipoOriginal == 'profesional' || _tipo == 'profesional');
         await SupabaseService.convertirEnPedido(cotActualizada);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -991,7 +1167,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     items: _items, estado: estado ?? 'Borrador',
     descuentoPct: _descuentoPct, ivaPct: _aplicaIva ? _ivaPct : 0,
     costoEnvio: _costoEnvio, metodoPago: _metodoPago,
-    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion);
+    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion,
+    tipo: _tipo, datosPro: _tipo == 'profesional' ? _datosPro() : {});
 }
 
 // ═══════════════════════════════════════════
@@ -1584,15 +1761,7 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
       Cotizacion cot = widget.cotizacion;
       if (cot.items.isEmpty && cot.id != null) {
         final items = await SupabaseService.getCotizacionItems(cot.id!);
-        cot = Cotizacion(
-          id: cot.id, folio: cot.folio, cliente: cot.cliente, clienteId: cot.clienteId,
-          estado: cot.estado, items: items,
-          descuentoPct: cot.descuentoPct, descuentoFijo: cot.descuentoFijo,
-          ivaPct: cot.ivaPct, costoEnvio: cot.costoEnvio,
-          metodoPago: cot.metodoPago, condicionEntrega: cot.condicionEntrega,
-          fechaEntrega: cot.fechaEntrega, diasHabiles: cot.diasHabiles,
-          vigenciaDias: cot.vigenciaDias, notas: cot.notas,
-          pdfUrl: cot.pdfUrl, createdAt: cot.createdAt, totalBd: cot.totalBd);
+        cot = cot.copiaConItems(items);
       }
       final cfg = await SupabaseService.getConfiguracion();
       final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg);

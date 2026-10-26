@@ -65,6 +65,24 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
       Navigator.pushAndRemoveUntil(context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (route) => false);
+    } else if (result.requiereConfirmar) {
+      // La cuenta quedó creada; falta confirmar el correo para entrar
+      await showDialog(context: context, builder: (ctx) => AlertDialog(
+        title: const Text('Confirma tu correo'),
+        content: Text(result.error ?? ''),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              final error = await AuthService.reenviarConfirmacion(correo);
+              if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: Text(error ?? 'Te enviamos otro correo.')));
+            },
+            child: const Text('Reenviar correo')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Ir a iniciar sesión')),
+        ]));
+      if (mounted) Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(result.error ?? 'Error al crear la cuenta'),

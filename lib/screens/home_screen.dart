@@ -23,6 +23,11 @@ import 'agenda_screen.dart';
 import 'equipo_screen.dart';
 import 'permisos_screen.dart';
 import 'reportes_screen.dart';
+import 'premium_screen.dart';
+import 'calculadora_cnc_screen.dart';
+import 'envios_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/hetna_api.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -89,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _btn(1, Icons.notifications_outlined, 'Alertas', badge: _alertas),
       _btn(2, Icons.description_outlined, 'Cotizar'),
       _btn(3, Icons.local_shipping_outlined, 'Avances'),
-      _btn(4, Icons.calculate_outlined, 'Simular', premium: true),
+      _btn(4, Icons.calculate_outlined, 'Simular', plan: 'simulador'),
       // Botón Más
       Expanded(child: Builder(builder: (ctx) => GestureDetector(
         onTap: () => Scaffold.of(ctx).openDrawer(),
@@ -105,13 +110,13 @@ class _HomeScreenState extends State<HomeScreen> {
     ]))),
   );
 
-  Widget _btn(int idx, IconData icon, String label, {int badge = 0, bool premium = false}) {
+  Widget _btn(int idx, IconData icon, String label, {int badge = 0, String? plan}) {
     final active = idx == _tab;
-    final bloqueado = premium && !AuthService.esPremiumActivo;
+    final bloqueado = plan != null && !AuthService.puede(plan);
     return Expanded(child: GestureDetector(
       onTap: () async {
         if (bloqueado) {
-          await AuthService.exigirPremium(context, funcion: label);
+          await AuthService.exigirModulo(context, plan!, funcion: label);
           return;
         }
         setState(() => _tab = idx);
@@ -153,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Text(AuthService.rol ?? '',
             style: const TextStyle(color: Colors.white60, fontSize: 11)),
           // Aviso de plan / trial
-          if (AuthService.plan == 'trial' && !AuthService.trialVencido) ...[
+          if ((AuthService.plan == 'trial' || AuthService.plan == 'prueba') && !AuthService.trialVencido) ...[
             const SizedBox(height: 8),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(color: Colors.white.withOpacity(0.15),
@@ -172,15 +177,37 @@ class _HomeScreenState extends State<HomeScreen> {
         ])),
       _dItem(Icons.people_outline,         'CRM Clientes',        5, modulo: 'clientes'),
       _dItem(Icons.inventory_2_outlined,   'Productos y Catálogo',6, modulo: 'productos'),
-      _dItem(Icons.warehouse_outlined,     'Inventario Bodega',   7, modulo: 'inventario'),
-      _dItem(Icons.receipt_long_outlined,  'Gastos y Compras',    8, modulo: 'gastos'),
-      _dItem(Icons.campaign_outlined,      'Marketing',           9, premium: true, modulo: 'marketing'),
-      _dItem(Icons.group_outlined,         'Mi equipo',          10, modulo: 'equipo'),
+      _dItem(Icons.warehouse_outlined,     'Inventario Bodega',   7, plan: 'inventario', modulo: 'inventario'),
+      _dItem(Icons.receipt_long_outlined,  'Gastos y Compras',    8, plan: 'gastos', modulo: 'gastos'),
+      _dItem(Icons.campaign_outlined,      'Marketing',           9, plan: 'marketing', modulo: 'marketing'),
+      _dItem(Icons.group_outlined,         'Mi equipo',          10, plan: 'equipo', modulo: 'equipo'),
       const Divider(height: 1),
-      _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11, premium: true, modulo: 'reportes'),
+      _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11, plan: 'reportes', modulo: 'reportes'),
       _dItem(Icons.settings_outlined,      'Configuración',      12, modulo: 'config'),
-      _dItem(Icons.tune_outlined,          'Config Simulador',   13),
-      _dItem(Icons.calculate_outlined,     'Costos del taller',  14),
+      _dItem(Icons.tune_outlined,          'Config Simulador',   13, plan: 'config_simulador'),
+      _dItem(Icons.calculate_outlined,     'Costos del taller',  14, plan: 'costos_taller'),
+      // ── Herramientas HETNA (abiertas en todos los planes) ──
+      const Divider(height: 1),
+      _seccion('HERRAMIENTAS HETNA'),
+      _dPush(Icons.precision_manufacturing_outlined, 'Calculadora CNC', const CalculadoraCncScreen()),
+      _dPush(Icons.local_shipping_outlined, 'Envíos HETNA', const EnviosScreen()),
+      // ── Ecosistema hetnacnc.com ──
+      const Divider(height: 1),
+      _seccion('HETNA CNC'),
+      _dLink(Icons.storefront_outlined, 'Tienda', HetnaApi.urlTienda),
+      _dLink(Icons.forum_outlined, 'Foro CNC', HetnaApi.urlForo),
+      _dLink(Icons.science_outlined, 'Laboratorio CAM', HetnaApi.urlLaboratorio),
+      _dLink(Icons.gavel_outlined, 'Licitaciones (RFQ)', HetnaApi.urlLicitaciones),
+      const Divider(height: 1),
+      ListTile(
+        leading: const Icon(Icons.workspace_premium_outlined, color: AppColors.naranja, size: 22),
+        title: const Text('Mi plan', style: TextStyle(fontSize: 14)),
+        trailing: Text(Planes.nombres[AuthService.planActual]!,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.naranja)),
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen()));
+        }),
       if (AuthService.esAdmin)
         ListTile(
           leading: const Icon(Icons.admin_panel_settings_outlined, color: AppColors.textoSecundario, size: 22),
@@ -202,9 +229,31 @@ class _HomeScreenState extends State<HomeScreen> {
         }),
     ]));
 
-  Widget _dItem(IconData icon, String label, int idx, {bool premium = false, String? modulo}) {
+  Widget _seccion(String t) => Padding(
+    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+    child: Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+      color: AppColors.textoSecundario, letterSpacing: 0.8)));
+
+  Widget _dPush(IconData icon, String label, Widget pantalla) => ListTile(
+    leading: Icon(icon, color: AppColors.naranja, size: 22),
+    title: Text(label, style: const TextStyle(fontSize: 14)),
+    onTap: () {
+      Navigator.pop(context);
+      Navigator.push(context, MaterialPageRoute(builder: (_) => pantalla));
+    });
+
+  Widget _dLink(IconData icon, String label, String url) => ListTile(
+    leading: Icon(icon, color: AppColors.azul, size: 22),
+    title: Text(label, style: const TextStyle(fontSize: 14)),
+    trailing: const Icon(Icons.open_in_new, size: 16, color: AppColors.textoSecundario),
+    onTap: () {
+      Navigator.pop(context);
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    });
+
+  Widget _dItem(IconData icon, String label, int idx, {String? plan, String? modulo}) {
     final active = _tab == idx;
-    final bloqueadoPremium = premium && !AuthService.esPremiumActivo;
+    final bloqueadoPremium = plan != null && !AuthService.puede(plan);
     final sinPermisoRol = modulo != null && !AuthService.tieneAcceso(modulo);
     final bloqueado = bloqueadoPremium || sinPermisoRol;
     return ListTile(
@@ -221,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onTap: () async {
         Navigator.pop(context);
         if (bloqueadoPremium) {
-          await AuthService.exigirPremium(context, funcion: label);
+          await AuthService.exigirModulo(context, plan!, funcion: label);
           return;
         }
         if (sinPermisoRol) {

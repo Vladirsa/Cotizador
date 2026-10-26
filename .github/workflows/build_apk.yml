@@ -294,12 +294,17 @@ jobs:
             </FilesMatch>
           </IfModule>
           HTACCESS
-      - name: Deploy a Hostinger via SFTP (hetnacnc.com/cotizador)
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+      # hetnacnc.com ya apunta al VPS (2.25.245.190), no al hosting viejo de
+      # Hostinger: subir allí dejaba la versión web donde nadie la ve.
+      # Secretos necesarios en GitHub → Settings → Secrets → Actions:
+      #   VPS_HOST (2.25.245.190), VPS_USER (root), VPS_SSH_KEY (llave privada)
+      - name: Deploy al VPS (hetnacnc.com/cotizador)
+        uses: appleboy/scp-action@v0.1.7
         with:
-          server: ${{ secrets.HOSTINGER_SSH_HOST }}
-          port: ${{ secrets.HOSTINGER_SSH_PORT }}
-          username: ${{ secrets.HOSTINGER_SSH_USERNAME }}
-          password: ${{ secrets.HOSTINGER_SSH_PASSWORD }}
-          local_path: tmp_app/build/web
-          remote_path: domains/hetnacnc.com/public_html/cotizador
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: tmp_app/build/web/*
+          target: /var/www/cotizador
+          strip_components: 3
+          rm: true

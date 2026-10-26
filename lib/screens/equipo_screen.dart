@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
+import 'premium_screen.dart';
 
 // ══════════════════════════════════════════════════════
 // MODELO
@@ -407,6 +408,19 @@ class _EquipoScreenState extends State<EquipoScreen> {
 
   // ── INVITAR USUARIO (por código, sin Supabase Dashboard) ──
   void _invitarUsuario() {
+    // Límite de usuarios del plan (activos + invitaciones sin usar)
+    final limite = Planes.usuarios[AuthService.planActual];
+    final ocupados = _usuarios.where((u) => u.activo).length + _invitacionesPendientes.length;
+    if (limite != null && ocupados >= limite) {
+      final siguiente = AuthService.planActual == Plan.pro ? 'Industrial' : 'Pro';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Tu plan ${Planes.nombres[AuthService.planActual]} permite $limite '
+          '${limite == 1 ? 'usuario' : 'usuarios'}. Sube a $siguiente para agregar más.'),
+        backgroundColor: AppColors.ambar,
+        action: SnackBarAction(label: 'Ver planes', textColor: Colors.white,
+          onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen())))));
+      return;
+    }
     String rolSel = 'vendedor';
 
     showModalBottomSheet(

@@ -265,6 +265,13 @@ class Cotizacion {
   String? pdfUrl;
   final DateTime? createdAt;
   final double? totalBd; // total guardado en BD
+  // 'sencilla' (la de siempre) o 'profesional' (formato internacional).
+  String tipo;
+  // Datos técnicos de la cotización profesional (proyecto, alcance,
+  // material, tolerancias, proceso, calidad...). Vacío en la sencilla.
+  Map<String, dynamic> datosPro;
+
+  bool get esProfesional => tipo == 'profesional';
 
   Cotizacion({
     this.id,
@@ -286,7 +293,21 @@ class Cotizacion {
     this.pdfUrl,
     this.createdAt,
     this.totalBd,
-  });
+    this.tipo = 'sencilla',
+    Map<String, dynamic>? datosPro,
+  }) : datosPro = datosPro ?? {};
+
+  // La misma cotización con sus partidas cargadas (conserva tipo y datos técnicos)
+  Cotizacion copiaConItems(List<CotizacionItem> nuevos) => Cotizacion(
+    id: id, folio: folio, cliente: cliente, clienteId: clienteId,
+    estado: estado, items: nuevos,
+    descuentoPct: descuentoPct, descuentoFijo: descuentoFijo,
+    ivaPct: ivaPct, costoEnvio: costoEnvio,
+    metodoPago: metodoPago, condicionEntrega: condicionEntrega,
+    fechaEntrega: fechaEntrega, diasHabiles: diasHabiles,
+    vigenciaDias: vigenciaDias, notas: notas,
+    pdfUrl: pdfUrl, createdAt: createdAt, totalBd: totalBd,
+    tipo: tipo, datosPro: datosPro);
 
   double get subtotal => items.fold(0, (s, i) => s + i.subtotal);
   double get montoDescuento => (subtotal * descuentoPct / 100) + descuentoFijo;
@@ -339,6 +360,9 @@ class Cotizacion {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) : null,
       totalBd: (json['total'] as num?)?.toDouble(),
+      tipo: (json['tipo'] as String?) ?? 'sencilla',
+      datosPro: json['datos_pro'] is Map
+          ? Map<String, dynamic>.from(json['datos_pro'] as Map) : null,
     );
   }
 }

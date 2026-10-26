@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
+import '../services/auth_service.dart';
 
 // ══════════════════════════════════════════════════════
 // MODELO
@@ -546,7 +547,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
         'whatsapp_numero': _numCtrl.text.trim(),
         'whatsapp_token': _tokenCtrl.text.trim().isEmpty ? null : _tokenCtrl.text.trim(),
         'whatsapp_modo': _modo,
-      }).eq('negocio_id', _sb.auth.currentUser?.id ?? '');
+      }).eq('negocio_id', AuthService.negocioId ?? '');
 
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('✅ Configuración guardada'),
