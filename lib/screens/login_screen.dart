@@ -10,6 +10,7 @@ import '../services/auth_service.dart';
 import 'home_screen.dart';
 import 'registro_taller_screen.dart';
 import 'unirse_equipo_screen.dart';
+import '../i18n/tr.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -47,25 +48,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
     showDialog(context: context, builder: (ctx) => StatefulBuilder(
       builder: (ctx2, setS) => AlertDialog(
-        title: const Text('Recuperar contraseña'),
+        title: Text(tr('Recuperar contraseña')),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          const Text('Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.',
+          Text(tr('Ingresa tu correo y te enviaremos un enlace para crear una nueva contraseña.'),
             style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
           const SizedBox(height: 14),
           TextField(controller: correoCtrl,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(labelText: 'Correo electrónico',
+            decoration: InputDecoration(labelText: tr('Correo electrónico'),
               isDense: true, border: OutlineInputBorder())),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: enviando ? null : () async {
               final correo = correoCtrl.text.trim();
               if (correo.isEmpty || !correo.contains('@')) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('Ingresa un correo válido'), backgroundColor: AppColors.rojo));
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('Ingresa un correo válido')), backgroundColor: AppColors.rojo));
                 return;
               }
               setS(() => enviando = true);
@@ -75,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   redirectTo: AuthService.urlRecuperar);
                 if (ctx.mounted) Navigator.pop(ctx);
                 if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('✅ Enviamos un enlace a $correo. Revisa tu correo (y spam).'),
+                  content: Text(trf('✅ Enviamos un enlace a {0}. Revisa tu correo (y spam).', [correo])),
                   backgroundColor: AppColors.verde));
               } catch (e) {
                 setS(() => enviando = false);
@@ -87,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: enviando
               ? const SizedBox(width: 16, height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Enviar enlace', style: TextStyle(color: Colors.white))),
+              : Text(tr('Enviar enlace'), style: TextStyle(color: Colors.white))),
         ])));
   }
 
@@ -118,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
     setState(() => _reenviando = false);
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(error ?? '✅ Te enviamos otro correo a $correo. Revisa también spam.'),
+      content: Text(tr(error ?? trf('✅ Te enviamos otro correo a {0}. Revisa también spam.', [correo]))),
       backgroundColor: error == null ? AppColors.verde : AppColors.rojo));
   }
 
@@ -152,10 +153,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(color: AppColors.azul,
                             fontSize: 52, fontWeight: FontWeight.w800)))),
                   const SizedBox(height: 16),
-                  const Text('HETNA CNC',
+                  Text(tr('HETNA CNC'),
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800,
                       color: Colors.white, letterSpacing: 2)),
-                  const Text('Sistema de gestión',
+                  Text(tr('Sistema de gestión'),
                     style: TextStyle(fontSize: 13, color: Colors.white60)),
 
                   const SizedBox(height: 36),
@@ -170,8 +171,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: Colors.black.withOpacity(0.12),
                         blurRadius: 20, offset: const Offset(0, 8))]),
                     child: Column(children: [
-                      const Align(alignment: Alignment.centerLeft,
-                        child: Text('Iniciar sesión',
+                      Align(alignment: Alignment.centerLeft,
+                        child: Text(tr('Iniciar sesión'),
                           style: TextStyle(fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: AppColors.azul))),
@@ -192,8 +193,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(10),
                             borderSide: const BorderSide(color: AppColors.grisBorde))),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
-                          if (!v.contains('@')) return 'Correo invalido';
+                          if (v == null || v.trim().isEmpty) return tr('Ingresa tu correo');
+                          if (!v.contains('@')) return tr('Correo invalido');
                           return null;
                         }),
                       const SizedBox(height: 14),
@@ -205,7 +206,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _login(),
                         decoration: InputDecoration(
-                          labelText: 'Contrasena',
+                          labelText: tr('Contrasena'),
                           prefixIcon: const Icon(Icons.lock_outline,
                             size: 20, color: AppColors.textoSecundario),
                           suffixIcon: IconButton(
@@ -222,8 +223,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(10),
                             borderSide: const BorderSide(color: AppColors.grisBorde))),
                         validator: (v) {
-                          if (v == null || v.isEmpty) return 'Ingresa tu contrasena';
-                          if (v.length < 6) return 'Minimo 6 caracteres';
+                          if (v == null || v.isEmpty) return tr('Ingresa tu contrasena');
+                          if (v.length < 6) return tr('Minimo 6 caracteres');
                           return null;
                         }),
 
@@ -248,9 +249,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: TextButton.icon(
                               onPressed: _reenviando ? null : _reenviarConfirmacion,
                               icon: const Icon(Icons.mark_email_unread_outlined, size: 18),
-                              label: Text(_reenviando
-                                ? 'Enviando…'
-                                : 'Reenviar correo de confirmación'))),
+                              label: Text(tr(_reenviando
+                                ? tr('Enviando…')
+                                : tr('Reenviar correo de confirmación'))))),
                       ],
 
                       const SizedBox(height: 20),
@@ -285,7 +286,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   const Divider(height: 1, color: Color(0xFFE5E7EB)),
                   const SizedBox(height: 16),
-                  const Text('Nuevo taller',
+                  Text(tr('Nuevo taller'),
                     style: TextStyle(fontSize: 13, color: AppColors.textoSecundario),
                     textAlign: TextAlign.center),
                   const SizedBox(height: 8),
@@ -312,7 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: AppColors.textoSecundario)))),
                   const SizedBox(height: 24),
 
-                  const Text('Acceso restringido - Solo personal autorizado',
+                  Text(tr('Acceso restringido - Solo personal autorizado'),
                     style: TextStyle(fontSize: 11, color: Colors.white38),
                     textAlign: TextAlign.center),
                 ],

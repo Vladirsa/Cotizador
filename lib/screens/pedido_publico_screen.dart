@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
+import '../i18n/tr.dart';
 
 class PedidoPublicoScreen extends StatefulWidget {
   final String slug;
@@ -49,7 +50,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
         params: {'p_slug': widget.slug});
 
       if (negocioData == null) {
-        setState(() { _error = 'No encontramos este taller.'; _cargando = false; });
+        setState(() { _error = tr('No encontramos este taller.'); _cargando = false; });
         return;
       }
 
@@ -65,7 +66,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
         _cargando = false;
       });
     } catch (e) {
-      setState(() { _error = 'Error al cargar: $e'; _cargando = false; });
+      setState(() { _error = trf('Error al cargar: {0}', [e]); _cargando = false; });
     }
   }
 
@@ -82,18 +83,18 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
 
   Future<void> _enviarPedido() async {
     if (_nombreCtrl.text.trim().isEmpty || _telefonoCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Escribe tu nombre y teléfono'), backgroundColor: AppColors.rojo));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Escribe tu nombre y teléfono')), backgroundColor: AppColors.rojo));
       return;
     }
     if (_esPedidoPersonalizado && _descripcionCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Describe lo que necesitas'), backgroundColor: AppColors.rojo));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Describe lo que necesitas')), backgroundColor: AppColors.rojo));
       return;
     }
     if (!_esPedidoPersonalizado && _carrito.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Agrega al menos un producto'), backgroundColor: AppColors.rojo));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Agrega al menos un producto')), backgroundColor: AppColors.rojo));
       return;
     }
 
@@ -128,7 +129,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
     } catch (e) {
       setState(() => _enviando = false);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error al enviar: $e'), backgroundColor: AppColors.rojo));
+        content: Text(trf('Error al enviar: {0}', [e])), backgroundColor: AppColors.rojo));
     }
   }
 
@@ -150,10 +151,10 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Icon(Icons.check_circle, color: AppColors.verde, size: 64),
             const SizedBox(height: 16),
-            const Text('¡Pedido enviado!',
+            Text(tr('¡Pedido enviado!'),
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
-            Text('${_negocio?['nombre'] ?? 'El taller'} se pondrá en contacto contigo pronto.',
+            Text(trf('{0} se pondrá en contacto contigo pronto.', [(_negocio?['nombre'] ?? tr('El taller'))]),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
           ]))));
@@ -166,7 +167,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(
-        title: Text(_negocio?['nombre'] ?? 'Hacer pedido'),
+        title: Text(tr(_negocio?['nombre'] ?? tr('Hacer pedido'))),
         backgroundColor: colorMarca, foregroundColor: Colors.white),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         Container(padding: const EdgeInsets.all(6),
@@ -179,7 +180,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
                 decoration: BoxDecoration(
                   color: !_esPedidoPersonalizado ? colorMarca : Colors.transparent,
                   borderRadius: BorderRadius.circular(8)),
-                child: Text('Del catálogo', textAlign: TextAlign.center,
+                child: Text(tr('Del catálogo'), textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                     color: !_esPedidoPersonalizado ? Colors.white : AppColors.textoPrincipal))))),
             Expanded(child: GestureDetector(
@@ -188,7 +189,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
                 decoration: BoxDecoration(
                   color: _esPedidoPersonalizado ? colorMarca : Colors.transparent,
                   borderRadius: BorderRadius.circular(8)),
-                child: Text('Pedido especial', textAlign: TextAlign.center,
+                child: Text(tr('Pedido especial'), textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                     color: _esPedidoPersonalizado ? Colors.white : AppColors.textoPrincipal))))),
           ])),
@@ -196,8 +197,8 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
 
         if (!_esPedidoPersonalizado) ...[
           if (_productos.isEmpty)
-            const Padding(padding: EdgeInsets.all(20),
-              child: Text('Este taller aún no tiene productos en su catálogo.',
+            Padding(padding: EdgeInsets.all(20),
+              child: Text(tr('Este taller aún no tiene productos en su catálogo.'),
                 style: TextStyle(color: AppColors.textoSecundario))),
           ..._productos.map((p) {
             final cant = _carrito[p['id']] ?? 0;
@@ -214,7 +215,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
                             color: AppColors.textoSecundario, size: 20)))
                     : const Icon(Icons.inventory_2_outlined, color: AppColors.textoSecundario, size: 20)),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(p['nombre'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(tr(p['nombre'] ?? ''), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   Text('\$${(p['precio_venta'] as num? ?? 0).toStringAsFixed(0)}',
                     style: TextStyle(fontSize: 13, color: colorMarca, fontWeight: FontWeight.w700)),
                 ])),
@@ -239,27 +240,27 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
         ] else ...[
           TextField(controller: _descripcionCtrl, maxLines: 4,
             decoration: InputDecoration(
-              labelText: 'Describe lo que necesitas',
-              hintText: 'Ej: Necesito 10 letreros de madera de 30x20cm con mi logo...',
+              labelText: tr('Describe lo que necesitas'),
+              hintText: tr('Ej: Necesito 10 letreros de madera de 30x20cm con mi logo...'),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               filled: true, fillColor: Colors.white)),
         ],
 
         const SizedBox(height: 20),
-        const Text('Tus datos de contacto', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+        Text(tr('Tus datos de contacto'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
         TextField(controller: _nombreCtrl,
-          decoration: InputDecoration(labelText: 'Nombre completo *',
+          decoration: InputDecoration(labelText: tr('Nombre completo *'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             filled: true, fillColor: Colors.white)),
         const SizedBox(height: 10),
         TextField(controller: _telefonoCtrl, keyboardType: TextInputType.phone,
-          decoration: InputDecoration(labelText: 'WhatsApp / Teléfono *',
+          decoration: InputDecoration(labelText: tr('WhatsApp / Teléfono *'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             filled: true, fillColor: Colors.white)),
         const SizedBox(height: 10),
         TextField(controller: _correoCtrl, keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(labelText: 'Correo (opcional)',
+          decoration: InputDecoration(labelText: tr('Correo (opcional)'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
             filled: true, fillColor: Colors.white)),
 
@@ -271,7 +272,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
           child: _enviando
             ? const SizedBox(width: 22, height: 22,
                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : const Text('Enviar pedido',
+            : Text(tr('Enviar pedido'),
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)))),
         const SizedBox(height: 30),
       ]));

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/supabase_service.dart';
 import '../main.dart';
+import '../i18n/tr.dart';
 
 class PedidoEstadoScreen extends StatefulWidget {
   final String pedidoId;
@@ -45,11 +46,11 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
       setState(() => _enviandoPregunta = false);
       if (ok) {
         _preguntaCtrl.clear();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ Tu comentario fue enviado'), backgroundColor: AppColors.verde));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('✅ Tu comentario fue enviado')), backgroundColor: AppColors.verde));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No se pudo enviar, intenta de nuevo'), backgroundColor: AppColors.rojo));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('No se pudo enviar, intenta de nuevo')), backgroundColor: AppColors.rojo));
       }
     }
   }
@@ -86,10 +87,10 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       const Icon(Icons.search_off, size: 48, color: AppColors.textoSecundario),
       const SizedBox(height: 12),
-      const Text('No encontramos este pedido',
+      Text(tr('No encontramos este pedido'),
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
       const SizedBox(height: 4),
-      const Text('Verifica que la liga esté completa, o contacta al taller.',
+      Text(tr('Verifica que la liga esté completa, o contacta al taller.'),
         style: TextStyle(fontSize: 13, color: AppColors.textoSecundario), textAlign: TextAlign.center),
     ])));
 
@@ -97,7 +98,7 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
     final d = _data!;
     final folio = d['folio'] as String? ?? '';
     final estado = d['estado'] as String? ?? '';
-    final negocioNombre = d['negocio_nombre'] as String? ?? 'Taller';
+    final negocioNombre = d['negocio_nombre'] as String? ?? tr('Taller');
     final negocioTel = d['negocio_telefono'] as String?;
     final avances = (d['avances'] as List?) ?? [];
     final fotos = (d['fotos'] as List?) ?? [];
@@ -113,10 +114,10 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
         constraints: const BoxConstraints(maxWidth: 480),
         child: Column(children: [
           const SizedBox(height: 8),
-          Text(negocioNombre, style: const TextStyle(
+          Text(tr(negocioNombre), style: const TextStyle(
             fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.azul)),
           const SizedBox(height: 4),
-          Text('Pedido $folio', style: const TextStyle(
+          Text(trf('Pedido {0}', [folio]), style: const TextStyle(
             fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textoPrincipal)),
           const SizedBox(height: 20),
 
@@ -146,7 +147,7 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
           if (fotos.isNotEmpty) ...[
             const SizedBox(height: 20),
             Align(alignment: Alignment.centerLeft,
-              child: Text('Fotos del avance', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
+              child: Text(tr('Fotos del avance'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700))),
             const SizedBox(height: 8),
             SizedBox(height: 100, child: ListView.separated(
               scrollDirection: Axis.horizontal,
@@ -165,7 +166,7 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
               onPressed: () => launchUrl(Uri.parse('https://wa.me/$negocioTel'),
                 mode: LaunchMode.externalApplication),
               icon: const Icon(Icons.chat, color: AppColors.whatsapp),
-              label: const Text('Escríbenos por WhatsApp'),
+              label: Text(tr('Escríbenos por WhatsApp')),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.whatsapp,
                 side: const BorderSide(color: AppColors.whatsapp),
@@ -179,15 +180,15 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('¿Dudas o comentarios sobre tu pedido?',
+              Text(tr('¿Dudas o comentarios sobre tu pedido?'),
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(height: 10),
               TextField(controller: _nombreCtrl,
-                decoration: const InputDecoration(labelText: 'Tu nombre (opcional)',
+                decoration: InputDecoration(labelText: tr('Tu nombre (opcional)'),
                   isDense: true, border: OutlineInputBorder())),
               const SizedBox(height: 8),
               TextField(controller: _preguntaCtrl, maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Escribe aquí...',
+                decoration: InputDecoration(labelText: tr('Escribe aquí...'),
                   isDense: true, border: OutlineInputBorder())),
               const SizedBox(height: 10),
               SizedBox(width: double.infinity, child: ElevatedButton(
@@ -195,7 +196,7 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
                 child: _enviandoPregunta
                   ? const SizedBox(width: 16, height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Enviar comentario'))),
+                  : Text(tr('Enviar comentario')))),
             ])),
           const SizedBox(height: 24),
         ]),
@@ -219,10 +220,10 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
       const SizedBox(width: 12),
       Expanded(child: Padding(padding: const EdgeInsets.only(bottom: 20), child:
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_etiquetas[key] ?? key, style: TextStyle(fontSize: 14,
+          Text(tr(_etiquetas[key] ?? key), style: TextStyle(fontSize: 14,
             fontWeight: esActual ? FontWeight.w800 : FontWeight.w600,
             color: completada || esActual ? AppColors.textoPrincipal : AppColors.textoSecundario)),
-          if (fecha != null) Text(fecha, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+          if (fecha != null) Text(tr(fecha), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ]))),
     ]));
   }

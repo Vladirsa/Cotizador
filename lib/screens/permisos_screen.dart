@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
+import '../i18n/tr.dart';
 
 class PermisosScreen extends StatefulWidget {
   const PermisosScreen({super.key});
@@ -60,7 +61,7 @@ class _PermisosScreenState extends State<PermisosScreen> {
     if (mounted) {
       setState(() => _guardando = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(error ?? '✅ Permisos guardados para ${_etiquetasRol[_rolSel]}'),
+        content: Text(tr(error ?? trf('✅ Permisos guardados para {0}', [(_etiquetasRol[_rolSel])]))),
         backgroundColor: error != null ? AppColors.rojo : AppColors.verde));
     }
   }
@@ -70,7 +71,7 @@ class _PermisosScreenState extends State<PermisosScreen> {
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(
-        title: const Text('Permisos por rol',
+        title: Text(tr('Permisos por rol'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white, foregroundColor: Colors.black87, elevation: 0,
         actions: [
@@ -78,14 +79,14 @@ class _PermisosScreenState extends State<PermisosScreen> {
             onPressed: _guardando ? null : _guardar,
             child: _guardando
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul))),
+              : Text(tr('Guardar'), style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul))),
         ]),
       body: Column(children: [
         Container(
           color: Colors.white,
           padding: const EdgeInsets.all(12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Selecciona un rol para configurar',
+            Text(tr('Selecciona un rol para configurar'),
               style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, runSpacing: 8,
@@ -99,7 +100,7 @@ class _PermisosScreenState extends State<PermisosScreen> {
                       color: sel ? AppColors.azul : Colors.white,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-                    child: Text(_etiquetasRol[r] ?? r,
+                    child: Text(tr(_etiquetasRol[r] ?? r),
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                         color: sel ? Colors.white : AppColors.textoPrincipal))));
               }).toList()),
@@ -114,7 +115,7 @@ class _PermisosScreenState extends State<PermisosScreen> {
                   const Icon(Icons.info_outline, size: 16, color: AppColors.azul),
                   const SizedBox(width: 8),
                   Expanded(child: Text(
-                    'Los usuarios con rol "${_etiquetasRol[_rolSel]}" solo verán los módulos marcados abajo.',
+                    trf('Los usuarios con rol "{0}" solo verán los módulos marcados abajo.', [(_etiquetasRol[_rolSel])]),
                     style: const TextStyle(fontSize: 11, color: AppColors.azul))),
                 ])),
               const SizedBox(height: 12),

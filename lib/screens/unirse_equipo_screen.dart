@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import '../i18n/tr.dart';
 
 class UnirseEquipoScreen extends StatefulWidget {
   const UnirseEquipoScreen({super.key});
@@ -39,19 +40,19 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
     final passConfirm = _passConfirmCtrl.text;
 
     if (codigo.isEmpty || nombre.isEmpty || correo.isEmpty || pass.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Completa todos los campos'), backgroundColor: AppColors.rojo));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Completa todos los campos')), backgroundColor: AppColors.rojo));
       return;
     }
     if (pass.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('La contraseña debe tener al menos 6 caracteres'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('La contraseña debe tener al menos 6 caracteres')),
         backgroundColor: AppColors.rojo));
       return;
     }
     if (pass != passConfirm) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Las contraseñas no coinciden'), backgroundColor: AppColors.rojo));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Las contraseñas no coinciden')), backgroundColor: AppColors.rojo));
       return;
     }
 
@@ -68,24 +69,24 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
     } else if (result.requiereConfirmar) {
       // La cuenta quedó creada; falta confirmar el correo para entrar
       await showDialog(context: context, builder: (ctx) => AlertDialog(
-        title: const Text('Confirma tu correo'),
-        content: Text(result.error ?? ''),
+        title: Text(tr('Confirma tu correo')),
+        content: Text(tr(result.error ?? '')),
         actions: [
           TextButton(
             onPressed: () async {
               final error = await AuthService.reenviarConfirmacion(correo);
               if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                content: Text(error ?? 'Te enviamos otro correo.')));
+                content: Text(tr(error ?? tr('Te enviamos otro correo.')))));
             },
-            child: const Text('Reenviar correo')),
+            child: Text(tr('Reenviar correo'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Ir a iniciar sesión')),
+            child: Text(tr('Ir a iniciar sesión'))),
         ]));
       if (mounted) Navigator.pop(context);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(result.error ?? 'Error al crear la cuenta'),
+        content: Text(tr(result.error ?? tr('Error al crear la cuenta'))),
         backgroundColor: AppColors.rojo));
     }
   }
@@ -96,7 +97,7 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
       backgroundColor: AppColors.gris,
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0.5,
-        title: const Text('Unirme a un taller',
+        title: Text(tr('Unirme a un taller'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -105,16 +106,16 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(color: AppColors.azulClaro,
               borderRadius: BorderRadius.circular(12)),
-            child: const Row(children: [
+            child: Row(children: [
               Icon(Icons.qr_code_2, color: AppColors.azul, size: 28),
               SizedBox(width: 12),
               Expanded(child: Text(
-                'Pide a tu administrador el código de invitación de 6 letras que generó en la app.',
+                tr('Pide a tu administrador el código de invitación de 6 letras que generó en la app.'),
                 style: TextStyle(fontSize: 12, color: AppColors.azul))),
             ])),
           const SizedBox(height: 20),
 
-          const Text('Código de invitación', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(tr('Código de invitación'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           TextField(
             controller: _codigoCtrl,
@@ -132,19 +133,19 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
               letterSpacing: 4, fontFamily: 'monospace')),
           const SizedBox(height: 16),
 
-          const Text('Tu nombre completo', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(tr('Tu nombre completo'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           TextField(
             controller: _nombreCtrl,
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(
-              hintText: 'Juan Pérez',
+              hintText: tr('Juan Pérez'),
               prefixIcon: const Icon(Icons.person_outline, size: 18),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               isDense: true)),
           const SizedBox(height: 16),
 
-          const Text('Correo electrónico', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(tr('Correo electrónico'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           TextField(
             controller: _correoCtrl,
@@ -156,13 +157,13 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
               isDense: true)),
           const SizedBox(height: 16),
 
-          const Text('Crea una contraseña', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(tr('Crea una contraseña'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           TextField(
             controller: _passCtrl,
             obscureText: !_verPass,
             decoration: InputDecoration(
-              hintText: 'Mínimo 6 caracteres',
+              hintText: tr('Mínimo 6 caracteres'),
               prefixIcon: const Icon(Icons.lock_outline, size: 18),
               suffixIcon: IconButton(
                 icon: Icon(_verPass ? Icons.visibility_off : Icons.visibility, size: 18),
@@ -171,13 +172,13 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
               isDense: true)),
           const SizedBox(height: 16),
 
-          const Text('Confirma tu contraseña', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(tr('Confirma tu contraseña'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           TextField(
             controller: _passConfirmCtrl,
             obscureText: !_verPass,
             decoration: InputDecoration(
-              hintText: 'Repite la contraseña',
+              hintText: tr('Repite la contraseña'),
               prefixIcon: const Icon(Icons.lock_outline, size: 18),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               isDense: true)),
@@ -190,7 +191,7 @@ class _UnirseEquipoScreenState extends State<UnirseEquipoScreen> {
                 ? const SizedBox(width: 18, height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Icon(Icons.check_circle_outline, color: Colors.white),
-              label: Text(_cargando ? 'Creando cuenta...' : 'Unirme al taller',
+              label: Text(tr(_cargando ? tr('Creando cuenta...') : tr('Unirme al taller')),
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.azul,

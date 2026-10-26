@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import 'cotizar_screen.dart';
 import '../services/auth_service.dart';
+import '../i18n/tr.dart';
 
 // Taller de la sesión actual (antes estaba fijo y todos los talleres veían los
 // costos del taller HETNA).
@@ -901,7 +902,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
   void _agregarAlCarrito(ResultadoSimulador r) {
     setState(() => _carrito.add(r));
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('✅ ${r.servicio} agregado — ${_fmt.format(r.total)}'),
+      content: Text(trf('✅ {0} agregado — {1}', [(r.servicio), (_fmt.format(r.total))])),
       backgroundColor: AppColors.verde,
       duration: const Duration(seconds: 2)));
   }
@@ -919,7 +920,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Simulador de costos',
+        title: Text(tr('Simulador de costos'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         actions: [
           IconButton(icon: const Icon(Icons.refresh, color: AppColors.azul), onPressed: _cargar),
@@ -937,10 +938,10 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                   gradient: const LinearGradient(colors: [AppColors.azul, Color(0xFF2d5a8e)]),
                   borderRadius: BorderRadius.circular(12)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Calcula el costo real de cualquier trabajo',
+                  Text(tr('Calcula el costo real de cualquier trabajo'),
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
                   const SizedBox(height: 4),
-                  const Text('Selecciona el servicio y llena las variables.',
+                  Text(tr('Selecciona el servicio y llena las variables.'),
                     style: TextStyle(fontSize: 12, color: Colors.white70)),
                   if (_carrito.isNotEmpty) ...[
                     const SizedBox(height: 10),
@@ -953,7 +954,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           const Icon(Icons.description_outlined, color: Colors.white, size: 16),
                           const SizedBox(width: 6),
-                          Text('Cotizar ${_carrito.length} servicio${_carrito.length > 1 ? "s" : ""} — ${_fmt.format(_totalCarrito)}',
+                          Text(trf('Cotizar {0} servicio{1} — {2}', [(_carrito.length), (_carrito.length > 1 ? "s" : ""), (_fmt.format(_totalCarrito))]),
                             style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
                         ]))),
                   ],
@@ -976,7 +977,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
               // Carrito
               if (_carrito.isNotEmpty) ...[
                 const SizedBox(height: 20),
-                const Text('CARRITO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                Text(tr('CARRITO'), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
                   color: AppColors.textoSecundario, letterSpacing: 1.5)),
                 const SizedBox(height: 8),
                 ..._carrito.asMap().entries.map((e) => _cardCarrito(e.key, e.value)),
@@ -985,7 +986,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                   child: ElevatedButton.icon(
                     onPressed: _cotizar,
                     icon: const Icon(Icons.description_outlined, color: Colors.white),
-                    label: Text('Crear cotización — ${_fmt.format(_totalCarrito)}',
+                    label: Text(trf('Crear cotización — {0}', [(_fmt.format(_totalCarrito))]),
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.naranja,
@@ -1001,12 +1002,12 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
     child: Row(children: [
       const Icon(Icons.shopping_cart_outlined, color: Colors.white, size: 18),
       const SizedBox(width: 8),
-      Expanded(child: Text('${_carrito.length} servicio${_carrito.length > 1?"s":""} — ${_fmt.format(_totalCarrito)}',
+      Expanded(child: Text(trf('{0} servicio{1} — {2}', [(_carrito.length), (_carrito.length > 1?"s":""), (_fmt.format(_totalCarrito))]),
         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))),
       GestureDetector(onTap: _cotizar,
         child: Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-          child: const Text('Cotizar', style: TextStyle(color: AppColors.naranja,
+          child: Text(tr('Cotizar'), style: TextStyle(color: AppColors.naranja,
             fontWeight: FontWeight.w700, fontSize: 12)))),
     ]));
 
@@ -1050,11 +1051,10 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
 
   void _confirmarBorrarServicio(SimServicio s) {
     showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('¿Borrar servicio?'),
-      content: Text('Se eliminará "${s.nombre}" y todas sus tarifas y tipos de trabajo configurados. '
-        'Esta acción no se puede deshacer.'),
+      title: Text(tr('¿Borrar servicio?')),
+      content: Text(trf('Se eliminará "{0}" y todas sus tarifas y tipos de trabajo configurados. Esta acción no se puede deshacer.', [(s.nombre)])),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
         TextButton(
           onPressed: () async {
             Navigator.pop(ctx);
@@ -1069,15 +1069,15 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
               await sb.from('sim_servicios').delete().eq('id', s.id);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('✅ "${s.nombre}" eliminado'), backgroundColor: AppColors.verde));
+                  content: Text(trf('✅ "{0}" eliminado', [(s.nombre)])), backgroundColor: AppColors.verde));
                 _cargar();
               }
             } catch (e) {
               if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Error al eliminar: $e'), backgroundColor: AppColors.rojo));
+                content: Text(trf('Error al eliminar: {0}', [e])), backgroundColor: AppColors.rojo));
             }
           },
-          child: const Text('Eliminar', style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
+          child: Text(tr('Eliminar'), style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
       ]));
   }
 
@@ -1086,11 +1086,11 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
     child: Container(
       decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.azul.withOpacity(0.3))),
-      child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(Icons.add_circle_outline, size: 32, color: AppColors.azul),
         SizedBox(height: 8),
-        Text('Nuevo servicio', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
-        Text('Para tu negocio', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+        Text(tr('Nuevo servicio'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
+        Text(tr('Para tu negocio'), style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
       ])));
 
   Widget _cardCarrito(int idx, ResultadoSimulador r) {
@@ -1113,7 +1113,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
           Text(fmt.format(r.total), style: const TextStyle(fontSize: 14,
             fontWeight: FontWeight.w800, color: AppColors.azul)),
           GestureDetector(onTap: () => setState(() => _carrito.removeAt(idx)),
-            child: const Text('Quitar', style: TextStyle(fontSize: 10, color: AppColors.rojo))),
+            child: Text(tr('Quitar'), style: TextStyle(fontSize: 10, color: AppColors.rojo))),
         ]),
       ]));
   }
@@ -1132,7 +1132,7 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
         child: Column(children: [
           Padding(padding: const EdgeInsets.fromLTRB(16,16,16,12),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Nuevo servicio', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(tr('Nuevo servicio'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               GestureDetector(onTap: () => Navigator.pop(ctx), child: const Icon(Icons.close)),
             ])),
           const Divider(height: 1),
@@ -1148,11 +1148,11 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                       color: emojiSel == e ? AppColors.azulClaro : AppColors.gris,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: emojiSel == e ? AppColors.azul : AppColors.grisBorde)),
-                    child: Center(child: Text(e, style: const TextStyle(fontSize: 22)))))).toList()),
+                    child: Center(child: Text(tr(e), style: const TextStyle(fontSize: 22)))))).toList()),
               const SizedBox(height: 16),
               TextFormField(controller: nombreCtrl, textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Nombre del servicio *',
-                  hintText: 'Ej: Router CNC, Panadería, Cancelería...',
+                decoration: InputDecoration(labelText: tr('Nombre del servicio *'),
+                  hintText: tr('Ej: Router CNC, Panadería, Cancelería...'),
                   border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 20),
               SizedBox(width: double.infinity,
@@ -1170,13 +1170,13 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                         'emoji': emojiSel, 'activo': true, 'orden': _servicios.length + 1});
                     } catch (e) {
                       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error al crear: \$e'), backgroundColor: AppColors.rojo));
+                        SnackBar(content: Text(trf('Error al crear: {0}', [e])), backgroundColor: AppColors.rojo));
                       return;
                     }
                     if (mounted) { Navigator.pop(ctx); _cargar(); }
                   },
                   icon: const Icon(Icons.save_outlined, color: Colors.white),
-                  label: const Text('Crear servicio',
+                  label: Text(tr('Crear servicio'),
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                     padding: const EdgeInsets.symmetric(vertical: 13)))),
@@ -1339,20 +1339,20 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     // Generar descripción automática
     final descParts = <String>[_tipoSel!.nombre];
     if (_tipoSel!.necesitaLargo && _largo > 0 && _ancho > 0) {
-      descParts.add('Medidas: ${_largo}×${_ancho}${_alto > 0 ? "×${_alto}" : ""} cm');
+      descParts.add(trf('Medidas: {0}×{1}{2} cm', [_largo, _ancho, (_alto > 0 ? "×${_alto}" : "")]));
     }
-    if (_peso > 0) descParts.add('Peso: ${_peso} kg');
-    if (_metros > 0) descParts.add('${_metros} metros lineales');
+    if (_peso > 0) descParts.add(trf('Peso: {0} kg', [_peso]));
+    if (_metros > 0) descParts.add(trf('{0} metros lineales', [_metros]));
     if (_materialInvSel != null && !_clienteTreMaterial && _usarInventario) {
       descParts.add('Material: ${_materialInvSel!['nombre']}');
     } else if (_materialLibreNombre.isNotEmpty && !_clienteTreMaterial) {
       descParts.add('Material: $_materialLibreNombre');
     }
-    if (_clienteTreMaterial) descParts.add('Cliente trae el material');
+    if (_clienteTreMaterial) descParts.add(tr('Cliente trae el material'));
     if (_acabadoSel != null && _acabadoSel!.nombre != 'Sin acabado') {
       descParts.add('Acabado: ${_acabadoSel!.nombre}');
     }
-    if (_cantidad > 1) descParts.add('Cantidad: $_cantidad piezas');
+    if (_cantidad > 1) descParts.add(trf('Cantidad: {0} piezas', [_cantidad]));
     final desc = _descripcionEditable.isNotEmpty
       ? _descripcionEditable : descParts.join('\n');
 
@@ -1402,8 +1402,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   Widget build(BuildContext context) {
     if (_cargando) return const Scaffold(
       body: Center(child: CircularProgressIndicator()));
-    if (_config == null) return const Scaffold(
-      body: Center(child: Text('Error cargando')));
+    if (_config == null) return Scaffold(
+      body: Center(child: Text(tr('Error cargando'))));
 
     final cfg = _config!;
 
@@ -1428,7 +1428,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             child: ElevatedButton.icon(
               onPressed: _calcular,
               icon: const Icon(Icons.calculate_outlined, color: Colors.white),
-              label: const Text('Calcular precio',
+              label: Text(tr('Calcular precio'),
                 style: TextStyle(fontSize: 15, color: Colors.white,
                   fontWeight: FontWeight.w700)),
               style: ElevatedButton.styleFrom(
@@ -1500,26 +1500,26 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
       // 1. Filtro de categoria: 2D / 3D / CAM-CAD
-      _seccionCard('Categoria de diseno', _dropdownGenerico<String>(
+      _seccionCard(tr('Categoria de diseno'), _dropdownGenerico<String>(
         value: _categoriaDiseno,
         opciones: const ['2D', '3D', 'CAM/CAD'],
-        label: (c) => c == '2D' ? 'Diseno 2D (vectores)'
-          : c == '3D' ? 'Modelado 3D' : 'CAM / CAD (planos e ingenieria)',
-        sublabel: (c) => c == '2D' ? 'Corte laser, plasma, router 2D'
-          : c == '3D' ? 'Relieves, esculturas, tallado 3D'
-          : 'Planos tecnicos, programacion CNC',
+        label: (c) => c == '2D' ? tr('Diseno 2D (vectores)')
+          : c == '3D' ? tr('Modelado 3D') : tr('CAM / CAD (planos e ingenieria)'),
+        sublabel: (c) => c == '2D' ? tr('Corte laser, plasma, router 2D')
+          : c == '3D' ? tr('Relieves, esculturas, tallado 3D')
+          : tr('Planos tecnicos, programacion CNC'),
         onSelect: (c) => setState(() {
           _categoriaDiseno = c; _tipoSel = null; _resultado = null;
         }),
-        hint: 'Selecciona la categoria')),
+        hint: tr('Selecciona la categoria'))),
       const SizedBox(height: 10),
 
       // 2. Complejidad dentro de la categoria elegida
-      _seccionCard('Nivel de complejidad', tiposFiltrados.isEmpty
+      _seccionCard(tr('Nivel de complejidad'), tiposFiltrados.isEmpty
         ? Container(padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppColors.gris,
               borderRadius: BorderRadius.circular(8)),
-            child: const Text('No hay niveles configurados para esta categoria.',
+            child: Text(tr('No hay niveles configurados para esta categoria.'),
               style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)))
         : _dropdownGenerico<SimTipoTrabajo>(
             value: _tipoSel,
@@ -1527,32 +1527,32 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             label: (t) => t.nombre,
             sublabel: (t) => t.descripcionFormula,
             onSelect: (t) => setState(() { _tipoSel = t; _resultado = null; }),
-            hint: 'Selecciona el nivel')),
+            hint: tr('Selecciona el nivel'))),
       const SizedBox(height: 10),
 
       // 3. Estado del archivo
-      _seccionCard('Estado del archivo', Column(
+      _seccionCard(tr('Estado del archivo'), Column(
         crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: _chipArchivo(false, false, 'Diseno desde cero')),
+          Expanded(child: _chipArchivo(false, false, tr('Diseno desde cero'))),
           const SizedBox(width: 6),
-          Expanded(child: _chipArchivo(true, false, 'Cliente trae imagen')),
+          Expanded(child: _chipArchivo(true, false, tr('Cliente trae imagen'))),
           const SizedBox(width: 6),
-          Expanded(child: _chipArchivo(true, true, 'Trae vector listo')),
+          Expanded(child: _chipArchivo(true, true, tr('Trae vector listo'))),
         ]),
       ])),
       const SizedBox(height: 10),
 
       // 4. Opciones adicionales
-      _seccionCard('Opciones', Column(children: [
-        _toggleOpcion('Entrega urgente (+40%)', _entregaUrgente,
+      _seccionCard(tr('Opciones'), Column(children: [
+        _toggleOpcion(tr('Entrega urgente (+40%)'), _entregaUrgente,
           (v) => setState(() { _entregaUrgente = v; _resultado = null; })),
-        _toggleOpcion('Entregar archivo editable (+200%)',
+        _toggleOpcion(tr('Entregar archivo editable (+200%)'),
           _archivoEditableAlCliente,
           (v) => setState(() { _archivoEditableAlCliente = v; _resultado = null; })),
         const SizedBox(height: 8),
         Row(children: [
-          const Text('Revisiones extra (+\$150 c/u):', style: TextStyle(fontSize: 12)),
+          Text(tr('Revisiones extra (+\$150 c/u):'), style: TextStyle(fontSize: 12)),
           const Spacer(),
           IconButton(
             onPressed: () => setState(() {
@@ -1566,7 +1566,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         ]),
         const Divider(height: 16),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text('IVA 16%',
+          Text(tr('IVA 16%'),
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           Switch(value: _aplicarIva,
             onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -1582,13 +1582,13 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     crossAxisAlignment: CrossAxisAlignment.start, children: [
 
     // 1. Tipo de trabajo -> controla _tipoLaser directamente
-    _seccionCard('Tipo de trabajo', _dropdownGenerico<String>(
+    _seccionCard(tr('Tipo de trabajo'), _dropdownGenerico<String>(
       value: _tipoLaser,
       opciones: const ['corte', 'grabado', 'ambos'],
       label: (t) => {'corte':'Solo corte','grabado':'Solo grabado','ambos':'Corte + Grabado'}[t] ?? t,
       sublabel: (t) => {'corte':'Perimetro de la pieza','grabado':'Raster sobre superficie','ambos':'Corta y graba'}[t],
       onSelect: (t) => setState(() { _tipoLaser = t; _resultado = null; }),
-      hint: 'Selecciona el tipo de trabajo')),
+      hint: tr('Selecciona el tipo de trabajo'))),
     const SizedBox(height: 10),
 
     // 2. Material
@@ -1596,15 +1596,15 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     const SizedBox(height: 10),
 
     // 3. Densidad (solo si lleva grabado) -- ahora sincronizado con _tipoLaser
-    _seccionCard('Densidad del grabado', _buildDensidadLaser()),
+    _seccionCard(tr('Densidad del grabado'), _buildDensidadLaser()),
     const SizedBox(height: 10),
 
     // 4. Dimensiones
-    _seccionCard('Dimensiones', Column(children: [
-      _campoMedida('Largo (cm)', _largo,
+    _seccionCard(tr('Dimensiones'), Column(children: [
+      _campoMedida(tr('Largo (cm)'), _largo,
         (v) => setState(() { _largo = v; _resultado = null; })),
       const SizedBox(height: 10),
-      _campoMedida('Ancho (cm)', _ancho,
+      _campoMedida(tr('Ancho (cm)'), _ancho,
         (v) => setState(() { _ancho = v; _resultado = null; })),
       const SizedBox(height: 10),
       _filaCantidad(),
@@ -1616,16 +1616,16 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     const SizedBox(height: 10),
 
     // 6. Extras
-    _seccionCard('Extras', Column(children: [
-      _toggleOpcion('Diseno / Vectorizacion', _llevaDiseno,
+    _seccionCard(tr('Extras'), Column(children: [
+      _toggleOpcion(tr('Diseno / Vectorizacion'), _llevaDiseno,
         (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
-      _toggleOpcion('Desgaste tubo CO2', _llevaTuboCO2,
+      _toggleOpcion(tr('Desgaste tubo CO2'), _llevaTuboCO2,
         (v) => setState(() { _llevaTuboCO2 = v; _resultado = null; })),
-      _toggleOpcion('Flete / Entrega', _llevaFlete,
+      _toggleOpcion(tr('Flete / Entrega'), _llevaFlete,
         (v) => setState(() { _llevaFlete = v; _resultado = null; })),
       const Divider(height: 16),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('IVA 16%',
+        Text(tr('IVA 16%'),
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         Switch(value: _aplicarIva,
           onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -1643,7 +1643,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         child: ElevatedButton.icon(
           onPressed: _calcular,
           icon: const Icon(Icons.calculate_outlined, color: Colors.white),
-          label: const Text('Calcular precio',
+          label: Text(tr('Calcular precio'),
             style: TextStyle(fontSize: 15, color: Colors.white,
               fontWeight: FontWeight.w700)),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
@@ -1681,15 +1681,15 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
 
   // ── EXTRAS FIBRA ─────────────────────────────────
   Widget _buildExtrasFibra() => Column(children: [
-    _toggleOpcion('🔧 Plantilla de sujeción (+\$150)', _llevaPlantilla,
+    _toggleOpcion(tr('🔧 Plantilla de sujeción (+\$150)'), _llevaPlantilla,
       (v) => setState(() { _llevaPlantilla = v; _resultado = null; })),
-    _toggleOpcion('🔄 Eje rotativo (+\$25/pza)', _llevaRotativo,
+    _toggleOpcion(tr('🔄 Eje rotativo (+\$25/pza)'), _llevaRotativo,
       (v) => setState(() { _llevaRotativo = v; _resultado = null; })),
-    _toggleOpcion('✏️ Diseño/Setup', _llevaDisenoFibra,
+    _toggleOpcion(tr('✏️ Diseño/Setup'), _llevaDisenoFibra,
       (v) => setState(() { _llevaDisenoFibra = v; _resultado = null; })),
     const Divider(height: 16),
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const Text('IVA 16%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      Text(tr('IVA 16%'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       Switch(value: _aplicarIva,
         onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
         activeColor: AppColors.azul),
@@ -1721,14 +1721,14 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             color: _materialImpresion == m['v'] ? Colors.white70 : AppColors.textoSecundario)),
         ])))).toList()),
     const SizedBox(height: 14),
-    const Text('Calidad de impresión:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+    Text(tr('Calidad de impresión:'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
     const SizedBox(height: 8),
     Row(children: [
-      _chipCalidad('rapida', '⚡ Rapida', 'Menor detalle / Mas barata'),
+      _chipCalidad('rapida', tr('⚡ Rapida'), tr('Menor detalle / Mas barata')),
       const SizedBox(width: 8),
-      _chipCalidad('normal', '⚖️ Normal', 'Equilibrio / calidad-precio'),
+      _chipCalidad('normal', tr('⚖️ Normal'), tr('Equilibrio / calidad-precio')),
       const SizedBox(width: 8),
-      _chipCalidad('alta', '💎 Alta', 'Maximo detalle / Mas tiempo'),
+      _chipCalidad('alta', tr('💎 Alta'), tr('Maximo detalle / Mas tiempo')),
     ]),
   ]);
 
@@ -1743,9 +1743,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+          Text(tr(titulo), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
             color: sel ? Colors.white : AppColors.textoPrincipal), textAlign: TextAlign.center),
-          Text(sub, style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : AppColors.textoSecundario),
+          Text(tr(sub), style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : AppColors.textoSecundario),
             textAlign: TextAlign.center),
         ]))));
   }
@@ -1766,7 +1766,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           color: _materialHerreria == m ? AppColors.azul : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: _materialHerreria == m ? AppColors.azul : AppColors.grisBorde)),
-        child: Text(m, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+        child: Text(tr(m), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
           color: _materialHerreria == m ? Colors.white : AppColors.textoPrincipal))))).toList()),
     const SizedBox(height: 12),
     const Text('Acabado:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
@@ -1781,7 +1781,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           color: _acabadoHerreria == a ? AppColors.naranja : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: _acabadoHerreria == a ? AppColors.naranja : AppColors.grisBorde)),
-        child: Text(a, style: TextStyle(fontSize: 11,
+        child: Text(tr(a), style: TextStyle(fontSize: 11,
           color: _acabadoHerreria == a ? Colors.white : AppColors.textoPrincipal))))).toList()),
   ]);
 
@@ -1828,19 +1828,19 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           color: _acabadoCarpinteria == a ? AppColors.naranja : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: _acabadoCarpinteria == a ? AppColors.naranja : AppColors.grisBorde)),
-        child: Text(a, style: TextStyle(fontSize: 11,
+        child: Text(tr(a), style: TextStyle(fontSize: 11,
           color: _acabadoCarpinteria == a ? Colors.white : AppColors.textoPrincipal))))).toList()),
   ]);
 
 
   Widget _buildExtrasImpresion() => Column(children: [
-    _toggleOpcion('🎨 Incluir modelado 3D', _llevaDisenyo3D,
+    _toggleOpcion(tr('🎨 Incluir modelado 3D'), _llevaDisenyo3D,
       (v) => setState(() { _llevaDisenyo3D = v; _resultado = null; })),
-    _toggleOpcion('✨ Post-proceso (lijado/pintura)', _llevaPostProceso,
+    _toggleOpcion(tr('✨ Post-proceso (lijado/pintura)'), _llevaPostProceso,
       (v) => setState(() { _llevaPostProceso = v; _resultado = null; })),
     const Divider(height: 16),
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const Text('IVA 16%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      Text(tr('IVA 16%'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       Switch(value: _aplicarIva,
         onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
         activeColor: AppColors.azul),
@@ -1848,16 +1848,16 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   ]);
 
   Widget _buildExtrasHerreria() => Column(children: [
-    _toggleOpcion('🔧 Incluir instalación', _llevaInstalacion,
+    _toggleOpcion(tr('🔧 Incluir instalación'), _llevaInstalacion,
       (v) => setState(() { _llevaInstalacion = v; _resultado = null; })),
     if (_llevaInstalacion) ...[
       const SizedBox(height: 8),
-      _campoMedida('Horas de instalación', _horasInstalacion,
+      _campoMedida(tr('Horas de instalación'), _horasInstalacion,
         (v) => setState(() { _horasInstalacion = v; _resultado = null; })),
     ],
     const Divider(height: 16),
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const Text('IVA 16%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      Text(tr('IVA 16%'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       Switch(value: _aplicarIva,
         onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
         activeColor: AppColors.azul),
@@ -1865,18 +1865,18 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   ]);
 
   Widget _buildExtrasCarpinteria() => Column(children: [
-    _toggleOpcion('🔩 Incluir herrajes', _llevaHerrajes,
+    _toggleOpcion(tr('🔩 Incluir herrajes'), _llevaHerrajes,
       (v) => setState(() { _llevaHerrajes = v; _resultado = null; })),
-    _toggleOpcion('🔧 Incluir instalación', _llevaInstalacionCarp,
+    _toggleOpcion(tr('🔧 Incluir instalación'), _llevaInstalacionCarp,
       (v) => setState(() { _llevaInstalacionCarp = v; _resultado = null; })),
     if (_llevaInstalacionCarp) ...[
       const SizedBox(height: 8),
-      _campoMedida('Horas de instalación', _horasInstalacionCarp,
+      _campoMedida(tr('Horas de instalación'), _horasInstalacionCarp,
         (v) => setState(() { _horasInstalacionCarp = v; _resultado = null; })),
     ],
     const Divider(height: 16),
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const Text('IVA 16%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      Text(tr('IVA 16%'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       Switch(value: _aplicarIva,
         onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
         activeColor: AppColors.azul),
@@ -1927,7 +1927,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           label: (t) => t.nombre,
           sublabel: (t) => t.descripcionFormula,
           onSelect: (t) => setState(() { _tipoSel = t; _resultado = null; }),
-          hint: 'Selecciona el tipo de trabajo'),
+          hint: tr('Selecciona el tipo de trabajo')),
       const SizedBox(height: 8),
       GestureDetector(
         onTap: _nuevoModo,
@@ -1935,10 +1935,10 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(20),
             border: Border.all(color: AppColors.azul.withOpacity(0.3))),
-          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(Icons.add, size: 14, color: AppColors.azul),
             SizedBox(width: 4),
-            Text('Agregar modo', style: TextStyle(fontSize: 11, color: AppColors.azul, fontWeight: FontWeight.w600)),
+            Text(tr('Agregar modo'), style: TextStyle(fontSize: 11, color: AppColors.azul, fontWeight: FontWeight.w600)),
           ]))),
     ]);
   }
@@ -1980,7 +1980,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             child: Row(children: [
               const Icon(Icons.tune_outlined, size: 18, color: AppColors.azul),
               const SizedBox(width: 8),
-              Expanded(child: Text('Tarifas de ${_tipoSel?.nombre ?? "este modo"}',
+              Expanded(child: Text(trf('Tarifas de {0}', [(_tipoSel?.nombre ?? tr('este modo'))]),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.azul))),
               Icon(_mostrarTarifas ? Icons.expand_less : Icons.expand_more, color: AppColors.azul),
             ]))),
@@ -2009,7 +2009,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
               child: OutlinedButton.icon(
                 onPressed: _guardarTarifas,
                 icon: const Icon(Icons.save_outlined, size: 16, color: AppColors.verde),
-                label: const Text('Guardar tarifas',
+                label: Text(tr('Guardar tarifas'),
                   style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.verde)))),
           ])),
@@ -2026,8 +2026,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         t.valor = val;
       }
     }
-    if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('✅ Tarifas guardadas'), backgroundColor: AppColors.verde));
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(tr('✅ Tarifas guardadas')), backgroundColor: AppColors.verde));
   }
 
   // ── VARIABLES SEGÚN FÓRMULA ──────────────────────
@@ -2038,20 +2038,20 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     if (formula == 'por_diseno') {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ¿El cliente trae archivo?
-        const Text('Estado del archivo:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(tr('Estado del archivo:'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Row(children: [
-          Expanded(child: _chipArchivo(false, false, '🎨 Diseñar desde cero')),
+          Expanded(child: _chipArchivo(false, false, tr('🎨 Diseñar desde cero'))),
           const SizedBox(width: 6),
-          Expanded(child: _chipArchivo(true, false, '🖼️ Cliente trae imagen')),
+          Expanded(child: _chipArchivo(true, false, tr('🖼️ Cliente trae imagen'))),
           const SizedBox(width: 6),
-          Expanded(child: _chipArchivo(true, true, '✅ Trae vector listo')),
+          Expanded(child: _chipArchivo(true, true, tr('✅ Trae vector listo'))),
         ]),
         const SizedBox(height: 12),
 
         // Si no trae vector listo, mostrar tipos
         if (!(_clienteTraeArchivo && _archivoEsVector)) ...[
-          const Text('El tipo de trabajo ya determina el precio:',
+          Text(tr('El tipo de trabajo ya determina el precio:'),
             style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           const SizedBox(height: 4),
           Container(padding: const EdgeInsets.all(10),
@@ -2065,14 +2065,14 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         // Opciones adicionales
         const Text('Opciones:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        _toggleOpcion('🚀 Entrega urgente (+40%)', _entregaUrgente,
+        _toggleOpcion(tr('🚀 Entrega urgente (+40%)'), _entregaUrgente,
           (v) => setState(() { _entregaUrgente = v; _resultado = null; })),
-        _toggleOpcion('📁 Entregar archivo editable (.AI/.DXF) (+200%)',
+        _toggleOpcion(tr('📁 Entregar archivo editable (.AI/.DXF) (+200%)'),
           _archivoEditableAlCliente,
           (v) => setState(() { _archivoEditableAlCliente = v; _resultado = null; })),
         const SizedBox(height: 8),
         Row(children: [
-          const Text('Revisiones extra (+\$150 c/u):', style: TextStyle(fontSize: 12)),
+          Text(tr('Revisiones extra (+\$150 c/u):'), style: TextStyle(fontSize: 12)),
           const Spacer(),
           IconButton(
             onPressed: () => setState(() { if (_revisionesExtra > 0) { _revisionesExtra--; _resultado = null; } }),
@@ -2088,7 +2088,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     if (formula == 'precio_fijo') {
       return Container(padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
-        child: const Text('Precio fijo negociado. Edita la tarifa "precio_fijo" arriba.',
+        child: Text(tr('Precio fijo negociado. Edita la tarifa "precio_fijo" arriba.'),
           style: TextStyle(fontSize: 12, color: AppColors.azul)));
     }
 
@@ -2102,7 +2102,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     if (esPlasmaScreen) {
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Calibre
-        const Text('Calibre del material:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(tr('Calibre del material:'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Wrap(spacing: 6, runSpacing: 6,
           children: ['Cal 20','Cal 18','Cal 16','Cal 14','Cal 12','Cal 10','Cal 8','Cal 6','1/4"','3/8"','1/2"+']
@@ -2114,7 +2114,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
                   color: _calibre == c ? AppColors.azul : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: _calibre == c ? AppColors.azul : AppColors.grisBorde)),
-                child: Text(c, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                child: Text(tr(c), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                   color: _calibre == c ? Colors.white : AppColors.textoPrincipal))))).toList()),
 
         const SizedBox(height: 12),
@@ -2128,22 +2128,22 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           label: (m) => {'acero_negro':'Acero negro','inox':'Inoxidable','aluminio':'Aluminio'}[m] ?? m,
           sublabel: (m) => {'acero_negro':'Tarifa base','inox':'x1.4','aluminio':'x1.3'}[m],
           onSelect: (m) => setState(() { _material = m; _resultado = null; }),
-          hint: 'Selecciona el material'),
+          hint: tr('Selecciona el material')),
 
         const SizedBox(height: 12),
 
         // Dimensiones según tipo
         if (formula == 'por_area' || formula == 'por_metro') ...[
           if (tipo.necesitaLargo) ...[
-            _campoMedida('Largo (cm)', _largo, (v) => setState(() { _largo = v; _resultado = null; })),
+            _campoMedida(tr('Largo (cm)'), _largo, (v) => setState(() { _largo = v; _resultado = null; })),
             const SizedBox(height: 10),
           ],
           if (tipo.necesitaAncho) ...[
-            _campoMedida('Ancho (cm)', _ancho, (v) => setState(() { _ancho = v; _resultado = null; })),
+            _campoMedida(tr('Ancho (cm)'), _ancho, (v) => setState(() { _ancho = v; _resultado = null; })),
             const SizedBox(height: 10),
           ],
           if (tipo.necesitaMetros) ...[
-            _campoMedida('Metros lineales', _metros, (v) => setState(() { _metros = v; _resultado = null; })),
+            _campoMedida(tr('Metros lineales'), _metros, (v) => setState(() { _metros = v; _resultado = null; })),
             const SizedBox(height: 10),
           ],
         ],
@@ -2153,19 +2153,19 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         // Adicionales Plasma
         const Text('Adicionales:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        _toggleOpcion('🧹 Incluir limpieza de pieza', _llevaLimpieza,
+        _toggleOpcion(tr('🧹 Incluir limpieza de pieza'), _llevaLimpieza,
           (v) => setState(() { _llevaLimpieza = v; _resultado = null; })),
-        _toggleOpcion('🚚 Incluir flete/maniobra', _llevaFlete,
+        _toggleOpcion(tr('🚚 Incluir flete/maniobra'), _llevaFlete,
           (v) => setState(() { _llevaFlete = v; _resultado = null; })),
-        _toggleOpcion('✏️ Incluir diseño', _llevaDisenoPlasma,
+        _toggleOpcion(tr('✏️ Incluir diseño'), _llevaDisenoPlasma,
           (v) => setState(() { _llevaDisenoPlasma = v; _resultado = null; })),
         if (_llevaDisenoPlasma) ...[
           const SizedBox(height: 8),
-          _toggleOpcion('📁 Cliente trae archivo DXF', _clienteTraeArchivoDXF,
+          _toggleOpcion(tr('📁 Cliente trae archivo DXF'), _clienteTraeArchivoDXF,
             (v) => setState(() { _clienteTraeArchivoDXF = v; _resultado = null; })),
           if (!_clienteTraeArchivoDXF) ...[
             const SizedBox(height: 8),
-            _campoMedida('Horas de diseño', _horasDisenoPlasma,
+            _campoMedida(tr('Horas de diseño'), _horasDisenoPlasma,
               (v) => setState(() { _horasDisenoPlasma = v; _resultado = null; })),
           ],
         ],
@@ -2174,41 +2174,40 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
 
     return Column(children: [
       if (tipo.necesitaLargo && formula != 'por_minuto') ...[
-        _campoMedida('Largo (cm)', _largo, (v) => setState(() { _largo = v; _resultado = null; })),
+        _campoMedida(tr('Largo (cm)'), _largo, (v) => setState(() { _largo = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
       if (tipo.necesitaAncho && formula != 'por_minuto') ...[
-        _campoMedida('Ancho (cm)', _ancho, (v) => setState(() { _ancho = v; _resultado = null; })),
+        _campoMedida(tr('Ancho (cm)'), _ancho, (v) => setState(() { _ancho = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
       if (tipo.necesitaAlto || formula == 'por_volumen') ...[
-        _campoMedida('Alto / Profundidad (cm)', _alto,
+        _campoMedida(tr('Alto / Profundidad (cm)'), _alto,
           (v) => setState(() { _alto = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
       if (tipo.necesitaHoras || formula == 'por_hora') ...[
-        _campoMedida('Horas de trabajo', _horas,
+        _campoMedida(tr('Horas de trabajo'), _horas,
           (v) => setState(() { _horas = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
       if (tipo.necesitaMinutos || formula == 'por_minuto') ...[
-        _campoMedida('Minutos estimados', _minutos,
+        _campoMedida(tr('Minutos estimados'), _minutos,
           (v) => setState(() { _minutos = v; _resultado = null; })),
         const SizedBox(height: 10),
         if (formula == 'por_minuto' && _largo > 0 && _ancho > 0 && _minutos == 0)
           Container(padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
-            child: const Text('💡 Si no sabes los minutos exactos, '
-              'deja en 0 y el sistema estimará según el área.',
+            child: Text(tr('💡 Si no sabes los minutos exactos, deja en 0 y el sistema estimará según el área.'),
               style: TextStyle(fontSize: 11, color: AppColors.azul))),
       ],
       if (tipo.necesitaMetros || formula == 'por_metro') ...[
-        _campoMedida('Metros lineales', _metros,
+        _campoMedida(tr('Metros lineales'), _metros,
           (v) => setState(() { _metros = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
       if (tipo.necesitaPeso || formula == 'por_kg') ...[
-        _campoMedida('Peso (kg)', _peso,
+        _campoMedida(tr('Peso (kg)'), _peso,
           (v) => setState(() { _peso = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
@@ -2217,39 +2216,39 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         const SizedBox(height: 10),
         const Divider(height: 1),
         const SizedBox(height: 10),
-        const Text('Acabado manual (opcional):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(tr('Acabado manual (opcional):'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        _toggleOpcion('🪚 Lleva lijado', _horasLijado > 0,
+        _toggleOpcion(tr('🪚 Lleva lijado'), _horasLijado > 0,
           (v) => setState(() { _horasLijado = v ? 1.0 : 0; _resultado = null; })),
         if (_horasLijado > 0) ...[
           const SizedBox(height: 6),
-          _campoMedida('Horas de lijado', _horasLijado,
+          _campoMedida(tr('Horas de lijado'), _horasLijado,
             (v) => setState(() { _horasLijado = v; _resultado = null; })),
         ],
         const SizedBox(height: 8),
-        _toggleOpcion('🖌️ Lleva barnizado/pintado', _horasBarnizado > 0,
+        _toggleOpcion(tr('🖌️ Lleva barnizado/pintado'), _horasBarnizado > 0,
           (v) => setState(() { _horasBarnizado = v ? 1.0 : 0; _resultado = null; })),
         if (_horasBarnizado > 0) ...[
           const SizedBox(height: 6),
-          _campoMedida('Horas de barnizado', _horasBarnizado,
+          _campoMedida(tr('Horas de barnizado'), _horasBarnizado,
             (v) => setState(() { _horasBarnizado = v; _resultado = null; })),
         ],
         const SizedBox(height: 8),
-        _toggleOpcion('✏️ Requiere diseño adicional', _llevaDiseno,
+        _toggleOpcion(tr('✏️ Requiere diseño adicional'), _llevaDiseno,
           (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
       ],
 
       // Complejidad para volumétrico
       if (formula == 'por_volumen') ...[
-        const Text('Complejidad del tallado:',
+        Text(tr('Complejidad del tallado:'),
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
         Wrap(spacing: 8, runSpacing: 8,
           children: [
-            _chipComp('simple', 'Simple', 'Relieve bajo < 1cm'),
-            _chipComp('media', 'Media', 'Relieve normal 1-2cm'),
-            _chipComp('alta', 'Alta', 'Escultura > 2cm'),
-            _chipComp('premium', 'Premium', 'Escultura compleja'),
+            _chipComp('simple', tr('Simple'), tr('Relieve bajo < 1cm')),
+            _chipComp('media', tr('Media'), tr('Relieve normal 1-2cm')),
+            _chipComp('alta', tr('Alta'), tr('Escultura > 2cm')),
+            _chipComp('premium', tr('Premium'), tr('Escultura compleja')),
           ]),
       ],
     ]);
@@ -2266,9 +2265,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+          Text(tr(titulo), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
             color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(sub, style: TextStyle(fontSize: 9,
+          Text(tr(sub), style: TextStyle(fontSize: 9,
             color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ]))));
   }
@@ -2287,7 +2286,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           color: sel ? AppColors.azul : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-        child: Text(label, textAlign: TextAlign.center,
+        child: Text(tr(label), textAlign: TextAlign.center,
           style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
             color: sel ? Colors.white : AppColors.textoPrincipal))));
   }
@@ -2306,7 +2305,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           Icon(val ? Icons.check_box_outlined : Icons.check_box_outline_blank,
             size: 18, color: val ? AppColors.azul : AppColors.grisBorde),
           const SizedBox(width: 8),
-          Expanded(child: Text(label, style: TextStyle(fontSize: 12,
+          Expanded(child: Text(tr(label), style: TextStyle(fontSize: 12,
             color: val ? AppColors.azul : AppColors.textoPrincipal,
             fontWeight: val ? FontWeight.w600 : FontWeight.normal))),
         ])));
@@ -2322,9 +2321,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+          Text(tr(titulo), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
             color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(sub, style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : AppColors.textoSecundario)),
+          Text(tr(sub), style: TextStyle(fontSize: 9, color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ])));
   }
 
@@ -2339,24 +2338,24 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
       // 1. Tipo de trabajo (dropdown)
-      _seccionCard('Tipo de trabajo', _buildTipos()),
+      _seccionCard(tr('Tipo de trabajo'), _buildTipos()),
 
       const SizedBox(height: 10),
 
       // 2. Dimensiones
-      if (tipo != null) _seccionCard('Medidas', Column(children: [
+      if (tipo != null) _seccionCard(tr('Medidas'), Column(children: [
         if (tipo.necesitaLargo || tipo.formula == 'por_area' || tipo.formula == 'por_volumen') ...[
-          _campoMedida('Largo (cm)', _largo,
+          _campoMedida(tr('Largo (cm)'), _largo,
             (v) => setState(() { _largo = v; _resultado = null; })),
           const SizedBox(height: 10),
         ],
         if (tipo.necesitaAncho || tipo.formula == 'por_area' || tipo.formula == 'por_volumen') ...[
-          _campoMedida('Ancho (cm)', _ancho,
+          _campoMedida(tr('Ancho (cm)'), _ancho,
             (v) => setState(() { _ancho = v; _resultado = null; })),
           const SizedBox(height: 10),
         ],
         if (es3D || tipo.necesitaAlto) ...[
-          _campoMedida('Alto / Profundidad (cm)', _alto,
+          _campoMedida(tr('Alto / Profundidad (cm)'), _alto,
             (v) => setState(() { _alto = v; _resultado = null; })),
           const SizedBox(height: 10),
         ],
@@ -2367,9 +2366,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             decoration: BoxDecoration(color: AppColors.azulClaro,
               borderRadius: BorderRadius.circular(8)),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Volumen calculado:',
+              Text(tr('Volumen calculado:'),
                 style: TextStyle(fontSize: 12, color: AppColors.azul)),
-              Text('${(_largo * _ancho * _alto).toStringAsFixed(0)} cm³',
+              Text(trf('{0} cm³', [((_largo * _ancho * _alto).toStringAsFixed(0))]),
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
                   color: AppColors.azul)),
             ])),
@@ -2384,7 +2383,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.verde.withOpacity(0.3))),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Precio rango base × ${_tipoSel?.factor.toStringAsFixed(1)}:',
+                Text(trf('Precio rango base × {0}:', [(_tipoSel?.factor.toStringAsFixed(1))]),
                   style: const TextStyle(fontSize: 12)),
                 Text(fmt.format(precio * (_tipoSel?.factor ?? 1.0)),
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
@@ -2414,36 +2413,36 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       const SizedBox(height: 10),
 
       // 6. Adicionales Router 2D
-      if (tipo?.formula == 'por_area') _seccionCard('Acabado manual', Column(children: [
-        _toggleOpcion('Lijado', _horasLijado > 0,
+      if (tipo?.formula == 'por_area') _seccionCard(tr('Acabado manual'), Column(children: [
+        _toggleOpcion(tr('Lijado'), _horasLijado > 0,
           (v) => setState(() { _horasLijado = v ? 1.0 : 0; _resultado = null; })),
         if (_horasLijado > 0) ...[
           const SizedBox(height: 8),
-          _campoMedida('Horas de lijado', _horasLijado,
+          _campoMedida(tr('Horas de lijado'), _horasLijado,
             (v) => setState(() { _horasLijado = v; _resultado = null; })),
         ],
         const SizedBox(height: 6),
-        _toggleOpcion('Barnizado / Pintado', _horasBarnizado > 0,
+        _toggleOpcion(tr('Barnizado / Pintado'), _horasBarnizado > 0,
           (v) => setState(() { _horasBarnizado = v ? 1.0 : 0; _resultado = null; })),
         if (_horasBarnizado > 0) ...[
           const SizedBox(height: 8),
-          _campoMedida('Horas de barnizado', _horasBarnizado,
+          _campoMedida(tr('Horas de barnizado'), _horasBarnizado,
             (v) => setState(() { _horasBarnizado = v; _resultado = null; })),
         ],
         const SizedBox(height: 6),
-        _toggleOpcion('Requiere diseño adicional', _llevaDiseno,
+        _toggleOpcion(tr('Requiere diseño adicional'), _llevaDiseno,
           (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
       ])),
 
       const SizedBox(height: 10),
 
       // 7. IVA
-      _seccionCard('Facturación', Row(
+      _seccionCard(tr('Facturación'), Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Incluir IVA 16%',
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr('Incluir IVA 16%'),
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          Text('Para clientes con factura',
+          Text(tr('Para clientes con factura'),
             style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ]),
         Switch(value: _aplicarIva,
@@ -2459,9 +2458,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     value: _acabadoSel,
     opciones: cfg.acabados,
     label: (a) => a.nombre,
-    sublabel: (a) => a.precio > 0 ? '+\$${a.precio.toStringAsFixed(0)}' : 'Sin costo adicional',
+    sublabel: (a) => a.precio > 0 ? '+\$${a.precio.toStringAsFixed(0)}' : tr('Sin costo adicional'),
     onSelect: (a) => setState(() { _acabadoSel = a; _resultado = null; }),
-    hint: 'Selecciona el acabado');
+    hint: tr('Selecciona el acabado'));
 
   Widget _filaCantidad() => Row(children: [
     const Text('Cantidad:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -2489,35 +2488,35 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     crossAxisAlignment: CrossAxisAlignment.start, children: [
 
     // Tipo
-    _seccionCard('Tipo de trabajo', _buildTipos()),
+    _seccionCard(tr('Tipo de trabajo'), _buildTipos()),
     const SizedBox(height: 10),
 
     // Calibre
-    _seccionCard('Calibre del material', _buildCalibre()),
+    _seccionCard(tr('Calibre del material'), _buildCalibre()),
     const SizedBox(height: 10),
 
     // Material
     _seccionCard('Material', Row(children: [
-      _chipMaterial('acero_negro', 'Acero negro', 'Base'),
+      _chipMaterial('acero_negro', tr('Acero negro'), tr('Base')),
       const SizedBox(width: 8),
-      _chipMaterial('inox', 'Inoxidable', 'x1.4'),
+      _chipMaterial('inox', tr('Inoxidable'), 'x1.4'),
       const SizedBox(width: 8),
-      _chipMaterial('aluminio', 'Aluminio', 'x1.3'),
+      _chipMaterial('aluminio', tr('Aluminio'), 'x1.3'),
     ])),
     const SizedBox(height: 10),
 
     // Medidas
-    _seccionCard('Medidas', Column(children: [
+    _seccionCard(tr('Medidas'), Column(children: [
       if (_tipoSel?.necesitaLargo == true || _tipoSel?.formula == 'por_area') ...[
-        _campoMedida('Largo (cm)', _largo,
+        _campoMedida(tr('Largo (cm)'), _largo,
           (v) => setState(() { _largo = v; _resultado = null; })),
         const SizedBox(height: 10),
-        _campoMedida('Ancho (cm)', _ancho,
+        _campoMedida(tr('Ancho (cm)'), _ancho,
           (v) => setState(() { _ancho = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
       if (_tipoSel?.necesitaMetros == true || _tipoSel?.formula == 'por_metro') ...[
-        _campoMedida('Metros lineales', _metros,
+        _campoMedida(tr('Metros lineales'), _metros,
           (v) => setState(() { _metros = v; _resultado = null; })),
         const SizedBox(height: 10),
       ],
@@ -2530,26 +2529,26 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     const SizedBox(height: 10),
 
     // Extras
-    _seccionCard('Adicionales', Column(children: [
-      _toggleOpcion('Limpieza de pieza', _llevaLimpieza,
+    _seccionCard(tr('Adicionales'), Column(children: [
+      _toggleOpcion(tr('Limpieza de pieza'), _llevaLimpieza,
         (v) => setState(() { _llevaLimpieza = v; _resultado = null; })),
-      _toggleOpcion('Flete / Maniobra', _llevaFlete,
+      _toggleOpcion(tr('Flete / Maniobra'), _llevaFlete,
         (v) => setState(() { _llevaFlete = v; _resultado = null; })),
-      _toggleOpcion('Diseño / Vectorizacion', _llevaDisenoPlasma,
+      _toggleOpcion(tr('Diseño / Vectorizacion'), _llevaDisenoPlasma,
         (v) => setState(() { _llevaDisenoPlasma = v; _resultado = null; })),
       if (_llevaDisenoPlasma) ...[
         const SizedBox(height: 8),
-        _toggleOpcion('Cliente trae archivo DXF', _clienteTraeArchivoDXF,
+        _toggleOpcion(tr('Cliente trae archivo DXF'), _clienteTraeArchivoDXF,
           (v) => setState(() { _clienteTraeArchivoDXF = v; _resultado = null; })),
         if (!_clienteTraeArchivoDXF) ...[
           const SizedBox(height: 8),
-          _campoMedida('Horas de diseno', _horasDisenoPlasma,
+          _campoMedida(tr('Horas de diseno'), _horasDisenoPlasma,
             (v) => setState(() { _horasDisenoPlasma = v; _resultado = null; })),
         ],
       ],
       const Divider(height: 16),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('IVA 16%',
+        Text(tr('IVA 16%'),
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         Switch(value: _aplicarIva,
           onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -2572,9 +2571,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+          Text(tr(titulo), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
             color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(sub, style: TextStyle(fontSize: 10,
+          Text(tr(sub), style: TextStyle(fontSize: 10,
             color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ])));
   }
@@ -2590,9 +2589,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+          Text(tr(titulo), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
             color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(vel, style: TextStyle(fontSize: 9,
+          Text(tr(vel), style: TextStyle(fontSize: 9,
             color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ])));
   }
@@ -2602,11 +2601,11 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     crossAxisAlignment: CrossAxisAlignment.start, children: [
 
     // Tipo (dropdown)
-    _seccionCard('Tipo de grabado', _buildTipos()),
+    _seccionCard(tr('Tipo de grabado'), _buildTipos()),
     const SizedBox(height: 10),
 
     // Material del grabado
-    _seccionCard('Material a grabar', () {
+    _seccionCard(tr('Material a grabar'), () {
       const mats = {
         'acero_inox':'Acero Inox', 'acero_negro':'Acero negro', 'aluminio':'Aluminio',
         'laton':'Laton', 'cobre':'Cobre', 'titanio':'Titanio',
@@ -2621,12 +2620,12 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         label: (m) => mats[m] ?? m,
         sublabel: (m) => subs[m],
         onSelect: (m) => setState(() { _material = m; _resultado = null; }),
-        hint: 'Selecciona el material');
+        hint: tr('Selecciona el material'));
     }()),
     const SizedBox(height: 10),
 
     // Cantidad - precio escalonado
-    _seccionCard('Cantidad', Column(children: [
+    _seccionCard(tr('Cantidad'), Column(children: [
       _filaCantidad(),
       const SizedBox(height: 10),
       _previewPrecioFibra(cfg),
@@ -2638,16 +2637,16 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     const SizedBox(height: 10),
 
     // Extras
-    _seccionCard('Extras', Column(children: [
-      _toggleOpcion('Plantilla de sujecion (+\$150)', _llevaPlantilla,
+    _seccionCard(tr('Extras'), Column(children: [
+      _toggleOpcion(tr('Plantilla de sujecion (+\$150)'), _llevaPlantilla,
         (v) => setState(() { _llevaPlantilla = v; _resultado = null; })),
-      _toggleOpcion('Eje rotativo (+\$25/pza)', _llevaRotativo,
+      _toggleOpcion(tr('Eje rotativo (+\$25/pza)'), _llevaRotativo,
         (v) => setState(() { _llevaRotativo = v; _resultado = null; })),
-      _toggleOpcion('Setup / Diseno', _llevaDisenoFibra,
+      _toggleOpcion(tr('Setup / Diseno'), _llevaDisenoFibra,
         (v) => setState(() { _llevaDisenoFibra = v; _resultado = null; })),
       const Divider(height: 16),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('IVA 16%',
+        Text(tr('IVA 16%'),
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         Switch(value: _aplicarIva,
           onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -2668,9 +2667,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+          Text(tr(titulo), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
             color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(sub, style: TextStyle(fontSize: 9,
+          Text(tr(sub), style: TextStyle(fontSize: 9,
             color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ])));
   }
@@ -2681,16 +2680,16 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     String rango;
     if (_cantidad <= 10) {
       tarifa = cfg.getTarifa('precio_1_10') > 0 ? cfg.getTarifa('precio_1_10') : 80;
-      rango = '1-10 pzas';
+      rango = tr('1-10 pzas');
     } else if (_cantidad <= 50) {
       tarifa = cfg.getTarifa('precio_11_50') > 0 ? cfg.getTarifa('precio_11_50') : 45;
-      rango = '11-50 pzas';
+      rango = tr('11-50 pzas');
     } else if (_cantidad <= 200) {
       tarifa = cfg.getTarifa('precio_51_200') > 0 ? cfg.getTarifa('precio_51_200') : 20;
-      rango = '51-200 pzas';
+      rango = tr('51-200 pzas');
     } else {
       tarifa = cfg.getTarifa('precio_200_mas') > 0 ? cfg.getTarifa('precio_200_mas') : 10;
-      rango = '200+ pzas';
+      rango = tr('200+ pzas');
     }
     final factor = _tipoSel?.factor ?? 1.0;
     return Container(
@@ -2701,7 +2700,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Rango: $rango',
             style: const TextStyle(fontSize: 11, color: AppColors.azul)),
-          Text('${fmt.format(tarifa)} x pieza (factor x${factor.toStringAsFixed(1)})',
+          Text(trf('{0} x pieza (factor x{1})', [(fmt.format(tarifa)), (factor.toStringAsFixed(1))]),
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ]),
         Text(fmt.format(tarifa * factor * _cantidad),
@@ -2714,7 +2713,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   Widget _bodyImpresion(SimConfig cfg) => Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-    _seccionCard('Tipo / Calidad', _buildTipos()),
+    _seccionCard(tr('Tipo / Calidad'), _buildTipos()),
     const SizedBox(height: 10),
 
     _seccionCard('Material', () {
@@ -2726,18 +2725,18 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         label: (m) => mats[m] ?? m,
         sublabel: (m) => subs[m],
         onSelect: (m) => setState(() { _materialImpresion = m; _resultado = null; }),
-        hint: 'Selecciona el material');
+        hint: tr('Selecciona el material'));
     }()),
     const SizedBox(height: 10),
 
-    _seccionCard('Dimensiones de la pieza', Column(children: [
-      _campoMedida('Largo (cm)', _largo,
+    _seccionCard(tr('Dimensiones de la pieza'), Column(children: [
+      _campoMedida(tr('Largo (cm)'), _largo,
         (v) => setState(() { _largo = v; _resultado = null; })),
       const SizedBox(height: 10),
-      _campoMedida('Ancho (cm)', _ancho,
+      _campoMedida(tr('Ancho (cm)'), _ancho,
         (v) => setState(() { _ancho = v; _resultado = null; })),
       const SizedBox(height: 10),
-      _campoMedida('Alto (cm)', _alto,
+      _campoMedida(tr('Alto (cm)'), _alto,
         (v) => setState(() { _alto = v; _resultado = null; })),
       const SizedBox(height: 10),
       _filaCantidad(),
@@ -2752,7 +2751,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             decoration: BoxDecoration(color: AppColors.azulClaro,
               borderRadius: BorderRadius.circular(8)),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('Gramos estimados (20% relleno):',
+              Text(tr('Gramos estimados (20% relleno):'),
                 style: const TextStyle(fontSize: 11, color: AppColors.azul)),
               Text('${gr.toStringAsFixed(0)} gr',
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
@@ -2763,14 +2762,14 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     ])),
     const SizedBox(height: 10),
 
-    _seccionCard('Extras', Column(children: [
-      _toggleOpcion('Incluir modelado 3D', _llevaDisenyo3D,
+    _seccionCard(tr('Extras'), Column(children: [
+      _toggleOpcion(tr('Incluir modelado 3D'), _llevaDisenyo3D,
         (v) => setState(() { _llevaDisenyo3D = v; _resultado = null; })),
-      _toggleOpcion('Post-proceso (lijado/pintura)', _llevaPostProceso,
+      _toggleOpcion(tr('Post-proceso (lijado/pintura)'), _llevaPostProceso,
         (v) => setState(() { _llevaPostProceso = v; _resultado = null; })),
       const Divider(height: 16),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('IVA 16%',
+        Text(tr('IVA 16%'),
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         Switch(value: _aplicarIva,
           onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -2791,9 +2790,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+          Text(tr(titulo), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
             color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(sub, style: TextStyle(fontSize: 9,
+          Text(tr(sub), style: TextStyle(fontSize: 9,
             color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ])));
   }
@@ -2801,7 +2800,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   // HERRERÍA ────────────────────────────────────────────────────
   Widget _bodyHerreria(SimConfig cfg) => Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _seccionCard('Tipo de trabajo', _buildTipos()),
+    _seccionCard(tr('Tipo de trabajo'), _buildTipos()),
     const SizedBox(height: 10),
     _seccionCard('Material', _dropdownGenerico<String>(
       value: _materialHerreria.isNotEmpty ? _materialHerreria : null,
@@ -2812,16 +2811,16 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         _clienteTreMaterial = m == 'Cliente trae';
         _resultado = null;
       }),
-      hint: 'Selecciona el material')),
+      hint: tr('Selecciona el material'))),
     const SizedBox(height: 10),
-    _seccionCard('Medidas', Column(children: [
-      _campoMedida('Largo (cm)', _largo,
+    _seccionCard(tr('Medidas'), Column(children: [
+      _campoMedida(tr('Largo (cm)'), _largo,
         (v) => setState(() { _largo = v; _resultado = null; })),
       const SizedBox(height: 10),
-      _campoMedida('Ancho (cm)', _ancho,
+      _campoMedida(tr('Ancho (cm)'), _ancho,
         (v) => setState(() { _ancho = v; _resultado = null; })),
       const SizedBox(height: 10),
-      _campoMedida('Horas estimadas', _horas,
+      _campoMedida(tr('Horas estimadas'), _horas,
         (v) => setState(() { _horas = v; _resultado = null; })),
       const SizedBox(height: 10),
       _filaCantidad(),
@@ -2832,19 +2831,19 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       opciones: const ['Sin acabado', 'Anticorrosivo', 'Pintura epoxica', 'Galvanizado'],
       label: (a) => a,
       onSelect: (a) => setState(() { _acabadoHerreria = a; _resultado = null; }),
-      hint: 'Selecciona el acabado')),
+      hint: tr('Selecciona el acabado'))),
     const SizedBox(height: 10),
-    _seccionCard('Extras', Column(children: [
-      _toggleOpcion('Instalacion', _llevaInstalacion,
+    _seccionCard(tr('Extras'), Column(children: [
+      _toggleOpcion(tr('Instalacion'), _llevaInstalacion,
         (v) => setState(() { _llevaInstalacion = v; _resultado = null; })),
       if (_llevaInstalacion) ...[
         const SizedBox(height: 8),
-        _campoMedida('Horas de instalacion', _horasInstalacion,
+        _campoMedida(tr('Horas de instalacion'), _horasInstalacion,
           (v) => setState(() { _horasInstalacion = v; _resultado = null; })),
       ],
       const Divider(height: 16),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('IVA 16%',
+        Text(tr('IVA 16%'),
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         Switch(value: _aplicarIva,
           onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -2857,7 +2856,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   // CARPINTERÍA ─────────────────────────────────────────────────
   Widget _bodyCarpinteria(SimConfig cfg) => Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _seccionCard('Tipo de trabajo', _buildTipos()),
+    _seccionCard(tr('Tipo de trabajo'), _buildTipos()),
     const SizedBox(height: 10),
     _seccionCard('Material', () {
       const mats = {'mdf':'MDF','triplay':'Triplay','cedro':'Cedro',
@@ -2874,20 +2873,20 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           _clienteTreMaterial = m == 'cliente';
           _resultado = null;
         }),
-        hint: 'Selecciona el material');
+        hint: tr('Selecciona el material'));
     }()),
     const SizedBox(height: 10),
-    _seccionCard('Medidas', Column(children: [
-      _campoMedida('Largo (cm)', _largo,
+    _seccionCard(tr('Medidas'), Column(children: [
+      _campoMedida(tr('Largo (cm)'), _largo,
         (v) => setState(() { _largo = v; _resultado = null; })),
       const SizedBox(height: 10),
-      _campoMedida('Ancho (cm)', _ancho,
+      _campoMedida(tr('Ancho (cm)'), _ancho,
         (v) => setState(() { _ancho = v; _resultado = null; })),
       const SizedBox(height: 10),
-      _campoMedida('Alto (cm)', _alto,
+      _campoMedida(tr('Alto (cm)'), _alto,
         (v) => setState(() { _alto = v; _resultado = null; })),
       const SizedBox(height: 10),
-      _campoMedida('Horas estimadas de trabajo', _horas,
+      _campoMedida(tr('Horas estimadas de trabajo'), _horas,
         (v) => setState(() { _horas = v; _resultado = null; })),
       const SizedBox(height: 10),
       _filaCantidad(),
@@ -2898,21 +2897,21 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       opciones: const ['Sin acabado', 'Barniz', 'Pintura', 'Sellador', 'Laminado'],
       label: (a) => a,
       onSelect: (a) => setState(() { _acabadoCarpinteria = a; _resultado = null; }),
-      hint: 'Selecciona el acabado')),
+      hint: tr('Selecciona el acabado'))),
     const SizedBox(height: 10),
-    _seccionCard('Extras', Column(children: [
-      _toggleOpcion('Herrajes incluidos', _llevaHerrajes,
+    _seccionCard(tr('Extras'), Column(children: [
+      _toggleOpcion(tr('Herrajes incluidos'), _llevaHerrajes,
         (v) => setState(() { _llevaHerrajes = v; _resultado = null; })),
-      _toggleOpcion('Instalacion', _llevaInstalacionCarp,
+      _toggleOpcion(tr('Instalacion'), _llevaInstalacionCarp,
         (v) => setState(() { _llevaInstalacionCarp = v; _resultado = null; })),
       if (_llevaInstalacionCarp) ...[
         const SizedBox(height: 8),
-        _campoMedida('Horas de instalacion', _horasInstalacionCarp,
+        _campoMedida(tr('Horas de instalacion'), _horasInstalacionCarp,
           (v) => setState(() { _horasInstalacionCarp = v; _resultado = null; })),
       ],
       const Divider(height: 16),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Text('IVA 16%',
+        Text(tr('IVA 16%'),
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         Switch(value: _aplicarIva,
           onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -2923,15 +2922,15 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   ]);
 
   Widget _buildExtrasLaser(SimConfig cfg) => Column(children: [
-    _toggleOpcion('Diseno / Vectorizacion', _llevaDiseno,
+    _toggleOpcion(tr('Diseno / Vectorizacion'), _llevaDiseno,
       (v) => setState(() { _llevaDiseno = v; _resultado = null; })),
-    _toggleOpcion('Desgaste tubo CO2', _llevaTuboCO2,
+    _toggleOpcion(tr('Desgaste tubo CO2'), _llevaTuboCO2,
       (v) => setState(() { _llevaTuboCO2 = v; _resultado = null; })),
-    _toggleOpcion('Flete / Entrega', _llevaFlete,
+    _toggleOpcion(tr('Flete / Entrega'), _llevaFlete,
       (v) => setState(() { _llevaFlete = v; _resultado = null; })),
     const Divider(height: 16),
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const Text('IVA 16%',
+      Text(tr('IVA 16%'),
         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       Switch(value: _aplicarIva,
         onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -2940,10 +2939,10 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   ]);
 
   Widget _buildMedidasSimple() => Column(children: [
-    _campoMedida('Largo (cm)', _largo,
+    _campoMedida(tr('Largo (cm)'), _largo,
       (v) => setState(() { _largo = v; _resultado = null; })),
     const SizedBox(height: 10),
-    _campoMedida('Ancho (cm)', _ancho,
+    _campoMedida(tr('Ancho (cm)'), _ancho,
       (v) => setState(() { _ancho = v; _resultado = null; })),
     const SizedBox(height: 10),
     _filaCantidad(),
@@ -2951,9 +2950,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
 
   Widget _buildMaterial() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
     Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Cliente trae el material', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        Text('No suma costo de material', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(tr('Cliente trae el material'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Text(tr('No suma costo de material'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       ]),
       Switch(value: _clienteTreMaterial,
         onChanged: (v) => setState(() { _clienteTreMaterial = v; _resultado = null; }),
@@ -2975,7 +2974,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             child: Column(children: [
               Icon(Icons.warehouse_outlined, size: 16,
                 color: _usarInventario ? Colors.white : AppColors.textoSecundario),
-              Text('Del inventario', style: TextStyle(fontSize: 11,
+              Text(tr('Del inventario'), style: TextStyle(fontSize: 11,
                 color: _usarInventario ? Colors.white : AppColors.textoSecundario,
                 fontWeight: FontWeight.w600)),
             ])))),
@@ -2991,7 +2990,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             child: Column(children: [
               Icon(Icons.edit_outlined, size: 16,
                 color: !_usarInventario ? Colors.white : AppColors.textoSecundario),
-              Text('Captura manual', style: TextStyle(fontSize: 11,
+              Text(tr('Captura manual'), style: TextStyle(fontSize: 11,
                 color: !_usarInventario ? Colors.white : AppColors.textoSecundario,
                 fontWeight: FontWeight.w600)),
             ])))),
@@ -3001,21 +3000,21 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         if (_materialesInv.isEmpty)
           Container(padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
-            child: const Text('Sin materiales en inventario. Usa captura manual.',
+            child: Text(tr('Sin materiales en inventario. Usa captura manual.'),
               style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)))
         else
           DropdownButtonFormField<String>(
             value: _materialInvSel?['id'] as String?,
-            decoration: const InputDecoration(labelText: 'Material del inventario',
+            decoration: InputDecoration(labelText: tr('Material del inventario'),
               border: OutlineInputBorder(), isDense: true,
               prefixIcon: Icon(Icons.search, size: 18)),
             items: [
-              const DropdownMenuItem<String>(value: null,
-                child: Text('Sin material', style: TextStyle(fontSize: 13))),
+              DropdownMenuItem<String>(value: null,
+                child: Text(tr('Sin material'), style: TextStyle(fontSize: 13))),
               ..._materialesInv.map((m) => DropdownMenuItem<String>(
                 value: m['id'] as String,
                 child: Row(children: [
-                  Expanded(child: Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 13),
+                  Expanded(child: Text(tr(m['nombre'] ?? ''), style: const TextStyle(fontSize: 13),
                     overflow: TextOverflow.ellipsis)),
                   Text('\$${((m['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}',
                     style: const TextStyle(fontSize: 11, color: AppColors.verde, fontWeight: FontWeight.w700)),
@@ -3031,17 +3030,15 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           Container(padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: AppColors.verde.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8)),
-            child: Text('Stock: ${_materialInvSel!['stock_actual']} ${_materialInvSel!['unidad'] ?? 'pzas'}  '
-              '|  Costo: \$${((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(2)}/pza '
-              '(+15% merma incluida)',
+            child: Text(trf('Stock: {0} {1}  |  Costo: \${2}/pza (+15% merma incluida)', [(_materialInvSel!['stock_actual']), (_materialInvSel!['unidad'] ?? 'pzas'), (((_materialInvSel!['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(2))]),
               style: const TextStyle(fontSize: 11))),
         ],
       ] else ...[
         Row(children: [
           Expanded(child: TextFormField(
             initialValue: _materialLibreNombre,
-            decoration: const InputDecoration(labelText: 'Nombre del material',
-              hintText: 'Ej: Cedro, MDF 15mm, Acrílico...',
+            decoration: InputDecoration(labelText: tr('Nombre del material'),
+              hintText: tr('Ej: Cedro, MDF 15mm, Acrílico...'),
               border: OutlineInputBorder(), isDense: true),
             onChanged: (v) => setState(() { _materialLibreNombre = v; _resultado = null; }),
             style: const TextStyle(fontSize: 13))),
@@ -3050,14 +3047,14 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             initialValue: _materialLibrePrecio > 0 ? _materialLibrePrecio.toStringAsFixed(2) : '',
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
-            decoration: const InputDecoration(labelText: 'Precio', prefixText: r'$',
+            decoration: InputDecoration(labelText: tr('Precio'), prefixText: r'$',
               border: OutlineInputBorder(), isDense: true),
             onChanged: (v) => setState(() {
               _materialLibrePrecio = double.tryParse(v) ?? 0; _resultado = null; }),
             style: const TextStyle(fontSize: 13))),
         ]),
         const SizedBox(height: 4),
-        const Text('Se agrega automáticamente +15% de merma.',
+        Text(tr('Se agrega automáticamente +15% de merma.'),
           style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
       ],
     ],
@@ -3117,9 +3114,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       ],
       const Divider(height: 16),
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Incluir IVA 16%', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          Text('Para clientes con factura', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr('Incluir IVA 16%'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(tr('Para clientes con factura'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ]),
         Switch(value: _aplicarIva,
           onChanged: (v) => setState(() { _aplicarIva = v; _resultado = null; }),
@@ -3134,22 +3131,22 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
 
     final precios = [
       ResultadoPrecio(
-        etiqueta: 'PRECIO MÍNIMO', emoji: '🟡',
-        descripcion: 'Cubre costos, margen mínimo.\n⚠️ Úsalo solo en casos especiales o clientes frecuentes.',
+        etiqueta: tr('PRECIO MÍNIMO'), emoji: '🟡',
+        descripcion: tr('Cubre costos, margen mínimo.\n⚠️ Úsalo solo en casos especiales o clientes frecuentes.'),
         costo: r.costoTotal, precio: r.pvMinimo,
         utilidad: r.pvMinimo - r.costoTotal,
         margen: r.costoTotal > 0 ? ((r.pvMinimo - r.costoTotal)/r.pvMinimo*100) : 0,
         color: AppColors.ambar),
       ResultadoPrecio(
-        etiqueta: 'PRECIO RECOMENDADO', emoji: '🟢',
-        descripcion: 'Precio competitivo y rentable.\n✅ Recomendado para la mayoría de trabajos.',
+        etiqueta: tr('PRECIO RECOMENDADO'), emoji: '🟢',
+        descripcion: tr('Precio competitivo y rentable.\n✅ Recomendado para la mayoría de trabajos.'),
         costo: r.costoTotal, precio: r.pvRecomendado,
         utilidad: r.pvRecomendado - r.costoTotal,
         margen: r.costoTotal > 0 ? ((r.pvRecomendado - r.costoTotal)/r.pvRecomendado*100) : 0,
         color: AppColors.verde, esRecomendado: true),
       ResultadoPrecio(
-        etiqueta: 'PRECIO PREMIUM', emoji: '🔵',
-        descripcion: 'Para clientes de alto valor o trabajos urgentes.\n💎 Aumenta la rentabilidad del negocio.',
+        etiqueta: tr('PRECIO PREMIUM'), emoji: '🔵',
+        descripcion: tr('Para clientes de alto valor o trabajos urgentes.\n💎 Aumenta la rentabilidad del negocio.'),
         costo: r.costoTotal, precio: r.pvPremium,
         utilidad: r.pvPremium - r.costoTotal,
         margen: r.costoTotal > 0 ? ((r.pvPremium - r.costoTotal)/r.pvPremium*100) : 0,
@@ -3196,20 +3193,20 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: AppColors.verde,
                     borderRadius: BorderRadius.circular(20)),
-                  child: const Text('✓ MEJOR', style: TextStyle(fontSize: 9,
+                  child: Text(tr('✓ MEJOR'), style: TextStyle(fontSize: 9,
                     color: Colors.white, fontWeight: FontWeight.w700))),
                 if (sel && !p.esRecomendado) Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(color: p.color,
                     borderRadius: BorderRadius.circular(20)),
-                  child: const Text('ELEGIDO', style: TextStyle(fontSize: 9,
+                  child: Text(tr('ELEGIDO'), style: TextStyle(fontSize: 9,
                     color: Colors.white, fontWeight: FontWeight.w700))),
               ]),
               const SizedBox(height: 8),
               Row(children: [
-                _kpiPrecio('Costo', fmt.format(p.costo), AppColors.textoSecundario),
-                _kpiPrecio('Utilidad', fmt.format(p.utilidad), p.color),
-                _kpiPrecio('Margen', '${p.margen.toStringAsFixed(1)}%', p.color),
+                _kpiPrecio(tr('Costo'), fmt.format(p.costo), AppColors.textoSecundario),
+                _kpiPrecio(tr('Utilidad'), fmt.format(p.utilidad), p.color),
+                _kpiPrecio(tr('Margen'), '${p.margen.toStringAsFixed(1)}%', p.color),
                 _kpiPrecio('Gan/hr', fmt.format(r.gananciaHora), AppColors.textoSecundario),
               ]),
               const SizedBox(height: 8),
@@ -3226,7 +3223,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('DESGLOSE DE COSTOS', style: TextStyle(fontSize: 10,
+          Text(tr('DESGLOSE DE COSTOS'), style: TextStyle(fontSize: 10,
             fontWeight: FontWeight.w700, color: AppColors.textoSecundario, letterSpacing: 1.5)),
           const SizedBox(height: 12),
           ...r.costosDesglose.entries
@@ -3253,7 +3250,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             }),
           const Divider(height: 16),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('COSTO TOTAL', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(tr('COSTO TOTAL'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             Text(fmt.format(r.costoTotal),
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.rojo)),
           ]),
@@ -3266,10 +3263,10 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.azul.withOpacity(0.2))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
+          Row(children: [
             Icon(Icons.lightbulb_outline, size: 16, color: AppColors.azul),
             SizedBox(width: 6),
-            Text('Observaciones financieras', style: TextStyle(fontSize: 12,
+            Text(tr('Observaciones financieras'), style: TextStyle(fontSize: 12,
               fontWeight: FontWeight.w700, color: AppColors.azul)),
           ]),
           const SizedBox(height: 10),
@@ -3283,14 +3280,14 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Descripción para cotización:',
+          Text(tr('Descripción para cotización:'),
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textoSecundario)),
           const SizedBox(height: 8),
           TextFormField(
             initialValue: _descripcionEditable,
             maxLines: 4, minLines: 2,
             onChanged: (v) => setState(() => _descripcionEditable = v),
-            decoration: InputDecoration(hintText: 'Descripción del trabajo...',
+            decoration: InputDecoration(hintText: tr('Descripción del trabajo...'),
               filled: true, fillColor: AppColors.gris,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
             style: const TextStyle(fontSize: 12)),
@@ -3306,7 +3303,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             Navigator.pop(context);
           },
           icon: const Icon(Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
-          label: const Text('Agregar al carrito',
+          label: Text(tr('Agregar al carrito'),
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde,
             padding: const EdgeInsets.symmetric(vertical: 12)))),
@@ -3320,7 +3317,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
               builder: (_) => CotizarScreen(carritoSimulador: [rFinal])));
           },
           icon: const Icon(Icons.description_outlined, color: Colors.white, size: 16),
-          label: const Text('Cotizar ahora',
+          label: Text(tr('Cotizar ahora'),
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.naranja,
             padding: const EdgeInsets.symmetric(vertical: 12)))),
@@ -3352,37 +3349,36 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
 
     // Observación margen
     if (r.margenReal < 20) {
-      obs.add(_obs('⚠️ Margen bajo (${r.margenReal.toStringAsFixed(1)}%)',
-        'Este trabajo apenas cubre costos. Considera aumentar el precio o reducir el material.', AppColors.rojo));
+      obs.add(_obs(trf('⚠️ Margen bajo ({0}%)', [(r.margenReal.toStringAsFixed(1))]),
+        tr('Este trabajo apenas cubre costos. Considera aumentar el precio o reducir el material.'), AppColors.rojo));
     } else if (r.margenReal >= 40) {
-      obs.add(_obs('✅ Excelente margen (${r.margenReal.toStringAsFixed(1)}%)',
-        'Este trabajo es muy rentable. Mantén este precio como referencia.', AppColors.verde));
+      obs.add(_obs(trf('✅ Excelente margen ({0}%)', [(r.margenReal.toStringAsFixed(1))]),
+        tr('Este trabajo es muy rentable. Mantén este precio como referencia.'), AppColors.verde));
     } else {
-      obs.add(_obs('👍 Margen saludable (${r.margenReal.toStringAsFixed(1)}%)',
-        'El precio recomendado es competitivo y cubre bien los costos.', AppColors.azul));
+      obs.add(_obs(trf('👍 Margen saludable ({0}%)', [(r.margenReal.toStringAsFixed(1))]),
+        tr('El precio recomendado es competitivo y cubre bien los costos.'), AppColors.azul));
     }
 
     // Observación material
     final pctMat = r.costoTotal > 0 ? (r.cm / r.costoTotal * 100) : 0;
     if (pctMat > 40) {
-      obs.add(_obs('📦 Material: ${pctMat.toStringAsFixed(0)}% del costo',
-        'El material es el mayor costo. Busca precio de mayoreo con tu proveedor.', AppColors.naranja));
+      obs.add(_obs(trf('📦 Material: {0}% del costo', [(pctMat.toStringAsFixed(0))]),
+        tr('El material es el mayor costo. Busca precio de mayoreo con tu proveedor.'), AppColors.naranja));
     }
 
     // Observación tiempo (referencia para planear entregas)
     if (r.tiempoHoras > 0) {
       final dias = (r.tiempoHoras / 8).ceil();
-      obs.add(_obs('⏱️ Tiempo estimado: ${r.tiempoHoras.toStringAsFixed(1)} horas (~$dias día${dias>1?"s":""} de trabajo)',
-        'Ganancia por hora: ${fmt.format(r.gananciaHora)}. '
-        '${r.gananciaHora > 200 ? "Trabajo muy rentable." : r.gananciaHora > 100 ? "Rentabilidad aceptable." : "Considera ajustar el precio."}',
+      obs.add(_obs(trf('⏱️ Tiempo estimado: {0} horas (~{1} día{2} de trabajo)', [(r.tiempoHoras.toStringAsFixed(1)), dias, dias>1?"s":""]),
+        trf('Ganancia por hora: {0}. {1}', [(fmt.format(r.gananciaHora)), (r.gananciaHora > 200 ? tr('Trabajo muy rentable.') : r.gananciaHora > 100 ? tr('Rentabilidad aceptable.') : tr('Considera ajustar el precio.'))]),
         AppColors.azul));
     }
 
     // Observación costos taller
     final pctCI = r.costoTotal > 0 ? (r.ci / r.costoTotal * 100) : 0;
     if (pctCI < 5 && (_costosTaller?.costoHoraTaller ?? 0) < 1) {
-      obs.add(_obs('💡 Configura tus costos fijos',
-        'Ve a "Costos del taller" y agrega renta, luz y salarios para calcular el precio real.',
+      obs.add(_obs(tr('💡 Configura tus costos fijos'),
+        tr('Ve a "Costos del taller" y agrega renta, luz y salarios para calcular el precio real.'),
         AppColors.ambar));
     }
 
@@ -3394,8 +3390,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Container(width: 3, height: 40, color: color, margin: const EdgeInsets.only(right: 8, top: 2)),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(titulo, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
-        Text(detalle, style: const TextStyle(fontSize: 11, color: AppColors.textoPrincipal)),
+        Text(tr(titulo), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        Text(tr(detalle), style: const TextStyle(fontSize: 11, color: AppColors.textoPrincipal)),
       ])),
     ]));
 
@@ -3413,8 +3409,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
 
   Widget _kpiPrecio(String label, String val, Color color) =>
     Expanded(child: Column(children: [
-      Text(val, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
-      Text(label, style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario)),
+      Text(tr(val), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+      Text(tr(label), style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario)),
     ]));
 
   // ── HELPERS ──────────────────────────────────────
@@ -3423,7 +3419,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(padding: const EdgeInsets.fromLTRB(14,12,14,8),
-        child: Text(titulo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul))),
+        child: Text(tr(titulo), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul))),
       const Divider(height: 1),
       Padding(padding: const EdgeInsets.all(14), child: child),
     ]));
@@ -3476,7 +3472,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         child: Column(children: [
           Padding(padding: const EdgeInsets.fromLTRB(16,16,16,12),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Nuevo modo de trabajo', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              Text(tr('Nuevo modo de trabajo'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               GestureDetector(onTap: () => Navigator.pop(ctx), child: const Icon(Icons.close)),
             ])),
           const Divider(height: 1),
@@ -3485,11 +3481,11 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
               bottom: MediaQuery.of(ctx).viewInsets.bottom + 16),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               TextFormField(controller: nombreCtrl, textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(labelText: 'Nombre del modo *',
-                  hintText: 'Ej: Corte 2D, Talla 3D, Grabado...',
+                decoration: InputDecoration(labelText: tr('Nombre del modo *'),
+                  hintText: tr('Ej: Corte 2D, Talla 3D, Grabado...'),
                   border: OutlineInputBorder(), isDense: true)),
               const SizedBox(height: 16),
-              const Text('¿Cómo se cobra?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              Text(tr('¿Cómo se cobra?'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
               ...formulas.map((f) => GestureDetector(
                 onTap: () => setS(() => formula = f['v']!),
@@ -3536,7 +3532,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
                     if (mounted) { Navigator.pop(ctx); _cargar(); }
                   },
                   icon: const Icon(Icons.save_outlined, color: Colors.white),
-                  label: const Text('Crear modo', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                  label: Text(tr('Crear modo'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                     padding: const EdgeInsets.symmetric(vertical: 13)))),
             ]))),
@@ -3561,7 +3557,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       label: (m) => mats[m] ?? m,
       sublabel: (m) => vels[m],
       onSelect: (m) => setState(() { _materialLaser = m; _resultado = null; }),
-      hint: 'Selecciona el material');
+      hint: tr('Selecciona el material'));
   }
 
   Widget _buildDensidadLaser() {
@@ -3570,8 +3566,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(color: AppColors.gris,
           borderRadius: BorderRadius.circular(8)),
-        child: const Text(
-          'La densidad aplica solo para grabado.',
+        child: Text(
+          tr('La densidad aplica solo para grabado.'),
           style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)));
     }
     const dens = {
@@ -3588,7 +3584,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       label: (d) => dens[d] ?? d,
       sublabel: (d) => subs[d],
       onSelect: (d) => setState(() { _densidadLaser = d; _resultado = null; }),
-      hint: 'Selecciona la densidad');
+      hint: tr('Selecciona la densidad'));
   }
 
   Widget _chipDensidad(String val, String titulo, String sub) {
@@ -3603,10 +3599,10 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
           border: Border.all(
             color: sel ? AppColors.azul : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(fontSize: 13,
+          Text(tr(titulo), style: TextStyle(fontSize: 13,
             fontWeight: FontWeight.w700,
             color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(sub, style: TextStyle(fontSize: 10,
+          Text(tr(sub), style: TextStyle(fontSize: 10,
             color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ])));
   }
@@ -3619,9 +3615,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       value: _calibre,
       opciones: calibres,
       label: (c) => c,
-      sublabel: (c) => delgados.contains(c) ? 'Delgado' : 'Medio/Grueso',
+      sublabel: (c) => delgados.contains(c) ? tr('Delgado') : 'Medio/Grueso',
       onSelect: (c) => setState(() { _calibre = c; _resultado = null; }),
-      hint: 'Selecciona el calibre');
+      hint: tr('Selecciona el calibre'));
   }
 
 }

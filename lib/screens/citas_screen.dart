@@ -4,6 +4,7 @@ import '../main.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
 import '../models/models.dart';
+import '../i18n/tr.dart';
 
 class CitasScreen extends StatefulWidget {
   const CitasScreen({super.key});
@@ -48,7 +49,7 @@ class _CitasScreenState extends State<CitasScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Agenda de citas',
+        title: Text(tr('Agenda de citas'),
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
         actions: [
           IconButton(
@@ -88,13 +89,13 @@ class _CitasScreenState extends State<CitasScreen> {
             ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Icon(Icons.event_busy_outlined, size: 48, color: AppColors.grisBorde),
                 const SizedBox(height: 12),
-                Text('Sin citas ${_filtro == "Todas" ? "" : _filtro.toLowerCase()}s',
+                Text(trf('Sin citas {0}s', [(_filtro == "Todas" ? "" : _filtro.toLowerCase())]),
                   style: const TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
                 const SizedBox(height: 20),
                 ElevatedButton.icon(
                   onPressed: _nuevaCita,
                   icon: const Icon(Icons.add, color: Colors.white),
-                  label: const Text('Agendar cita', style: TextStyle(color: Colors.white)),
+                  label: Text(tr('Agendar cita'), style: TextStyle(color: Colors.white)),
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul)),
               ]))
             : ListView.builder(
@@ -133,23 +134,23 @@ class _CitasScreenState extends State<CitasScreen> {
                               color: color.withOpacity(0.12),
                               borderRadius: BorderRadius.circular(8)),
                             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                              Text(fecha != null ? '${fecha.day}' : '--',
+                              Text(tr(fecha != null ? '${fecha.day}' : '--'),
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color)),
-                              Text(fecha != null ? DateFormat('MMM', 'es_MX').format(fecha).toUpperCase() : '',
+                              Text(tr(fecha != null ? DateFormat('MMM', 'es_MX').format(fecha).toUpperCase() : ''),
                                 style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: color)),
                             ])),
                           const SizedBox(width: 10),
                           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(cita['titulo'] as String? ?? '',
+                            Text(tr(cita['titulo'] as String? ?? ''),
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                             if (cita['clientes'] != null)
-                              Text((cita['clientes'] as Map<String, dynamic>?)?['nombre'] as String? ?? '',
+                              Text(tr((cita['clientes'] as Map<String, dynamic>?)?['nombre'] as String? ?? ''),
                                 style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
                             if (fecha != null)
                               Text(
-                                '${esHoy ? "🔵 HOY — " : ""}'
+                                '${esHoy ? tr('🔵 HOY — ') : ""}'
                                 '${_fmtFecha.format(fecha).capitalize()} · ${_fmtHora.format(fecha)}'
-                                '${cita['duracion_min'] != null ? " (${cita['duracion_min']} min)" : ""}',
+                                '${cita['duracion_min'] != null ? trf(' ({0} min)', [(cita['duracion_min'])]) : ""}',
                                 style: TextStyle(fontSize: 11,
                                   color: esHoy ? AppColors.azul : AppColors.textoSecundario,
                                   fontWeight: esHoy ? FontWeight.w600 : FontWeight.normal)),
@@ -159,7 +160,7 @@ class _CitasScreenState extends State<CitasScreen> {
                             decoration: BoxDecoration(
                               color: color.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20)),
-                            child: Text(estado,
+                            child: Text(tr(estado),
                               style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: color))),
                         ])),
                       // Acciones
@@ -172,7 +173,7 @@ class _CitasScreenState extends State<CitasScreen> {
                               Expanded(child: ElevatedButton.icon(
                                 onPressed: () => _notificarWA(cita),
                                 icon: const Icon(Icons.chat, size: 14, color: Colors.white),
-                                label: const Text('Notificar WA', style: TextStyle(fontSize: 11, color: Colors.white)),
+                                label: Text(tr('Notificar WA'), style: TextStyle(fontSize: 11, color: Colors.white)),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFF25D366),
                                   padding: const EdgeInsets.symmetric(vertical: 8)))),
@@ -183,7 +184,7 @@ class _CitasScreenState extends State<CitasScreen> {
                               Expanded(child: OutlinedButton.icon(
                                 onPressed: () => _cambiarEstado(cita['id'] as String, 'Confirmada'),
                                 icon: const Icon(Icons.check, size: 14, color: AppColors.verde),
-                                label: const Text('Confirmar', style: TextStyle(fontSize: 11, color: AppColors.verde)),
+                                label: Text(tr('Confirmar'), style: TextStyle(fontSize: 11, color: AppColors.verde)),
                                 style: OutlinedButton.styleFrom(
                                   side: const BorderSide(color: AppColors.verde),
                                   padding: const EdgeInsets.symmetric(vertical: 8)))),
@@ -201,12 +202,12 @@ class _CitasScreenState extends State<CitasScreen> {
                                 }
                               },
                               itemBuilder: (_) => [
-                                const PopupMenuItem(value: 'editar',
-                                  child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Editar')])),
-                                const PopupMenuItem(value: 'completar',
-                                  child: Row(children: [Icon(Icons.task_alt_outlined, size: 16, color: AppColors.verde), SizedBox(width: 8), Text('Marcar completada')])),
-                                const PopupMenuItem(value: 'cancelar',
-                                  child: Row(children: [Icon(Icons.cancel_outlined, size: 16, color: AppColors.rojo), SizedBox(width: 8), Text('Cancelar', style: TextStyle(color: AppColors.rojo))])),
+                                PopupMenuItem(value: 'editar',
+                                  child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text(tr('Editar'))])),
+                                PopupMenuItem(value: 'completar',
+                                  child: Row(children: [Icon(Icons.task_alt_outlined, size: 16, color: AppColors.verde), SizedBox(width: 8), Text(tr('Marcar completada'))])),
+                                PopupMenuItem(value: 'cancelar',
+                                  child: Row(children: [Icon(Icons.cancel_outlined, size: 16, color: AppColors.rojo), SizedBox(width: 8), Text(tr('Cancelar'), style: TextStyle(color: AppColors.rojo))])),
                               ]),
                           ])),
                     ]));
@@ -236,15 +237,11 @@ class _CitasScreenState extends State<CitasScreen> {
   Future<void> _notificarWA(Map<String, dynamic> cita) async {
     final wa = (cita['clientes'] as Map?)?['whatsapp'] as String? ?? '';
     if (wa.isEmpty) return;
-    final nombre = (cita['clientes'] as Map?)?['nombre'] as String? ?? 'Cliente';
+    final nombre = (cita['clientes'] as Map?)?['nombre'] as String? ?? tr('Cliente');
     final fecha = DateTime.tryParse(cita['fecha_hora'] as String? ?? '');
-    final lugar = cita['lugar'] as String? ?? 'Taller HETNA CNC';
+    final lugar = cita['lugar'] as String? ?? tr('Taller HETNA CNC');
     final titulo = cita['titulo'] as String? ?? '';
-    final msg = 'Hola *$nombre* 📅 Te confirmamos tu cita en *HETNA CNC*:\n\n'
-      '📋 *$titulo*\n'
-      '📅 *${fecha != null ? DateFormat("EEEE dd 'de' MMMM 'a las' HH:mm", 'es_MX').format(fecha) : ""}*\n'
-      '📍 *$lugar*\n\n'
-      'Si necesitas reprogramar avísanos con anticipación. ¡Te esperamos! 😊';
+    final msg = trf('Hola *{0}* 📅 Te confirmamos tu cita en *HETNA CNC*:\n\n📋 *{1}*\n📅 *{2}*\n📍 *{3}*\n\nSi necesitas reprogramar avísanos con anticipación. ¡Te esperamos! 😊', [nombre, titulo, (fecha != null ? DateFormat("EEEE dd 'de' MMMM 'a las' HH:mm", 'es_MX').format(fecha) : ""), lugar]);
     await WhatsAppService.abrirChat(numero: wa, mensaje: msg);
     await SupabaseService.actualizarCita(cita['id'] as String, {'wa_enviado': true});
     await _cargar();
@@ -283,7 +280,7 @@ class _FormCitaState extends State<_FormCita> {
     if (c != null) {
       _tituloCtrl.text = c['titulo'] ?? '';
       _descCtrl.text   = c['descripcion'] ?? '';
-      _lugarCtrl.text  = c['lugar'] ?? 'Taller HETNA CNC';
+      _lugarCtrl.text  = c['lugar'] ?? tr('Taller HETNA CNC');
       _durCtrl.text    = c['duracion_min']?.toString() ?? '60';
       if (c['fecha_hora'] != null) {
         _fecha = DateTime.tryParse(c['fecha_hora'] as String) ?? _fecha;
@@ -293,7 +290,7 @@ class _FormCitaState extends State<_FormCita> {
         _clienteNombre = (c['clientes'] as Map<String, dynamic>?)?['nombre'] as String? ?? '';
       }
     } else {
-      _lugarCtrl.text = 'Taller HETNA CNC';
+      _lugarCtrl.text = tr('Taller HETNA CNC');
       _durCtrl.text   = '60';
     }
   }
@@ -314,14 +311,14 @@ class _FormCitaState extends State<_FormCita> {
       builder: (_) => SizedBox(
         height: MediaQuery.of(context).size.height * 0.6,
         child: Column(children: [
-          const Padding(padding: EdgeInsets.all(14),
-            child: Text('Seleccionar cliente',
+          Padding(padding: EdgeInsets.all(14),
+            child: Text(tr('Seleccionar cliente'),
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
           Expanded(child: ListView.builder(
             itemCount: clientes.length,
             itemBuilder: (_, i) => ListTile(
               title: Text(clientes[i].nombre),
-              subtitle: Text(clientes[i].empresa ?? ''),
+              subtitle: Text(tr(clientes[i].empresa ?? '')),
               onTap: () {
                 setState(() { _clienteId = clientes[i].id; _clienteNombre = clientes[i].nombre; });
                 Navigator.pop(context);
@@ -349,7 +346,7 @@ class _FormCitaState extends State<_FormCita> {
   Future<void> _guardar() async {
     if (_tituloCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El título es obligatorio')));
+        SnackBar(content: Text(tr('El título es obligatorio'))));
       return;
     }
     setState(() => _guardando = true);
@@ -392,12 +389,12 @@ class _FormCitaState extends State<_FormCita> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: Text(widget.cita == null ? 'Nueva cita' : 'Editar cita',
+        title: Text(tr(widget.cita == null ? tr('Nueva cita') : tr('Editar cita')),
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
         actions: [
           TextButton(
             onPressed: _guardando ? null : _guardar,
-            child: Text(_guardando ? 'Guardando...' : 'Guardar',
+            child: Text(tr(_guardando ? tr('Guardando...') : tr('Guardar')),
               style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
         ]),
       body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -405,8 +402,8 @@ class _FormCitaState extends State<_FormCita> {
         TextField(
           controller: _tituloCtrl,
           decoration: InputDecoration(
-            labelText: 'Motivo de la cita *',
-            hintText: 'Ej: Ver muestras de tablas de cocina',
+            labelText: tr('Motivo de la cita *'),
+            hintText: tr('Ej: Ver muestras de tablas de cocina'),
             prefixIcon: const Icon(Icons.event_note_outlined),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
           textCapitalization: TextCapitalization.sentences),
@@ -425,7 +422,7 @@ class _FormCitaState extends State<_FormCita> {
               const Icon(Icons.person_outline, size: 18, color: AppColors.textoSecundario),
               const SizedBox(width: 10),
               Expanded(child: Text(
-                _clienteNombre.isEmpty ? 'Seleccionar cliente (opcional)' : _clienteNombre,
+                tr(_clienteNombre.isEmpty ? tr('Seleccionar cliente (opcional)') : _clienteNombre),
                 style: TextStyle(fontSize: 13,
                   color: _clienteNombre.isEmpty ? AppColors.textoSecundario : AppColors.textoPrincipal))),
               const Icon(Icons.chevron_right, size: 16, color: AppColors.textoSecundario),
@@ -447,7 +444,7 @@ class _FormCitaState extends State<_FormCita> {
               Expanded(child: Text(
                 _fmt.format(_fecha).capitalize(),
                 style: const TextStyle(fontSize: 13, color: AppColors.azul, fontWeight: FontWeight.w600))),
-              const Text('Cambiar', style: TextStyle(fontSize: 11, color: AppColors.azul)),
+              Text(tr('Cambiar'), style: TextStyle(fontSize: 11, color: AppColors.azul)),
             ]))),
         const SizedBox(height: 12),
 
@@ -456,7 +453,7 @@ class _FormCitaState extends State<_FormCita> {
           Expanded(child: TextField(
             controller: _lugarCtrl,
             decoration: InputDecoration(
-              labelText: 'Lugar',
+              labelText: tr('Lugar'),
               prefixIcon: const Icon(Icons.place_outlined),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))))),
           const SizedBox(width: 10),
@@ -464,7 +461,7 @@ class _FormCitaState extends State<_FormCita> {
             controller: _durCtrl,
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
-              labelText: 'Duración',
+              labelText: tr('Duración'),
               suffixText: 'min',
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))))),
         ]),
@@ -475,8 +472,8 @@ class _FormCitaState extends State<_FormCita> {
           controller: _descCtrl,
           maxLines: 3,
           decoration: InputDecoration(
-            labelText: 'Notas (opcional)',
-            hintText: 'Detalles de la cita...',
+            labelText: tr('Notas (opcional)'),
+            hintText: tr('Detalles de la cita...'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
           textCapitalization: TextCapitalization.sentences),
         const SizedBox(height: 8),
@@ -488,11 +485,11 @@ class _FormCitaState extends State<_FormCita> {
             color: AppColors.verde.withOpacity(0.08),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.verde.withOpacity(0.2))),
-          child: const Row(children: [
+          child: Row(children: [
             Icon(Icons.notifications_active_outlined, size: 16, color: AppColors.verde),
             SizedBox(width: 8),
             Expanded(child: Text(
-              'Se creará una alerta de recordatorio 24 horas antes de la cita',
+              tr('Se creará una alerta de recordatorio 24 horas antes de la cita'),
               style: TextStyle(fontSize: 11, color: AppColors.verde))),
           ])),
         const SizedBox(height: 24),
@@ -503,7 +500,7 @@ class _FormCitaState extends State<_FormCita> {
             backgroundColor: AppColors.azul,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-          child: Text(_guardando ? 'Guardando...' : 'Agendar cita',
+          child: Text(tr(_guardando ? tr('Guardando...') : tr('Agendar cita')),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
       ]));
   }

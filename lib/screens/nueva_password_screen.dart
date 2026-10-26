@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import 'home_screen.dart';
+import '../i18n/tr.dart';
 
 class NuevaPasswordScreen extends StatefulWidget {
   const NuevaPasswordScreen({super.key});
@@ -24,11 +25,11 @@ class _NuevaPasswordScreenState extends State<NuevaPasswordScreen> {
     final confirm = _passConfirmCtrl.text;
 
     if (pass.length < 6) {
-      setState(() => _error = 'La contraseña debe tener al menos 6 caracteres');
+      setState(() => _error = tr('La contraseña debe tener al menos 6 caracteres'));
       return;
     }
     if (pass != confirm) {
-      setState(() => _error = 'Las contraseñas no coinciden');
+      setState(() => _error = tr('Las contraseñas no coinciden'));
       return;
     }
 
@@ -46,7 +47,7 @@ class _NuevaPasswordScreenState extends State<NuevaPasswordScreen> {
           (route) => false);
       }
     } catch (e) {
-      setState(() { _error = 'No se pudo actualizar: $e'; _cargando = false; });
+      setState(() { _error = trf('No se pudo actualizar: {0}', [e]); _cargando = false; });
     }
   }
 
@@ -63,12 +64,12 @@ class _NuevaPasswordScreenState extends State<NuevaPasswordScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 const Icon(Icons.lock_reset, size: 56, color: AppColors.azul),
                 const SizedBox(height: 16),
-                const Text('Crea tu nueva contraseña',
+                Text(tr('Crea tu nueva contraseña'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
                     color: AppColors.azul)),
                 const SizedBox(height: 6),
-                const Text('Escribe tu nueva contraseña para volver a entrar a HETNA CNC.',
+                Text(tr('Escribe tu nueva contraseña para volver a entrar a HETNA CNC.'),
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
                 const SizedBox(height: 24),
@@ -87,7 +88,7 @@ class _NuevaPasswordScreenState extends State<NuevaPasswordScreen> {
                 ],
 
                 TextField(controller: _passCtrl, obscureText: !_verPass,
-                  decoration: InputDecoration(labelText: 'Nueva contraseña',
+                  decoration: InputDecoration(labelText: tr('Nueva contraseña'),
                     prefixIcon: const Icon(Icons.lock_outline, size: 18),
                     suffixIcon: IconButton(
                       icon: Icon(_verPass ? Icons.visibility_off : Icons.visibility, size: 18),
@@ -95,7 +96,7 @@ class _NuevaPasswordScreenState extends State<NuevaPasswordScreen> {
                     isDense: true, border: OutlineInputBorder())),
                 const SizedBox(height: 14),
                 TextField(controller: _passConfirmCtrl, obscureText: !_verPass,
-                  decoration: const InputDecoration(labelText: 'Confirmar contraseña',
+                  decoration: InputDecoration(labelText: tr('Confirmar contraseña'),
                     prefixIcon: Icon(Icons.lock_outline, size: 18),
                     isDense: true, border: OutlineInputBorder())),
                 const SizedBox(height: 24),
@@ -107,7 +108,7 @@ class _NuevaPasswordScreenState extends State<NuevaPasswordScreen> {
                   child: _cargando
                     ? const SizedBox(width: 22, height: 22,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Guardar contraseña',
+                    : Text(tr('Guardar contraseña'),
                         style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
                           color: Colors.white)))),
               ]))))));

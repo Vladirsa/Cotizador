@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
 import 'simulador_screen.dart' hide SimuladorScreen;
+import '../i18n/tr.dart';
 
 class ConfigSimuladorScreen extends StatefulWidget {
   const ConfigSimuladorScreen({super.key});
@@ -46,18 +47,18 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       backgroundColor: AppColors.gris,
       appBar: AppBar(
         backgroundColor: Colors.white, elevation: 0.5,
-        title: const Text('Configurar simulador',
+        title: Text(tr('Configurar simulador'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         actions: [
           IconButton(
             onPressed: () => _mostrarAyudaGeneral(),
             icon: const Icon(Icons.help_outline, color: AppColors.azul),
-            tooltip: 'Ayuda'),
+            tooltip: tr('Ayuda')),
           if (_servicioSel != null)
             TextButton.icon(
               onPressed: _agregarServicio,
               icon: const Icon(Icons.add, color: AppColors.azul, size: 18),
-              label: const Text('Nuevo', style: TextStyle(color: AppColors.azul))),
+              label: Text(tr('Nuevo'), style: TextStyle(color: AppColors.azul))),
         ]),
       body: _cargando && _servicios.isEmpty
         ? const Center(child: CircularProgressIndicator())
@@ -73,8 +74,8 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10)),
-      child: const Text(
-        '⚙️ Selecciona un servicio para configurar sus tarifas, materiales, tipos de trabajo y extras.',
+      child: Text(
+        tr('⚙️ Selecciona un servicio para configurar sus tarifas, materiales, tipos de trabajo y extras.'),
         style: TextStyle(fontSize: 13, color: AppColors.azul))),
     const SizedBox(height: 14),
     ..._servicios.map((s) => GestureDetector(
@@ -94,7 +95,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(s.nombre, style: const TextStyle(
               fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.azul)),
-            Text('Toca para configurar', style: const TextStyle(
+            Text(tr('Toca para configurar'), style: const TextStyle(
               fontSize: 11, color: AppColors.textoSecundario)),
           ])),
           const Icon(Icons.chevron_right, color: AppColors.textoSecundario),
@@ -104,7 +105,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
   // ── CONFIGURACIÓN DE UN SERVICIO ────────────────────
   Widget _pantallaConfig() {
     if (_cargando) return const Center(child: CircularProgressIndicator());
-    if (_config == null) return const Center(child: Text('Error al cargar'));
+    if (_config == null) return Center(child: Text(tr('Error al cargar')));
     final cfg = _config!;
 
     return ListView(padding: const EdgeInsets.all(14), children: [
@@ -120,9 +121,9 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       const SizedBox(height: 16),
 
       // ── TARIFAS ──
-      _seccionCard('💰 Tarifas', cfg.tarifas.values.toList(),
-        ayuda: 'El precio base por unidad de trabajo, por ejemplo "corte por metro" a \$50, o "precio por hora de máquina" a \$300.',
-        addLabel: '+ Agregar tarifa',
+      _seccionCard(tr('💰 Tarifas'), cfg.tarifas.values.toList(),
+        ayuda: tr('El precio base por unidad de trabajo, por ejemplo "corte por metro" a \$50, o "precio por hora de máquina" a \$300.'),
+        addLabel: tr('+ Agregar tarifa'),
         onAdd: () => _nuevoItem('tarifa'),
         builder: (_, i) {
           final t = cfg.tarifas.values.toList()[i];
@@ -139,10 +140,10 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
 
       // ── RANGOS (solo router) ──
       if (cfg.rangos.isNotEmpty || _servicioSel?.nombre.toLowerCase().contains('router') == true)
-        _seccionCard('📊 Tabla de rangos (Router)',
+        _seccionCard(tr('📊 Tabla de rangos (Router)'),
           cfg.rangos,
-          ayuda: 'Para cuando el precio cambia según qué tan grande es el trabajo (ej. cortar 1-10 piezas a \$50 c/u, pero 11-50 piezas a \$40 c/u). "Índice desde/hasta" son los límites del rango.',
-          addLabel: '+ Agregar rango',
+          ayuda: tr('Para cuando el precio cambia según qué tan grande es el trabajo (ej. cortar 1-10 piezas a \$50 c/u, pero 11-50 piezas a \$40 c/u). "Índice desde/hasta" son los límites del rango.'),
+          addLabel: tr('+ Agregar rango'),
           onAdd: () => _nuevoRango(),
           builder: (_, i) {
             final r = cfg.rangos[i];
@@ -153,9 +154,9 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
 
       // ── MATERIALES ──
       if (false) // materiales ahora en inventario
-        _seccionCard('🪨 Materiales',
+        _seccionCard(tr('🪨 Materiales'),
           [],
-          addLabel: '+ Agregar material',
+          addLabel: tr('+ Agregar material'),
           onAdd: () => _nuevoNombre('sim_materiales', 'Material'),
           builder: (_, i) {
             final m = [][i];
@@ -166,10 +167,10 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
 
       // ── TIPOS DE TRABAJO ──
       if (cfg.tipos.isNotEmpty)
-        _seccionCard('🔨 Tipos de trabajo',
+        _seccionCard(tr('🔨 Tipos de trabajo'),
           cfg.tipos,
-          ayuda: 'Variantes dentro del servicio (ej. "Corte simple", "Relieve 3D"). El Factor de complejidad multiplica el precio base: 1.0 = normal, 1.5 = 50% más caro, 3.0 = el triple.',
-          addLabel: '+ Agregar tipo',
+          ayuda: tr('Variantes dentro del servicio (ej. "Corte simple", "Relieve 3D"). El Factor de complejidad multiplica el precio base: 1.0 = normal, 1.5 = 50% más caro, 3.0 = el triple.'),
+          addLabel: tr('+ Agregar tipo'),
           onAdd: () => _nuevoTipo(),
           builder: (_, i) {
             final t = cfg.tipos[i];
@@ -180,10 +181,10 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
 
       // ── ACABADOS ──
       if (cfg.acabados.isNotEmpty)
-        _seccionCard('✨ Acabados',
+        _seccionCard(tr('✨ Acabados'),
           cfg.acabados,
-          ayuda: 'Terminados opcionales que el cliente puede elegir y suman un costo fijo (ej. "Barniz", "Pintura", "Pulido").',
-          addLabel: '+ Agregar acabado',
+          ayuda: tr('Terminados opcionales que el cliente puede elegir y suman un costo fijo (ej. "Barniz", "Pintura", "Pulido").'),
+          addLabel: tr('+ Agregar acabado'),
           onAdd: () => _nuevoExtra('sim_acabados', 'Acabado'),
           builder: (_, i) {
             final a = cfg.acabados[i];
@@ -200,11 +201,11 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
 
       // ── EXTRAS ──
       if (cfg.extras.isNotEmpty)
-        _seccionCard('🎁 Extras',
+        _seccionCard(tr('🎁 Extras'),
           cfg.extras,
-          ayuda: 'Cargos adicionales opcionales que no son de terminado (ej. "Entrega urgente", "Diseño personalizado"). Pueden ser precio fijo, porcentaje, o por pieza.',
-          addLabel: '+ Agregar extra',
-          onAdd: () => _nuevoExtra('sim_extras', 'Extra'),
+          ayuda: tr('Cargos adicionales opcionales que no son de terminado (ej. "Entrega urgente", "Diseño personalizado"). Pueden ser precio fijo, porcentaje, o por pieza.'),
+          addLabel: tr('+ Agregar extra'),
+          onAdd: () => _nuevoExtra('sim_extras', tr('Extra')),
           builder: (_, i) {
             final e = cfg.extras[i];
             return _itemEditable(
@@ -234,7 +235,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Row(children: [
-            Text(titulo, style: const TextStyle(
+            Text(tr(titulo), style: const TextStyle(
               fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
             if (ayuda != null) GestureDetector(
               onTap: () => _mostrarAyuda(titulo, ayuda),
@@ -247,7 +248,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.azulClaro, borderRadius: BorderRadius.circular(20)),
-              child: Text(addLabel, style: const TextStyle(
+              child: Text(tr(addLabel), style: const TextStyle(
                 fontSize: 11, color: AppColors.azul, fontWeight: FontWeight.w600)))),
         ])),
       const Divider(height: 1, color: AppColors.grisBorde),
@@ -265,10 +266,10 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       title: Row(children: [
         const Icon(Icons.help_outline, color: AppColors.azul, size: 20),
         const SizedBox(width: 8),
-        Expanded(child: Text(titulo, style: const TextStyle(fontSize: 15))),
+        Expanded(child: Text(tr(titulo), style: const TextStyle(fontSize: 15))),
       ]),
-      content: Text(texto, style: const TextStyle(fontSize: 13, height: 1.4)),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Entendido'))]));
+      content: Text(tr(texto), style: const TextStyle(fontSize: 13, height: 1.4)),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('Entendido')))]));
   }
 
   // ── AYUDA: pantalla completa del Simulador ──────────
@@ -284,46 +285,26 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
             Center(child: Container(width: 36, height: 4,
               decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
             const SizedBox(height: 16),
-            const Text('❓ Cómo funciona el Simulador', style: TextStyle(
+            Text(tr('❓ Cómo funciona el Simulador'), style: TextStyle(
               fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.azul)),
             const SizedBox(height: 8),
-            const Text(
-              'El Simulador calcula un precio sugerido para un trabajo, combinando lo que tú configuras aquí '
-              '(tarifas, tipos de trabajo) con las medidas que captura tu vendedor al cotizar. Aquí abajo se '
-              'explica cada sección para que sepas qué llenar.',
+            Text(
+              tr('El Simulador calcula un precio sugerido para un trabajo, combinando lo que tú configuras aquí (tarifas, tipos de trabajo) con las medidas que captura tu vendedor al cotizar. Aquí abajo se explica cada sección para que sepas qué llenar.'),
               style: TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.4)),
-            _bloqueAyuda('💰 Tarifas',
-              'El precio base por unidad de trabajo. Por ejemplo, "corte por metro" a \$50, o "precio por hora de '
-              'máquina" a \$300. Cada servicio (Router, Herrería, Láser, etc.) tiene sus propias tarifas.'),
-            _bloqueAyuda('🔨 Tipos de trabajo y Factor de complejidad',
-              'Un "tipo de trabajo" es una variante dentro del servicio — por ejemplo, dentro de Router puedes '
-              'tener "Corte simple", "Relieve 3D", "Escultura". El Factor de complejidad multiplica el precio '
-              'base según qué tan difícil es ese trabajo comparado con lo más sencillo:\n\n'
-              '• Factor 1.0 = trabajo normal, sin ajuste (corte simple)\n'
-              '• Factor 1.5 = 50% más caro que lo normal\n'
-              '• Factor 3.0 = el triple de precio (por ejemplo, relieve 3D, que tarda más y desgasta más la '
-              'herramienta)\n\n'
-              'Regla simple: entre más tiempo, cuidado o desgaste de herramienta necesite un trabajo, más alto '
-              'debe ser su factor.'),
-            _bloqueAyuda('📊 Tabla de rangos',
-              'Se usa cuando el precio no es siempre el mismo por unidad, sino que cambia según qué tan grande '
-              'es el trabajo — por ejemplo, cortar de 1 a 10 piezas cuesta \$50 cada una, pero de 11 a 50 piezas '
-              'baja a \$40 cada una (por volumen). "Índice desde" e "Índice hasta" son los límites de ese rango '
-              '(ej. desde 1 hasta 10), y "Precio" es lo que aplica dentro de ese rango.'),
-            _bloqueAyuda('✨ Acabados',
-              'Opciones extra de terminado que el cliente puede elegir y que suman un costo fijo al final — '
-              'por ejemplo "Barniz", "Pintura", "Pulido". Se le suman al precio base del trabajo si el cliente '
-              'los pide.'),
-            _bloqueAyuda('🎁 Extras',
-              'Cargos adicionales opcionales que no son de terminado — por ejemplo "Entrega urgente", "Diseño '
-              'personalizado", "Instalación". Pueden ser un precio fijo, un porcentaje del total, o un precio '
-              'por pieza, según cómo lo configures.'),
+            _bloqueAyuda(tr('💰 Tarifas'),
+              tr('El precio base por unidad de trabajo. Por ejemplo, "corte por metro" a \$50, o "precio por hora de máquina" a \$300. Cada servicio (Router, Herrería, Láser, etc.) tiene sus propias tarifas.')),
+            _bloqueAyuda(tr('🔨 Tipos de trabajo y Factor de complejidad'),
+              tr('Un "tipo de trabajo" es una variante dentro del servicio — por ejemplo, dentro de Router puedes tener "Corte simple", "Relieve 3D", "Escultura". El Factor de complejidad multiplica el precio base según qué tan difícil es ese trabajo comparado con lo más sencillo:\n\n• Factor 1.0 = trabajo normal, sin ajuste (corte simple)\n• Factor 1.5 = 50% más caro que lo normal\n• Factor 3.0 = el triple de precio (por ejemplo, relieve 3D, que tarda más y desgasta más la herramienta)\n\nRegla simple: entre más tiempo, cuidado o desgaste de herramienta necesite un trabajo, más alto debe ser su factor.')),
+            _bloqueAyuda(tr('📊 Tabla de rangos'),
+              tr('Se usa cuando el precio no es siempre el mismo por unidad, sino que cambia según qué tan grande es el trabajo — por ejemplo, cortar de 1 a 10 piezas cuesta \$50 cada una, pero de 11 a 50 piezas baja a \$40 cada una (por volumen). "Índice desde" e "Índice hasta" son los límites de ese rango (ej. desde 1 hasta 10), y "Precio" es lo que aplica dentro de ese rango.')),
+            _bloqueAyuda(tr('✨ Acabados'),
+              tr('Opciones extra de terminado que el cliente puede elegir y que suman un costo fijo al final — por ejemplo "Barniz", "Pintura", "Pulido". Se le suman al precio base del trabajo si el cliente los pide.')),
+            _bloqueAyuda(tr('🎁 Extras'),
+              tr('Cargos adicionales opcionales que no son de terminado — por ejemplo "Entrega urgente", "Diseño personalizado", "Instalación". Pueden ser un precio fijo, un porcentaje del total, o un precio por pieza, según cómo lo configures.')),
             const SizedBox(height: 8),
             Container(padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10)),
-              child: const Text('💡 Consejo: si no estás seguro de un precio, empieza con un número '
-                'aproximado y ajústalo después de cotizar unos trabajos reales — es más fácil corregir '
-                'que adivinar desde cero.',
+              child: Text(tr('💡 Consejo: si no estás seguro de un precio, empieza con un número aproximado y ajústalo después de cotizar unos trabajos reales — es más fácil corregir que adivinar desde cero.'),
                 style: TextStyle(fontSize: 12, color: AppColors.azul, height: 1.4))),
           ]))));
   }
@@ -331,9 +312,9 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
   Widget _bloqueAyuda(String titulo, String texto) => Padding(
     padding: const EdgeInsets.only(top: 18),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(titulo, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
+      Text(tr(titulo), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
       const SizedBox(height: 6),
-      Text(texto, style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.45)),
+      Text(tr(texto), style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.45)),
     ]));
 
   // ── ITEM EDITABLE (tarifa con valor numérico) ───────
@@ -348,9 +329,9 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(children: [
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(titulo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(tr(titulo), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           if (subtitulo.isNotEmpty)
-            Text(subtitulo, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            Text(tr(subtitulo), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ])),
         const SizedBox(width: 10),
         SizedBox(width: 90,
@@ -397,7 +378,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
     Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(children: [
-        Expanded(child: Text(nombre,
+        Expanded(child: Text(tr(nombre),
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
         GestureDetector(
           onTap: () => _editarNombre(id, tabla, nombre),
@@ -416,7 +397,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       child: Row(children: [
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(t.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-          Text('Factor de complejidad: ${t.factor}',
+          Text(trf('Factor de complejidad: {0}', [(t.factor)]),
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ])),
         const SizedBox(width: 10),
@@ -428,7 +409,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
             textAlign: TextAlign.center,
             decoration: InputDecoration(
               isDense: true, filled: true, fillColor: AppColors.gris,
-              labelText: 'Factor',
+              labelText: tr('Factor'),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))),
             onFieldSubmitted: (v) async {
               final d = double.tryParse(v);
@@ -446,7 +427,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
               await Supabase.instance.client.from('sim_tipos_trabajo')
                 .update({'factor_complejidad': d}).eq('id', t.id);
               if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('✅ Factor guardado'),
+                SnackBar(content: Text(tr('✅ Factor guardado')),
                   backgroundColor: AppColors.verde));
               _cargarConfig(_servicioSel!);
             }
@@ -503,7 +484,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
             if (d != null) {
               await _guardarPrecio('sim_rangos', r.id, d);
               if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('✅ Rango guardado'),
+                SnackBar(content: Text(tr('✅ Rango guardado')),
                   backgroundColor: AppColors.verde));
             }
           },
@@ -532,7 +513,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
   Future<void> _guardarTarifa(String id, double valor) async {
     await _sb.from('sim_tarifas').update({'valor': valor}).eq('id', id);
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Tarifa guardada'),
+      SnackBar(content: Text(tr('✅ Tarifa guardada')),
         backgroundColor: AppColors.verde));
     _cargarConfig(_servicioSel!);
   }
@@ -546,15 +527,15 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Confirmar'),
-        content: const Text('¿Eliminar este elemento? No se puede deshacer.'),
+        title: Text(tr('Confirmar')),
+        content: Text(tr('¿Eliminar este elemento? No se puede deshacer.')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar')),
+            child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
         ]));
     if (confirm == true) {
       await _sb.from(tabla).delete().eq('id', id);
@@ -565,18 +546,18 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
   Future<void> _editarNombre(String id, String tabla, String nombreActual) async {
     final ctrl = TextEditingController(text: nombreActual);
     await showDialog(context: context, builder: (_) => AlertDialog(
-      title: const Text('Editar nombre'),
+      title: Text(tr('Editar nombre')),
       content: TextField(controller: ctrl,
-        decoration: const InputDecoration(labelText: 'Nombre')),
+        decoration: InputDecoration(labelText: tr('Nombre'))),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('Cancelar'))),
         ElevatedButton(
           onPressed: () async {
             await _sb.from(tabla).update({'nombre': ctrl.text.trim()}).eq('id', id);
             if (mounted) Navigator.pop(context);
             _cargarConfig(_servicioSel!);
           },
-          child: const Text('Guardar')),
+          child: Text(tr('Guardar'))),
       ]));
   }
 
@@ -588,18 +569,18 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
     await showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _bottomForm('Nueva tarifa', [
+      builder: (_) => _bottomForm(tr('Nueva tarifa'), [
         TextField(controller: nombreCtrl,
-          decoration: const InputDecoration(labelText: 'Nombre', isDense: true,
+          decoration: InputDecoration(labelText: tr('Nombre'), isDense: true,
             border: OutlineInputBorder())),
         const SizedBox(height: 10),
         TextField(controller: valorCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Valor (\$)', isDense: true,
+          decoration: InputDecoration(labelText: tr('Valor (\$)'), isDense: true,
             border: OutlineInputBorder())),
         const SizedBox(height: 10),
         TextField(controller: unidadCtrl,
-          decoration: const InputDecoration(labelText: 'Unidad (\$/m2, \$/min...)',
+          decoration: InputDecoration(labelText: tr('Unidad (\$/m2, \$/min...)'),
             isDense: true, border: OutlineInputBorder())),
       ], onGuardar: () async {
         await _sb.from('sim_tarifas').insert({'negocio_id': AuthService.negocioId,
@@ -622,26 +603,26 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
     await showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _bottomForm('Nuevo rango', [
+      builder: (_) => _bottomForm(tr('Nuevo rango'), [
         Row(children: [
           Expanded(child: TextField(controller: desdeCtrl,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Indice desde',
+            decoration: InputDecoration(labelText: tr('Indice desde'),
               isDense: true, border: OutlineInputBorder()))),
           const SizedBox(width: 10),
           Expanded(child: TextField(controller: hastaCtrl,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Indice hasta',
+            decoration: InputDecoration(labelText: tr('Indice hasta'),
               isDense: true, border: OutlineInputBorder()))),
         ]),
         const SizedBox(height: 10),
         TextField(controller: precioCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(labelText: 'Precio (\$)',
+          decoration: InputDecoration(labelText: tr('Precio (\$)'),
             isDense: true, border: OutlineInputBorder())),
         const SizedBox(height: 10),
         TextField(controller: descCtrl,
-          decoration: const InputDecoration(labelText: 'Descripcion (opcional)',
+          decoration: InputDecoration(labelText: tr('Descripcion (opcional)'),
             isDense: true, border: OutlineInputBorder())),
       ], onGuardar: () async {
         await _sb.from('sim_rangos').insert({'negocio_id': AuthService.negocioId,
@@ -661,7 +642,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
     await showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _bottomForm('Nuevo $label', [
+      builder: (_) => _bottomForm(trf('Nuevo {0}', [label]), [
         TextField(controller: ctrl,
           textCapitalization: TextCapitalization.words,
           decoration: InputDecoration(labelText: label,
@@ -682,17 +663,17 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
     await showModalBottomSheet(
       context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _bottomForm('Nuevo tipo de trabajo', [
+      builder: (_) => _bottomForm(tr('Nuevo tipo de trabajo'), [
         TextField(controller: nombreCtrl,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(labelText: 'Nombre',
+          decoration: InputDecoration(labelText: tr('Nombre'),
             isDense: true, border: OutlineInputBorder())),
         const SizedBox(height: 10),
         TextField(controller: factorCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Factor de complejidad (ej: 1.5)',
-            helperText: 'Corte simple = 1.0, Relieve 3D = 3.0, Escultura = 6.0',
+          decoration: InputDecoration(
+            labelText: tr('Factor de complejidad (ej: 1.5)'),
+            helperText: tr('Corte simple = 1.0, Relieve 3D = 3.0, Escultura = 6.0'),
             isDense: true, border: OutlineInputBorder())),
       ], onGuardar: () async {
         await _sb.from('sim_tipos_trabajo').insert({'negocio_id': AuthService.negocioId,
@@ -713,7 +694,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       context: context, isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(builder: (ctx, setS) =>
-        _bottomForm('Nuevo $label', [
+        _bottomForm(trf('Nuevo {0}', [label]), [
           TextField(controller: nombreCtrl,
             textCapitalization: TextCapitalization.words,
             decoration: InputDecoration(labelText: label,
@@ -721,7 +702,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
           const SizedBox(height: 10),
           TextField(controller: precioCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Precio (\$)',
+            decoration: InputDecoration(labelText: tr('Precio (\$)'),
               isDense: true, border: OutlineInputBorder())),
           const SizedBox(height: 10),
           // Tipo precio
@@ -733,7 +714,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
                 decoration: BoxDecoration(
                   color: tipoPrecio == t ? AppColors.azul : AppColors.gris,
                   borderRadius: BorderRadius.circular(20)),
-                child: Text(t, style: TextStyle(
+                child: Text(tr(t), style: TextStyle(
                   fontSize: 11,
                   color: tipoPrecio == t ? Colors.white : AppColors.textoSecundario))))).toList()),
         ], onGuardar: () async {
@@ -751,14 +732,12 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
   Future<void> _agregarServicio() async {
     // Solo mostrar info de cómo agregar un nuevo servicio
     showDialog(context: context, builder: (_) => AlertDialog(
-      title: const Text('Agregar servicio'),
-      content: const Text(
-        'Para agregar un nuevo tipo de servicio al simulador, '
-        'insertar un registro en la tabla sim_servicios en Supabase '
-        'con la clave, nombre y emoji del nuevo servicio.'),
+      title: Text(tr('Agregar servicio')),
+      content: Text(
+        tr('Para agregar un nuevo tipo de servicio al simulador, insertar un registro en la tabla sim_servicios en Supabase con la clave, nombre y emoji del nuevo servicio.')),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context),
-          child: const Text('Entendido')),
+          child: Text(tr('Entendido'))),
       ]));
   }
 
@@ -777,7 +756,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
           decoration: BoxDecoration(color: Colors.grey[300],
             borderRadius: BorderRadius.circular(2))),
         const SizedBox(height: 14),
-        Text(titulo, style: const TextStyle(
+        Text(tr(titulo), style: const TextStyle(
           fontSize: 15, fontWeight: FontWeight.w700)),
         const SizedBox(height: 16),
         ...campos,
@@ -791,7 +770,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azul,
               padding: const EdgeInsets.symmetric(vertical: 12)),
-            child: const Text('Guardar',
+            child: Text(tr('Guardar'),
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
       ]));
 }

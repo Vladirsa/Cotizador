@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/hetna_api.dart';
 import 'calculadora_cnc_screen.dart';
 import 'envios_screen.dart';
+import '../i18n/tr.dart';
 
 class InicioScreen extends StatefulWidget {
   const InicioScreen({super.key});
@@ -137,9 +138,9 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
             decoration: BoxDecoration(color: AppColors.azul, borderRadius: BorderRadius.circular(6)),
             child: const Center(child: Text('H', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)))),
           const SizedBox(width: 8),
-          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('HETNA CNC', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
-            Text('Panel de control', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario, height: 1)),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr('HETNA CNC'), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
+            Text(tr('Panel de control'), style: TextStyle(fontSize: 10, color: AppColors.textoSecundario, height: 1)),
           ]),
         ]),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)],
@@ -149,12 +150,12 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           isScrollable: true,
-          tabs: const [
-            Tab(text: '📊 Dashboard'),
-            Tab(text: '📋 Cotizaciones'),
-            Tab(text: '🏭 Producción'),
-            Tab(text: '📦 Inventario'),
-            Tab(text: '🛒 Productos'),
+          tabs: [
+            Tab(text: tr('📊 Dashboard')),
+            Tab(text: tr('📋 Cotizaciones')),
+            Tab(text: tr('🏭 Producción')),
+            Tab(text: tr('📦 Inventario')),
+            Tab(text: tr('🛒 Productos')),
           ],
         ),
       ),
@@ -202,7 +203,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           Icon(cubierto ? Icons.check_circle : Icons.flag_outlined,
             color: Colors.white, size: 18),
           const SizedBox(width: 6),
-          const Text('META: CUBRIR COSTOS FIJOS DEL MES',
+          Text(tr('META: CUBRIR COSTOS FIJOS DEL MES'),
             style: TextStyle(fontSize: 10, color: Colors.white70, letterSpacing: 1)),
         ]),
         const SizedBox(height: 10),
@@ -223,17 +224,16 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
               cubierto ? Colors.white : AppColors.ambar))),
         const SizedBox(height: 8),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('${(progreso * 100).toStringAsFixed(0)}% cubierto',
+          Text(trf('{0}% cubierto', [((progreso * 100).toStringAsFixed(0))]),
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-          Text(cubierto
-            ? '✅ Meta alcanzada este mes'
-            : 'Faltan ${_fmt.format(faltante)}',
+          Text(tr(cubierto
+            ? tr('✅ Meta alcanzada este mes')
+            : trf('Faltan {0}', [(_fmt.format(faltante))])),
             style: const TextStyle(fontSize: 12, color: Colors.white70)),
         ]),
         if (!cubierto) ...[
           const SizedBox(height: 4),
-          Text('Necesitas vender ~${_fmt.format(promedioDiarioNecesario)}/día '
-            'los próximos $diasRestantes días para cubrir renta, luz y demás gastos fijos.',
+          Text(trf('Necesitas vender ~{0}/día los próximos {1} días para cubrir renta, luz y demás gastos fijos.', [(_fmt.format(promedioDiarioNecesario)), diasRestantes]),
             style: const TextStyle(fontSize: 11, color: Colors.white60)),
         ],
       ]));
@@ -248,9 +248,9 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const Icon(Icons.flag_outlined, color: AppColors.ambar, size: 22),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Configura tus costos fijos',
+        Text(tr('Configura tus costos fijos'),
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.ambar)),
-        const Text('Ve a "Costos del taller" (renta, luz, etc.) para ver aquí tu meta mensual de punto de equilibrio.',
+        Text(tr('Ve a "Costos del taller" (renta, luz, etc.) para ver aquí tu meta mensual de punto de equilibrio.'),
           style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       ])),
     ]));
@@ -261,9 +261,9 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Row(children: [
-      _chipPeriodo('dia', 'Día'),
-      _chipPeriodo('semana', 'Semana'),
-      _chipPeriodo('mes', 'Mes'),
+      _chipPeriodo('dia', tr('Día')),
+      _chipPeriodo('semana', tr('Semana')),
+      _chipPeriodo('mes', tr('Mes')),
     ]));
 
   Widget _chipPeriodo(String val, String label) {
@@ -275,7 +275,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         decoration: BoxDecoration(
           color: sel ? AppColors.azul : Colors.transparent,
           borderRadius: BorderRadius.circular(8)),
-        child: Text(label, textAlign: TextAlign.center,
+        child: Text(tr(label), textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
             color: sel ? Colors.white : AppColors.textoSecundario)))));
   }
@@ -308,7 +308,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     // Gastos por categoría (del periodo seleccionado)
     final porCategoria = <String, double>{};
     for (final g in gastosPeriodo) {
-      final cat = g['categoria'] as String? ?? 'Otro';
+      final cat = g['categoria'] as String? ?? tr('Otro');
       porCategoria[cat] = (porCategoria[cat] ?? 0) + ((g['monto'] as num?)?.toDouble() ?? 0);
     }
     final sortedCategorias = porCategoria.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
@@ -336,7 +336,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     final aprobadas = _cotizaciones.where((c) => c.estado == 'Aprobada' || c.estado == 'Pedido').length;
     final tasaConversion = totalCots > 0 ? (aprobadas / totalCots * 100) : 0.0;
 
-    final etiquetaPeriodo = {'dia': 'HOY', 'semana': 'ESTA SEMANA', 'mes': 'ESTE MES'}[_periodoDash] ?? 'ESTE MES';
+    final etiquetaPeriodo = {'dia': 'HOY', 'semana': 'ESTA SEMANA', 'mes': 'ESTE MES'}[_periodoDash] ?? tr('ESTE MES');
 
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
 
@@ -357,20 +357,20 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
             begin: Alignment.topLeft, end: Alignment.bottomRight),
           borderRadius: BorderRadius.circular(16)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('UTILIDAD NETA — $etiquetaPeriodo',
+          Text(trf('UTILIDAD NETA — {0}', [etiquetaPeriodo]),
             style: const TextStyle(fontSize: 10, color: Colors.white60, letterSpacing: 1.5)),
           const SizedBox(height: 4),
           Text(_fmt.format(utilidadNeta),
             style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800,
               color: utilidadNeta >= 0 ? Colors.greenAccent : Colors.redAccent)),
-          Text('Margen: ${margen.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+          Text(trf('Margen: {0}%', [(margen.toStringAsFixed(1))]), style: const TextStyle(fontSize: 12, color: Colors.white70)),
           const SizedBox(height: 14),
           Row(children: [
-            _heroStat('Ventas', _fmt.format(totalVentas), Colors.greenAccent),
+            _heroStat(tr('Ventas'), _fmt.format(totalVentas), Colors.greenAccent),
             _heroDivider(),
-            _heroStat('Gastos', _fmt.format(totalGastos), Colors.orangeAccent),
+            _heroStat(tr('Gastos'), _fmt.format(totalGastos), Colors.orangeAccent),
             _heroDivider(),
-            _heroStat('Por cobrar', _fmt.format(porCobrar), Colors.yellow.shade200),
+            _heroStat(tr('Por cobrar'), _fmt.format(porCobrar), Colors.yellow.shade200),
           ]),
         ])),
 
@@ -384,40 +384,40 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       if (alertas > 0 || materialesBajos > 0) ...[
         Row(children: [
           if (alertas > 0) Expanded(child: _alertaCard(
-            '⚠️ $alertas seguimientos\npendientes', AppColors.ambar)),
+            trf('⚠️ {0} seguimientos\npendientes', [alertas]), AppColors.ambar)),
           if (alertas > 0 && materialesBajos > 0) const SizedBox(width: 8),
           if (materialesBajos > 0) Expanded(child: _alertaCard(
-            '📦 $materialesBajos materiales\ncon stock bajo', AppColors.rojo)),
+            trf('📦 {0} materiales\ncon stock bajo', [materialesBajos]), AppColors.rojo)),
         ]),
         const SizedBox(height: 14),
       ],
 
       // ── KPIs rápidos ──
       Row(children: [
-        Expanded(child: _kpiCard2('Ventas cerradas', '${ventas.length}', AppColors.verde, Icons.check_circle_outline)),
+        Expanded(child: _kpiCard2(tr('Ventas cerradas'), '${ventas.length}', AppColors.verde, Icons.check_circle_outline)),
         const SizedBox(width: 8),
-        Expanded(child: _kpiCard2('En proceso', '${enProceso.length}', AppColors.ambar, Icons.pending_outlined)),
+        Expanded(child: _kpiCard2(tr('En proceso'), '${enProceso.length}', AppColors.ambar, Icons.pending_outlined)),
         const SizedBox(width: 8),
-        Expanded(child: _kpiCard2('Ticket prom.', ventas.isEmpty ? '\$0' : _fmt.format(totalVentas / ventas.length), AppColors.azul, Icons.receipt_outlined)),
+        Expanded(child: _kpiCard2(tr('Ticket prom.'), ventas.isEmpty ? '\$0' : _fmt.format(totalVentas / ventas.length), AppColors.azul, Icons.receipt_outlined)),
       ]),
       const SizedBox(height: 8),
       GridView.count(crossAxisCount: 2, shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         crossAxisSpacing: 8, mainAxisSpacing: 8, childAspectRatio: 2.6,
         children: [
-          _statCard('Cotizaciones', '${_cotizaciones.length}', AppColors.azul, Icons.description_outlined),
-          _statCard('Pedidos activos', '$pedidosActivos', const Color(0xFF7c3aed), Icons.local_shipping_outlined),
-          _statCard('Entregados', '${_pedidos.where((p) => p.estado == "Entregado").length}', AppColors.verde, Icons.check_circle_outline),
-          _statCard('Alertas', '$alertas', alertas > 0 ? AppColors.rojo : AppColors.verde, Icons.notifications_outlined),
+          _statCard(tr('Cotizaciones'), '${_cotizaciones.length}', AppColors.azul, Icons.description_outlined),
+          _statCard(tr('Pedidos activos'), '$pedidosActivos', const Color(0xFF7c3aed), Icons.local_shipping_outlined),
+          _statCard(tr('Entregados'), '${_pedidos.where((p) => p.estado == "Entregado").length}', AppColors.verde, Icons.check_circle_outline),
+          _statCard(tr('Alertas'), '$alertas', alertas > 0 ? AppColors.rojo : AppColors.verde, Icons.notifications_outlined),
         ]),
 
       const SizedBox(height: 16),
 
       // ── Gastos por categoría (del periodo) ──
-      _seccionInicio('GASTOS POR CATEGORÍA — $etiquetaPeriodo'),
+      _seccionInicio(trf('GASTOS POR CATEGORÍA — {0}', [etiquetaPeriodo])),
       if (sortedCategorias.isEmpty)
         Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-          child: const Center(child: Text('Sin gastos en este periodo', style: TextStyle(color: AppColors.textoSecundario))))
+          child: Center(child: Text(tr('Sin gastos en este periodo'), style: TextStyle(color: AppColors.textoSecundario))))
       else Container(padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(children: sortedCategorias.map((e) {
@@ -438,14 +438,14 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const SizedBox(height: 16),
 
       // ── Gráfica: ventas por día de la semana ──
-      _seccionInicio('VENTAS POR DÍA DE LA SEMANA'),
+      _seccionInicio(tr('VENTAS POR DÍA DE LA SEMANA')),
       Container(
         padding: const EdgeInsets.fromLTRB(12, 16, 16, 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: ventas.isEmpty
-          ? const SizedBox(height: 120, child: Center(
-              child: Text('Sin datos de ventas en este periodo', style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
+          ? SizedBox(height: 120, child: Center(
+              child: Text(tr('Sin datos de ventas en este periodo'), style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
           : SizedBox(height: 180,
               child: BarChart(BarChartData(
                 alignment: BarChartAlignment.spaceAround,
@@ -479,7 +479,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                     reservedSize: 44,
                     getTitlesWidget: (value, meta) {
                       if (value == 0) return const Text('', style: TextStyle(fontSize: 9));
-                      return Text('\$${(value / 1000).toStringAsFixed(0)}k',
+                      return Text(trf('\${0}k', [((value / 1000).toStringAsFixed(0))]),
                         style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario));
                     },
                   )),
@@ -508,14 +508,14 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const SizedBox(height: 16),
 
       // ── Gráfica: distribución de cotizaciones (histórico) ──
-      _seccionInicio('DISTRIBUCIÓN DE COTIZACIONES'),
+      _seccionInicio(tr('DISTRIBUCIÓN DE COTIZACIONES')),
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: _cotizaciones.isEmpty
-          ? const SizedBox(height: 120, child: Center(
-              child: Text('Sin cotizaciones', style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
+          ? SizedBox(height: 120, child: Center(
+              child: Text(tr('Sin cotizaciones'), style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
           : Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               SizedBox(width: 130, height: 130,
                 child: PieChart(PieChartData(
@@ -553,7 +553,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const SizedBox(height: 16),
 
       // ── Tasa de conversión (histórico) ──
-      _seccionInicio('TASA DE CONVERSIÓN'),
+      _seccionInicio(tr('TASA DE CONVERSIÓN')),
       Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
@@ -564,11 +564,11 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
               Text('${tasaConversion.toStringAsFixed(1)}%',
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800,
                   color: tasaConversion >= 50 ? AppColors.verde : AppColors.ambar)),
-              const Text('cotizaciones convertidas', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+              Text(tr('cotizaciones convertidas'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             ]),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text('$aprobadas / $totalCots', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
-              const Text('aprobadas / total', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+              Text(tr('aprobadas / total'), style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             ]),
           ]),
           const SizedBox(height: 12),
@@ -584,13 +584,13 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
             )),
           const SizedBox(height: 8),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Meta: 70%', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+            Text(tr('Meta: 70%'), style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(
                 color: (tasaConversion >= 70 ? AppColors.verde : tasaConversion >= 40 ? AppColors.ambar : AppColors.rojo).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20)),
               child: Text(
-                tasaConversion >= 70 ? '🎯 Excelente' : tasaConversion >= 40 ? '📈 En progreso' : '⚠️ Mejorar',
+                tr(tasaConversion >= 70 ? tr('🎯 Excelente') : tasaConversion >= 40 ? tr('📈 En progreso') : tr('⚠️ Mejorar')),
                 style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
                   color: tasaConversion >= 70 ? AppColors.verde : tasaConversion >= 40 ? AppColors.ambar : AppColors.rojo))),
           ]),
@@ -600,16 +600,16 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
 
       // ── Pedidos en proceso (siempre actuales) ──
       if (_pedidos.where((p) => p.estado != 'Entregado' && p.estado != 'Cancelado').isNotEmpty) ...[
-        _seccionInicio('PEDIDOS EN PROCESO'),
+        _seccionInicio(tr('PEDIDOS EN PROCESO')),
         ..._pedidos.where((p) => p.estado != 'Entregado' && p.estado != 'Cancelado').take(3).map((p) => _miniPedido(p)),
         const SizedBox(height: 16),
       ],
 
       // ── Ventas del periodo ──
-      _seccionInicio('VENTAS — $etiquetaPeriodo'),
+      _seccionInicio(trf('VENTAS — {0}', [etiquetaPeriodo])),
       if (ventas.isEmpty)
         Container(padding: const EdgeInsets.all(24), alignment: Alignment.center,
-          child: const Text('Sin ventas en este periodo', style: TextStyle(color: AppColors.textoSecundario)))
+          child: Text(tr('Sin ventas en este periodo'), style: TextStyle(color: AppColors.textoSecundario)))
       else
         ...ventas.take(10).map((p) => Container(
           margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12),
@@ -617,7 +617,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
             border: Border.all(color: AppColors.grisBorde, width: 0.5)),
           child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(p.cliente?.nombre ?? '—', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(tr(p.cliente?.nombre ?? '—'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               Text(p.folio, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
               const SizedBox(height: 3),
               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -631,10 +631,10 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const SizedBox(height: 14),
 
       // ── Gastos del periodo ──
-      _seccionInicio('GASTOS — $etiquetaPeriodo'),
+      _seccionInicio(trf('GASTOS — {0}', [etiquetaPeriodo])),
       if (gastosPeriodo.isEmpty)
         Container(padding: const EdgeInsets.all(16), alignment: Alignment.center,
-          child: const Text('Sin gastos registrados en este periodo', style: TextStyle(color: AppColors.textoSecundario)))
+          child: Text(tr('Sin gastos registrados en este periodo'), style: TextStyle(color: AppColors.textoSecundario)))
       else
         ...gastosPeriodo.take(8).map((g) => Container(
           margin: const EdgeInsets.only(bottom: 6), padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -642,8 +642,8 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
             border: Border.all(color: AppColors.grisBorde, width: 0.5)),
           child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(g['concepto'] ?? g['descripcion'] ?? '—', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-              Text(g['categoria'] ?? g['tipo'] ?? '', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+              Text(tr(g['concepto'] ?? g['descripcion'] ?? '—'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+              Text(tr(g['categoria'] ?? g['tipo'] ?? ''), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             ])),
             Text(_fmt.format((g['monto'] as num?)?.toDouble() ?? 0),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.rojo)),
@@ -732,7 +732,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                 child: Column(children: [
                   Text('$count', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
                     color: count > 0 ? color : AppColors.textoSecundario)),
-                  Text(e, style: const TextStyle(fontSize: 7, color: AppColors.textoSecundario), textAlign: TextAlign.center),
+                  Text(tr(e), style: const TextStyle(fontSize: 7, color: AppColors.textoSecundario), textAlign: TextAlign.center),
                   if (monto > 0) Text(_fmt.format(monto), style: TextStyle(fontSize: 7, color: color), textAlign: TextAlign.center),
                 ]))));
           }).toList())),
@@ -742,7 +742,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Icon(Icons.description_outlined, size: 48, color: AppColors.textoSecundario),
               const SizedBox(height: 8),
-              Text('No hay cotizaciones en "$_filtro"',
+              Text(trf('No hay cotizaciones en "{0}"', [_filtro]),
                 style: const TextStyle(color: AppColors.textoSecundario)),
             ]))
           : ListView.builder(
@@ -778,11 +778,11 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
 
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        _seccion('ESTADO DE PRODUCCIÓN'),
+        _seccion(tr('ESTADO DE PRODUCCIÓN')),
         if (_filtroProduccion != 'Todos')
           GestureDetector(
             onTap: () => setState(() => _filtroProduccion = 'Todos'),
-            child: const Text('Ver todos ✕',
+            child: Text(tr('Ver todos ✕'),
               style: TextStyle(fontSize: 11, color: AppColors.azul, fontWeight: FontWeight.w600))),
       ]),
       // Tarjetas de estado — ahora funcionan como FILTRO al tocarlas
@@ -805,20 +805,20 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                   width: seleccionado ? 1.5 : 0.5)),
               child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                 Text('$count', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: count > 0 ? color : AppColors.textoSecundario)),
-                Text(etiquetas[e] ?? e, textAlign: TextAlign.center, style: const TextStyle(fontSize: 8, color: AppColors.textoSecundario)),
+                Text(tr(etiquetas[e] ?? e), textAlign: TextAlign.center, style: const TextStyle(fontSize: 8, color: AppColors.textoSecundario)),
                 if (monto > 0) Text(_fmt.format(monto), style: TextStyle(fontSize: 8, color: color, fontWeight: FontWeight.w600)),
               ])));
         }).toList()),
 
       const SizedBox(height: 14),
       _seccion(_filtroProduccion == 'Todos'
-        ? 'PEDIDOS ACTIVOS'
-        : 'PEDIDOS EN "${etiquetas[_filtroProduccion] ?? _filtroProduccion}"'),
+        ? tr('PEDIDOS ACTIVOS')
+        : trf('PEDIDOS EN "{0}"', [(etiquetas[_filtroProduccion] ?? _filtroProduccion)])),
       ...pedidosMostrados.map((p) => _miniPedido(p)),
       if (pedidosMostrados.isEmpty)
         Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
           child: Center(child: Text(
-            _filtroProduccion == 'Todos' ? 'No hay pedidos activos' : 'No hay pedidos en esta etapa',
+            tr(_filtroProduccion == 'Todos' ? tr('No hay pedidos activos') : tr('No hay pedidos en esta etapa')),
             style: const TextStyle(color: AppColors.textoSecundario)))),
     ]));
   }
@@ -856,7 +856,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
 
       Row(children: [
-        Expanded(child: _statCard('Total materiales', '${todosLosMateriales.length}', AppColors.azul, Icons.inventory_2_outlined)),
+        Expanded(child: _statCard(tr('Total materiales'), '${todosLosMateriales.length}', AppColors.azul, Icons.inventory_2_outlined)),
         const SizedBox(width: 8),
         Expanded(child: _statCard('Stock bajo', '${bajos.length}', bajos.isEmpty ? AppColors.verde : AppColors.rojo, Icons.warning_amber_outlined)),
       ]),
@@ -865,7 +865,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text('Valor total en bodega:', style: TextStyle(fontSize: 13)),
+          Text(tr('Valor total en bodega:'), style: TextStyle(fontSize: 13)),
           Text(_fmt.format(valorTotal), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.azul)),
         ])),
 
@@ -874,7 +874,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('FILTRAR', style: TextStyle(fontSize: 9, color: AppColors.textoSecundario, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
+          Text(tr('FILTRAR'), style: TextStyle(fontSize: 9, color: AppColors.textoSecundario, letterSpacing: 1.5, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           Row(children: [
             const Icon(Icons.filter_list, size: 14, color: AppColors.textoSecundario),
@@ -893,7 +893,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                     color: activo ? color : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: activo ? color : AppColors.grisBorde)),
-                  child: Text(op, style: TextStyle(
+                  child: Text(tr(op), style: TextStyle(
                     fontSize: 11, fontWeight: FontWeight.w600,
                     color: activo ? Colors.white : AppColors.textoSecundario))));
             }),
@@ -916,7 +916,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                       color: activo ? AppColors.azul : Colors.transparent,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: activo ? AppColors.azul : AppColors.grisBorde)),
-                    child: Text(cat, style: TextStyle(
+                    child: Text(tr(cat), style: TextStyle(
                       fontSize: 11, fontWeight: FontWeight.w600,
                       color: activo ? Colors.white : AppColors.textoSecundario))));
               }).toList()))),
@@ -926,7 +926,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       const SizedBox(height: 12),
       if (materiales.isEmpty)
         Container(padding: const EdgeInsets.all(24), alignment: Alignment.center,
-          child: const Text('Sin materiales con estos filtros',
+          child: Text(tr('Sin materiales con estos filtros'),
             style: TextStyle(color: AppColors.textoSecundario, fontSize: 13)))
       else ...[
         Text('${materiales.length} resultado${materiales.length != 1 ? "s" : ""}',
@@ -950,7 +950,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                   if (stockBajo) const Padding(padding: EdgeInsets.only(right: 6),
                     child: Icon(Icons.warning_amber, color: AppColors.rojo, size: 14)),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                    Text(tr(m['nombre'] ?? ''), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
                     if (stockBajo)
                       Text('Mínimo: $stockMinimo ${m['unidad']}',
                         style: const TextStyle(fontSize: 10, color: AppColors.rojo)),
@@ -1021,7 +1021,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       TextField(
         onChanged: (v) => setState(() => _busquedaProductos = v),
         decoration: InputDecoration(
-          hintText: 'Buscar producto...',
+          hintText: tr('Buscar producto...'),
           hintStyle: const TextStyle(fontSize: 12),
           prefixIcon: const Icon(Icons.search, size: 18),
           suffixIcon: _busquedaProductos.isNotEmpty
@@ -1048,7 +1048,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                   color: activo ? AppColors.azul : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: activo ? AppColors.azul : AppColors.grisBorde)),
-                child: Text(cat, style: TextStyle(
+                child: Text(tr(cat), style: TextStyle(
                   fontSize: 11, fontWeight: FontWeight.w600,
                   color: activo ? Colors.white : AppColors.textoSecundario))));
           }).toList())),
@@ -1059,13 +1059,13 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           child: Column(children: [
             const Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.grisBorde),
             const SizedBox(height: 8),
-            Text(conteo.isEmpty
-              ? 'Sin datos de productos vendidos'
-              : 'Sin resultados con este filtro',
+            Text(tr(conteo.isEmpty
+              ? tr('Sin datos de productos vendidos')
+              : tr('Sin resultados con este filtro')),
               style: const TextStyle(color: AppColors.textoSecundario)),
           ]))
       else ...[
-        _seccionInicio('TOP PRODUCTOS POR VENTAS (${lista.length})'),
+        _seccionInicio(trf('TOP PRODUCTOS POR VENTAS ({0})', [(lista.length)])),
         ...lista.asMap().entries.map((e) {
           final i = e.key;
           final p = e.value;
@@ -1080,8 +1080,8 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)))),
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(p['nombre'] as String, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                Text(categoriaPorNombre[p['nombre']] ?? 'Sin categoría',
+                Text(tr(p['nombre'] as String), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                Text(tr(categoriaPorNombre[p['nombre']] ?? tr('Sin categoría')),
                   style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario)),
                 const SizedBox(height: 4),
                 ClipRRect(borderRadius: BorderRadius.circular(3), child: LinearProgressIndicator(
@@ -1111,25 +1111,25 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         child: Column(children: [
           Icon(i, color: web ? AppColors.azul : AppColors.naranja, size: 22),
           const SizedBox(height: 4),
-          Text(t, textAlign: TextAlign.center, maxLines: 2,
+          Text(tr(t), textAlign: TextAlign.center, maxLines: 2,
             style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
         ]))));
     void abrir(Widget w) => Navigator.push(context, MaterialPageRoute(builder: (_) => w));
     void abrirWeb(String u) => launchUrl(Uri.parse(u), mode: LaunchMode.externalApplication);
     return SizedBox(height: 74, child: ListView(scrollDirection: Axis.horizontal, children: [
-      chip(Icons.precision_manufacturing_outlined, 'Calculadora CNC', () => abrir(const CalculadoraCncScreen())),
-      chip(Icons.local_shipping_outlined, 'Envíos HETNA', () => abrir(const EnviosScreen())),
-      chip(Icons.storefront_outlined, 'Tienda', () => abrirWeb(HetnaApi.urlTienda), web: true),
-      chip(Icons.forum_outlined, 'Foro CNC', () => abrirWeb(HetnaApi.urlForo), web: true),
-      chip(Icons.science_outlined, 'Laboratorio CAM', () => abrirWeb(HetnaApi.urlLaboratorio), web: true),
-      chip(Icons.gavel_outlined, 'Licitaciones', () => abrirWeb(HetnaApi.urlLicitaciones), web: true),
+      chip(Icons.precision_manufacturing_outlined, tr('Calculadora CNC'), () => abrir(const CalculadoraCncScreen())),
+      chip(Icons.local_shipping_outlined, tr('Envíos HETNA'), () => abrir(const EnviosScreen())),
+      chip(Icons.storefront_outlined, tr('Tienda'), () => abrirWeb(HetnaApi.urlTienda), web: true),
+      chip(Icons.forum_outlined, tr('Foro CNC'), () => abrirWeb(HetnaApi.urlForo), web: true),
+      chip(Icons.science_outlined, tr('Laboratorio CAM'), () => abrirWeb(HetnaApi.urlLaboratorio), web: true),
+      chip(Icons.gavel_outlined, tr('Licitaciones'), () => abrirWeb(HetnaApi.urlLicitaciones), web: true),
     ]));
   }
 
   Widget _heroStat(String label, String valor, Color color) => Expanded(
     child: Column(children: [
-      Text(valor, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color), textAlign: TextAlign.center),
-      Text(label, style: const TextStyle(fontSize: 9, color: Colors.white60), textAlign: TextAlign.center),
+      Text(tr(valor), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color), textAlign: TextAlign.center),
+      Text(tr(label), style: const TextStyle(fontSize: 9, color: Colors.white60), textAlign: TextAlign.center),
     ]));
 
   Widget _heroDivider() => Container(width: 1, height: 36, color: Colors.white.withOpacity(0.2), margin: const EdgeInsets.symmetric(horizontal: 4));
@@ -1138,15 +1138,15 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     child: Container(padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
       child: Column(children: [
-        Text(valor, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color), textAlign: TextAlign.center),
-        Text(label, style: const TextStyle(fontSize: 9, color: Colors.white70), textAlign: TextAlign.center),
+        Text(tr(valor), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color), textAlign: TextAlign.center),
+        Text(tr(label), style: const TextStyle(fontSize: 9, color: Colors.white70), textAlign: TextAlign.center),
       ])));
 
   Widget _alertaCard(String texto, Color color) => Container(
     padding: const EdgeInsets.all(12),
     decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10),
       border: Border.all(color: color.withOpacity(0.3))),
-    child: Text(texto, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)));
+    child: Text(tr(texto), style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)));
 
   Widget _statCard(String label, String valor, Color color, IconData icon) => Container(
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
@@ -1158,8 +1158,8 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         child: Icon(icon, color: color, size: 20)),
       const SizedBox(width: 10),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-        Text(valor, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
-        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
+        Text(tr(valor), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+        Text(tr(label), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
           maxLines: 1, overflow: TextOverflow.ellipsis),
       ])),
     ]));
@@ -1167,21 +1167,21 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
   Widget _miniPedido(Pedido p) {
     final etapas = ['Pedido', 'Pago', 'Produccion', 'Pruebas', 'Entrega', 'Entregado'];
     final idx = etapas.indexOf(p.estado).clamp(0, etapas.length - 1);
-    final nombre = p.cliente?.nombre ?? p.cliente?.empresa ?? 'Sin cliente';
+    final nombre = p.cliente?.nombre ?? p.cliente?.empresa ?? tr('Sin cliente');
     return Container(margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(tr(nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             Text(p.folio, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(_fmt.format(p.total ?? 0), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(20)),
-              child: Text(p.estado == 'Produccion' ? 'Producción' : p.estado,
+              child: Text(tr(p.estado == 'Produccion' ? tr('Producción') : p.estado),
                 style: const TextStyle(fontSize: 9, color: AppColors.azul))),
           ]),
         ]),
@@ -1194,7 +1194,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
 
   Widget _itemCotizacion(Cotizacion c) {
     final color = _coloresEstado[c.estado] ?? Colors.grey;
-    final nombre = c.cliente?.nombre ?? c.cliente?.empresa ?? 'Sin cliente';
+    final nombre = c.cliente?.nombre ?? c.cliente?.empresa ?? tr('Sin cliente');
     return Container(margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
         border: Border(left: BorderSide(color: color, width: 4),
@@ -1204,8 +1204,8 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
       padding: const EdgeInsets.all(12),
       child: Row(children: [
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(nombre, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          Text(c.folio ?? '', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+          Text(tr(nombre), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          Text(tr(c.folio ?? ''), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           if (c.createdAt != null) Text(DateFormat('dd/MM/yyyy').format(c.createdAt!),
             style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           const SizedBox(height: 4),
@@ -1227,8 +1227,8 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     child: Container(padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
       child: Column(children: [
-        Text(valor, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
-        Text(label, style: const TextStyle(fontSize: 9, color: Colors.white70)),
+        Text(tr(valor), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        Text(tr(label), style: const TextStyle(fontSize: 9, color: Colors.white70)),
       ])));
 
   Widget _kpiCard2(String label, String valor, Color color, IconData icon) => Container(
@@ -1238,17 +1238,17 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Icon(icon, color: color, size: 18),
       const SizedBox(height: 8),
-      Text(valor, style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: color)),
-      Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
+      Text(tr(valor), style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: color)),
+      Text(tr(label), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
         maxLines: 1, overflow: TextOverflow.ellipsis),
     ]));
 
   Widget _seccionInicio(String t) => Padding(padding: const EdgeInsets.only(bottom: 8, top: 4),
-    child: Text(t, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario,
+    child: Text(tr(t), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario,
       letterSpacing: 1, fontWeight: FontWeight.w600)));
 
   Widget _seccion(String t) => Padding(padding: const EdgeInsets.only(bottom: 8, top: 4),
-    child: Text(t, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario, letterSpacing: 1)));
+    child: Text(tr(t), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario, letterSpacing: 1)));
 }
 
 // ── Extensión helper para mapIndexed ──

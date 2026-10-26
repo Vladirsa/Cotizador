@@ -7,6 +7,7 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
 import '../services/hetna_api.dart';
+import '../i18n/tr.dart';
 
 class CalculadoraCncScreen extends StatefulWidget {
   const CalculadoraCncScreen({super.key});
@@ -28,7 +29,7 @@ class _CalculadoraCncScreenState extends State<CalculadoraCncScreen> {
       final l = await HetnaApi.calculadoras();
       if (mounted) setState(() => _lista = l);
     } catch (e) {
-      if (mounted) setState(() => _error = 'Sin conexión con hetnacnc.com. $e');
+      if (mounted) setState(() => _error = trf('Sin conexión con hetnacnc.com. {0}', [e]));
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -46,7 +47,7 @@ class _CalculadoraCncScreenState extends State<CalculadoraCncScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.gris,
-      appBar: AppBar(title: const Text('Calculadora CNC'),
+      appBar: AppBar(title: Text(tr('Calculadora CNC')),
         backgroundColor: Colors.white, foregroundColor: AppColors.azul, elevation: 0.5),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
@@ -55,10 +56,10 @@ class _CalculadoraCncScreenState extends State<CalculadoraCncScreen> {
               mainAxisSize: MainAxisSize.min, children: [
                 Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textoSecundario)),
                 const SizedBox(height: 12),
-                OutlinedButton(onPressed: _cargar, child: const Text('Reintentar')),
+                OutlinedButton(onPressed: _cargar, child: Text(tr('Reintentar'))),
               ])))
           : ListView(padding: const EdgeInsets.all(16), children: [
-              const Text('Valores de partida. Confírmalos siempre con un corte de prueba.',
+              Text(tr('Valores de partida. Confírmalos siempre con un corte de prueba.'),
                 style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
               const SizedBox(height: 12),
               ..._lista.map((c) => Card(
@@ -155,7 +156,7 @@ class _FormularioCalcState extends State<_FormularioCalc> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
           child: _calculando
             ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-            : const Text('Calcular', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
+            : Text(tr('Calcular'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 10),
           child: Text(_error!, style: const TextStyle(color: AppColors.rojo))),
         if (_res != null) _resultado(_res!),
@@ -178,14 +179,14 @@ class _FormularioCalcState extends State<_FormularioCalc> {
           ])),
           Text(f.valor, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
         ]))),
-      ..._lista('Atención', r.avisos, AppColors.ambar),
-      ..._lista('Faltan datos', r.faltan, AppColors.rojo),
-      ..._lista('Supuestos', r.supuestos, AppColors.textoSecundario),
+      ..._lista(tr('Atención'), r.avisos, AppColors.ambar),
+      ..._lista(tr('Faltan datos'), r.faltan, AppColors.rojo),
+      ..._lista(tr('Supuestos'), r.supuestos, AppColors.textoSecundario),
     ]));
 
   List<Widget> _lista(String t, List<String> l, Color color) => l.isEmpty ? [] : [
     const SizedBox(height: 10),
-    Text(t, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+    Text(tr(t), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
     ...l.map((x) => Text('• $x', style: const TextStyle(fontSize: 12))),
   ];
 }

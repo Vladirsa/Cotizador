@@ -11,6 +11,7 @@ import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../utils/app_colors.dart';
 import 'package:intl/intl.dart';
+import '../i18n/tr.dart';
 
 class CatalogoScreen extends StatefulWidget {
   const CatalogoScreen({super.key});
@@ -111,14 +112,14 @@ class _CatalogoScreenState extends State<CatalogoScreen>
       );
       await _cargarPdfs();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ PDF subido correctamente'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('✅ PDF subido correctamente')),
           backgroundColor: AppColors.verde));
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error al subir: $e'),
+          content: Text(trf('Error al subir: {0}', [e])),
           backgroundColor: AppColors.rojo));
       }
     }
@@ -134,29 +135,29 @@ class _CatalogoScreenState extends State<CatalogoScreen>
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setS) => AlertDialog(
-          title: const Text('Agregar PDF al catálogo', style: TextStyle(fontSize: 15)),
+          title: Text(tr('Agregar PDF al catálogo'), style: TextStyle(fontSize: 15)),
           content: Column(mainAxisSize: MainAxisSize.min, children: [
             TextField(
               controller: nombreCtrl,
-              decoration: const InputDecoration(labelText: 'Nombre del catálogo', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: tr('Nombre del catálogo'), border: OutlineInputBorder()),
               autofocus: true),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: categoria,
-              decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
-              hint: const Text('Seleccionar categoría'),
-              items: categorias.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+              decoration: InputDecoration(labelText: tr('Categoría'), border: OutlineInputBorder()),
+              hint: Text(tr('Seleccionar categoría')),
+              items: categorias.map((c) => DropdownMenuItem(value: c, child: Text(tr(c), style: const TextStyle(fontSize: 13)))).toList(),
               onChanged: (v) => setS(() => categoria = v)),
           ]),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
             ElevatedButton(
               onPressed: () {
                 if (nombreCtrl.text.trim().isEmpty) return;
                 Navigator.pop(ctx, {'nombre': nombreCtrl.text.trim(), 'categoria': categoria ?? 'General'});
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-              child: const Text('Subir', style: TextStyle(color: Colors.white))),
+              child: Text(tr('Subir'), style: TextStyle(color: Colors.white))),
           ])));
   }
 
@@ -165,14 +166,14 @@ class _CatalogoScreenState extends State<CatalogoScreen>
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar PDF'),
-        content: Text('¿Eliminar "${pdf.nombre}"?'),
+        title: Text(tr('Eliminar PDF')),
+        content: Text(trf('¿Eliminar "{0}"?', [(pdf.nombre)])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
         ]));
     if (confirmar == true) {
       await SupabaseService.eliminarPdf(pdf.id!, pdf.url);
@@ -220,28 +221,28 @@ class _CatalogoScreenState extends State<CatalogoScreen>
                   border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
                 child: Column(children: [
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('Nuevo catálogo de productos',
+                    Text(tr('Nuevo catálogo de productos'),
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                     IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                   ]),
                   const SizedBox(height: 8),
                   TextField(
                     controller: nombreCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre del catálogo',
-                      hintText: 'Ej: Lista de precios Junio 2026',
+                    decoration: InputDecoration(
+                      labelText: tr('Nombre del catálogo'),
+                      hintText: tr('Ej: Lista de precios Junio 2026'),
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
                     style: const TextStyle(fontSize: 13)),
                   const SizedBox(height: 8),
                   Row(children: [
-                    Text('${_seleccionados.length} productos seleccionados',
+                    Text(trf('{0} productos seleccionados', [(_seleccionados.length)]),
                       style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
                     const Spacer(),
                     if (_seleccionados.isNotEmpty)
                       TextButton(
                         onPressed: () => setS(() => _seleccionados.clear()),
-                        child: const Text('Limpiar', style: TextStyle(fontSize: 12))),
+                        child: Text(tr('Limpiar'), style: TextStyle(fontSize: 12))),
                   ]),
                 ])),
 
@@ -282,8 +283,8 @@ class _CatalogoScreenState extends State<CatalogoScreen>
                   child: ElevatedButton.icon(
                     onPressed: _seleccionados.isEmpty ? null : () async {
                       if (nombreCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                          content: Text('Ingresa un nombre para el catálogo')));
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: Text(tr('Ingresa un nombre para el catálogo'))));
                         return;
                       }
                       final nombre = nombreCtrl.text.trim();
@@ -294,18 +295,18 @@ class _CatalogoScreenState extends State<CatalogoScreen>
                           nombre: nombre,
                           productoIds: ids);
                         await _cargarCatalogos();
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('✅ Catálogo creado'),
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(tr('✅ Catálogo creado')),
                           backgroundColor: AppColors.verde));
                       } catch (e) {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('Error al guardar: ${e.toString()}'),
+                          content: Text(trf('Error al guardar: {0}', [(e.toString())])),
                           backgroundColor: AppColors.rojo));
                       }
                     },
                     icon: const Icon(Icons.save_outlined, color: Colors.white),
                     label: Text(
-                      _seleccionados.isEmpty ? 'Selecciona productos' : 'Guardar catálogo (${_seleccionados.length})',
+                      tr(_seleccionados.isEmpty ? tr('Selecciona productos') : trf('Guardar catálogo ({0})', [(_seleccionados.length)])),
                       style: const TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.azul,
@@ -319,29 +320,33 @@ class _CatalogoScreenState extends State<CatalogoScreen>
     final productoIds = List<String>.from(cat['producto_ids'] ?? []);
     if (productoIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Esta lista no tiene productos')));
+        SnackBar(content: Text(tr('Esta lista no tiene productos'))));
       return;
     }
     if (_productos.isEmpty) await _cargarProductos();
+    if (!mounted) return;
+    final ingles = await PdfService.elegirIdioma(context);
+    if (ingles == null) return;
     final prods = _productos.where((p) => productoIds.contains(p.id)).toList();
     if (prods.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se encontraron los productos')));
+        SnackBar(content: Text(tr('No se encontraron los productos'))));
       return;
     }
     setState(() => _subiendo = true);
     try {
       final cfg = await SupabaseService.getConfiguracion();
       final bytes = await PdfService.generarListadoProductos(
-        nombreLista: cat['nombre'] as String? ?? 'Lista HETNA CNC',
+        nombreLista: cat['nombre'] as String? ?? tr('Lista HETNA CNC'),
         productos: prods,
-        empresa: cfg);
+        empresa: cfg,
+        ingles: ingles);
       final nombre = (cat['nombre'] as String? ?? 'catalogo')
           .replaceAll(' ', '_').toLowerCase();
       await PdfService.compartirPdf(bytes, '$nombre.pdf');
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al generar PDF: $e'),
+        SnackBar(content: Text(trf('Error al generar PDF: {0}', [e])),
           backgroundColor: AppColors.rojo));
     }
     if (mounted) setState(() => _subiendo = false);
@@ -369,8 +374,8 @@ class _CatalogoScreenState extends State<CatalogoScreen>
       sb.writeln();
     }
     sb.writeln('━━━━━━━━━━━━━━━━━━');
-    sb.writeln('🪵 *HETNA CNC* — Productos personalizados en madera, MDF y acrílico');
-    sb.writeln('📞 Contáctanos para más información');
+    sb.writeln(tr('🪵 *HETNA CNC* — Productos personalizados en madera, MDF y acrílico'));
+    sb.writeln(tr('📞 Contáctanos para más información'));
 
     final msg = Uri.encodeComponent(sb.toString());
     launchUrl(Uri.parse('https://wa.me/?text=$msg'), mode: LaunchMode.externalApplication);
@@ -380,7 +385,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Catálogo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        title: Text(tr('Catálogo'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         foregroundColor: AppColors.textoPrincipal,
         elevation: 0,
@@ -390,9 +395,9 @@ class _CatalogoScreenState extends State<CatalogoScreen>
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-          tabs: const [
-            Tab(icon: Icon(Icons.picture_as_pdf_outlined, size: 18), text: 'PDFs'),
-            Tab(icon: Icon(Icons.list_alt_outlined, size: 18), text: 'Listas'),
+          tabs: [
+            Tab(icon: Icon(Icons.picture_as_pdf_outlined, size: 18), text: tr('PDFs')),
+            Tab(icon: Icon(Icons.list_alt_outlined, size: 18), text: tr('Listas')),
           ]),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _cargarTodo),
@@ -417,8 +422,8 @@ class _CatalogoScreenState extends State<CatalogoScreen>
         child: _FormCliente(
           onGuardado: () {
             Navigator.pop(context);
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('✅ Cliente agregado'),
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(tr('✅ Cliente agregado')),
               backgroundColor: AppColors.verde));
           })));
   }
@@ -434,7 +439,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
             icon: _subiendo
               ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.upload_file, color: Colors.white),
-            label: Text(_subiendo ? 'Subiendo...' : 'Subir PDF de catálogo',
+            label: Text(tr(_subiendo ? tr('Subiendo...') : tr('Subir PDF de catálogo')),
               style: const TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azul,
@@ -447,10 +452,10 @@ class _CatalogoScreenState extends State<CatalogoScreen>
           ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Icon(Icons.picture_as_pdf_outlined, size: 56, color: AppColors.grisBorde),
               const SizedBox(height: 12),
-              const Text('No hay catálogos subidos aún',
+              Text(tr('No hay catálogos subidos aún'),
                 style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
               const SizedBox(height: 6),
-              const Text('Sube PDFs con tus productos y precios\npara enviarlos por WhatsApp a tus clientes',
+              Text(tr('Sube PDFs con tus productos y precios\npara enviarlos por WhatsApp a tus clientes'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
             ]))
@@ -511,7 +516,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
           Expanded(child: OutlinedButton.icon(
             onPressed: () => _abrirPdf(pdf.url),
             icon: const Icon(Icons.open_in_new, size: 14),
-            label: const Text('Ver PDF', style: TextStyle(fontSize: 12)),
+            label: Text(tr('Ver PDF'), style: TextStyle(fontSize: 12)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.azul,
               side: const BorderSide(color: AppColors.azul),
@@ -520,7 +525,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
           Expanded(child: ElevatedButton.icon(
             onPressed: () => _enviarPorWA(pdf),
             icon: const Icon(Icons.chat, size: 14, color: Colors.white),
-            label: const Text('Enviar WA', style: TextStyle(fontSize: 12, color: Colors.white)),
+            label: Text(tr('Enviar WA'), style: TextStyle(fontSize: 12, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF25D366),
               padding: const EdgeInsets.symmetric(vertical: 6)))),
@@ -536,7 +541,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
           Expanded(child: ElevatedButton.icon(
             onPressed: _mostrarCrearCatalogo,
             icon: const Icon(Icons.add, color: Colors.white, size: 16),
-            label: const Text('Crear lista', style: TextStyle(color: Colors.white, fontSize: 13)),
+            label: Text(tr('Crear lista'), style: TextStyle(color: Colors.white, fontSize: 13)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azul,
               padding: const EdgeInsets.symmetric(vertical: 12)))),
@@ -544,7 +549,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
           ElevatedButton.icon(
             onPressed: _mostrarNuevoCliente,
             icon: const Icon(Icons.person_add_outlined, color: Colors.white, size: 16),
-            label: const Text('+ Cliente', style: TextStyle(color: Colors.white, fontSize: 13)),
+            label: Text(tr('+ Cliente'), style: TextStyle(color: Colors.white, fontSize: 13)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.verde,
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14))),
@@ -557,10 +562,10 @@ class _CatalogoScreenState extends State<CatalogoScreen>
           ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Icon(Icons.list_alt_outlined, size: 56, color: AppColors.grisBorde),
               const SizedBox(height: 12),
-              const Text('No hay listas creadas aún',
+              Text(tr('No hay listas creadas aún'),
                 style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
               const SizedBox(height: 6),
-              const Text('Crea listas personalizadas de productos\ny envíalas por WhatsApp con precios',
+              Text(tr('Crea listas personalizadas de productos\ny envíalas por WhatsApp con precios'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
             ]))
@@ -597,10 +602,10 @@ class _CatalogoScreenState extends State<CatalogoScreen>
             child: const Icon(Icons.list_alt, color: AppColors.azul, size: 24)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(cat['nombre'] ?? 'Sin nombre',
+            Text(tr(cat['nombre'] ?? tr('Sin nombre')),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               maxLines: 1, overflow: TextOverflow.ellipsis),
-            Text('${ids.length} producto${ids.length != 1 ? "s" : ""} • $fecha',
+            Text(trf('{0} producto{1} • {2}', [(ids.length), (ids.length != 1 ? "s" : ""), fecha]),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           ])),
           IconButton(
@@ -609,14 +614,14 @@ class _CatalogoScreenState extends State<CatalogoScreen>
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (_) => AlertDialog(
-                  title: const Text('Eliminar lista'),
-                  content: Text('¿Eliminar "${cat['nombre']}"?'),
+                  title: Text(tr('Eliminar lista')),
+                  content: Text(trf('¿Eliminar "{0}"?', [(cat['nombre'])])),
                   actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+                    TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
                     ElevatedButton(
                       onPressed: () => Navigator.pop(context, true),
                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-                      child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+                      child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
                   ]));
               if (ok == true) {
                 await SupabaseService.eliminarCatalogoPersonalizado(cat['id']);
@@ -637,7 +642,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
             icon: _subiendo
               ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.picture_as_pdf_outlined, size: 14),
-            label: const Text('Generar PDF', style: TextStyle(fontSize: 11)),
+            label: Text(tr('Generar PDF'), style: TextStyle(fontSize: 11)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.rojo,
               side: const BorderSide(color: AppColors.rojo),
@@ -646,7 +651,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
           Expanded(child: ElevatedButton.icon(
             onPressed: () => _enviarCatalogoWA(cat),
             icon: const Icon(Icons.chat, size: 14, color: Colors.white),
-            label: const Text('Enviar WA', style: TextStyle(fontSize: 11, color: Colors.white)),
+            label: Text(tr('Enviar WA'), style: TextStyle(fontSize: 11, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF25D366),
               padding: const EdgeInsets.symmetric(vertical: 8)))),

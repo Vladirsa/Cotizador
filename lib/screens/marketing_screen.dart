@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
+import '../i18n/tr.dart';
 
 class MarketingScreen extends StatefulWidget {
   const MarketingScreen({super.key});
@@ -33,14 +34,14 @@ class _MarketingScreenState extends State<MarketingScreen>
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(
-        title: const Text('Marketing', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        title: Text(tr('Marketing'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         elevation: 0,
         actions: [
           IconButton(
             onPressed: () => _mostrarAyudaMarketing(context),
             icon: const Icon(Icons.help_outline, color: AppColors.azul),
-            tooltip: 'Ayuda'),
+            tooltip: tr('Ayuda')),
         ],
         bottom: TabBar(
           controller: _tabs,
@@ -48,11 +49,11 @@ class _MarketingScreenState extends State<MarketingScreen>
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          tabs: const [
-            Tab(icon: Icon(Icons.inbox_outlined, size: 16), text: 'Cola de hoy'),
-            Tab(icon: Icon(Icons.people_outline, size: 16), text: 'Campañas'),
-            Tab(icon: Icon(Icons.message_outlined, size: 16), text: 'Plantillas WA'),
-            Tab(icon: Icon(Icons.discount_outlined, size: 16), text: 'Cupones'),
+          tabs: [
+            Tab(icon: Icon(Icons.inbox_outlined, size: 16), text: tr('Cola de hoy')),
+            Tab(icon: Icon(Icons.people_outline, size: 16), text: tr('Campañas')),
+            Tab(icon: Icon(Icons.message_outlined, size: 16), text: tr('Plantillas WA')),
+            Tab(icon: Icon(Icons.discount_outlined, size: 16), text: tr('Cupones')),
           ]),
       ),
       body: TabBarView(controller: _tabs, children: [
@@ -79,42 +80,24 @@ void _mostrarAyudaMarketing(BuildContext context) {
           Center(child: Container(width: 36, height: 4,
             decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 16),
-          const Text('❓ Cómo funciona Marketing', style: TextStyle(
+          Text(tr('❓ Cómo funciona Marketing'), style: TextStyle(
             fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.azul)),
           const SizedBox(height: 8),
-          const Text(
-            'Este módulo te ayuda a mandar mensajes de WhatsApp a varios clientes a la vez, de forma '
-            'organizada y sin saturar tu número (Meta limita cuántos mensajes puedes mandar por día).',
+          Text(
+            tr('Este módulo te ayuda a mandar mensajes de WhatsApp a varios clientes a la vez, de forma organizada y sin saturar tu número (Meta limita cuántos mensajes puedes mandar por día).'),
             style: TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.4)),
-          _bloqueAyudaMkt('📥 Cola de hoy',
-            'Aquí aparecen los mensajes que ya están listos para mandarse hoy — vienen de una Campaña que '
-            'lanzaste. Los revisas uno por uno y confirmas si ya los enviaste. Tiene un límite diario para '
-            'no violar las reglas de WhatsApp Business (mandar demasiados mensajes seguidos puede hacer que '
-            'Meta bloquee tu número).'),
-          _bloqueAyudaMkt('👥 Campañas y Segmento objetivo',
-            'Una Campaña es "a quién le voy a mandar qué mensaje". El "Segmento objetivo" es el grupo de '
-            'clientes que la recibirá — por ejemplo, "Clientes que no han comprado en 30 días" o "Todos los '
-            'clientes activos". Eliges el segmento, eliges la plantilla de mensaje, y defines cuántos '
-            'mensajes por día quieres mandar de esa campaña (para que se reparta en la Cola de varios días '
-            'si el grupo es grande).'),
-          _bloqueAyudaMkt('💬 Plantillas WA y Variables',
-            'Una plantilla es un mensaje pre-escrito que se reutiliza. Puedes meterle variables que se '
-            'rellenan solas con los datos de cada cliente:\n\n'
-            '• *NOMBRE* = se cambia por el nombre del cliente\n'
-            '• *FOLIO* = número de cotización o pedido\n'
-            '• *MONTO* = el precio o total en pesos\n'
-            '• *FECHA* = la fecha actual\n\n'
-            'Por ejemplo: "Hola *NOMBRE*, tu cotización *FOLIO* por *MONTO* sigue disponible" se convierte '
-            'automáticamente en "Hola Juan, tu cotización COT-045 por \$1,200 sigue disponible" para cada '
-            'cliente.'),
-          _bloqueAyudaMkt('🎟️ Cupones',
-            'Códigos de descuento que puedes activar para tus campañas o compartir directamente con '
-            'clientes — por ejemplo un cupón "VERANO10" que da 10% de descuento.'),
+          _bloqueAyudaMkt(tr('📥 Cola de hoy'),
+            tr('Aquí aparecen los mensajes que ya están listos para mandarse hoy — vienen de una Campaña que lanzaste. Los revisas uno por uno y confirmas si ya los enviaste. Tiene un límite diario para no violar las reglas de WhatsApp Business (mandar demasiados mensajes seguidos puede hacer que Meta bloquee tu número).')),
+          _bloqueAyudaMkt(tr('👥 Campañas y Segmento objetivo'),
+            tr('Una Campaña es "a quién le voy a mandar qué mensaje". El "Segmento objetivo" es el grupo de clientes que la recibirá — por ejemplo, "Clientes que no han comprado en 30 días" o "Todos los clientes activos". Eliges el segmento, eliges la plantilla de mensaje, y defines cuántos mensajes por día quieres mandar de esa campaña (para que se reparta en la Cola de varios días si el grupo es grande).')),
+          _bloqueAyudaMkt(tr('💬 Plantillas WA y Variables'),
+            tr('Una plantilla es un mensaje pre-escrito que se reutiliza. Puedes meterle variables que se rellenan solas con los datos de cada cliente:\n\n• *NOMBRE* = se cambia por el nombre del cliente\n• *FOLIO* = número de cotización o pedido\n• *MONTO* = el precio o total en pesos\n• *FECHA* = la fecha actual\n\nPor ejemplo: "Hola *NOMBRE*, tu cotización *FOLIO* por *MONTO* sigue disponible" se convierte automáticamente en "Hola Juan, tu cotización COT-045 por \$1,200 sigue disponible" para cada cliente.')),
+          _bloqueAyudaMkt(tr('🎟️ Cupones'),
+            tr('Códigos de descuento que puedes activar para tus campañas o compartir directamente con clientes — por ejemplo un cupón "VERANO10" que da 10% de descuento.')),
           const SizedBox(height: 8),
           Container(padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10)),
-            child: const Text('💡 Consejo: empieza con campañas chicas (pocos mensajes al día) para '
-              'probar cómo responden tus clientes, antes de mandar a todo tu segmento de golpe.',
+            child: Text(tr('💡 Consejo: empieza con campañas chicas (pocos mensajes al día) para probar cómo responden tus clientes, antes de mandar a todo tu segmento de golpe.'),
               style: TextStyle(fontSize: 12, color: AppColors.azul, height: 1.4))),
         ]))));
 }
@@ -122,9 +105,9 @@ void _mostrarAyudaMarketing(BuildContext context) {
 Widget _bloqueAyudaMkt(String titulo, String texto) => Padding(
   padding: const EdgeInsets.only(top: 18),
   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(titulo, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
+    Text(tr(titulo), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
     const SizedBox(height: 6),
-    Text(texto, style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.45)),
+    Text(tr(texto), style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.45)),
   ]));
 
 // ══════════════════════════════════════════════
@@ -165,16 +148,16 @@ class _ColaTabState extends State<_ColaTab> {
 
   Future<void> _enviar(Map<String, dynamic> msg) async {
     if (_enviadosHoy >= _limitesDiario) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('⚠️ Límite diario alcanzado (5 mensajes). Continúa mañana.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('⚠️ Límite diario alcanzado (5 mensajes). Continúa mañana.')),
         backgroundColor: AppColors.ambar));
       return;
     }
     final cl = msg['clientes'] as Map<String, dynamic>?;
     final wa = cl?['whatsapp'] as String? ?? cl?['telefono'] as String? ?? '';
     if (wa.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Este cliente no tiene WhatsApp registrado')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Este cliente no tiene WhatsApp registrado'))));
       return;
     }
 
@@ -191,14 +174,14 @@ class _ColaTabState extends State<_ColaTab> {
     if (mounted) {
       final confirmar = await showDialog<bool>(context: context,
         builder: (_) => AlertDialog(
-          title: const Text('¿Enviaste el mensaje?', style: TextStyle(fontSize: 15)),
-          content: const Text('Confirma si el mensaje fue enviado exitosamente.'),
+          title: Text(tr('¿Enviaste el mensaje?'), style: TextStyle(fontSize: 15)),
+          content: Text(tr('Confirma si el mensaje fue enviado exitosamente.')),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context, false),
-              child: const Text('No enviado')),
+              child: Text(tr('No enviado'))),
             ElevatedButton(onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366)),
-              child: const Text('Sí, enviado', style: TextStyle(color: Colors.white))),
+              child: Text(tr('Sí, enviado'), style: TextStyle(color: Colors.white))),
           ]));
       if (confirmar == true) {
         await SupabaseService.marcarMensajeEnviado(msg['id']);
@@ -232,13 +215,13 @@ class _ColaTabState extends State<_ColaTab> {
                   Icon(restantes > 0 ? Icons.schedule_outlined : Icons.block_outlined,
                     size: 16, color: restantes > 0 ? AppColors.azul : AppColors.rojo),
                   const SizedBox(width: 8),
-                  Text(restantes > 0
-                    ? 'Puedes enviar $restantes mensaje${restantes != 1 ? "s" : ""} hoy'
-                    : 'Límite diario alcanzado',
+                  Text(tr(restantes > 0
+                    ? trf('Puedes enviar {0} mensaje{1} hoy', [restantes, (restantes != 1 ? "s" : "")])
+                    : tr('Límite diario alcanzado')),
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                       color: restantes > 0 ? AppColors.azul : AppColors.rojo)),
                 ]),
-                Text('$_enviadosHoy/$_limitesDiario enviados',
+                Text(trf('{0}/{1} enviados', [_enviadosHoy, _limitesDiario]),
                   style: TextStyle(fontSize: 11,
                     color: restantes > 0 ? AppColors.azul : AppColors.rojo)),
               ]),
@@ -261,21 +244,21 @@ class _ColaTabState extends State<_ColaTab> {
               child: Column(children: [
                 const Icon(Icons.inbox_outlined, size: 48, color: AppColors.grisBorde),
                 const SizedBox(height: 8),
-                const Text('No hay mensajes pendientes para hoy',
+                Text(tr('No hay mensajes pendientes para hoy'),
                   style: TextStyle(color: AppColors.textoSecundario)),
                 const SizedBox(height: 6),
-                const Text('Ve a Campañas para agregar mensajes a la cola',
+                Text(tr('Ve a Campañas para agregar mensajes a la cola'),
                   style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _cargar,
                   icon: const Icon(Icons.refresh, size: 14),
-                  label: const Text('Actualizar'),
+                  label: Text(tr('Actualizar')),
                   style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
                     side: const BorderSide(color: AppColors.azul))),
               ]))
           else ...[
-            Text('${_cola.length} mensaje${_cola.length != 1 ? "s" : ""} pendientes',
+            Text(trf('{0} mensaje{1} pendientes', [(_cola.length), (_cola.length != 1 ? "s" : "")]),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario,
                 fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
@@ -289,7 +272,7 @@ class _ColaTabState extends State<_ColaTab> {
           // Historial reciente
           if (_historial.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const Text('HISTORIAL RECIENTE', style: TextStyle(fontSize: 10,
+            Text(tr('HISTORIAL RECIENTE'), style: TextStyle(fontSize: 10,
               color: AppColors.textoSecundario, letterSpacing: 1, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             ..._historial.take(5).map((msg) {
@@ -304,12 +287,12 @@ class _ColaTabState extends State<_ColaTab> {
                     size: 16, color: enviado ? AppColors.verde : AppColors.textoSecundario),
                   const SizedBox(width: 8),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(cl?['nombre'] as String? ?? '—',
+                    Text(tr(cl?['nombre'] as String? ?? '—'),
                       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                    Text(msg['campana'] as String? ?? 'Sin campaña',
+                    Text(tr(msg['campana'] as String? ?? tr('Sin campaña')),
                       style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
                   ])),
-                  Text(enviado ? 'Enviado' : 'Omitido',
+                  Text(tr(enviado ? tr('Enviado') : tr('Omitido')),
                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
                       color: enviado ? AppColors.verde : AppColors.textoSecundario)),
                 ]));
@@ -343,31 +326,31 @@ class _TarjetaMensaje extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           CircleAvatar(radius: 16, backgroundColor: AppColors.azulClaro,
-            child: Text(nombre.isNotEmpty ? nombre[0].toUpperCase() : '?',
+            child: Text(tr(nombre.isNotEmpty ? nombre[0].toUpperCase() : '?'),
               style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700, fontSize: 13))),
           const SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(tr(nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             if (campana.isNotEmpty)
-              Text(campana, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+              Text(tr(campana), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           ])),
           Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(color: const Color(0xFF25D366).withOpacity(0.1),
               borderRadius: BorderRadius.circular(20)),
-            child: const Text('Pendiente',
+            child: Text(tr('Pendiente'),
               style: TextStyle(fontSize: 9, color: Color(0xFF25D366), fontWeight: FontWeight.w700))),
         ]),
         const SizedBox(height: 10),
         Container(padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
             border: const Border(left: BorderSide(color: Color(0xFF25D366), width: 3))),
-          child: Text(mensaje, style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.azul))),
+          child: Text(tr(mensaje), style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.azul))),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: OutlinedButton.icon(
             onPressed: onOmitir,
             icon: const Icon(Icons.skip_next_outlined, size: 14),
-            label: const Text('Omitir', style: TextStyle(fontSize: 12)),
+            label: Text(tr('Omitir'), style: TextStyle(fontSize: 12)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.textoSecundario,
               side: const BorderSide(color: AppColors.grisBorde),
@@ -376,7 +359,7 @@ class _TarjetaMensaje extends StatelessWidget {
           Expanded(flex: 2, child: ElevatedButton.icon(
             onPressed: puedeEnviar ? onEnviar : null,
             icon: const Icon(Icons.send, size: 14, color: Colors.white),
-            label: const Text('Enviar por WhatsApp', style: TextStyle(fontSize: 12, color: Colors.white)),
+            label: Text(tr('Enviar por WhatsApp'), style: TextStyle(fontSize: 12, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF25D366),
               disabledBackgroundColor: AppColors.grisBorde,
@@ -488,7 +471,7 @@ class _CampanasTabState extends State<_CampanasTab> {
                   border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
                 child: Row(children: [
                   Expanded(child: Text(
-                    campana == null ? 'Nueva campaña' : 'Editar campaña',
+                    tr(campana == null ? tr('Nueva campaña') : tr('Editar campaña')),
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx, false)),
                 ])),
@@ -498,14 +481,14 @@ class _CampanasTabState extends State<_CampanasTab> {
                 TextField(
                   controller: nombreCtrl,
                   decoration: InputDecoration(
-                    labelText: 'Nombre de la campaña *',
-                    hintText: 'Ej: Reactivación de clientes dormidos',
+                    labelText: tr('Nombre de la campaña *'),
+                    hintText: tr('Ej: Reactivación de clientes dormidos'),
                     prefixIcon: const Icon(Icons.campaign_outlined),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
                   textCapitalization: TextCapitalization.sentences),
                 const SizedBox(height: 16),
                 // Segmento
-                const Text('Segmento objetivo',
+                Text(tr('Segmento objetivo'),
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 ..._segmentos.map((s) {
@@ -527,24 +510,24 @@ class _CampanasTabState extends State<_CampanasTab> {
                           size: 16, color: sel ? color : AppColors.textoSecundario),
                         const SizedBox(width: 10),
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(s['nombre'] as String,
+                          Text(tr(s['nombre'] as String),
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                               color: sel ? color : AppColors.textoPrincipal)),
-                          Text(s['desc'] as String,
+                          Text(tr(s['desc'] as String),
                             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                         ])),
                       ])));
                 }),
                 const SizedBox(height: 16),
                 // Plantilla
-                const Text('Mensaje a enviar',
+                Text(tr('Mensaje a enviar'),
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 if (_plantillas.isEmpty)
                   Container(padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(color: const Color(0xFFFEF3E2),
                       borderRadius: BorderRadius.circular(8)),
-                    child: const Text('No hay plantillas. Crea una en la pestaña Plantillas.',
+                    child: Text(tr('No hay plantillas. Crea una en la pestaña Plantillas.'),
                       style: TextStyle(fontSize: 12, color: AppColors.ambar))),
                 ..._plantillas.map((p) {
                   final sel = plantSel?['id'] == p['id'];
@@ -564,7 +547,7 @@ class _CampanasTabState extends State<_CampanasTab> {
                           Icon(sel ? Icons.check_circle : Icons.radio_button_unchecked,
                             size: 16, color: sel ? AppColors.azul : AppColors.textoSecundario),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(p['titulo'] as String? ?? '',
+                          Expanded(child: Text(tr(p['titulo'] as String? ?? ''),
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                               color: sel ? AppColors.azul : AppColors.textoPrincipal))),
                         ]),
@@ -573,17 +556,17 @@ class _CampanasTabState extends State<_CampanasTab> {
                           Container(padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(color: AppColors.gris,
                               borderRadius: BorderRadius.circular(6)),
-                            child: Text(p['cuerpo'] as String? ?? '',
+                            child: Text(tr(p['cuerpo'] as String? ?? ''),
                               style: const TextStyle(fontSize: 11, height: 1.5))),
                         ],
                       ])));
                 }),
                 const SizedBox(height: 16),
                 // Límite diario
-                const Text('Mensajes por día',
+                Text(tr('Mensajes por día'),
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 4),
-                const Text('¿Cuántos mensajes enviar diariamente de esta campaña?',
+                Text(tr('¿Cuántos mensajes enviar diariamente de esta campaña?'),
                   style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                 const SizedBox(height: 8),
                 Wrap(spacing: 8, children: [5, 10, 20, 30, 50, 100].map((n) {
@@ -610,8 +593,8 @@ class _CampanasTabState extends State<_CampanasTab> {
                     onPressed: () async {
                       final nombre = nombreCtrl.text.trim();
                       if (nombre.isEmpty || segKey == null || plantId == null) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                          content: Text('Completa nombre, segmento y mensaje')));
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: Text(tr('Completa nombre, segmento y mensaje'))));
                         return;
                       }
                       final datos = {
@@ -627,7 +610,7 @@ class _CampanasTabState extends State<_CampanasTab> {
                         await SupabaseService.guardarCampana(datos);
                         await _cargar();
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text(campana == null ? '✅ Campaña creada' : '✅ Campaña actualizada'),
+                          content: Text(tr(campana == null ? tr('✅ Campaña creada') : tr('✅ Campaña actualizada'))),
                           backgroundColor: AppColors.verde));
                       } catch (e) {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -638,7 +621,7 @@ class _CampanasTabState extends State<_CampanasTab> {
                       backgroundColor: AppColors.azul,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                    child: Text(campana == null ? 'Crear campaña' : 'Guardar cambios',
+                    child: Text(tr(campana == null ? tr('Crear campaña') : tr('Guardar cambios')),
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   )))
             ])))));
@@ -649,14 +632,14 @@ class _CampanasTabState extends State<_CampanasTab> {
   Future<void> _eliminarCampana(Map<String, dynamic> campana) async {
     final ok = await showDialog<bool>(context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar campaña'),
-        content: Text('¿Eliminar "${campana['nombre']}"?'),
+        title: Text(tr('Eliminar campaña')),
+        content: Text(trf('¿Eliminar "{0}"?', [(campana['nombre'])])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
         ]));
     if (ok == true) {
       await SupabaseService.eliminarCampana(campana['id'] as String);
@@ -672,7 +655,7 @@ class _CampanasTabState extends State<_CampanasTab> {
         orElse: () => <String, dynamic>{});
       if (plantilla.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('La plantilla de esta campaña ya no existe')));
+          SnackBar(content: Text(tr('La plantilla de esta campaña ya no existe'))));
         return;
       }
       final segKey = campana['segmento_key'] as String? ?? 'todos';
@@ -681,7 +664,7 @@ class _CampanasTabState extends State<_CampanasTab> {
       final conWA = clientes.where((c) => c.whatsappNumero.isNotEmpty).take(limite).toList();
       if (conWA.isEmpty) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No hay clientes con WhatsApp en este segmento')));
+          SnackBar(content: Text(tr('No hay clientes con WhatsApp en este segmento'))));
         return;
       }
       for (final cliente in conWA) {
@@ -696,7 +679,7 @@ class _CampanasTabState extends State<_CampanasTab> {
         );
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('✅ ${conWA.length} mensajes de "${campana['nombre']}" agregados a la cola'),
+        content: Text(trf('✅ {0} mensajes de "{1}" agregados a la cola', [(conWA.length), (campana['nombre'])])),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -707,7 +690,7 @@ class _CampanasTabState extends State<_CampanasTab> {
   Future<void> _lanzarRapido(Map<String, dynamic> seg) async {
     if (_plantillas.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Crea una plantilla primero en la pestaña Plantillas')));
+        SnackBar(content: Text(tr('Crea una plantilla primero en la pestaña Plantillas'))));
       return;
     }
     Map<String, dynamic>? plantillaSel;
@@ -727,7 +710,7 @@ class _CampanasTabState extends State<_CampanasTab> {
               IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx, false)),
             ])),
           Expanded(child: ListView(padding: const EdgeInsets.all(12), children: [
-            const Text('Selecciona plantilla:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            Text(tr('Selecciona plantilla:'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             ..._plantillas.map((p) {
               final sel = plantillaSel?['id'] == p['id'];
@@ -743,13 +726,13 @@ class _CampanasTabState extends State<_CampanasTab> {
                     Icon(sel ? Icons.check_circle : Icons.radio_button_unchecked,
                       size: 16, color: sel ? AppColors.azul : AppColors.textoSecundario),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(p['titulo'] as String? ?? '',
+                    Expanded(child: Text(tr(p['titulo'] as String? ?? ''),
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                         color: sel ? AppColors.azul : AppColors.textoPrincipal))),
                   ])));
             }),
             const SizedBox(height: 12),
-            const Text('Mensajes a enviar hoy:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            Text(tr('Mensajes a enviar hoy:'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Wrap(spacing: 8, children: [5, 10, 20, 30, 50].map((n) {
               final sel = limite == n;
@@ -775,7 +758,7 @@ class _CampanasTabState extends State<_CampanasTab> {
                   disabledBackgroundColor: AppColors.grisBorde,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                child: Text(plantillaSel == null ? 'Selecciona plantilla' : 'Agregar $limite a la cola',
+                child: Text(tr(plantillaSel == null ? tr('Selecciona plantilla') : trf('Agregar {0} a la cola', [limite])),
                   style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))))),
         ]))));
     if (ok != true || plantillaSel == null) return;
@@ -784,7 +767,7 @@ class _CampanasTabState extends State<_CampanasTab> {
       final conWA = clientes.where((c) => c.whatsappNumero.isNotEmpty).take(limite).toList();
       if (conWA.isEmpty) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sin clientes con WA en "${seg['nombre']}"')));
+          SnackBar(content: Text(trf('Sin clientes con WA en "{0}"', [(seg['nombre'])]))));
         return;
       }
       for (final cliente in conWA) {
@@ -797,7 +780,7 @@ class _CampanasTabState extends State<_CampanasTab> {
           campana: '${seg['nombre']} — ${plantillaSel!['titulo']}');
       }
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('✅ ${conWA.length} mensajes agregados a la cola'),
+        content: Text(trf('✅ {0} mensajes agregados a la cola', [(conWA.length)])),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -816,7 +799,7 @@ class _CampanasTabState extends State<_CampanasTab> {
               child: ElevatedButton.icon(
                 onPressed: () => _editarCampana(),
                 icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text('+ Nueva campaña', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                label: Text(tr('+ Nueva campaña'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.azul,
                   padding: const EdgeInsets.symmetric(vertical: 12),
@@ -826,7 +809,7 @@ class _CampanasTabState extends State<_CampanasTab> {
           // ── Lista de campañas guardadas ──
           Expanded(child: ListView(padding: const EdgeInsets.all(14), children: [
             if (_campanas.isNotEmpty) ...[
-              const Text('MIS CAMPAÑAS', style: TextStyle(fontSize: 10,
+              Text(tr('MIS CAMPAÑAS'), style: TextStyle(fontSize: 10,
                 color: AppColors.textoSecundario, letterSpacing: 1, fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               ..._campanas.map((camp) {
@@ -850,15 +833,15 @@ class _CampanasTabState extends State<_CampanasTab> {
                           color: color.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(10)),
                         child: Icon(seg['icon'] as IconData, color: color, size: 20)),
-                      title: Text(camp['nombre'] as String? ?? '',
+                      title: Text(tr(camp['nombre'] as String? ?? ''),
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(seg['nombre'] as String,
+                        Text(tr(seg['nombre'] as String),
                           style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                         if (plantilla.isNotEmpty)
                           Text('📝 ${plantilla['titulo'] ?? ''}',
                             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                        Text('📬 ${camp['limite_diario'] ?? 20} mensajes/día',
+                        Text(trf('📬 {0} mensajes/día', [(camp['limite_diario'] ?? 20)]),
                           style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                       ]),
                       trailing: PopupMenuButton<String>(
@@ -869,12 +852,12 @@ class _CampanasTabState extends State<_CampanasTab> {
                           if (v == 'lanzar') _lanzarCampanaGuardada(camp);
                         },
                         itemBuilder: (_) => [
-                          const PopupMenuItem(value: 'lanzar',
-                            child: Row(children: [Icon(Icons.send, size: 16, color: AppColors.verde), SizedBox(width: 8), Text('Lanzar ahora')])),
-                          const PopupMenuItem(value: 'editar',
-                            child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: AppColors.azul), SizedBox(width: 8), Text('Editar')])),
-                          const PopupMenuItem(value: 'eliminar',
-                            child: Row(children: [Icon(Icons.delete_outline, size: 16, color: AppColors.rojo), SizedBox(width: 8), Text('Eliminar', style: TextStyle(color: AppColors.rojo))])),
+                          PopupMenuItem(value: 'lanzar',
+                            child: Row(children: [Icon(Icons.send, size: 16, color: AppColors.verde), SizedBox(width: 8), Text(tr('Lanzar ahora'))])),
+                          PopupMenuItem(value: 'editar',
+                            child: Row(children: [Icon(Icons.edit_outlined, size: 16, color: AppColors.azul), SizedBox(width: 8), Text(tr('Editar'))])),
+                          PopupMenuItem(value: 'eliminar',
+                            child: Row(children: [Icon(Icons.delete_outline, size: 16, color: AppColors.rojo), SizedBox(width: 8), Text(tr('Eliminar'), style: TextStyle(color: AppColors.rojo))])),
                         ]),
                     ),
                   ]));
@@ -883,16 +866,16 @@ class _CampanasTabState extends State<_CampanasTab> {
             ],
 
             // ── Segmentos rápidos ──
-            const Text('LANZAMIENTO RÁPIDO', style: TextStyle(fontSize: 10,
+            Text(tr('LANZAMIENTO RÁPIDO'), style: TextStyle(fontSize: 10,
               color: AppColors.textoSecundario, letterSpacing: 1, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Container(padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.azul.withOpacity(0.2))),
-              child: const Row(children: [
+              child: Row(children: [
                 Icon(Icons.info_outline, color: AppColors.azul, size: 14),
                 SizedBox(width: 6),
-                Expanded(child: Text('Lanza una campaña directa sin guardarla.',
+                Expanded(child: Text(tr('Lanza una campaña directa sin guardarla.'),
                   style: TextStyle(fontSize: 11, color: AppColors.azul))),
               ])),
             const SizedBox(height: 8),
@@ -906,16 +889,16 @@ class _CampanasTabState extends State<_CampanasTab> {
                   leading: Container(width: 36, height: 36,
                     decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                     child: Icon(seg['icon'] as IconData, color: color, size: 18)),
-                  title: Text(seg['nombre'] as String,
+                  title: Text(tr(seg['nombre'] as String),
                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  subtitle: Text(seg['desc'] as String,
+                  subtitle: Text(tr(seg['desc'] as String),
                     style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
                   trailing: GestureDetector(
                     onTap: () => _lanzarRapido(seg),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                      child: Text('Lanzar', style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700))))));
+                      child: Text(tr('Lanzar'), style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w700))))));
             }),
             const SizedBox(height: 20),
           ])),
@@ -981,7 +964,7 @@ class _PlantillasTabState extends State<_PlantillasTab> {
   Future<void> _editar([Map<String, dynamic>? plantilla]) async {
     final tituloCtrl = TextEditingController(text: plantilla?['titulo'] as String? ?? '');
     final cuerpoCtrl = TextEditingController(text: plantilla?['cuerpo'] as String? ?? '');
-    String cat = plantilla?['categoria'] as String? ?? 'General';
+    String cat = plantilla?['categoria'] as String? ?? tr('General');
     String tipoSel = plantilla?['tipo'] as String? ?? '';
     if (!_tiposAutomaticos.containsKey(tipoSel)) tipoSel = '';
 
@@ -995,40 +978,38 @@ class _PlantillasTabState extends State<_PlantillasTab> {
             padding: const EdgeInsets.all(16),
             child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(plantilla == null ? 'Nueva plantilla' : 'Editar plantilla',
+                Text(tr(plantilla == null ? tr('Nueva plantilla') : tr('Editar plantilla')),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx, false)),
               ]),
               const SizedBox(height: 12),
               TextField(controller: tituloCtrl,
-                decoration: const InputDecoration(labelText: 'Título *', border: OutlineInputBorder())),
+                decoration: InputDecoration(labelText: tr('Título *'), border: OutlineInputBorder())),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(value: cat,
-                decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
-                items: _categorias.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                decoration: InputDecoration(labelText: tr('Categoría'), border: OutlineInputBorder()),
+                items: _categorias.map((c) => DropdownMenuItem(value: c, child: Text(tr(c)))).toList(),
                 onChanged: (v) => setS(() => cat = v!)),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(value: tipoSel,
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: '¿Para qué mensaje automático es? (opcional)',
+                decoration: InputDecoration(
+                  labelText: tr('¿Para qué mensaje automático es? (opcional)'),
                   border: OutlineInputBorder()),
                 items: _tiposAutomaticos.entries.map((e) => DropdownMenuItem(
                   value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 12)))).toList(),
                 onChanged: (v) => setS(() => tipoSel = v ?? '')),
               const SizedBox(height: 4),
-              const Text('Si eliges una opción distinta a "Ninguno", este mensaje reemplaza el texto '
-                'por defecto justo en ese momento automático (ej. cuando el pedido pasa a producción).',
+              Text(tr('Si eliges una opción distinta a "Ninguno", este mensaje reemplaza el texto por defecto justo en ese momento automático (ej. cuando el pedido pasa a producción).'),
                 style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
               const SizedBox(height: 8),
               TextField(controller: cuerpoCtrl, maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Mensaje',
-                  hintText: 'Variables: escribe NOMBRE FOLIO MONTO FECHA en mayúsculas rodeadas de *',
+                decoration: InputDecoration(
+                  labelText: tr('Mensaje'),
+                  hintText: tr('Variables: escribe NOMBRE FOLIO MONTO FECHA en mayúsculas rodeadas de *'),
                   border: OutlineInputBorder())),
               const SizedBox(height: 4),
-              const Text('Variables: *NOMBRE* *FOLIO* *MONTO* *FECHA* — y en mensajes de avance también '
-                '*ANTICIPO* y *RESTANTE* (en mayúsculas entre asteriscos)',
+              Text(tr('Variables: *NOMBRE* *FOLIO* *MONTO* *FECHA* — y en mensajes de avance también *ANTICIPO* y *RESTANTE* (en mayúsculas entre asteriscos)'),
                 style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
               const SizedBox(height: 12),
               SizedBox(width: double.infinity,
@@ -1040,8 +1021,8 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                     final categoria = cat;
                     final tipo = tipoSel;
                     if (titulo.isEmpty || cuerpo.isEmpty) {
-                      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                        content: Text('Completa el título y el mensaje')));
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                        content: Text(tr('Completa el título y el mensaje'))));
                       return;
                     }
                     Navigator.pop(ctx, true);
@@ -1055,15 +1036,15 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                         'activo'   : true,
                       });
                       await _cargar();
-                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('✅ Plantilla guardada'), backgroundColor: AppColors.verde));
+                      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(tr('✅ Plantilla guardada')), backgroundColor: AppColors.verde));
                     } catch (e) {
                       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
                     }
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-                  child: const Text('Guardar', style: TextStyle(color: Colors.white)))),
+                  child: Text(tr('Guardar'), style: TextStyle(color: Colors.white)))),
             ]))))));
 
     if (ok != true) return;
@@ -1073,13 +1054,13 @@ class _PlantillasTabState extends State<_PlantillasTab> {
   Future<void> _eliminar(Map<String, dynamic> p) async {
     final ok = await showDialog<bool>(context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar plantilla'),
-        content: Text('¿Eliminar "${p['titulo']}"?'),
+        title: Text(tr('Eliminar plantilla')),
+        content: Text(trf('¿Eliminar "{0}"?', [(p['titulo'])])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
           ElevatedButton(onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
         ]));
     if (ok != true) return;
     await SupabaseService.eliminarPlantillaWA(p['id']);
@@ -1094,21 +1075,21 @@ class _PlantillasTabState extends State<_PlantillasTab> {
           child: ElevatedButton.icon(
             onPressed: () => _editar(),
             icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text('Nueva plantilla', style: TextStyle(color: Colors.white)),
+            label: Text(tr('Nueva plantilla'), style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
               padding: const EdgeInsets.symmetric(vertical: 11))))),
       Expanded(child: _cargando
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(onRefresh: _cargar,
             child: _plantillas.isEmpty
-              ? const Center(child: Text('Sin plantillas. Crea la primera.',
+              ? Center(child: Text(tr('Sin plantillas. Crea la primera.'),
                   style: TextStyle(color: AppColors.textoSecundario)))
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                   itemCount: _plantillas.length,
                   itemBuilder: (_, i) {
                     final p = _plantillas[i];
-                    final cat = p['categoria'] as String? ?? 'General';
+                    final cat = p['categoria'] as String? ?? tr('General');
                     final color = _coloresCat[cat] ?? AppColors.azul;
                     return Container(margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(color: Colors.white,
@@ -1120,7 +1101,7 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                           Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(color: color.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20)),
-                            child: Text(cat, style: TextStyle(fontSize: 9, color: color,
+                            child: Text(tr(cat), style: TextStyle(fontSize: 9, color: color,
                               fontWeight: FontWeight.w700))),
                           const Spacer(),
                           IconButton(icon: const Icon(Icons.edit_outlined, size: 16,
@@ -1134,14 +1115,14 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                             padding: EdgeInsets.zero, constraints: const BoxConstraints()),
                         ]),
                         const SizedBox(height: 6),
-                        Text(p['titulo'] as String? ?? '',
+                        Text(tr(p['titulo'] as String? ?? ''),
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 6),
                         Container(padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(color: AppColors.gris,
                             borderRadius: BorderRadius.circular(8),
                             border: Border(left: BorderSide(color: color, width: 3))),
-                          child: Text(p['cuerpo'] as String? ?? '',
+                          child: Text(tr(p['cuerpo'] as String? ?? ''),
                             style: const TextStyle(fontSize: 11, height: 1.5, color: AppColors.azul))),
                       ])));
                   }))),

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
+import '../i18n/tr.dart';
 
 class GastosScreen extends StatefulWidget {
   const GastosScreen({super.key});
@@ -35,7 +36,7 @@ class _GastosScreenState extends State<GastosScreen>
   Future<void> _cargar() async {
     setState(() => _cargando = true);
     try {
-      final data = await SupabaseService.getGastos(periodo: 'Todo');
+      final data = await SupabaseService.getGastos(periodo: tr('Todo'));
       if (mounted) setState(() {
         _gastos = (data as List)
           .map((j) => Gasto.fromJson(j as Map<String, dynamic>))
@@ -72,7 +73,7 @@ class _GastosScreenState extends State<GastosScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Gastos y Compras',
+        title: Text(tr('Gastos y Compras'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
             color: AppColors.azul)),
         actions: [
@@ -85,10 +86,10 @@ class _GastosScreenState extends State<GastosScreen>
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
-          tabs: const [
-            Tab(text: 'Gastos'),
-            Tab(text: 'Nuevo gasto'),
-            Tab(text: 'Resumen'),
+          tabs: [
+            Tab(text: tr('Gastos')),
+            Tab(text: tr('Nuevo gasto')),
+            Tab(text: tr('Resumen')),
           ])),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
@@ -105,13 +106,13 @@ class _GastosScreenState extends State<GastosScreen>
       return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         const Icon(Icons.receipt_long_outlined, size: 48, color: AppColors.grisBorde),
         const SizedBox(height: 12),
-        const Text('Sin gastos registrados',
+        Text(tr('Sin gastos registrados'),
           style: TextStyle(color: AppColors.textoSecundario)),
         const SizedBox(height: 8),
         ElevatedButton.icon(
           onPressed: () => _tabs.animateTo(1),
           icon: const Icon(Icons.add, color: Colors.white, size: 16),
-          label: const Text('Registrar gasto',
+          label: Text(tr('Registrar gasto'),
             style: TextStyle(color: Colors.white)),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul)),
       ]));
@@ -149,16 +150,16 @@ class _GastosScreenState extends State<GastosScreen>
 
       // KPIs
       Row(children: [
-        _kpi('Total mes', res['total']!, AppColors.rojo),
+        _kpi(tr('Total mes'), res['total']!, AppColors.rojo),
         const SizedBox(width: 8),
-        _kpi('Con factura', res['con_factura']!,
+        _kpi(tr('Con factura'), res['con_factura']!,
           AppColors.azul, esCantidad: true),
       ]),
       const SizedBox(height: 8),
       Row(children: [
-        _kpi('Directos', res['directos']!, AppColors.naranja),
+        _kpi(tr('Directos'), res['directos']!, AppColors.naranja),
         const SizedBox(width: 8),
-        _kpi('IVA acreditable', res['iva_acreditable']!, AppColors.verde),
+        _kpi(tr('IVA acreditable'), res['iva_acreditable']!, AppColors.verde),
       ]),
 
       const SizedBox(height: 16),
@@ -170,7 +171,7 @@ class _GastosScreenState extends State<GastosScreen>
           color: AppColors.azulClaro,
           borderRadius: BorderRadius.circular(10)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('💡 IVA acreditable este mes',
+          Text(tr('💡 IVA acreditable este mes'),
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
               color: AppColors.azul)),
           const SizedBox(height: 4),
@@ -178,15 +179,15 @@ class _GastosScreenState extends State<GastosScreen>
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
               color: AppColors.azul)),
           const SizedBox(height: 4),
-          const Text(
-            'Solo se acredita el IVA de gastos con factura válida y deducibles.',
+          Text(
+            tr('Solo se acredita el IVA de gastos con factura válida y deducibles.'),
             style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ])),
 
       const SizedBox(height: 16),
 
       // Por categoría
-      const Text('POR CATEGORÍA',
+      Text(tr('POR CATEGORÍA'),
         style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
           color: AppColors.textoSecundario, letterSpacing: 1.5)),
       const SizedBox(height: 8),
@@ -201,7 +202,7 @@ class _GastosScreenState extends State<GastosScreen>
             border: Border.all(color: AppColors.grisBorde, width: 0.5)),
           child: Column(children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(Gasto.etiquetasTipoSat[e.key] ?? e.key,
+              Text(tr(Gasto.etiquetasTipoSat[e.key] ?? e.key),
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
               Text(_fmt.format(e.value),
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
@@ -215,7 +216,7 @@ class _GastosScreenState extends State<GastosScreen>
               minHeight: 4,
               borderRadius: BorderRadius.circular(2)),
             const SizedBox(height: 2),
-            Text('${(pct * 100).toStringAsFixed(1)}% del total',
+            Text(trf('{0}% del total', [((pct * 100).toStringAsFixed(1))]),
               style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           ]));
       }),
@@ -229,10 +230,10 @@ class _GastosScreenState extends State<GastosScreen>
       borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(
+      Text(tr(label), style: const TextStyle(
         fontSize: 10, color: AppColors.textoSecundario)),
       const SizedBox(height: 4),
-      Text(esCantidad ? '${val.toInt()}' : _fmt.format(val),
+      Text(tr(esCantidad ? '${val.toInt()}' : _fmt.format(val)),
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
     ])));
 
@@ -328,27 +329,27 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
         bottom: MediaQuery.of(context).viewInsets.bottom + 20),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         // Tipo de gasto
-        const Text('TIPO DE GASTO', style: TextStyle(
+        Text(tr('TIPO DE GASTO'), style: TextStyle(
           fontSize: 10, fontWeight: FontWeight.w700,
           color: AppColors.textoSecundario, letterSpacing: 1.5)),
         const SizedBox(height: 8),
         Row(children: [
-          _chipTipo('directo', '🔧 Directo', 'Materiales, consumibles'),
+          _chipTipo('directo', tr('🔧 Directo'), tr('Materiales, consumibles')),
           const SizedBox(width: 8),
-          _chipTipo('indirecto', '📋 Indirecto', 'Luz, internet, renta'),
+          _chipTipo('indirecto', tr('📋 Indirecto'), tr('Luz, internet, renta')),
         ]),
 
         const SizedBox(height: 16),
 
         // Concepto y monto
-        _campo(_conceptoCtrl, 'Concepto / Descripción *',
+        _campo(_conceptoCtrl, tr('Concepto / Descripción *'),
           icon: Icons.receipt_long_outlined),
         const SizedBox(height: 10),
         Row(children: [
-          Expanded(child: _campo(_montoCtrl, 'Monto total \$',
+          Expanded(child: _campo(_montoCtrl, tr('Monto total \$'),
             tipo: TextInputType.number)),
           const SizedBox(width: 10),
-          Expanded(child: _campo(_provCtrl, 'Proveedor')),
+          Expanded(child: _campo(_provCtrl, tr('Proveedor'))),
         ]),
 
         const SizedBox(height: 10),
@@ -378,13 +379,13 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
         // Categoría SAT
         DropdownButtonFormField<String>(
           value: _tipoSat,
-          decoration: const InputDecoration(
-            labelText: 'Tipo de gasto (SAT)',
+          decoration: InputDecoration(
+            labelText: tr('Tipo de gasto (SAT)'),
             border: OutlineInputBorder(), isDense: true,
             prefixIcon: Icon(Icons.category_outlined, size: 18)),
           items: Gasto.tiposGastoSat.map((t) => DropdownMenuItem(
             value: t,
-            child: Text(Gasto.etiquetasTipoSat[t] ?? t,
+            child: Text(tr(Gasto.etiquetasTipoSat[t] ?? t),
               style: const TextStyle(fontSize: 13)))).toList(),
           onChanged: (v) => setState(() {
             _tipoSat = v ?? _tipoSat;
@@ -397,11 +398,11 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
         // ── SECCIÓN FISCAL ──────────────────────
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('¿Te facturaron?',
+            Text(tr('¿Te facturaron?'),
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-            Text(_tieneFactura
-              ? 'IVA acreditable para el SAT'
-              : 'Sin comprobante fiscal',
+            Text(tr(_tieneFactura
+              ? tr('IVA acreditable para el SAT')
+              : tr('Sin comprobante fiscal')),
               style: TextStyle(fontSize: 11,
                 color: _tieneFactura ? AppColors.verde : AppColors.textoSecundario)),
           ]),
@@ -427,7 +428,7 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
                 const Icon(Icons.check_circle_outline,
                   color: AppColors.verde, size: 14),
                 const SizedBox(width: 6),
-                const Text('Datos de la factura',
+                Text(tr('Datos de la factura'),
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
                     color: AppColors.verde)),
               ]),
@@ -435,16 +436,16 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
 
               // RFC y folio
               Row(children: [
-                Expanded(child: _campo(_rfcCtrl, 'RFC del proveedor',
+                Expanded(child: _campo(_rfcCtrl, tr('RFC del proveedor'),
                   icon: Icons.badge_outlined)),
                 const SizedBox(width: 8),
-                Expanded(child: _campo(_folioCtrl, 'Folio factura')),
+                Expanded(child: _campo(_folioCtrl, tr('Folio factura'))),
               ]),
               const SizedBox(height: 8),
 
               // IVA
               Row(children: [
-                Expanded(child: _campo(_ivaCtrl, 'IVA de la factura \$',
+                Expanded(child: _campo(_ivaCtrl, tr('IVA de la factura \$'),
                   tipo: TextInputType.number,
                   icon: Icons.percent_outlined)),
                 const SizedBox(width: 8),
@@ -455,13 +456,13 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
                     borderRadius: BorderRadius.circular(8)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                    const Text('Base (sin IVA)',
+                    Text(tr('Base (sin IVA)'),
                       style: TextStyle(fontSize: 10,
                         color: AppColors.textoSecundario)),
                     const SizedBox(height: 2),
-                    Text(_ivaCtrl.text.isNotEmpty
+                    Text(tr(_ivaCtrl.text.isNotEmpty
                       ? '\$${((double.tryParse(_montoCtrl.text) ?? 0) - (double.tryParse(_ivaCtrl.text) ?? 0)).toStringAsFixed(2)}'
-                      : '—',
+                      : '—'),
                       style: const TextStyle(fontSize: 13,
                         fontWeight: FontWeight.w700, color: AppColors.azul)),
                   ]))),
@@ -470,10 +471,10 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
 
               // Deducible
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('¿Es deducible de ISR?',
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(tr('¿Es deducible de ISR?'),
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  Text('El gasto reduce tu base de ISR',
+                  Text(tr('El gasto reduce tu base de ISR'),
                     style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
                 ]),
                 Switch(
@@ -492,7 +493,7 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
                   const Icon(Icons.info_outline, size: 14, color: AppColors.azul),
                   const SizedBox(width: 6),
                   Expanded(child: Text(
-                    'IVA acreditable: ${_ivaCtrl.text.isNotEmpty && _esDeducible ? '\$${_ivaCtrl.text}' : '\$0.00'} — se resta del IVA a pagar al SAT.',
+                    trf('IVA acreditable: {0} — se resta del IVA a pagar al SAT.', [(_ivaCtrl.text.isNotEmpty && _esDeducible ? '\$${_ivaCtrl.text}' : '\$0.00')]),
                     style: const TextStyle(fontSize: 10, color: AppColors.azul))),
                 ])),
             ])),
@@ -508,7 +509,7 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
               ? const SizedBox(width: 16, height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.save_outlined, color: Colors.white, size: 18),
-            label: Text(esEdicion ? 'Actualizar gasto' : 'Registrar gasto',
+            label: Text(tr(esEdicion ? tr('Actualizar gasto') : tr('Registrar gasto')),
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.azul,
@@ -529,7 +530,7 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-              const Text('Editar gasto',
+              Text(tr('Editar gasto'),
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
               GestureDetector(onTap: () => Navigator.pop(context),
                 child: const Icon(Icons.close)),
@@ -544,15 +545,15 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
 
   Future<void> _guardar() async {
     if (_conceptoCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('El concepto es obligatorio'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('El concepto es obligatorio')),
         backgroundColor: AppColors.rojo));
       return;
     }
     final monto = double.tryParse(_montoCtrl.text);
     if (monto == null || monto <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('El monto debe ser mayor a 0'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('El monto debe ser mayor a 0')),
         backgroundColor: AppColors.rojo));
       return;
     }
@@ -604,10 +605,10 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
           border: Border.all(
             color: sel ? AppColors.rojo : AppColors.grisBorde)),
         child: Column(children: [
-          Text(titulo, style: TextStyle(
+          Text(tr(titulo), style: TextStyle(
             fontSize: 13, fontWeight: FontWeight.w700,
             color: sel ? Colors.white : AppColors.textoPrincipal)),
-          Text(sub, style: TextStyle(
+          Text(tr(sub), style: TextStyle(
             fontSize: 10,
             color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ]))));
@@ -667,7 +668,7 @@ class _TarjetaGasto extends StatelessWidget {
               decoration: BoxDecoration(
                 color: gasto.tipo == 'directo' ? AppColors.rojo : AppColors.ambar,
                 borderRadius: BorderRadius.circular(10)),
-              child: Text(gasto.tipo == 'directo' ? 'Directo' : 'Indirecto',
+              child: Text(tr(gasto.tipo == 'directo' ? tr('Directo') : tr('Indirecto')),
                 style: const TextStyle(fontSize: 10, color: Colors.white,
                   fontWeight: FontWeight.w600))),
             const SizedBox(width: 6),
@@ -677,14 +678,14 @@ class _TarjetaGasto extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.verde,
                   borderRadius: BorderRadius.circular(10)),
-                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.receipt_outlined, size: 10, color: Colors.white),
                   SizedBox(width: 3),
-                  Text('Facturado', style: TextStyle(
+                  Text(tr('Facturado'), style: TextStyle(
                     fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600)),
                 ])),
             const Spacer(),
-            Text(gasto.fecha != null ? fmtFecha.format(gasto.fecha!) : '',
+            Text(tr(gasto.fecha != null ? fmtFecha.format(gasto.fecha!) : ''),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             const SizedBox(width: 8),
             GestureDetector(
@@ -706,7 +707,7 @@ class _TarjetaGasto extends StatelessWidget {
                   style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
               ],
               const SizedBox(height: 4),
-              Text(Gasto.etiquetasTipoSat[gasto.tipoGastoSat] ?? gasto.categoria,
+              Text(tr(Gasto.etiquetasTipoSat[gasto.tipoGastoSat] ?? gasto.categoria),
                 style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             ])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [

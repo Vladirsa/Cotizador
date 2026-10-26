@@ -6,6 +6,7 @@ import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
+import '../i18n/tr.dart';
 
 class ClientesScreen extends StatefulWidget {
   const ClientesScreen({super.key});
@@ -60,13 +61,13 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(
-        title: const Text('CRM Clientes'),
+        title: Text(tr('CRM Clientes')),
         bottom: TabBar(
           controller: _tabs,
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
-          tabs: const [Tab(text: 'Clientes'), Tab(text: 'Nuevo cliente')],
+          tabs: [Tab(text: tr('Clientes')), Tab(text: tr('Nuevo cliente'))],
         ),
       ),
       body: TabBarView(controller: _tabs, children: [
@@ -79,7 +80,7 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
   Widget _listaClientes() => Column(children: [
     Container(color: Colors.white, padding: const EdgeInsets.all(12), child: Column(children: [
       TextField(
-        decoration: InputDecoration(hintText: 'Buscar por nombre, empresa, teléfono...', prefixIcon: const Icon(Icons.search, size: 20), filled: true, fillColor: AppColors.gris,
+        decoration: InputDecoration(hintText: tr('Buscar por nombre, empresa, teléfono...'), prefixIcon: const Icon(Icons.search, size: 20), filled: true, fillColor: AppColors.gris,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none), contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12)),
         onChanged: (v) => setState(() { _busqueda = v; _aplicarFiltros(); }),
       ),
@@ -94,7 +95,7 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
               color: _tipoFiltro == t ? AppColors.azul : Colors.white,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: _tipoFiltro == t ? AppColors.azul : AppColors.grisBorde)),
-            child: Text(t, style: TextStyle(fontSize: 11, color: _tipoFiltro == t ? Colors.white : AppColors.textoSecundario)),
+            child: Text(tr(t), style: TextStyle(fontSize: 11, color: _tipoFiltro == t ? Colors.white : AppColors.textoSecundario)),
           ),
         )).toList())),
     ])),
@@ -103,7 +104,7 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
       : RefreshIndicator(
           onRefresh: _cargar,
           child: _filtrados.isEmpty
-            ? const Center(child: Text('No hay clientes', style: TextStyle(color: AppColors.textoSecundario)))
+            ? Center(child: Text(tr('No hay clientes'), style: TextStyle(color: AppColors.textoSecundario)))
             : ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: _filtrados.length,
@@ -140,21 +141,21 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar cliente'),
-        content: Text('¿Eliminar a "${cliente.nombre}"? Se borrarán también sus cotizaciones y datos relacionados.'),
+        title: Text(tr('Eliminar cliente')),
+        content: Text(trf('¿Eliminar a "{0}"? Se borrarán también sus cotizaciones y datos relacionados.', [(cliente.nombre)])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
         ]));
     if (confirmar == true && cliente.id != null) {
       try {
         await SupabaseService.eliminarCliente(cliente.id!);
         await _cargar();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Cliente eliminado'),
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('Cliente eliminado')),
           backgroundColor: AppColors.rojo));
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
@@ -249,8 +250,8 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           tabs: [
-            Tab(text: 'Cotizaciones (${_cotizaciones.length})'),
-            Tab(text: 'Pedidos (${_pedidos.length})'),
+            Tab(text: trf('Cotizaciones ({0})', [(_cotizaciones.length)])),
+            Tab(text: trf('Pedidos ({0})', [(_pedidos.length)])),
           ])),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
@@ -260,9 +261,9 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
               child: Row(children: [
-                _kpi('Cotizaciones', '${_cotizaciones.length}', AppColors.azul),
-                _kpi('Pedidos', '${_pedidos.length}', AppColors.naranja),
-                _kpi('Total histórico', _fmt.format(_totalHistorico), AppColors.verde),
+                _kpi(tr('Cotizaciones'), '${_cotizaciones.length}', AppColors.azul),
+                _kpi(tr('Pedidos'), '${_pedidos.length}', AppColors.naranja),
+                _kpi(tr('Total histórico'), _fmt.format(_totalHistorico), AppColors.verde),
               ])),
             Expanded(child: TabBarView(controller: _tabs, children: [
               _tabCotizaciones(),
@@ -272,11 +273,11 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
   }
 
   Widget _tabCotizaciones() => _cotizaciones.isEmpty
-    ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
+    ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.description_outlined, size: 48, color: AppColors.grisBorde),
           SizedBox(height: 8),
-          Text('Sin cotizaciones', style: TextStyle(color: AppColors.textoSecundario)),
+          Text(tr('Sin cotizaciones'), style: TextStyle(color: AppColors.textoSecundario)),
         ]))
     : ListView.builder(
         padding: const EdgeInsets.all(12),
@@ -284,11 +285,11 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
         itemBuilder: (_, i) => _cardCotizacion(_cotizaciones[i]));
 
   Widget _tabPedidos() => _pedidos.isEmpty
-    ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
+    ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.local_shipping_outlined, size: 48, color: AppColors.grisBorde),
           SizedBox(height: 8),
-          Text('Sin pedidos', style: TextStyle(color: AppColors.textoSecundario)),
+          Text(tr('Sin pedidos'), style: TextStyle(color: AppColors.textoSecundario)),
         ]))
     : ListView.builder(
         padding: const EdgeInsets.all(12),
@@ -311,11 +312,11 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
         child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Text(c.folio ?? 'Sin folio',
+            Text(tr(c.folio ?? tr('Sin folio')),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
                 color: AppColors.azul)),
             const SizedBox(height: 2),
-            Text(c.createdAt != null ? _fmtFecha.format(c.createdAt!) : '',
+            Text(tr(c.createdAt != null ? _fmtFecha.format(c.createdAt!) : ''),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             const SizedBox(height: 4),
             Container(
@@ -341,11 +342,11 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
                   decoration: BoxDecoration(
                     color: AppColors.rojo.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.picture_as_pdf_outlined,
                       size: 14, color: AppColors.rojo),
                     SizedBox(width: 4),
-                    Text('Ver PDF', style: TextStyle(
+                    Text(tr('Ver PDF'), style: TextStyle(
                       fontSize: 10, color: AppColors.rojo,
                       fontWeight: FontWeight.w600)),
                   ]))),
@@ -373,7 +374,7 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
             children: [
             Text(p.folio, style: const TextStyle(
               fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
-            Text(p.createdAt != null ? _fmtFecha.format(p.createdAt!) : '',
+            Text(tr(p.createdAt != null ? _fmtFecha.format(p.createdAt!) : ''),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -419,9 +420,9 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
 
   Widget _kpi(String label, String val, Color color) =>
     Expanded(child: Column(children: [
-      Text(val, style: TextStyle(
+      Text(tr(val), style: TextStyle(
         fontSize: 16, fontWeight: FontWeight.w800, color: color)),
-      Text(label, style: const TextStyle(
+      Text(tr(label), style: const TextStyle(
         fontSize: 9, color: AppColors.textoSecundario)),
     ]));
 }
@@ -465,7 +466,7 @@ class _TarjetaCliente extends StatelessWidget {
               icon: const Icon(Icons.chat, color: Color(0xFF25D366), size: 20),
               onPressed: () => WhatsAppService.abrirChat(
   numero: cliente.whatsappNumero,
-  mensaje: '¡Hola ${cliente.nombre}! Te contacto de *HETNA CNC*. ¿En qué podemos ayudarte?'),
+  mensaje: trf('¡Hola {0}! Te contacto de *HETNA CNC*. ¿En qué podemos ayudarte?', [(cliente.nombre)])),
             ),
           IconButton(icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.textoSecundario), onPressed: onEditar),
           IconButton(icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.rojo), onPressed: onEliminar),
@@ -512,57 +513,57 @@ class _FormClienteState extends State<_FormCliente> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.cliente == null ? 'Nuevo cliente' : 'Editar cliente'),
+        title: Text(tr(widget.cliente == null ? tr('Nuevo cliente') : tr('Editar cliente'))),
         leading: widget.cliente != null ? IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)) : null,
         actions: [
           TextButton(onPressed: _guardar, child: _guardando
             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-            : const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w600))),
+            : Text(tr('Guardar'), style: TextStyle(fontWeight: FontWeight.w600))),
         ],
       ),
       body: Form(key: _form, child: ListView(padding: const EdgeInsets.all(14), children: [
-        _campo('Nombre completo *', _nombre, obligatorio: true),
-        _campo('Empresa', _empresa),
+        _campo(tr('Nombre completo *'), _nombre, obligatorio: true),
+        _campo(tr('Empresa'), _empresa),
         _campo('RFC', _rfc),
-        _campo('Domicilio (calle y número)', _domicilio),
+        _campo(tr('Domicilio (calle y número)'), _domicilio),
         Row(children: [
-          Expanded(child: _campo('Ciudad', _ciudad)),
+          Expanded(child: _campo(tr('Ciudad'), _ciudad)),
           const SizedBox(width: 8),
-          Expanded(child: _campo('Estado', _estado)),
+          Expanded(child: _campo(tr('Estado'), _estado)),
         ]),
         Row(children: [
-          Expanded(child: _campo('Código Postal', _cp, tipo: TextInputType.number)),
+          Expanded(child: _campo(tr('Código Postal'), _cp, tipo: TextInputType.number)),
           const SizedBox(width: 8),
-          Expanded(child: _campo('Teléfono', _tel, tipo: TextInputType.phone)),
+          Expanded(child: _campo(tr('Teléfono'), _tel, tipo: TextInputType.phone)),
         ]),
         Row(children: [
-          Expanded(child: _campo('WhatsApp', _wa, tipo: TextInputType.phone)),
+          Expanded(child: _campo(tr('WhatsApp'), _wa, tipo: TextInputType.phone)),
           const SizedBox(width: 8),
-          Expanded(child: _campo('Correo', _correo, tipo: TextInputType.emailAddress)),
+          Expanded(child: _campo(tr('Correo'), _correo, tipo: TextInputType.emailAddress)),
         ]),
         const SizedBox(height: 4),
-        const Text('Tipo de cliente', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        Text(tr('Tipo de cliente'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         const SizedBox(height: 4),
         DropdownButtonFormField<String>(
           value: _tipo,
           decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-          items: _tipos.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))).toList(),
+          items: _tipos.map((t) => DropdownMenuItem(value: t, child: Text(tr(t), style: const TextStyle(fontSize: 13)))).toList(),
           onChanged: (v) => setState(() => _tipo = v!),
         ),
         const SizedBox(height: 8),
-        _campo('Notas internas', _notas, lineas: 3),
-        ElevatedButton(onPressed: _guardar, child: Text(widget.cliente == null ? 'Guardar cliente' : 'Actualizar cliente')),
+        _campo(tr('Notas internas'), _notas, lineas: 3),
+        ElevatedButton(onPressed: _guardar, child: Text(tr(widget.cliente == null ? tr('Guardar cliente') : tr('Actualizar cliente')))),
       ])),
     );
   }
 
   Widget _campo(String label, TextEditingController ctrl, {bool obligatorio = false, TextInputType tipo = TextInputType.text, int lineas = 1}) =>
     Padding(padding: const EdgeInsets.only(bottom: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      Text(tr(label), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       const SizedBox(height: 4),
       TextFormField(
         controller: ctrl, keyboardType: tipo, maxLines: lineas,
-        validator: obligatorio ? (v) => v?.isEmpty == true ? 'Requerido' : null : null,
+        validator: obligatorio ? (v) => v?.isEmpty == true ? tr('Requerido') : null : null,
         decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
         style: const TextStyle(fontSize: 13),
       ),
@@ -653,7 +654,7 @@ class _SelectorEtiquetasClienteState extends State<SelectorEtiquetasCliente> {
     if (_todas.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        const Text('Etiquetas', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        Text(tr('Etiquetas'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         if (_guardando) ...[
           const SizedBox(width: 8),
           const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1.5)),
@@ -673,7 +674,7 @@ class _SelectorEtiquetasClienteState extends State<SelectorEtiquetasCliente> {
               color: sel ? color : Colors.transparent,
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: sel ? color : AppColors.grisBorde)),
-            child: Text(et['nombre'] as String? ?? '',
+            child: Text(tr(et['nombre'] as String? ?? ''),
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                 color: sel ? Colors.white : AppColors.textoSecundario))));
       }).toList()),

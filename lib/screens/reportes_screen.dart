@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
+import '../i18n/tr.dart';
 
 class ReportesScreen extends StatefulWidget {
   const ReportesScreen({super.key});
@@ -37,16 +38,16 @@ class _ReportesScreenState extends State<ReportesScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Reportes',
+        title: Text(tr('Reportes'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         bottom: TabBar(
           controller: _tabCtrl,
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
-          tabs: const [
-            Tab(icon: Icon(Icons.table_chart_outlined, size: 16), text: 'Excel'),
-            Tab(icon: Icon(Icons.receipt_outlined, size: 16), text: 'Fiscal SAT'),
+          tabs: [
+            Tab(icon: Icon(Icons.table_chart_outlined, size: 16), text: tr('Excel')),
+            Tab(icon: Icon(Icons.receipt_outlined, size: 16), text: tr('Fiscal SAT')),
           ])),
       body: TabBarView(controller: _tabCtrl, children: [
         const _TabExcel(),
@@ -84,13 +85,13 @@ class _TabExcelState extends State<_TabExcel> {
         decoration: BoxDecoration(
           gradient: const LinearGradient(colors: [AppColors.azul, Color(0xFF2d5a8e)]),
           borderRadius: BorderRadius.circular(12)),
-        child: const Row(children: [
+        child: Row(children: [
           Text('📊', style: TextStyle(fontSize: 32)),
           SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Reportes Excel', style: TextStyle(
+            Text(tr('Reportes Excel'), style: TextStyle(
               fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
-            Text('Exporta cotizaciones, pedidos y gastos en .xlsx',
+            Text(tr('Exporta cotizaciones, pedidos y gastos en .xlsx'),
               style: TextStyle(fontSize: 12, color: Colors.white70)),
           ])),
         ])),
@@ -98,7 +99,7 @@ class _TabExcelState extends State<_TabExcel> {
       const SizedBox(height: 16),
 
       // Filtro fechas
-      _seccion('RANGO DE FECHAS'),
+      _seccion(tr('RANGO DE FECHAS')),
       Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: Colors.white,
@@ -106,16 +107,16 @@ class _TabExcelState extends State<_TabExcel> {
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(children: [
           Row(children: [
-            Expanded(child: _selectorFecha('Desde', _desde,
+            Expanded(child: _selectorFecha(tr('Desde'), _desde,
               (d) => setState(() => _desde = d))),
             const SizedBox(width: 10),
-            Expanded(child: _selectorFecha('Hasta', _hasta,
+            Expanded(child: _selectorFecha(tr('Hasta'), _hasta,
               (d) => setState(() => _hasta = d))),
           ]),
           const SizedBox(height: 10),
           SingleChildScrollView(scrollDirection: Axis.horizontal,
             child: Row(children: [
-              _btnRapido('Este mes', () => setState(() {
+              _btnRapido(tr('Este mes'), () => setState(() {
                 final h = DateTime.now();
                 _desde = DateTime(h.year, h.month, 1);
                 _hasta = DateTime(h.year, h.month + 1, 0);
@@ -125,11 +126,11 @@ class _TabExcelState extends State<_TabExcel> {
                 _desde = DateTime(h.year, h.month - 1, 1);
                 _hasta = DateTime(h.year, h.month, 0);
               })),
-              _btnRapido('3 meses', () => setState(() {
+              _btnRapido(tr('3 meses'), () => setState(() {
                 _desde = DateTime.now().subtract(const Duration(days: 90));
                 _hasta = DateTime.now();
               })),
-              _btnRapido('Este año', () => setState(() {
+              _btnRapido(tr('Este año'), () => setState(() {
                 _desde = DateTime(DateTime.now().year, 1, 1);
                 _hasta = DateTime(DateTime.now().year, 12, 31);
               })),
@@ -139,14 +140,14 @@ class _TabExcelState extends State<_TabExcel> {
       const SizedBox(height: 16),
 
       // Cotizaciones
-      _seccion('COTIZACIONES'),
+      _seccion(tr('COTIZACIONES')),
       Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Folio, cliente, productos, totales, estado, fecha.',
+          Text(tr('Folio, cliente, productos, totales, estado, fecha.'),
             style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
           const SizedBox(height: 10),
           const Text('Filtrar:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
@@ -161,26 +162,26 @@ class _TabExcelState extends State<_TabExcel> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: _estadoCot == e ? AppColors.azul : AppColors.grisBorde)),
-                child: Text(e, style: TextStyle(
+                child: Text(tr(e), style: TextStyle(
                   fontSize: 11,
                   color: _estadoCot == e ? Colors.white : AppColors.textoSecundario,
                   fontWeight: _estadoCot == e ? FontWeight.w600 : FontWeight.normal))))).toList()),
           const SizedBox(height: 14),
-          _btnExportar('Exportar cotizaciones .xlsx', AppColors.azul,
+          _btnExportar(tr('Exportar cotizaciones .xlsx'), AppColors.azul,
             _generando ? null : _exportarCotizaciones),
         ])),
 
       const SizedBox(height: 12),
 
       // Pedidos
-      _seccion('PEDIDOS'),
+      _seccion(tr('PEDIDOS')),
       Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Folio, cliente, total, etapa, fechas.',
+          Text(tr('Folio, cliente, total, etapa, fechas.'),
             style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
           const SizedBox(height: 10),
           Wrap(spacing: 6, runSpacing: 6,
@@ -193,11 +194,11 @@ class _TabExcelState extends State<_TabExcel> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: _estadoPed == e ? const Color(0xFF7c3aed) : AppColors.grisBorde)),
-                child: Text(e, style: TextStyle(
+                child: Text(tr(e), style: TextStyle(
                   fontSize: 11,
                   color: _estadoPed == e ? Colors.white : AppColors.textoSecundario))))).toList()),
           const SizedBox(height: 14),
-          _btnExportar('Exportar pedidos .xlsx', const Color(0xFF7c3aed),
+          _btnExportar(tr('Exportar pedidos .xlsx'), const Color(0xFF7c3aed),
             _generando ? null : _exportarPedidos),
         ])),
 
@@ -211,31 +212,31 @@ class _TabExcelState extends State<_TabExcel> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Concepto, categoría, tipo, monto, fecha.',
+          Text(tr('Concepto, categoría, tipo, monto, fecha.'),
             style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
           const SizedBox(height: 14),
-          _btnExportar('Exportar gastos .xlsx', AppColors.rojo,
+          _btnExportar(tr('Exportar gastos .xlsx'), AppColors.rojo,
             _generando ? null : _exportarGastos),
         ])),
 
       const SizedBox(height: 12),
 
       // Reporte completo
-      _seccion('REPORTE COMPLETO'),
+      _seccion(tr('REPORTE COMPLETO')),
       Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.verde.withOpacity(0.3))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
+          Row(children: [
             Icon(Icons.auto_awesome, color: AppColors.verde, size: 16),
             SizedBox(width: 6),
-            Text('4 pestañas: Resumen + Cotizaciones + Pedidos + Gastos',
+            Text(tr('4 pestañas: Resumen + Cotizaciones + Pedidos + Gastos'),
               style: TextStyle(fontSize: 12, color: AppColors.verde, fontWeight: FontWeight.w600)),
           ]),
           const SizedBox(height: 14),
-          _btnExportar('Exportar reporte completo', AppColors.verde,
+          _btnExportar(tr('Exportar reporte completo'), AppColors.verde,
             _generando ? null : _exportarCompleto),
         ])),
 
@@ -273,7 +274,7 @@ class _TabExcelState extends State<_TabExcel> {
         _cellNum(sheet, 8, r, c.total);
         _cell(sheet, 9, r, c.metodoPago ?? '');
       }
-      await _guardar(excel, 'Cotizaciones_${_fmtFecha.format(_desde)}');
+      await _guardar(excel, trf('Cotizaciones_{0}', [(_fmtFecha.format(_desde))]));
     } catch (e) { _error('$e'); }
     finally { if (mounted) setState(() => _generando = false); }
   }
@@ -305,7 +306,7 @@ class _TabExcelState extends State<_TabExcel> {
         _cell(sheet, 6, r, p.fechaEntregado != null ? _fmtFecha.format(p.fechaEntregado!) : '');
         _cell(sheet, 7, r, p.notasInternas ?? '');
       }
-      await _guardar(excel, 'Pedidos_${_fmtFecha.format(_desde)}');
+      await _guardar(excel, trf('Pedidos_{0}', [(_fmtFecha.format(_desde))]));
     } catch (e) { _error('$e'); }
     finally { if (mounted) setState(() => _generando = false); }
   }
@@ -333,7 +334,7 @@ class _TabExcelState extends State<_TabExcel> {
         _cell(sheet, 3, r, g['tipo'] ?? '');
         _cellNum(sheet, 4, r, (g['monto'] as num?)?.toDouble() ?? 0);
       }
-      await _guardar(excel, 'Gastos_${_fmtFecha.format(_desde)}');
+      await _guardar(excel, trf('Gastos_{0}', [(_fmtFecha.format(_desde))]));
     } catch (e) { _error('$e'); }
     finally { if (mounted) setState(() => _generando = false); }
   }
@@ -370,12 +371,12 @@ class _TabExcelState extends State<_TabExcel> {
       final tv = peds.where((p) => p.estado == 'Entregado')
         .fold(0.0, (s, p) => s + (p.total ?? 0));
       final tg = gasts.fold(0.0, (s, g) => s + ((g['monto'] as num?)?.toDouble() ?? 0));
-      _cell(res,0,1,'Período'); _cell(res,1,1,'${_fmtFecha.format(_desde)} al ${_fmtFecha.format(_hasta)}');
-      _cell(res,0,2,'Cotizaciones'); _cellNum(res,1,2,cots.length.toDouble());
-      _cell(res,0,3,'Pedidos'); _cellNum(res,1,3,peds.length.toDouble());
-      _cell(res,0,4,'Ventas entregadas'); _cellNum(res,1,4,tv);
-      _cell(res,0,5,'Total gastos'); _cellNum(res,1,5,tg);
-      _cell(res,0,6,'Utilidad neta'); _cellNum(res,1,6,tv-tg);
+      _cell(res,0,1,tr('Período')); _cell(res,1,1,'${_fmtFecha.format(_desde)} al ${_fmtFecha.format(_hasta)}');
+      _cell(res,0,2,tr('Cotizaciones')); _cellNum(res,1,2,cots.length.toDouble());
+      _cell(res,0,3,tr('Pedidos')); _cellNum(res,1,3,peds.length.toDouble());
+      _cell(res,0,4,tr('Ventas entregadas')); _cellNum(res,1,4,tv);
+      _cell(res,0,5,tr('Total gastos')); _cellNum(res,1,5,tg);
+      _cell(res,0,6,tr('Utilidad neta')); _cellNum(res,1,6,tv-tg);
 
       // Cotizaciones
       final sc = excel['Cotizaciones'];
@@ -412,7 +413,7 @@ class _TabExcelState extends State<_TabExcel> {
         _cellNum(sg,3,i+1,(g['monto'] as num?)?.toDouble()??0);
       }
 
-      await _guardar(excel, 'Reporte_Completo_${_fmtFecha.format(_desde)}');
+      await _guardar(excel, trf('Reporte_Completo_{0}', [(_fmtFecha.format(_desde))]));
     } catch (e) { _error('$e'); }
     finally { if (mounted) setState(() => _generando = false); }
   }
@@ -446,18 +447,18 @@ class _TabExcelState extends State<_TabExcel> {
     await archivo.writeAsBytes(bytes);
     if (mounted) {
       await Share.shareXFiles([XFile(archivo.path)],
-        text: 'Reporte HETNA CNC — $nombre');
+        text: trf('Reporte HETNA CNC — {0}', [nombre]));
     }
   }
 
   void _error(String msg) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: AppColors.rojo));
+      SnackBar(content: Text(tr(msg)), backgroundColor: AppColors.rojo));
   }
 
   Widget _seccion(String t) => Padding(
     padding: const EdgeInsets.only(bottom: 8, top: 4),
-    child: Text(t, style: const TextStyle(
+    child: Text(tr(t), style: const TextStyle(
       fontSize: 10, fontWeight: FontWeight.w700,
       color: AppColors.textoSecundario, letterSpacing: 1.5)));
 
@@ -471,7 +472,7 @@ class _TabExcelState extends State<_TabExcel> {
         child: _generando
           ? const SizedBox(width: 18, height: 18,
               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-          : Text(label,
+          : Text(tr(label),
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600))));
 
   Widget _selectorFecha(String label, DateTime fecha, void Function(DateTime) onChange) =>
@@ -488,7 +489,7 @@ class _TabExcelState extends State<_TabExcel> {
           border: Border.all(color: AppColors.grisBorde),
           borderRadius: BorderRadius.circular(8)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(
+          Text(tr(label), style: const TextStyle(
             fontSize: 10, color: AppColors.textoSecundario)),
           const SizedBox(height: 3),
           Row(children: [
@@ -507,7 +508,7 @@ class _TabExcelState extends State<_TabExcel> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: AppColors.azulClaro, borderRadius: BorderRadius.circular(20)),
-        child: Text(label, style: const TextStyle(
+        child: Text(tr(label), style: const TextStyle(
           fontSize: 11, color: AppColors.azul, fontWeight: FontWeight.w600))));
 }
 
@@ -588,13 +589,13 @@ class _TabFiscalState extends State<_TabFiscal> {
         decoration: BoxDecoration(
           gradient: const LinearGradient(colors: [Color(0xFF8B0000), Color(0xFFB71C1C)]),
           borderRadius: BorderRadius.circular(12)),
-        child: const Row(children: [
+        child: Row(children: [
           Text('🏛️', style: TextStyle(fontSize: 28)),
           SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Módulo Fiscal SAT', style: TextStyle(
+            Text(tr('Módulo Fiscal SAT'), style: TextStyle(
               fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white)),
-            Text('Estimado de impuestos. No sustituye declaración oficial.',
+            Text(tr('Estimado de impuestos. No sustituye declaración oficial.'),
               style: TextStyle(fontSize: 11, color: Colors.white70)),
           ])),
         ])),
@@ -608,12 +609,12 @@ class _TabFiscalState extends State<_TabFiscal> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Régimen fiscal', style: TextStyle(
+          Text(tr('Régimen fiscal'), style: TextStyle(
             fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
           const SizedBox(height: 10),
           Wrap(spacing: 8, children: [
-            _chipRegimen('RESICO', 'Régimen Simplificado de Confianza'),
-            _chipRegimen('Empresarial', 'Actividades Empresariales'),
+            _chipRegimen('RESICO', tr('Régimen Simplificado de Confianza')),
+            _chipRegimen(tr('Empresarial'), tr('Actividades Empresariales')),
           ]),
         ])),
 
@@ -626,22 +627,22 @@ class _TabFiscalState extends State<_TabFiscal> {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Período fiscal', style: TextStyle(
+          Text(tr('Período fiscal'), style: TextStyle(
             fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
           const SizedBox(height: 10),
           Row(children: [
-            Expanded(child: _selectorFecha('Desde', _desde,
+            Expanded(child: _selectorFecha(tr('Desde'), _desde,
               (d) { setState(() => _desde = d); _calcular(); })),
             const SizedBox(width: 10),
-            Expanded(child: _selectorFecha('Hasta', _hasta,
+            Expanded(child: _selectorFecha(tr('Hasta'), _hasta,
               (d) { setState(() => _hasta = d); _calcular(); })),
           ]),
           const SizedBox(height: 8),
           SingleChildScrollView(scrollDirection: Axis.horizontal,
             child: Row(children: [
-              _btnQ('Ene-Mar', 1, 3), _btnQ('Abr-Jun', 4, 6),
-              _btnQ('Jul-Sep', 7, 9), _btnQ('Oct-Dic', 10, 12),
-              _btnRapido('Este año', () { setState(() {
+              _btnQ(tr('Ene-Mar'), 1, 3), _btnQ(tr('Abr-Jun'), 4, 6),
+              _btnQ(tr('Jul-Sep'), 7, 9), _btnQ(tr('Oct-Dic'), 10, 12),
+              _btnRapido(tr('Este año'), () { setState(() {
                 _desde = DateTime(DateTime.now().year, 1, 1);
                 _hasta = DateTime(DateTime.now().year, 12, 31);
               }); _calcular(); }),
@@ -654,33 +655,33 @@ class _TabFiscalState extends State<_TabFiscal> {
         const Center(child: Padding(padding: EdgeInsets.all(20),
           child: CircularProgressIndicator()))
       else if (_res != null) ...[
-        _cardFiscal('💰 Ingresos y Gastos', [
-          _linea('Ingresos totales (${_res!['nPed']} pedidos)', _res!['ingresos'], color: AppColors.verde),
-          _linea('Gastos directos (materiales)', _res!['gDir'], color: AppColors.rojo),
-          _linea('Gastos indirectos (fijos)', _res!['gInd'], color: AppColors.rojo),
+        _cardFiscal(tr('💰 Ingresos y Gastos'), [
+          _linea(trf('Ingresos totales ({0} pedidos)', [(_res!['nPed'])]), _res!['ingresos'], color: AppColors.verde),
+          _linea(tr('Gastos directos (materiales)'), _res!['gDir'], color: AppColors.rojo),
+          _linea(tr('Gastos indirectos (fijos)'), _res!['gInd'], color: AppColors.rojo),
           const Divider(height: 14),
-          _linea('Utilidad / Base gravable', _res!['utilidad'], bold: true,
+          _linea(tr('Utilidad / Base gravable'), _res!['utilidad'], bold: true,
             color: (_res!['utilidad'] as double) >= 0 ? AppColors.verde : AppColors.rojo),
         ]),
         const SizedBox(height: 10),
-        _cardFiscal('🧾 IVA', [
-          _linea('IVA trasladado (cobrado 16%)', _res!['ivaTras']),
-          _linea('IVA acreditable (pagado en gastos)', _res!['ivaAcred']),
+        _cardFiscal(tr('🧾 IVA'), [
+          _linea(tr('IVA trasladado (cobrado 16%)'), _res!['ivaTras']),
+          _linea(tr('IVA acreditable (pagado en gastos)'), _res!['ivaAcred']),
           const Divider(height: 14),
-          _linea('IVA a cargo (pagar al SAT)', _res!['ivaC'], bold: true, color: AppColors.rojo),
+          _linea(tr('IVA a cargo (pagar al SAT)'), _res!['ivaC'], bold: true, color: AppColors.rojo),
           const SizedBox(height: 6),
-          _aviso('Declaración mensual — límite día 17 del mes siguiente.'),
+          _aviso(tr('Declaración mensual — límite día 17 del mes siguiente.')),
         ]),
         const SizedBox(height: 10),
-        _cardFiscal('🏦 ISR', [
-          _lineaTexto('Régimen', _regimen == 'RESICO'
-            ? 'RESICO — tasa sobre ingresos' : 'Empresarial — tasa sobre utilidad'),
-          _linea('Base de cálculo', _regimen == 'RESICO'
+        _cardFiscal(tr('🏦 ISR'), [
+          _lineaTexto(tr('Régimen'), _regimen == 'RESICO'
+            ? tr('RESICO — tasa sobre ingresos') : tr('Empresarial — tasa sobre utilidad')),
+          _linea(tr('Base de cálculo'), _regimen == 'RESICO'
             ? _res!['ingresos'] : _res!['utilidad']),
           const Divider(height: 14),
-          _linea('ISR estimado', _res!['isr'], bold: true, color: AppColors.rojo),
+          _linea(tr('ISR estimado'), _res!['isr'], bold: true, color: AppColors.rojo),
           const SizedBox(height: 6),
-          _aviso('Pago provisional mensual. Declaración anual en Abril.'),
+          _aviso(tr('Pago provisional mensual. Declaración anual en Abril.')),
         ]),
         const SizedBox(height: 10),
         Container(
@@ -689,33 +690,33 @@ class _TabFiscalState extends State<_TabFiscal> {
             color: const Color(0xFF8B0000),
             borderRadius: BorderRadius.circular(12)),
           child: Column(children: [
-            const Text('TOTAL ESTIMADO A PAGAR AL SAT',
+            Text(tr('TOTAL ESTIMADO A PAGAR AL SAT'),
               style: TextStyle(fontSize: 11, color: Colors.white70, letterSpacing: 1)),
             const SizedBox(height: 8),
             Text(_fmt.format((_res!['ivaC'] as double) + (_res!['isr'] as double)),
               style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Colors.white)),
             const SizedBox(height: 4),
-            Text('IVA: ${_fmt.format(_res!['ivaC'])}  +  ISR: ${_fmt.format(_res!['isr'])}',
+            Text(trf('IVA: {0}  +  ISR: {1}', [(_fmt.format(_res!['ivaC'])), (_fmt.format(_res!['isr']))]),
               style: const TextStyle(fontSize: 11, color: Colors.white70)),
           ])),
         const SizedBox(height: 10),
-        _cardFiscal('📋 Checklist SAT', [
-          _check('Declaración IVA mensual (día 17)', true),
-          _check('Pago provisional ISR mensual (día 17)', true),
-          _check('DIOT mensual (proveedores)', true),
-          _check('Declaración anual ISR (Abril)', false),
-          _check('Contabilidad electrónica (trimestral)', false),
+        _cardFiscal(tr('📋 Checklist SAT'), [
+          _check(tr('Declaración IVA mensual (día 17)'), true),
+          _check(tr('Pago provisional ISR mensual (día 17)'), true),
+          _check(tr('DIOT mensual (proveedores)'), true),
+          _check(tr('Declaración anual ISR (Abril)'), false),
+          _check(tr('Contabilidad electrónica (trimestral)'), false),
         ]),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: AppColors.ambarClaro,
             borderRadius: BorderRadius.circular(10)),
-          child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('⚠️', style: TextStyle(fontSize: 14)),
             SizedBox(width: 8),
             Expanded(child: Text(
-              'Estimación orientativa. Consulta con tu contador para la declaración oficial.',
+              tr('Estimación orientativa. Consulta con tu contador para la declaración oficial.'),
               style: TextStyle(fontSize: 11, color: Color(0xFF854f0b)))),
           ])),
         const SizedBox(height: 10),
@@ -723,7 +724,7 @@ class _TabFiscalState extends State<_TabFiscal> {
           child: ElevatedButton.icon(
             onPressed: _exportarFiscal,
             icon: const Icon(Icons.download_outlined, color: Colors.white, size: 16),
-            label: const Text('Exportar reporte fiscal .xlsx',
+            label: Text(tr('Exportar reporte fiscal .xlsx'),
               style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF8B0000),
@@ -748,10 +749,10 @@ class _TabFiscalState extends State<_TabFiscal> {
         if (bold) cell.cellStyle = CellStyle(bold: true);
       }
 
-      wc(0, 0, 'REPORTE FISCAL ESTIMADO — HETNA CNC', bold: true);
-      wc(0, 1, 'Período: ${_fmtFecha.format(_desde)} al ${_fmtFecha.format(_hasta)}');
+      wc(0, 0, tr('REPORTE FISCAL ESTIMADO — HETNA CNC'), bold: true);
+      wc(0, 1, trf('Período: {0} al {1}', [(_fmtFecha.format(_desde)), (_fmtFecha.format(_hasta))]));
       wc(0, 2, 'Régimen: $_regimen');
-      wc(0, 4, 'CONCEPTO', bold: true); wc(1, 4, 'MONTO', bold: true);
+      wc(0, 4, tr('CONCEPTO'), bold: true); wc(1, 4, 'MONTO', bold: true);
 
       final filas = [
         ['Ingresos totales', _fmt.format(_res!['ingresos'])],
@@ -780,7 +781,7 @@ class _TabFiscalState extends State<_TabFiscal> {
       if (!await dir.exists()) await dir.create(recursive: true);
       final archivo = File('${dir.path}/ReporteFiscal_${DateFormat('ddMMyyyy').format(_desde)}.xlsx');
       await archivo.writeAsBytes(bytes);
-      if (mounted) await Share.shareXFiles([XFile(archivo.path)], text: 'Reporte Fiscal SAT');
+      if (mounted) await Share.shareXFiles([XFile(archivo.path)], text: tr('Reporte Fiscal SAT'));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
@@ -798,10 +799,10 @@ class _TabFiscalState extends State<_TabFiscal> {
         border: Border.all(
           color: _regimen == clave ? const Color(0xFF8B0000) : AppColors.grisBorde)),
       child: Column(children: [
-        Text(clave, style: TextStyle(
+        Text(tr(clave), style: TextStyle(
           fontSize: 12, fontWeight: FontWeight.w700,
           color: _regimen == clave ? Colors.white : AppColors.textoPrincipal)),
-        Text(label, style: TextStyle(
+        Text(tr(label), style: TextStyle(
           fontSize: 10, color: _regimen == clave ? Colors.white70 : AppColors.textoSecundario)),
       ])));
 
@@ -811,7 +812,7 @@ class _TabFiscalState extends State<_TabFiscal> {
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(titulo, style: const TextStyle(
+      Text(tr(titulo), style: const TextStyle(
         fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
       const SizedBox(height: 12),
       ...items,
@@ -820,7 +821,7 @@ class _TabFiscalState extends State<_TabFiscal> {
   Widget _linea(String label, double monto, {bool bold=false, Color? color}) =>
     Padding(padding: const EdgeInsets.only(bottom: 8),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Expanded(child: Text(label, style: TextStyle(
+        Expanded(child: Text(tr(label), style: TextStyle(
           fontSize: 12, fontWeight: bold ? FontWeight.w700 : FontWeight.normal))),
         Text(_fmt.format(monto), style: TextStyle(
           fontSize: 12, fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
@@ -830,8 +831,8 @@ class _TabFiscalState extends State<_TabFiscal> {
   Widget _lineaTexto(String label, String valor) =>
     Padding(padding: const EdgeInsets.only(bottom: 8),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: const TextStyle(fontSize: 12)),
-        Expanded(child: Text(valor, textAlign: TextAlign.right,
+        Text(tr(label), style: const TextStyle(fontSize: 12)),
+        Expanded(child: Text(tr(valor), textAlign: TextAlign.right,
           style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
       ]));
 
@@ -839,7 +840,7 @@ class _TabFiscalState extends State<_TabFiscal> {
     padding: const EdgeInsets.all(8),
     decoration: BoxDecoration(
       color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
-    child: Text(texto, style: const TextStyle(fontSize: 11, color: AppColors.azul)));
+    child: Text(tr(texto), style: const TextStyle(fontSize: 11, color: AppColors.azul)));
 
   Widget _check(String texto, bool mensual) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
@@ -847,13 +848,13 @@ class _TabFiscalState extends State<_TabFiscal> {
       Icon(Icons.check_circle_outline, size: 16,
         color: mensual ? AppColors.verde : AppColors.ambar),
       const SizedBox(width: 8),
-      Expanded(child: Text(texto, style: const TextStyle(fontSize: 12))),
+      Expanded(child: Text(tr(texto), style: const TextStyle(fontSize: 12))),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: mensual ? AppColors.verde.withOpacity(0.1) : AppColors.ambar.withOpacity(0.1),
           borderRadius: BorderRadius.circular(10)),
-        child: Text(mensual ? 'Mensual' : 'Anual',
+        child: Text(tr(mensual ? tr('Mensual') : tr('Anual')),
           style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600,
             color: mensual ? AppColors.verde : AppColors.ambar))),
     ]));
@@ -871,7 +872,7 @@ class _TabFiscalState extends State<_TabFiscal> {
           border: Border.all(color: AppColors.grisBorde),
           borderRadius: BorderRadius.circular(8)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+          Text(tr(label), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           const SizedBox(height: 3),
           Row(children: [
             const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.azul),
@@ -895,6 +896,6 @@ class _TabFiscalState extends State<_TabFiscal> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           color: const Color(0xFFfce8e8), borderRadius: BorderRadius.circular(20)),
-        child: Text(label, style: const TextStyle(
+        child: Text(tr(label), style: const TextStyle(
           fontSize: 11, color: Color(0xFF8B0000), fontWeight: FontWeight.w600))));
 }

@@ -10,13 +10,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../services/hetna_api.dart';
+import '../i18n/tr.dart';
 
 class EnvioElegido {
   final String? cotizacionId;
   final OpcionEnvio opcion;
   EnvioElegido(this.cotizacionId, this.opcion);
   String get descripcion => '${opcion.paqueteria} ${opcion.servicio}'
-    '${opcion.dias != null ? ' (${opcion.dias} días)' : ''}';
+    '${opcion.dias != null ? trf(' ({0} días)', [(opcion.dias)]) : ''}';
 }
 
 class EnviosScreen extends StatefulWidget {
@@ -85,11 +86,11 @@ class _EnviosScreenState extends State<EnviosScreen> {
     FocusScope.of(context).unfocus();
     final peso = _n(_peso), l = _n(_largo), a = _n(_ancho), h = _n(_alto);
     if (_cpO.text.length != 5 || _cpD.text.length != 5) {
-      setState(() => _error = 'Escribe los dos códigos postales (5 dígitos).');
+      setState(() => _error = tr('Escribe los dos códigos postales (5 dígitos).'));
       return;
     }
     if (peso == null || l == null || a == null || h == null) {
-      setState(() => _error = 'Revisa el peso y las medidas.');
+      setState(() => _error = tr('Revisa el peso y las medidas.'));
       return;
     }
     setState(() { _cargando = true; _error = null; _res = null; });
@@ -103,7 +104,7 @@ class _EnviosScreenState extends State<EnviosScreen> {
         await p.setString('envio_cp_origen', _cpO.text);
         if (_colO != null) await p.setString('envio_colonia_origen', _colO!);
       } catch (_) {}
-      if (mounted) setState(() { _res = r; if (r.opciones.isEmpty) _error = r.aviso ?? 'No hay paqueterías para esa ruta.'; });
+      if (mounted) setState(() { _res = r; if (r.opciones.isEmpty) _error = r.aviso ?? tr('No hay paqueterías para esa ruta.'); });
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     } finally {
@@ -115,23 +116,23 @@ class _EnviosScreenState extends State<EnviosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.gris,
-      appBar: AppBar(title: const Text('Envíos HETNA'),
+      appBar: AppBar(title: Text(tr('Envíos HETNA')),
         backgroundColor: Colors.white, foregroundColor: AppColors.azul, elevation: 0.5),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        _caja('Origen', _cpO, _infoO, _colO, (v) => setState(() => _colO = v), true),
-        _caja('Destino', _cpD, _infoD, _colD, (v) => setState(() => _colD = v), false),
-        _bloque('Paquete', Column(children: [
+        _caja(tr('Origen'), _cpO, _infoO, _colO, (v) => setState(() => _colO = v), true),
+        _caja(tr('Destino'), _cpD, _infoD, _colD, (v) => setState(() => _colD = v), false),
+        _bloque(tr('Paquete'), Column(children: [
           DropdownButtonFormField<String>(
             value: _tipo, isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Tipo de empaque', isDense: true, border: OutlineInputBorder()),
-            items: _empaques.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+            decoration: InputDecoration(labelText: tr('Tipo de empaque'), isDense: true, border: OutlineInputBorder()),
+            items: _empaques.map((e) => DropdownMenuItem(value: e, child: Text(tr(e)))).toList(),
             onChanged: (v) => setState(() => _tipo = v ?? _tipo)),
           const SizedBox(height: 10),
           Row(children: [
-            _num(_peso, 'Peso', 'kg'), const SizedBox(width: 6),
-            _num(_largo, 'Largo', 'cm'), const SizedBox(width: 6),
-            _num(_ancho, 'Ancho', 'cm'), const SizedBox(width: 6),
-            _num(_alto, 'Alto', 'cm'),
+            _num(_peso, tr('Peso'), 'kg'), const SizedBox(width: 6),
+            _num(_largo, tr('Largo'), 'cm'), const SizedBox(width: 6),
+            _num(_ancho, tr('Ancho'), 'cm'), const SizedBox(width: 6),
+            _num(_alto, tr('Alto'), 'cm'),
           ]),
         ])),
         const SizedBox(height: 4),
@@ -140,7 +141,7 @@ class _EnviosScreenState extends State<EnviosScreen> {
           icon: _cargando
             ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.local_shipping_outlined, color: Colors.white),
-          label: const Text('Cotizar envío', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          label: Text(tr('Cotizar envío'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.naranja,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))))),
         if (_error != null) Padding(padding: const EdgeInsets.only(top: 12),
@@ -148,7 +149,7 @@ class _EnviosScreenState extends State<EnviosScreen> {
         if (_res != null && _res!.opciones.isNotEmpty) ...[
           const SizedBox(height: 16),
           Text('${_res!.opciones.length} opciones'
-            '${_res!.pesoCobrado != null ? ' · peso cobrado ${_res!.pesoCobrado} kg' : ''}',
+            '${_res!.pesoCobrado != null ? trf(' · peso cobrado {0} kg', [(_res!.pesoCobrado)]) : ''}',
             style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
           const SizedBox(height: 8),
           ..._res!.opciones.map(_opcion),
@@ -164,20 +165,20 @@ class _EnviosScreenState extends State<EnviosScreen> {
     child: Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(o.paqueteria, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-        Text('${o.servicio}${o.dias != null ? ' · ${o.dias} días' : ''}'
-          '${o.recoleccion ? ' · recolección' : ''}',
+        Text('${o.servicio}${o.dias != null ? trf(' · {0} días', [(o.dias)]) : ''}'
+          '${o.recoleccion ? tr(' · recolección') : ''}',
           style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
       ])),
       Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
         Text(_fmt.format(o.precio), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppColors.azul)),
         if (widget.paraCotizacion)
           TextButton(onPressed: () => Navigator.pop(context, EnvioElegido(_res?.id, o)),
-            child: const Text('Usar en cotización'))
+            child: Text(tr('Usar en cotización')))
         else if (_res?.id != null)
           TextButton(
             onPressed: () => launchUrl(Uri.parse(HetnaApi.urlSolicitarEnvio(_res!.id!, o.tarifaId)),
               mode: LaunchMode.externalApplication),
-            child: const Text('Comprar guía')),
+            child: Text(tr('Comprar guía'))),
       ]),
     ]));
 
@@ -185,7 +186,7 @@ class _EnviosScreenState extends State<EnviosScreen> {
       ValueChanged<String?> onCol, bool origen) =>
     _bloque(titulo, Column(children: [
       TextField(controller: cp, keyboardType: TextInputType.number, maxLength: 5,
-        decoration: InputDecoration(labelText: 'Código postal', isDense: true, counterText: '',
+        decoration: InputDecoration(labelText: tr('Código postal'), isDense: true, counterText: '',
           border: const OutlineInputBorder(),
           helperText: info != null ? '${info.municipio}, ${info.estado}' : null),
         onChanged: (v) { if (v.length == 5) _buscarCP(origen); }),
@@ -193,8 +194,8 @@ class _EnviosScreenState extends State<EnviosScreen> {
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
           value: col, isExpanded: true,
-          decoration: const InputDecoration(labelText: 'Colonia', isDense: true, border: OutlineInputBorder()),
-          items: info.colonias.map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis))).toList(),
+          decoration: InputDecoration(labelText: tr('Colonia'), isDense: true, border: OutlineInputBorder()),
+          items: info.colonias.map((c) => DropdownMenuItem(value: c, child: Text(tr(c), overflow: TextOverflow.ellipsis))).toList(),
           onChanged: onCol),
       ],
     ]));
@@ -209,7 +210,7 @@ class _EnviosScreenState extends State<EnviosScreen> {
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(t, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul)),
+      Text(tr(t), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul)),
       const SizedBox(height: 10),
       child,
     ]));
