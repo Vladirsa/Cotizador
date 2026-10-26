@@ -46,7 +46,9 @@ Future<void> cargarIdioma() async {
 String tr(String es) => enIngles ? (textosEn[es] ?? es) : es;
 
 /// Igual que tr() pero con valores: trf('Hola {0}', [nombre])
-String trf(String es, List<Object?> valores) => _rellenar(tr(es), valores);
+/// Los valores que también son textos de la app (p. ej. 'ESTE MES') se traducen.
+String trf(String es, List<Object?> valores) => _rellenar(
+    tr(es), enIngles ? [for (final v in valores) v is String ? tr(v) : v] : valores);
 
 /// Para documentos con su propio idioma (p. ej. el PDF de una cotización).
 String trIdioma(String es, bool ingles) => ingles ? (textosEn[es] ?? es) : es;
