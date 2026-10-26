@@ -431,7 +431,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                       prefixIcon: Icon(Icons.account_balance_outlined, size: 18, color: AppColors.azul)),
                     items: _regimenesFiscales.entries.map((e) =>
                       DropdownMenuItem(value: e.key,
-                        child: Text(e.value, style: const TextStyle(fontSize: 12)))).toList(),
+                        child: Text(tr(e.value), style: const TextStyle(fontSize: 12)))).toList(),
                     onChanged: (v) => setState(() => _regimenFiscal = v!))),
 
                 // Serie

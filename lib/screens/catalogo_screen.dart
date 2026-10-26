@@ -261,7 +261,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
                           if (v == true) _seleccionados.add(p.id!);
                           else _seleccionados.remove(p.id);
                         }),
-                        title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        title: Text(tr(p.nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                         subtitle: Text(
                           '${_fmt.format(p.precioVenta)} • ${p.categoriaNombre ?? ''}',
                           style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
@@ -487,7 +487,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
             child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo, size: 24)),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(pdf.nombre,
+            Text(tr(pdf.nombre),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
               maxLines: 1, overflow: TextOverflow.ellipsis),
             Row(children: [
@@ -498,11 +498,11 @@ class _CatalogoScreenState extends State<CatalogoScreen>
                   decoration: BoxDecoration(
                     color: AppColors.azul.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20)),
-                  child: Text(pdf.categoria!,
+                  child: Text(tr(pdf.categoria!),
                     style: const TextStyle(fontSize: 10, color: AppColors.azul, fontWeight: FontWeight.w500))),
               if (pdf.tamanoTexto.isNotEmpty)
                 Padding(padding: const EdgeInsets.only(top: 3),
-                  child: Text(pdf.tamanoTexto,
+                  child: Text(tr(pdf.tamanoTexto),
                     style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario))),
             ]),
           ])),

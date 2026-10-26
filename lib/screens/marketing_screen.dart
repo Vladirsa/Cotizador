@@ -997,7 +997,7 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                   labelText: tr('¿Para qué mensaje automático es? (opcional)'),
                   border: OutlineInputBorder()),
                 items: _tiposAutomaticos.entries.map((e) => DropdownMenuItem(
-                  value: e.key, child: Text(e.value, style: const TextStyle(fontSize: 12)))).toList(),
+                  value: e.key, child: Text(tr(e.value), style: const TextStyle(fontSize: 12)))).toList(),
                 onChanged: (v) => setS(() => tipoSel = v ?? '')),
               const SizedBox(height: 4),
               Text(tr('Si eliges una opción distinta a "Ninguno", este mensaje reemplaza el texto por defecto justo en ese momento automático (ej. cuando el pedido pasa a producción).'),

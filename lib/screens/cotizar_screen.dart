@@ -196,7 +196,7 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
                   color: activo ? (e == 'Todos' ? AppColors.azul : color) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: activo ? (e == 'Todos' ? AppColors.azul : color) : AppColors.grisBorde)),
-                child: Text('$e ($count)', style: TextStyle(fontSize: 11,
+                child: Text('${tr(e)} ($count)', style: TextStyle(fontSize: 11,
                   color: activo ? Colors.white : AppColors.textoSecundario,
                   fontWeight: activo ? FontWeight.w600 : FontWeight.normal))));
           }).toList()))),
@@ -253,14 +253,14 @@ class _TarjetaCotizacion extends StatelessWidget {
             const SizedBox(height: 4),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(cotizacion.estado, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+              child: Text(tr(cotizacion.estado), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(tr(monto > 0 ? fmt.format(monto) : tr('Sin monto')),
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
                 color: monto > 0 ? AppColors.azul : AppColors.textoSecundario)),
             if (cotizacion.items.isNotEmpty)
-              Text('${cotizacion.items.length} producto${cotizacion.items.length > 1 ? "s" : ""}',
+              Text(trf(cotizacion.items.length > 1 ? '{0} productos' : '{0} producto', [cotizacion.items.length]),
                 style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             const SizedBox(height: 4),
             GestureDetector(
@@ -649,8 +649,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             leading: CircleAvatar(backgroundColor: AppColors.azulClaro,
               child: Text(_cliente!.nombre[0].toUpperCase(),
                 style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
-            title: Text(_cliente!.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-            subtitle: Text(_cliente!.tipoCliente),
+            title: Text(tr(_cliente!.nombreCompleto), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            subtitle: Text(tr(_cliente!.tipoCliente)),
             trailing: TextButton(onPressed: _seleccionarCliente, child: Text(tr('Cambiar'))))),
       _bloque(tr('Fecha de cotización'), Icons.calendar_today_outlined,
         GestureDetector(
@@ -1254,14 +1254,14 @@ class _ItemRow extends StatelessWidget {
             onTap: () => _editarDetalle(context),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Flexible(child: Text(item.nombreProducto,
+                Flexible(child: Text(tr(item.nombreProducto),
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
                 const SizedBox(width: 4),
                 const Icon(Icons.edit_outlined, size: 13, color: AppColors.textoSecundario),
               ]),
               if (item.descripcion != null && item.descripcion!.isNotEmpty)
                 Padding(padding: const EdgeInsets.only(top: 2),
-                  child: Text(item.descripcion!,
+                  child: Text(tr(item.descripcion!),
                     style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
                     maxLines: 2, overflow: TextOverflow.ellipsis)),
             ]))),
@@ -1352,8 +1352,8 @@ class _SelectorClienteState extends State<_SelectorCliente> {
               leading: CircleAvatar(backgroundColor: AppColors.azulClaro,
                 child: Text(c.nombre[0].toUpperCase(),
                   style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
-              title: Text(c.nombreCompleto, style: const TextStyle(fontSize: 13)),
-              subtitle: Text(c.tipoCliente, style: const TextStyle(fontSize: 11)),
+              title: Text(tr(c.nombreCompleto), style: const TextStyle(fontSize: 13)),
+              subtitle: Text(tr(c.tipoCliente), style: const TextStyle(fontSize: 11)),
               trailing: c.whatsappNumero.isNotEmpty
                 ? const Icon(Icons.chat, color: Color(0xFF25D366), size: 18) : null,
               onTap: () { widget.onSeleccionado(c); Navigator.pop(context); });
@@ -1431,7 +1431,7 @@ class _SelectorProductoState extends State<_SelectorProducto> {
               itemBuilder: (_, i) {
                 final p = _filtrados[i];
                 return ListTile(
-                  title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                  title: Text(tr(p.nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                   subtitle: Text(tr(p.categoriaNombre ?? p.unidadMedida), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                   trailing: Text('\$${p.precioVenta.toStringAsFixed(0)}',
                     style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul, fontSize: 15)),
@@ -1580,7 +1580,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                       if (v == true) _seleccionados.add(p.id!);
                       else _seleccionados.remove(p.id);
                     }),
-                    title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                    title: Text(tr(p.nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                     subtitle: Text('${_fmt.format(p.precioVenta)} • ${p.categoriaNombre ?? ""}',
                       style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                     activeColor: AppColors.azul, dense: true);
@@ -1677,7 +1677,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                           leading: Container(width: 38, height: 38,
                             decoration: BoxDecoration(color: AppColors.rojoClaro, borderRadius: BorderRadius.circular(8)),
                             child: const Icon(Icons.picture_as_pdf, color: AppColors.rojo, size: 20)),
-                          title: Text(pdf.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                          title: Text(tr(pdf.nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                           subtitle: Text('${pdf.categoria ?? ""} ${pdf.tamanoTexto}',
                             style: const TextStyle(fontSize: 10)),
                           trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textoSecundario),
@@ -1741,7 +1741,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                             decoration: BoxDecoration(color: AppColors.azul.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                             child: const Icon(Icons.list_alt, color: AppColors.azul, size: 20)),
                           title: Text(tr(cat['nombre'] ?? ''), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                          subtitle: Text('${ids.length} productos', style: const TextStyle(fontSize: 10)),
+                          subtitle: Text(trf('{0} productos', [ids.length]), style: const TextStyle(fontSize: 10)),
                           trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textoSecundario),
                             onPressed: () async {
                               await SupabaseService.eliminarCatalogoPersonalizado(cat['id']);
@@ -1877,9 +1877,9 @@ class _ContactosPickerState extends State<_ContactosPicker> {
                   child: Text(
                     tr(c.displayName.isNotEmpty ? c.displayName[0].toUpperCase() : '?'),
                     style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
-                title: Text(c.displayName,
+                title: Text(tr(c.displayName),
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                subtitle: Text(c.phones.first.number,
+                subtitle: Text(tr(c.phones.first.number),
                   style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                 onTap: () {
                   Navigator.pop(ctx);

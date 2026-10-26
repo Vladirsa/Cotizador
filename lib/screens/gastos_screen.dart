@@ -698,12 +698,12 @@ class _TarjetaGasto extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
           child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(gasto.concepto,
+              Text(tr(gasto.concepto),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 maxLines: 2, overflow: TextOverflow.ellipsis),
               if (gasto.proveedor != null) ...[
                 const SizedBox(height: 2),
-                Text(gasto.proveedor!,
+                Text(tr(gasto.proveedor!),
                   style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
               ],
               const SizedBox(height: 4),

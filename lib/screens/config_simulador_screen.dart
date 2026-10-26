@@ -90,10 +90,10 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
           color: Colors.white, borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.grisBorde, width: 0.5)),
         child: Row(children: [
-          Text(s.emoji, style: const TextStyle(fontSize: 28)),
+          Text(tr(s.emoji), style: const TextStyle(fontSize: 28)),
           const SizedBox(width: 14),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s.nombre, style: const TextStyle(
+            Text(tr(s.nombre), style: const TextStyle(
               fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.azul)),
             Text(tr('Toca para configurar'), style: const TextStyle(
               fontSize: 11, color: AppColors.textoSecundario)),
@@ -115,7 +115,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
         child: Row(children: [
           const Icon(Icons.arrow_back_ios, size: 16, color: AppColors.azul),
           const SizedBox(width: 6),
-          Text('${_servicioSel!.emoji} ${_servicioSel!.nombre}',
+          Text('${_servicioSel!.emoji} ${tr(_servicioSel!.nombre)}',
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         ])),
       const SizedBox(height: 16),
@@ -396,7 +396,7 @@ class _ConfigSimuladorScreenState extends State<ConfigSimuladorScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(children: [
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(tr(t.nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           Text(trf('Factor de complejidad: {0}', [(t.factor)]),
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ])),

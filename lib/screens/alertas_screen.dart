@@ -115,7 +115,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
                           color: activo ? color : Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: activo ? color : AppColors.grisBorde)),
-                        child: Text('$label ($count)',
+                        child: Text('${tr(label)} ($count)',
                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                             color: activo ? Colors.white : AppColors.textoSecundario))));
                   }).toList()))),
@@ -288,7 +288,7 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
                 Icon(sel ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                   size: 16, color: sel ? AppColors.azul : AppColors.textoSecundario),
                 const SizedBox(width: 10),
-                Text(e.value,
+                Text(tr(e.value),
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                     color: sel ? AppColors.azul : AppColors.textoPrincipal)),
               ])));
@@ -483,7 +483,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
               if (a.clienteNombre != null)
-                Text(a.clienteNombre!,
+                Text(tr(a.clienteNombre!),
                   style: TextStyle(fontSize: 11, color: color),
                   maxLines: 1, overflow: TextOverflow.ellipsis),
               if (a.fechaProgramada != null)

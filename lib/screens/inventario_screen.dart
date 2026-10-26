@@ -108,7 +108,7 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   if (hayBajos) const Padding(padding: EdgeInsets.only(right: 3),
                     child: Icon(Icons.warning_amber, size: 11, color: AppColors.rojo)),
-                  Text('$cat ($count)', style: TextStyle(fontSize: 10,
+                  Text('${tr(cat)} ($count)', style: TextStyle(fontSize: 10,
                     color: activo ? Colors.white : AppColors.textoSecundario)),
                 ])));
           }).toList()))),
@@ -360,7 +360,7 @@ class _TarjetaMaterial extends StatelessWidget {
             size: 18, color: bajStock ? AppColors.rojo : AppColors.azul))),
         title: Text(tr(material['nombre'] ?? ''), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         subtitle: Row(children: [
-          Text('${material['categoria']}', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+          Text(tr('${material['categoria']}'), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           if (costo > 0) ...[
             const Text(' · ', style: TextStyle(color: AppColors.textoSecundario)),
             Text(fmt.format(costo), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),

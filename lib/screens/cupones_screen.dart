@@ -203,7 +203,7 @@ class _CuponesScreenState extends State<CuponesScreen> {
   Widget _detalle(String label, String valor) => Padding(
     padding: const EdgeInsets.only(bottom: 3),
     child: Row(children: [
-      Text('$label: ', style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      Text('${tr(label)}: ', style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       Text(tr(valor), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textoPrincipal)),
     ]));
 }

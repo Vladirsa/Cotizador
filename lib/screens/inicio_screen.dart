@@ -424,7 +424,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           final pct = totalGastos > 0 ? e.value / totalGastos : 0.0;
           return Padding(padding: const EdgeInsets.only(bottom: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(e.key, style: const TextStyle(fontSize: 12)),
+              Text(tr(e.key), style: const TextStyle(fontSize: 12)),
               Text(_fmt.format(e.value), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.azul)),
             ]),
             const SizedBox(height: 4),
@@ -542,7 +542,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                     child: Row(children: [
                       Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
                       const SizedBox(width: 6),
-                      Expanded(child: Text(e.key, style: const TextStyle(fontSize: 11))),
+                      Expanded(child: Text(tr(e.key), style: const TextStyle(fontSize: 11))),
                       Text('${e.value}', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
                     ]));
                 }).toList(),
@@ -618,11 +618,11 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           child: Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(tr(p.cliente?.nombre ?? '—'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              Text(p.folio, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+              Text(tr(p.folio), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
               const SizedBox(height: 3),
               Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(color: AppColors.verde.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text(p.estado, style: const TextStyle(fontSize: 10, color: AppColors.verde, fontWeight: FontWeight.w500))),
+                child: Text(tr(p.estado), style: const TextStyle(fontSize: 10, color: AppColors.verde, fontWeight: FontWeight.w500))),
             ])),
             Text(_fmt.format(p.total ?? 0),
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
@@ -701,7 +701,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: activo ? (e == 'Todos' ? AppColors.azul : color) : AppColors.grisBorde)),
-                  child: Text('$e ($count)', style: TextStyle(fontSize: 11,
+                  child: Text('${tr(e)} ($count)', style: TextStyle(fontSize: 11,
                     color: activo ? Colors.white : AppColors.textoSecundario,
                     fontWeight: activo ? FontWeight.w600 : FontWeight.normal))));
             }).toList()))),
@@ -929,7 +929,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           child: Text(tr('Sin materiales con estos filtros'),
             style: TextStyle(color: AppColors.textoSecundario, fontSize: 13)))
       else ...[
-        Text('${materiales.length} resultado${materiales.length != 1 ? "s" : ""}',
+        Text(trf(materiales.length == 1 ? '{0} resultado' : '{0} resultados', [materiales.length]),
           style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
         const SizedBox(height: 6),
         ...categoriasFiltradas.map((cat) {
@@ -1087,7 +1087,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                 ClipRRect(borderRadius: BorderRadius.circular(3), child: LinearProgressIndicator(
                   value: pct, backgroundColor: AppColors.gris, minHeight: 5,
                   valueColor: const AlwaysStoppedAnimation(AppColors.azul))),
-                Text('${p['cantidad']} unidades', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+                Text(trf('{0} unidades', [p['cantidad']]), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
               ])),
               const SizedBox(width: 10),
               Text(_fmt.format(p['total']),
@@ -1175,7 +1175,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(tr(nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-            Text(p.folio, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+            Text(tr(p.folio), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(_fmt.format(p.total ?? 0), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
@@ -1211,7 +1211,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
           const SizedBox(height: 4),
           Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-            child: Text(c.estado, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+            child: Text(tr(c.estado), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(_fmt.format(c.total > 0 ? c.total : 0),

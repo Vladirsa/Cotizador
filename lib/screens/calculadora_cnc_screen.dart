@@ -69,8 +69,8 @@ class _CalculadoraCncScreenState extends State<CalculadoraCncScreen> {
                   side: const BorderSide(color: AppColors.grisBorde, width: 0.5)),
                 child: ListTile(
                   leading: Icon(_iconos[c.maquina] ?? Icons.calculate_outlined, color: AppColors.naranja),
-                  title: Text(c.nombre, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  subtitle: Text(c.resumen, style: const TextStyle(fontSize: 12)),
+                  title: Text(tr(c.nombre), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  subtitle: Text(tr(c.resumen), style: const TextStyle(fontSize: 12)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(context,
                     MaterialPageRoute(builder: (_) => _FormularioCalc(def: c)))))),
@@ -134,7 +134,7 @@ class _FormularioCalcState extends State<_FormularioCalc> {
     final d = widget.def;
     return Scaffold(
       backgroundColor: AppColors.gris,
-      appBar: AppBar(title: Text(d.nombre, style: const TextStyle(fontSize: 15)),
+      appBar: AppBar(title: Text(tr(d.nombre), style: const TextStyle(fontSize: 15)),
         backgroundColor: Colors.white, foregroundColor: AppColors.azul, elevation: 0.5),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         ...d.campos.map((c) => Padding(padding: const EdgeInsets.only(bottom: 10), child: c.tipo == 'opcion'
@@ -142,7 +142,7 @@ class _FormularioCalcState extends State<_FormularioCalc> {
               value: _opc[c.k], isExpanded: true,
               decoration: InputDecoration(labelText: '${c.etiqueta}${c.req ? ' *' : ''}',
                 isDense: true, border: const OutlineInputBorder(), filled: true, fillColor: Colors.white),
-              items: c.opciones.map((o) => DropdownMenuItem(value: o.v, child: Text(o.t, overflow: TextOverflow.ellipsis))).toList(),
+              items: c.opciones.map((o) => DropdownMenuItem(value: o.v, child: Text(tr(o.t), overflow: TextOverflow.ellipsis))).toList(),
               onChanged: (v) => setState(() => _opc[c.k] = v))
           : TextField(
               controller: _num[c.k],
@@ -169,15 +169,15 @@ class _FormularioCalcState extends State<_FormularioCalc> {
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (r.titulo.isNotEmpty) Text(r.titulo, style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.azul)),
+      if (r.titulo.isNotEmpty) Text(tr(r.titulo), style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.azul)),
       const SizedBox(height: 8),
       ...r.filas.map((f) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(
         crossAxisAlignment: CrossAxisAlignment.start, children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(f.etiqueta, style: const TextStyle(fontSize: 13)),
-            if (f.nota != null) Text(f.nota!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            Text(tr(f.etiqueta), style: const TextStyle(fontSize: 13)),
+            if (f.nota != null) Text(tr(f.nota!), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           ])),
-          Text(f.valor, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+          Text(tr(f.valor), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
         ]))),
       ..._lista(tr('Atención'), r.avisos, AppColors.ambar),
       ..._lista(tr('Faltan datos'), r.faltan, AppColors.rojo),

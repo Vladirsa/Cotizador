@@ -1032,13 +1032,13 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center, children: [
                 Container(width: 40, height: 40,
                   decoration: BoxDecoration(color: AppColors.azulClaro, shape: BoxShape.circle),
-                  child: Center(child: Text(s.emoji, style: const TextStyle(fontSize: 20)))),
+                  child: Center(child: Text(tr(s.emoji), style: const TextStyle(fontSize: 20)))),
                 const SizedBox(height: 6),
-                Text(s.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                Text(tr(s.nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
                   color: AppColors.azul), textAlign: TextAlign.center),
                 if (s.descripcion != null) Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  child: Text(s.descripcion!, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
+                  child: Text(tr(s.descripcion!), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario),
                     textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis)),
               ])))),
         Positioned(top: 4, right: 4,
@@ -1101,11 +1101,11 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Row(children: [
-        Text(r.emoji, style: const TextStyle(fontSize: 22)),
+        Text(tr(r.emoji), style: const TextStyle(fontSize: 22)),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(r.servicio, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-          Text(r.descripcion, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
+          Text(tr(r.servicio), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          Text(tr(r.descripcion), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
             maxLines: 2, overflow: TextOverflow.ellipsis),
         ])),
         const SizedBox(width: 8),
@@ -1991,8 +1991,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(children: [
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(t.nombre, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-                  if (t.unidad != null) Text(t.unidad!,
+                  Text(tr(t.nombre), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                  if (t.unidad != null) Text(tr(t.unidad!),
                     style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
                 ])),
                 const SizedBox(width: 10),
@@ -3107,7 +3107,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         ...cfg.extras.map((e) => CheckboxListTile(
           value: e.seleccionado,
           onChanged: (v) => setState(() { e.seleccionado = v ?? false; _resultado = null; }),
-          title: Text(e.nombre, style: const TextStyle(fontSize: 13)),
+          title: Text(tr(e.nombre), style: const TextStyle(fontSize: 13)),
           subtitle: Text('+${_fmt.format(e.precio)}',
             style: const TextStyle(fontSize: 11, color: AppColors.verde)),
           activeColor: AppColors.azul, dense: true, contentPadding: EdgeInsets.zero)),
@@ -3174,10 +3174,10 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
                 width: sel ? 2 : 0.5)),
             child: Column(children: [
               Row(children: [
-                Text(p.emoji, style: const TextStyle(fontSize: 20)),
+                Text(tr(p.emoji), style: const TextStyle(fontSize: 20)),
                 const SizedBox(width: 8),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(p.etiqueta, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                  Text(tr(p.etiqueta), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
                     color: p.color, letterSpacing: 0.5)),
                   Row(children: [
                     Text(fmt.format(p.precio),
@@ -3212,7 +3212,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
               const SizedBox(height: 8),
               Container(padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
-                child: Text(p.descripcion, style: const TextStyle(fontSize: 11, color: AppColors.textoPrincipal))),
+                child: Text(tr(p.descripcion), style: const TextStyle(fontSize: 11, color: AppColors.textoPrincipal))),
             ])));
       }),
 
@@ -3233,7 +3233,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
               final color = _colorCosto(e.key);
               return Padding(padding: const EdgeInsets.only(bottom: 8), child: Column(children: [
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text(e.key, style: const TextStyle(fontSize: 12)),
+                  Text(tr(e.key), style: const TextStyle(fontSize: 12)),
                   Row(children: [
                     Text('${(pct*100).toStringAsFixed(1)}%',
                       style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),

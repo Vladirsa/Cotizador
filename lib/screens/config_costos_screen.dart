@@ -568,7 +568,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
             fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
           Text(trf('Salario: {0}/mes  •  Prestaciones: {1}%', [(_fmt.format(salario)), (prest.toStringAsFixed(0))]),
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-          Text('${horas.toStringAsFixed(0)} horas/mes',
+          Text(trf('{0} horas/mes', [horas.toStringAsFixed(0)]),
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [

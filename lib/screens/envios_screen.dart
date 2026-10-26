@@ -148,8 +148,8 @@ class _EnviosScreenState extends State<EnviosScreen> {
           child: Text(_error!, style: const TextStyle(color: AppColors.rojo, fontSize: 13))),
         if (_res != null && _res!.opciones.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('${_res!.opciones.length} opciones'
-            '${_res!.pesoCobrado != null ? trf(' · peso cobrado {0} kg', [(_res!.pesoCobrado)]) : ''}',
+          Text(trf('{0} opciones', [_res!.opciones.length]) +
+            (_res!.pesoCobrado != null ? trf(' · peso cobrado {0} kg', [(_res!.pesoCobrado)]) : ''),
             style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
           const SizedBox(height: 8),
           ..._res!.opciones.map(_opcion),
@@ -164,7 +164,7 @@ class _EnviosScreenState extends State<EnviosScreen> {
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Row(children: [
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(o.paqueteria, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        Text(tr(o.paqueteria), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
         Text('${o.servicio}${o.dias != null ? trf(' · {0} días', [(o.dias)]) : ''}'
           '${o.recoleccion ? tr(' · recolección') : ''}',
           style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),

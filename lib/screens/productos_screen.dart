@@ -179,7 +179,7 @@ class _TarjetaProducto extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
           child: const Icon(Icons.inventory_2_outlined, color: AppColors.azul, size: 20)),
-        title: Text(producto.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        title: Text(tr(producto.nombre), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
         subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (producto.sku != null) Text('SKU: ${producto.sku}', style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           Row(children: [
@@ -187,7 +187,7 @@ class _TarjetaProducto extends StatelessWidget {
               margin: const EdgeInsets.only(top: 4, right: 6),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(4)),
-              child: Text(producto.categoriaNombre!, style: const TextStyle(fontSize: 10, color: AppColors.azul))),
+              child: Text(tr(producto.categoriaNombre!), style: const TextStyle(fontSize: 10, color: AppColors.azul))),
             if (producto.stockBajo) Container(
               margin: const EdgeInsets.only(top: 4),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -301,7 +301,7 @@ class _FormProductoState extends State<_FormProducto> {
         _campo(tr('Descripción'), _descripcion, lineas: 2),
         _seccion(tr('Categoría y clasificación')),
         _dropCampo(tr('Categoría'), _categoriaId,
-          widget.categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nombre, style: const TextStyle(fontSize: 13)))).toList(),
+          widget.categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(tr(c.nombre), style: const TextStyle(fontSize: 13)))).toList(),
           (v) => setState(() => _categoriaId = v)),
         Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

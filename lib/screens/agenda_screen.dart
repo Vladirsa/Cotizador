@@ -400,7 +400,7 @@ class _AgendaScreenState extends State<AgendaScreen>
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Text(tr(esHoy ? trf('Hoy — {0}', [esTitulo]) : esTitulo),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
-            Text('${_eventosDia.length} evento${_eventosDia.length != 1 ? "s" : ""}',
+            Text(trf(_eventosDia.length == 1 ? '{0} evento' : '{0} eventos', [_eventosDia.length]),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           ])),
         Expanded(child: _eventosDia.isEmpty
@@ -552,16 +552,16 @@ class _AgendaScreenState extends State<AgendaScreen>
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(children: [
-              Text(e.tipoEmoji, style: const TextStyle(fontSize: 20)),
+              Text(tr(e.tipoEmoji), style: const TextStyle(fontSize: 20)),
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(e.titulo, style: TextStyle(
+                Text(tr(e.titulo), style: TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w600,
                   color: e.completado ? AppColors.textoSecundario : AppColors.textoPrincipal,
                   decoration: e.completado ? TextDecoration.lineThrough : null),
                   maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (e.clienteNombre != null)
-                  Text(e.clienteNombre!,
+                  Text(tr(e.clienteNombre!),
                     style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
                     maxLines: 1, overflow: TextOverflow.ellipsis),
                 Row(children: [
@@ -571,7 +571,7 @@ class _AgendaScreenState extends State<AgendaScreen>
                     decoration: BoxDecoration(
                       color: semaforo.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20)),
-                    child: Text(e.semaforoLabel, style: TextStyle(
+                    child: Text(tr(e.semaforoLabel), style: TextStyle(
                       fontSize: 10, fontWeight: FontWeight.w600, color: semaforo))),
                 ]),
               ])),
@@ -610,18 +610,18 @@ class _AgendaScreenState extends State<AgendaScreen>
             decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 16),
           Row(children: [
-            Text(e.tipoEmoji, style: const TextStyle(fontSize: 28)),
+            Text(tr(e.tipoEmoji), style: const TextStyle(fontSize: 28)),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(e.titulo, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-              Text(e.tipoLabel, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+              Text(tr(e.titulo), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              Text(tr(e.tipoLabel), style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
             ])),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: e.semaforo.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20)),
-              child: Text(e.semaforoLabel, style: TextStyle(
+              child: Text(tr(e.semaforoLabel), style: TextStyle(
                 fontSize: 11, fontWeight: FontWeight.w700, color: e.semaforo))),
           ]),
           const SizedBox(height: 16),
@@ -652,7 +652,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       child: Row(children: [
         Icon(icon, size: 16, color: AppColors.textoSecundario),
         const SizedBox(width: 10),
-        Text('$label: ', style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
+        Text('${tr(label)}: ', style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
         Expanded(child: Text(tr(valor), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
       ]));
 
@@ -695,7 +695,7 @@ class _AgendaScreenState extends State<AgendaScreen>
                         color: sel ? AppColors.azul : Colors.transparent,
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde)),
-                      child: Text('${ev.tipoEmoji} ${ev.tipoLabel}',
+                      child: Text('${ev.tipoEmoji} ${tr(ev.tipoLabel)}',
                         style: TextStyle(fontSize: 11,
                           color: sel ? Colors.white : AppColors.textoSecundario))));
                 }).toList()),
@@ -1052,19 +1052,19 @@ class _AgendaBodyState extends State<AgendaBody>
             bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
         child: Padding(padding: const EdgeInsets.all(10),
           child: Row(children: [
-            Text(e.tipoEmoji, style: const TextStyle(fontSize: 18)),
+            Text(tr(e.tipoEmoji), style: const TextStyle(fontSize: 18)),
             const SizedBox(width: 8),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(e.titulo, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+              Text(tr(e.titulo), style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
                 color: e.completado ? AppColors.textoSecundario : AppColors.textoPrincipal,
                 decoration: e.completado ? TextDecoration.lineThrough : null),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
               if (e.clienteNombre != null)
-                Text(e.clienteNombre!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                Text(tr(e.clienteNombre!), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
               Container(margin: const EdgeInsets.only(top: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                 decoration: BoxDecoration(color: sem.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-                child: Text(e.semaforoLabel, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: sem))),
+                child: Text(tr(e.semaforoLabel), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: sem))),
             ])),
             if (e.monto > 0) Text(_fmt.format(e.monto),
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.azul)),

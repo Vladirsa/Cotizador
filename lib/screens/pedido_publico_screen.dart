@@ -231,7 +231,7 @@ class _PedidoPublicoScreenState extends State<PedidoPublicoScreen> {
             Container(padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(color: colorMarca.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('$_totalPiezas producto${_totalPiezas > 1 ? "s" : ""}',
+                Text(trf(_totalPiezas > 1 ? '{0} productos' : '{0} producto', [_totalPiezas]),
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 Text('\$${_totalCarrito.toStringAsFixed(0)}',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: colorMarca)),

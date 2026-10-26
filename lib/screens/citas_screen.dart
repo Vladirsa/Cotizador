@@ -77,7 +77,7 @@ class _CitasScreenState extends State<CitasScreen> {
                     color: activo ? color : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: activo ? color : AppColors.grisBorde)),
-                  child: Text('$e ($count)',
+                  child: Text('${tr(e)} ($count)',
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                       color: activo ? Colors.white : AppColors.textoSecundario))));
             }).toList()))),

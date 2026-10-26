@@ -151,7 +151,7 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
                     color: activo ? color : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: activo ? color : AppColors.grisBorde)),
-                  child: Text('${_etiquetas[e]} ($count)',
+                  child: Text('${tr('${_etiquetas[e]}')} ($count)',
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                       color: activo ? Colors.white : AppColors.textoSecundario))));
             }).toList()))),

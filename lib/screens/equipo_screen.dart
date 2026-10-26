@@ -230,7 +230,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
           child: Text(tr(codigo), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
             letterSpacing: 2, color: AppColors.azul, fontFamily: 'monospace'))),
         const SizedBox(width: 10),
-        Expanded(child: Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
+        Expanded(child: Text('${uTmp.rolEmoji} ${tr(uTmp.rolLabel)}',
           style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
         IconButton(
           onPressed: () async {
@@ -270,7 +270,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(20)),
-            child: Text('${usu.rolEmoji} ${usu.rolLabel}',
+            child: Text('${usu.rolEmoji} ${tr(usu.rolLabel)}',
               style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600))),
         ])),
         IconButton(
@@ -325,14 +325,14 @@ class _EquipoScreenState extends State<EquipoScreen> {
             ],
           ]),
           if (u.correo != null)
-            Text(u.correo!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            Text(tr(u.correo!), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           const SizedBox(height: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20)),
-            child: Text('${u.rolEmoji} ${u.rolLabel}',
+            child: Text('${u.rolEmoji} ${tr(u.rolLabel)}',
               style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600))),
         ])),
         if (esAdmin && !esMismoUsuario)
@@ -397,7 +397,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: color.withOpacity(0.15))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
+              Text('${uTmp.rolEmoji} ${tr(uTmp.rolLabel)}',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
               const SizedBox(height: 8),
               ...permisos.map((p) => Padding(
@@ -464,7 +464,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                       color: sel ? color : Colors.transparent,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: sel ? color : AppColors.grisBorde)),
-                    child: Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
+                    child: Text('${uTmp.rolEmoji} ${tr(uTmp.rolLabel)}',
                       style: TextStyle(fontSize: 11,
                         color: sel ? Colors.white : AppColors.textoSecundario,
                         fontWeight: sel ? FontWeight.w600 : FontWeight.normal))));
@@ -503,7 +503,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
       builder: (_) => AlertDialog(
         title: Text(tr('Código generado')),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Rol: ${uTmp.rolEmoji} ${uTmp.rolLabel}',
+          Text('Rol: ${uTmp.rolEmoji} ${tr(uTmp.rolLabel)}',
             style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
           const SizedBox(height: 16),
           Container(
@@ -637,7 +637,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                       color: sel ? color : Colors.transparent,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(color: sel ? color : AppColors.grisBorde)),
-                    child: Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
+                    child: Text('${uTmp.rolEmoji} ${tr(uTmp.rolLabel)}',
                       style: TextStyle(fontSize: 12,
                         color: sel ? Colors.white : AppColors.textoSecundario,
                         fontWeight: sel ? FontWeight.w700 : FontWeight.normal))));

@@ -200,9 +200,9 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
           color: AppColors.azulClaro,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(12))),
         child: Row(children: [
-          Text(p.emoji, style: const TextStyle(fontSize: 18)),
+          Text(tr(p.emoji), style: const TextStyle(fontSize: 18)),
           const SizedBox(width: 8),
-          Expanded(child: Text(p.descripcion,
+          Expanded(child: Text(tr(p.descripcion),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
               color: AppColors.azul))),
           GestureDetector(
@@ -219,7 +219,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
       // Preview del mensaje
       Padding(
         padding: const EdgeInsets.all(14),
-        child: Text(p.mensaje,
+        child: Text(tr(p.mensaje),
           style: const TextStyle(fontSize: 12, color: AppColors.textoPrincipal, height: 1.5),
           maxLines: 4, overflow: TextOverflow.ellipsis)),
       // Variables usadas
@@ -427,7 +427,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('${p.emoji} ${p.descripcion}',
+                Text('${p.emoji} ${tr(p.descripcion)}',
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
                     color: AppColors.azul)),
                 GestureDetector(

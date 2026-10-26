@@ -324,7 +324,7 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20)),
-              child: Text(c.estado,
+              child: Text(tr(c.estado),
                 style: TextStyle(fontSize: 10, color: color,
                   fontWeight: FontWeight.w600))),
           ])),
@@ -372,7 +372,7 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
         Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Text(p.folio, style: const TextStyle(
+            Text(tr(p.folio), style: const TextStyle(
               fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.azul)),
             Text(tr(p.createdAt != null ? _fmtFecha.format(p.createdAt!) : ''),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
@@ -386,7 +386,7 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
               decoration: BoxDecoration(
                 color: color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20)),
-              child: Text(p.estado,
+              child: Text(tr(p.estado),
                 style: TextStyle(fontSize: 10, color: color,
                   fontWeight: FontWeight.w600))),
           ]),
@@ -453,12 +453,12 @@ class _TarjetaCliente extends StatelessWidget {
           backgroundColor: color.withOpacity(0.1),
           child: Text(cliente.nombre.substring(0, 1).toUpperCase(), style: TextStyle(color: color, fontWeight: FontWeight.w600)),
         ),
-        title: Text(cliente.nombreCompleto, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+        title: Text(tr(cliente.nombreCompleto), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
         subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          if (cliente.ciudad != null) Text(cliente.ciudad!, style: const TextStyle(fontSize: 11)),
+          if (cliente.ciudad != null) Text(tr(cliente.ciudad!), style: const TextStyle(fontSize: 11)),
           Container(margin: const EdgeInsets.only(top: 4), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-            child: Text(cliente.tipoCliente, style: TextStyle(fontSize: 10, color: color))),
+            child: Text(tr(cliente.tipoCliente), style: TextStyle(fontSize: 10, color: color))),
         ]),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
           if (cliente.whatsappNumero.isNotEmpty)
