@@ -123,10 +123,10 @@ class HetnaCncApp extends StatelessWidget {
         if (child == null) return const SizedBox();
         // Al cambiar de idioma se vuelve a construir toda la app para que
         // todas las pantallas muestren los textos en el idioma nuevo.
-        child = KeyedSubtree(key: ValueKey(locale.languageCode), child: child);
-        if (!kIsWeb) return child;
+        final Widget app = KeyedSubtree(key: ValueKey(locale.languageCode), child: child);
+        if (!kIsWeb) return app;
         return LayoutBuilder(builder: (context, constraints) {
-          if (constraints.maxWidth <= 760) return child;
+          if (constraints.maxWidth <= 760) return app;
           final anchoMarco = (constraints.maxWidth * 0.65).clamp(700.0, 1000.0);
           return Container(
             width: double.infinity,
@@ -150,7 +150,7 @@ class HetnaCncApp extends StatelessWidget {
                     color: Colors.black.withOpacity(0.35),
                     blurRadius: 40, offset: const Offset(0, 20))]),
                 clipBehavior: Clip.antiAlias,
-                child: child)));
+                child: app)));
         });
       },
       theme: ThemeData(
