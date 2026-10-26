@@ -338,7 +338,7 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
             child: Row(children: [
               const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.azul),
               const SizedBox(width: 10),
-              Text(DateFormat('dd/MM/yyyy HH:mm').format(_fecha),
+              Text(DateFormat(enIngles ? 'MM/dd/yyyy h:mm a' : 'dd/MM/yyyy HH:mm').format(_fecha),
                 style: const TextStyle(fontSize: 13, color: AppColors.azul, fontWeight: FontWeight.w600)),
               const Spacer(),
               Text(tr('Cambiar'), style: TextStyle(fontSize: 11, color: AppColors.azul)),
@@ -434,7 +434,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
     final a = widget.alerta;
     final info = widget.tipos[a.tipo] ?? widget.tipos['seguimiento_dia3']!;
     final color = info['color'] as Color;
-    final fmt   = DateFormat('dd/MM/yy HH:mm');
+    final fmt   = DateFormat(enIngles ? 'MM/dd/yy h:mm a' : 'dd/MM/yy HH:mm');
     final vencida = a.fechaProgramada != null && a.fechaProgramada!.isBefore(DateTime.now());
 
     return Dismissible(

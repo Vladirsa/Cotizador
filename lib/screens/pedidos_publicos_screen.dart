@@ -194,7 +194,7 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
                     style: const TextStyle(fontSize: 11, color: AppColors.whatsapp)),
                 ])),
             ])),
-            if (fecha != null) Text(DateFormat('dd/MM HH:mm').format(fecha),
+            if (fecha != null) Text(DateFormat(enIngles ? 'MM/dd h:mm a' : 'dd/MM HH:mm').format(fecha),
               style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           ]),
           const SizedBox(height: 8),

@@ -21,7 +21,7 @@ class _GastosScreenState extends State<GastosScreen>
   bool _cargando = true;
 
   final _fmt = NumberFormat(r'$#,##0.00', 'es_MX');
-  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
 
   @override
   void initState() {
@@ -131,7 +131,7 @@ class _GastosScreenState extends State<GastosScreen>
   Widget _tabResumen() {
     final res = _resumenMes;
     final hoy = DateTime.now();
-    final mesNombre = DateFormat('MMMM yyyy', 'es_MX').format(hoy);
+    final mesNombre = DateFormat('MMMM yyyy', localeFormato).format(hoy);
 
     // Agrupar por categoría
     final porCat = <String, double>{};
@@ -277,7 +277,7 @@ class _TabNuevoGastoState extends State<_TabNuevoGasto> {
   String _tipoSat    = 'materiales';
 
   bool _guardando = false;
-  final _fmt = DateFormat('dd/MM/yyyy', 'es_MX');
+  final _fmt = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
 
   @override
   void initState() {

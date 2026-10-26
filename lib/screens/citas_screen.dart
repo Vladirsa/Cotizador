@@ -16,7 +16,7 @@ class _CitasScreenState extends State<CitasScreen> {
   List<Map<String, dynamic>> _citas = [];
   bool _cargando = true;
   String _filtro = 'Programada';
-  final _fmtFecha = DateFormat('EEEE dd MMM', 'es_MX');
+  final _fmtFecha = DateFormat('EEEE dd MMM', localeFormato);
   final _fmtHora  = DateFormat('HH:mm');
 
   final _estados = ['Programada', 'Confirmada', 'Completada', 'Cancelada', 'Todas'];
@@ -136,7 +136,7 @@ class _CitasScreenState extends State<CitasScreen> {
                             child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                               Text(tr(fecha != null ? '${fecha.day}' : '--'),
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: color)),
-                              Text(tr(fecha != null ? DateFormat('MMM', 'es_MX').format(fecha).toUpperCase() : ''),
+                              Text(tr(fecha != null ? DateFormat('MMM', localeFormato).format(fecha).toUpperCase() : ''),
                                 style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: color)),
                             ])),
                           const SizedBox(width: 10),
@@ -241,7 +241,7 @@ class _CitasScreenState extends State<CitasScreen> {
     final fecha = DateTime.tryParse(cita['fecha_hora'] as String? ?? '');
     final lugar = cita['lugar'] as String? ?? tr('Taller HETNA CNC');
     final titulo = cita['titulo'] as String? ?? '';
-    final msg = trf('Hola *{0}* 📅 Te confirmamos tu cita en *HETNA CNC*:\n\n📋 *{1}*\n📅 *{2}*\n📍 *{3}*\n\nSi necesitas reprogramar avísanos con anticipación. ¡Te esperamos! 😊', [nombre, titulo, (fecha != null ? DateFormat("EEEE dd 'de' MMMM 'a las' HH:mm", 'es_MX').format(fecha) : ""), lugar]);
+    final msg = trf('Hola *{0}* 📅 Te confirmamos tu cita en *HETNA CNC*:\n\n📋 *{1}*\n📅 *{2}*\n📍 *{3}*\n\nSi necesitas reprogramar avísanos con anticipación. ¡Te esperamos! 😊', [nombre, titulo, (fecha != null ? DateFormat(enIngles ? "EEEE, MMMM d 'at' h:mm a" : "EEEE dd 'de' MMMM 'a las' HH:mm", localeFormato).format(fecha) : ""), lugar]);
     await WhatsAppService.abrirChat(numero: wa, mensaje: msg);
     await SupabaseService.actualizarCita(cita['id'] as String, {'wa_enviado': true});
     await _cargar();
@@ -271,7 +271,7 @@ class _FormCitaState extends State<_FormCita> {
   String? _clienteId;
   String _clienteNombre = '';
   bool _guardando = false;
-  final _fmt = DateFormat("EEEE dd 'de' MMMM, HH:mm", 'es_MX');
+  final _fmt = DateFormat(enIngles ? "EEEE, MMMM d, h:mm a" : "EEEE dd 'de' MMMM, HH:mm", localeFormato);
 
   @override
   void initState() {

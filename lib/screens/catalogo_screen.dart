@@ -582,7 +582,7 @@ class _CatalogoScreenState extends State<CatalogoScreen>
   Widget _tarjetaCatalogo(Map<String, dynamic> cat) {
     final ids = List<String>.from(cat['producto_ids'] ?? []);
     final fecha = cat['created_at'] != null
-      ? DateFormat('dd/MM/yyyy').format(DateTime.parse(cat['created_at']))
+      ? DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(DateTime.parse(cat['created_at']))
       : '';
 
     return Container(

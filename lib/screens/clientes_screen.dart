@@ -184,7 +184,7 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
   bool _cargando = true;
 
   final _fmt = NumberFormat(r'$#,##0', 'es_MX');
-  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
 
   @override
   void initState() {

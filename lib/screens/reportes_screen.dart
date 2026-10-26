@@ -72,7 +72,7 @@ class _TabExcelState extends State<_TabExcel> {
   String _estadoPed = 'Todos';
   bool _generando = false;
 
-  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
   final _estadosCot = ['Todos','Borrador','Enviada','Aprobada','Pedido','Vencida','Rechazada'];
   final _estadosPed = ['Todos','Pedido','Pago','Produccion','Pruebas','Entrega','Entregado'];
 
@@ -257,7 +257,7 @@ class _TabExcelState extends State<_TabExcel> {
       }).toList();
 
       final excel = Excel.createExcel();
-      final sheet = excel['Cotizaciones'];
+      final sheet = excel[tr('Cotizaciones')];
       excel.delete('Sheet1');
       _header(sheet, ['Folio','Fecha','Cliente','Empresa','Estado',
         'Subtotal','Desc%','IVA%','Total','Método pago']);
@@ -291,7 +291,7 @@ class _TabExcelState extends State<_TabExcel> {
       }).toList();
 
       final excel = Excel.createExcel();
-      final sheet = excel['Pedidos'];
+      final sheet = excel[tr('Pedidos')];
       excel.delete('Sheet1');
       _header(sheet, ['Folio','Fecha','Cliente','Estado','Total',
         'F.Entrega estimada','F.Entregado','Notas']);
@@ -323,7 +323,7 @@ class _TabExcelState extends State<_TabExcel> {
       }).toList();
 
       final excel = Excel.createExcel();
-      final sheet = excel['Gastos'];
+      final sheet = excel[tr('Gastos')];
       excel.delete('Sheet1');
       _header(sheet, ['Fecha','Concepto','Categoría','Tipo','Monto']);
       for (int i = 0; i < filtrados.length; i++) {
@@ -366,7 +366,7 @@ class _TabExcelState extends State<_TabExcel> {
       excel.delete('Sheet1');
 
       // Resumen
-      final res = excel['Resumen'];
+      final res = excel[tr('Resumen')];
       _header(res, ['Concepto','Valor']);
       final tv = peds.where((p) => p.estado == 'Entregado')
         .fold(0.0, (s, p) => s + (p.total ?? 0));
@@ -379,7 +379,7 @@ class _TabExcelState extends State<_TabExcel> {
       _cell(res,0,6,tr('Utilidad neta')); _cellNum(res,1,6,tv-tg);
 
       // Cotizaciones
-      final sc = excel['Cotizaciones'];
+      final sc = excel[tr('Cotizaciones')];
       _header(sc, ['Folio','Fecha','Cliente','Estado','Total']);
       for (int i = 0; i < cots.length; i++) {
         final c = cots[i];
@@ -391,7 +391,7 @@ class _TabExcelState extends State<_TabExcel> {
       }
 
       // Pedidos
-      final sp = excel['Pedidos'];
+      final sp = excel[tr('Pedidos')];
       _header(sp, ['Folio','Fecha','Cliente','Estado','Total']);
       for (int i = 0; i < peds.length; i++) {
         final p = peds[i];
@@ -403,7 +403,7 @@ class _TabExcelState extends State<_TabExcel> {
       }
 
       // Gastos
-      final sg = excel['Gastos'];
+      final sg = excel[tr('Gastos')];
       _header(sg, ['Fecha','Concepto','Categoría','Monto']);
       for (int i = 0; i < gasts.length; i++) {
         final g = gasts[i];
@@ -422,7 +422,7 @@ class _TabExcelState extends State<_TabExcel> {
   void _header(Sheet s, List<String> headers) {
     for (int i = 0; i < headers.length; i++) {
       final cell = s.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
-      cell.value = TextCellValue(headers[i]);
+      cell.value = TextCellValue(tr(headers[i]));
       cell.cellStyle = CellStyle(
         bold: true,
         backgroundColorHex: ExcelColor.fromHexString('#1a3a5c'),
@@ -432,7 +432,7 @@ class _TabExcelState extends State<_TabExcel> {
 
   void _cell(Sheet s, int col, int row, String val) =>
     s.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value =
-      TextCellValue(val);
+      TextCellValue(tr(val));
 
   void _cellNum(Sheet s, int col, int row, double val) =>
     s.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row)).value =
@@ -529,7 +529,7 @@ class _TabFiscalState extends State<_TabFiscal> {
   String _regimen = 'RESICO';
 
   final _fmt = NumberFormat(r'$#,##0.00', 'es_MX');
-  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
 
   @override
   void initState() { super.initState(); _calcular(); }
@@ -740,7 +740,7 @@ class _TabFiscalState extends State<_TabFiscal> {
     setState(() => _generando = true);
     try {
       final excel = Excel.createExcel();
-      final sheet = excel['Reporte Fiscal SAT'];
+      final sheet = excel[tr('Reporte Fiscal SAT')];
       excel.delete('Sheet1');
 
       void wc(int col, int row, String val, {bool bold = false}) {

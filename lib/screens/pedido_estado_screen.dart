@@ -102,7 +102,7 @@ class _PedidoEstadoScreenState extends State<PedidoEstadoScreen> {
     final negocioTel = d['negocio_telefono'] as String?;
     final avances = (d['avances'] as List?) ?? [];
     final fotos = (d['fotos'] as List?) ?? [];
-    final fmtFecha = DateFormat("d 'de' MMMM, h:mm a", 'es_MX');
+    final fmtFecha = DateFormat(enIngles ? "MMMM d, h:mm a" : "d 'de' MMMM, h:mm a", localeFormato);
 
     // Índice de la etapa actual dentro del orden estándar, para pintar
     // completadas/actual/pendientes en la línea de tiempo

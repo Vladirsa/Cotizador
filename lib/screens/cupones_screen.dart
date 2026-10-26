@@ -15,7 +15,7 @@ class _CuponesScreenState extends State<CuponesScreen> {
   List<Map<String, dynamic>> _cupones = [];
   bool _cargando = true;
   final _fmt = NumberFormat('#,##0.00', 'es_MX');
-  final _fmtFecha = DateFormat('dd/MM/yyyy');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy');
 
   @override
   void initState() { super.initState(); _cargar(); }
@@ -227,7 +227,7 @@ class _FormCuponState extends State<_FormCupon> {
   String _tipo = 'porcentaje';
   DateTime? _fechaFin;
   bool _guardando = false;
-  final _fmt = DateFormat('dd/MM/yyyy');
+  final _fmt = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy');
 
   @override
   void initState() {

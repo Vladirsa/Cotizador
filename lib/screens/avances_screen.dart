@@ -158,7 +158,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
           Container(width: double.infinity, color: Colors.white,
             padding: const EdgeInsets.only(left: 12, right: 12, bottom: 6),
             child: Text(
-              '${DateFormat('dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat('dd/MM/yy').format(_rangoFechas!.end)}',
+              '${DateFormat(enIngles ? 'MM/dd/yy' : 'dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat(enIngles ? 'MM/dd/yy' : 'dd/MM/yy').format(_rangoFechas!.end)}',
               style: const TextStyle(fontSize: 10, color: AppColors.azul, fontWeight: FontWeight.w600))),
 
         // Filtros por etapa

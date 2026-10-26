@@ -178,7 +178,7 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
         Container(width: double.infinity, color: Colors.white,
           padding: const EdgeInsets.only(left: 12, right: 12, bottom: 6),
           child: Text(
-            '${DateFormat('dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat('dd/MM/yy').format(_rangoFechas!.end)}',
+            '${DateFormat(enIngles ? 'MM/dd/yy' : 'dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat(enIngles ? 'MM/dd/yy' : 'dd/MM/yy').format(_rangoFechas!.end)}',
             style: const TextStyle(fontSize: 10, color: AppColors.azul, fontWeight: FontWeight.w600))),
 
       Container(color: Colors.white, padding: const EdgeInsets.all(10),
@@ -248,7 +248,7 @@ class _TarjetaCotizacion extends StatelessWidget {
             Text(tr(nombre), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             Text(tr(cotizacion.folio ?? ''), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             if (cotizacion.createdAt != null)
-              Text(DateFormat('dd/MM/yyyy').format(cotizacion.createdAt!),
+              Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(cotizacion.createdAt!),
                 style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             const SizedBox(height: 4),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -538,6 +538,12 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (v != null && v >= 0 && mounted) {
         setState(() { _ivaPct = v > 0 ? v : 16; _aplicaIva = v > 0; });
       }
+      // Moneda por defecto de la cotización profesional
+      final m = (cfg['moneda'] ?? '').toString().toUpperCase();
+      if ((m == 'USD' || m == 'MXN') && mounted) {
+        final c = _ctrlPro('moneda', m);
+        if (c.text.trim().isEmpty || c.text.trim() == 'MXN') c.text = m;
+      }
     } catch (_) {}
   }
 
@@ -662,7 +668,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.grisBorde)),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(DateFormat('dd/MM/yyyy').format(_fechaCotizacion),
+              Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(_fechaCotizacion),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               const Icon(Icons.edit_calendar, size: 16, color: AppColors.azul),
             ]))),
@@ -836,12 +842,12 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     _bloque(titulo, icon, Column(children: campos.map((f) => Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TextField(
-        controller: _ctrlPro(f.$1, f.$4),
+        controller: _ctrlPro(f.$1, tr(f.$4)),
         maxLines: f.$3,
         minLines: 1,
         style: const TextStyle(fontSize: 13),
         decoration: InputDecoration(
-          labelText: f.$2, isDense: true,
+          labelText: tr(f.$2), isDense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))))).toList()));
 
   Widget _campo(String label, {required Widget child}) =>

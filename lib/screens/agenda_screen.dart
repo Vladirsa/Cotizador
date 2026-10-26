@@ -203,8 +203,8 @@ class _AgendaScreenState extends State<AgendaScreen>
   List<AgendaEvento> _pendientes = [];
   bool _cargando = true;
 
-  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
-  final _fmtMes = DateFormat('MMMM yyyy', 'es_MX');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
+  final _fmtMes = DateFormat('MMMM yyyy', localeFormato);
   final _fmt = NumberFormat('\$#,##0', 'es_MX');
 
   @override
@@ -725,7 +725,7 @@ class _AgendaScreenState extends State<AgendaScreen>
                 child: Row(children: [
                   const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.azul),
                   const SizedBox(width: 8),
-                  Text(DateFormat('dd/MM/yyyy').format(fechaSel),
+                  Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(fechaSel),
                     style: const TextStyle(fontSize: 13)),
                 ]))),
             const SizedBox(height: 10),
@@ -795,8 +795,8 @@ class _AgendaBodyState extends State<AgendaBody>
   List<AgendaEvento> _pendientes = [];
   bool _cargando = true;
 
-  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
-  final _fmtMes   = DateFormat('MMMM yyyy',  'es_MX');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
+  final _fmtMes   = DateFormat('MMMM yyyy', localeFormato);
   final _fmt       = NumberFormat(r'$#,##0',  'es_MX');
 
   @override
@@ -1101,7 +1101,7 @@ class _AgendaBodyState extends State<AgendaBody>
             child: Row(children: [
               const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.azul),
               const SizedBox(width: 8),
-              Text(DateFormat('dd/MM/yyyy').format(fechaSel), style: const TextStyle(fontSize: 13)),
+              Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(fechaSel), style: const TextStyle(fontSize: 13)),
             ]))),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity,

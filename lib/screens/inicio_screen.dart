@@ -212,7 +212,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
             style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Colors.white)),
           const SizedBox(width: 6),
           Padding(padding: const EdgeInsets.only(bottom: 4),
-            child: Text('de ${_fmt.format(meta)}',
+            child: Text(trf('de {0}', [_fmt.format(meta)]),
               style: const TextStyle(fontSize: 13, color: Colors.white60))),
         ]),
         const SizedBox(height: 10),
@@ -456,7 +456,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
                     getTooltipItem: (group, groupIndex, rod, rodIndex) {
                       final dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
                       return BarTooltipItem(
-                        '${dias[group.x]}\n${_fmt.format(rod.toY)}',
+                        '${tr(dias[group.x])}\n${_fmt.format(rod.toY)}',
                         const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600));
                     },
                   ),
@@ -1206,7 +1206,7 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(tr(nombre), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
           Text(tr(c.folio ?? ''), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
-          if (c.createdAt != null) Text(DateFormat('dd/MM/yyyy').format(c.createdAt!),
+          if (c.createdAt != null) Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(c.createdAt!),
             style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           const SizedBox(height: 4),
           Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
