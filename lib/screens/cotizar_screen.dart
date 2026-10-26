@@ -12,6 +12,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'simulador_screen.dart';
 import 'envios_screen.dart';
 import '../services/auth_service.dart';
+import '../i18n/tr.dart';
 
 class CotizarScreen extends StatefulWidget {
   final dynamic itemInicial;
@@ -33,16 +34,16 @@ class _CotizarScreenState extends State<CotizarScreen> with SingleTickerProvider
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(
-        title: const Text('Cotizador'),
+        title: Text(tr('Cotizador')),
         bottom: TabBar(
           controller: _tabs,
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
-          tabs: const [
-            Tab(text: 'Nueva'),
-            Tab(text: 'Mis cotizaciones'),
-            Tab(text: 'Catálogo'),
+          tabs: [
+            Tab(text: tr('Nueva')),
+            Tab(text: tr('Mis cotizaciones')),
+            Tab(text: tr('Catálogo')),
           ],
         ),
       ),
@@ -136,7 +137,7 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
             controller: _busquedaCtrl,
             onChanged: (v) => setState(() => _busqueda = v),
             decoration: InputDecoration(
-              hintText: 'Buscar por cliente o folio...',
+              hintText: tr('Buscar por cliente o folio...'),
               hintStyle: const TextStyle(fontSize: 12),
               prefixIcon: const Icon(Icons.search, size: 18),
               suffixIcon: _busqueda.isNotEmpty
@@ -177,7 +178,7 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
         Container(width: double.infinity, color: Colors.white,
           padding: const EdgeInsets.only(left: 12, right: 12, bottom: 6),
           child: Text(
-            '${DateFormat('dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat('dd/MM/yy').format(_rangoFechas!.end)}',
+            '${DateFormat(enIngles ? 'MM/dd/yy' : 'dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat(enIngles ? 'MM/dd/yy' : 'dd/MM/yy').format(_rangoFechas!.end)}',
             style: const TextStyle(fontSize: 10, color: AppColors.azul, fontWeight: FontWeight.w600))),
 
       Container(color: Colors.white, padding: const EdgeInsets.all(10),
@@ -202,7 +203,7 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
       Expanded(child: _cargando
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(onRefresh: _cargar, child: _filtradas.isEmpty
-            ? const Center(child: Text('No hay cotizaciones', style: TextStyle(color: AppColors.textoSecundario)))
+            ? Center(child: Text(tr('No hay cotizaciones'), style: TextStyle(color: AppColors.textoSecundario)))
             : ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: _filtradas.length,
@@ -226,7 +227,7 @@ class _TarjetaCotizacion extends StatelessWidget {
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final color = colores[cotizacion.estado] ?? Colors.grey;
-    final nombre = cotizacion.cliente?.nombre ?? cotizacion.cliente?.empresa ?? 'Sin cliente';
+    final nombre = cotizacion.cliente?.nombre ?? cotizacion.cliente?.empresa ?? tr('Sin cliente');
     final montoItems = cotizacion.items.fold(0.0, (s, i) => s + i.subtotal);
     final monto = cotizacion.total > 0 ? cotizacion.total
       : montoItems > 0 ? montoItems * 1.16
@@ -244,10 +245,10 @@ class _TarjetaCotizacion extends StatelessWidget {
       child: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nombre, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
-            Text(cotizacion.folio ?? '', style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            Text(tr(nombre), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+            Text(tr(cotizacion.folio ?? ''), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             if (cotizacion.createdAt != null)
-              Text(DateFormat('dd/MM/yyyy').format(cotizacion.createdAt!),
+              Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(cotizacion.createdAt!),
                 style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
             const SizedBox(height: 4),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -255,7 +256,7 @@ class _TarjetaCotizacion extends StatelessWidget {
               child: Text(cotizacion.estado, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            Text(monto > 0 ? fmt.format(monto) : 'Sin monto',
+            Text(tr(monto > 0 ? fmt.format(monto) : tr('Sin monto')),
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
                 color: monto > 0 ? AppColors.azul : AppColors.textoSecundario)),
             if (cotizacion.items.isNotEmpty)
@@ -275,7 +276,7 @@ class _TarjetaCotizacion extends StatelessWidget {
                 Expanded(child: ElevatedButton.icon(
                   onPressed: () => _editarCotizacion(context),
                   icon: const Icon(Icons.edit_outlined, size: 15, color: Colors.white),
-                  label: const Text('Editar', style: TextStyle(fontSize: 12, color: Colors.white)),
+                  label: Text(tr('Editar'), style: TextStyle(fontSize: 12, color: Colors.white)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.azul,
                     padding: const EdgeInsets.symmetric(vertical: 8)))),
@@ -287,21 +288,21 @@ class _TarjetaCotizacion extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF185fa5),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                  child: const Text('→ Enviada', style: TextStyle(fontSize: 11, color: Colors.white))),
+                  child: Text(tr('→ Enviada'), style: TextStyle(fontSize: 11, color: Colors.white))),
               if (cotizacion.estado == 'Enviada')
                 Expanded(child: ElevatedButton(
                   onPressed: () => _cambiarEstado(context, 'Aprobada'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1d9e75),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                  child: const Text('→ Aprobada', style: TextStyle(fontSize: 11, color: Colors.white)))),
+                  child: Text(tr('→ Aprobada'), style: TextStyle(fontSize: 11, color: Colors.white)))),
               if (cotizacion.estado == 'Aprobada')
                 Expanded(child: ElevatedButton(
                   onPressed: () => _convertirPedido(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF7c3aed),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                  child: const Text('→ Pedido', style: TextStyle(fontSize: 11, color: Colors.white)))),
+                  child: Text(tr('→ Pedido'), style: TextStyle(fontSize: 11, color: Colors.white)))),
             ]),
             if (cotizacion.estado == 'Borrador') ...[
               const SizedBox(height: 6),
@@ -309,7 +310,7 @@ class _TarjetaCotizacion extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: () => _editarCotizacion(context),
                   icon: const Icon(Icons.edit_outlined, size: 15, color: Colors.white),
-                  label: const Text('Editar cotización',
+                  label: Text(tr('Editar cotización'),
                     style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w700)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.azul,
@@ -330,7 +331,7 @@ class _TarjetaCotizacion extends StatelessWidget {
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => Scaffold(
         appBar: AppBar(
-          title: Text('Editar — ${cotizacion.folio ?? "cotización"}'),
+          title: Text(trf('Editar — {0}', [(cotizacion.folio ?? tr('cotización'))])),
           backgroundColor: Colors.white),
         body: _NuevaCotizacion(
           cotizacionEditar: cotizacion,
@@ -342,7 +343,7 @@ class _TarjetaCotizacion extends StatelessWidget {
       await SupabaseService.cambiarEstadoCotizacion(cotizacion.id!, nuevoEstado);
       onActualizar();
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('✅ Estado → $nuevoEstado'), backgroundColor: AppColors.azul));
+        content: Text(trf('✅ Estado → {0}', [nuevoEstado])), backgroundColor: AppColors.azul));
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
@@ -357,8 +358,8 @@ class _TarjetaCotizacion extends StatelessWidget {
       }
       await SupabaseService.convertirEnPedido(cotConItems);
       onActualizar();
-      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ ¡Pedido creado! Visible en Avances'),
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ ¡Pedido creado! Visible en Avances')),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -370,16 +371,16 @@ class _TarjetaCotizacion extends StatelessWidget {
     final confirmar = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar cotización'),
-        content: Text(tienePedido
-          ? 'Esta cotización tiene un pedido vinculado. Al eliminarla también se eliminará el pedido. ¿Continuar?'
-          : '¿Eliminar la cotización ${cotizacion.folio ?? ""}? Esta acción no se puede deshacer.'),
+        title: Text(tr('Eliminar cotización')),
+        content: Text(tr(tienePedido
+          ? tr('Esta cotización tiene un pedido vinculado. Al eliminarla también se eliminará el pedido. ¿Continuar?')
+          : trf('¿Eliminar la cotización {0}? Esta acción no se puede deshacer.', [(cotizacion.folio ?? "")]))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
         ]));
     if (confirmar == true) {
       try {
@@ -388,12 +389,12 @@ class _TarjetaCotizacion extends StatelessWidget {
         }
         await SupabaseService.eliminarCotizacion(cotizacion.id!);
         onActualizar();
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('🗑️ Cotización eliminada'),
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('🗑️ Cotización eliminada')),
           backgroundColor: AppColors.rojo));
       } catch (e) {
         if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error al eliminar: $e')));
+          content: Text(trf('Error al eliminar: {0}', [e]))));
       }
     }
   }
@@ -476,7 +477,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     }
     if (!mounted) return false;
     await AuthService.exigirModulo(context, 'cotizacion_profesional',
-      funcion: 'más cotizaciones profesionales (ya usaste tu muestra gratis)');
+      funcion: tr('más cotizaciones profesionales (ya usaste tu muestra gratis)'));
     return false;
   }
 
@@ -529,14 +530,32 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
   String _tiempoEntrega = '15 días';
 
+  // Impuesto por defecto del taller (Configuración → Idioma, moneda e impuestos)
+  Future<void> _cargarImpuestoDefault() async {
+    try {
+      final cfg = await SupabaseService.getConfiguracion();
+      final v = double.tryParse('${cfg['impuesto_pct'] ?? ''}');
+      if (v != null && v >= 0 && mounted) {
+        setState(() { _ivaPct = v > 0 ? v : 16; _aplicaIva = v > 0; });
+      }
+      // Moneda por defecto de la cotización profesional
+      final m = (cfg['moneda'] ?? '').toString().toUpperCase();
+      if ((m == 'USD' || m == 'MXN') && mounted) {
+        final c = _ctrlPro('moneda', m);
+        if (c.text.trim().isEmpty || c.text.trim() == 'MXN') c.text = m;
+      }
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
+    if (widget.cotizacionEditar == null) _cargarImpuestoDefault();
     if (widget.itemInicial != null) {
       try {
         final item = widget.itemInicial!;
         _items.add(CotizacionItem(
-          nombreProducto: (item.trabajo ?? item.nombre ?? 'Servicio').toString(),
+          nombreProducto: (item.trabajo ?? item.nombre ?? tr('Servicio')).toString(),
           cantidad: 1,
           precioUnitario: ((item.precio ?? item.precioUnitario ?? 0) as num).toDouble(),
           sku: null,
@@ -569,7 +588,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _aplicaIva = c.ivaPct > 0;
       _costoEnvio = c.costoEnvio;
       _metodoPago = c.metodoPago ?? '50% anticipo / 50% entrega';
-      _condicionEntrega = c.condicionEntrega ?? 'LAB — En planta HETNA';
+      _condicionEntrega = c.condicionEntrega ?? tr('LAB — En planta HETNA');
       _notas = c.notas ?? '';
       if (c.createdAt != null) _fechaCotizacion = c.createdAt!;
       _tipo = c.tipo;
@@ -600,32 +619,31 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           child: Row(children: [
             const Icon(Icons.edit, size: 16, color: AppColors.ambar),
             const SizedBox(width: 8),
-            Text('Editando: ${widget.cotizacionEditar!.folio ?? "cotización"}',
+            Text('Editando: ${widget.cotizacionEditar!.folio ?? tr('cotización')}',
               style: const TextStyle(fontSize: 12, color: AppColors.ambar, fontWeight: FontWeight.w600)),
           ])),
-      _bloque('Tipo de cotización', Icons.description_outlined, Column(children: [
+      _bloque(tr('Tipo de cotización'), Icons.description_outlined, Column(children: [
         Row(children: [
-          Expanded(child: _opcionTipo('sencilla', 'Sencilla', 'Partidas, condiciones y total')),
+          Expanded(child: _opcionTipo('sencilla', tr('Sencilla'), tr('Partidas, condiciones y total'))),
           const SizedBox(width: 8),
-          Expanded(child: _opcionTipo('profesional', 'Profesional ⭐', 'Formato internacional con datos técnicos y firma')),
+          Expanded(child: _opcionTipo('profesional', tr('Profesional ⭐'), tr('Formato internacional con datos técnicos y firma'))),
         ]),
         if (_tipo == 'profesional' && _muestraGratis && !AuthService.puede('cotizacion_profesional'))
           Container(
             margin: const EdgeInsets.only(top: 8),
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8)),
-            child: const Text(
-              'Esta es tu cotización profesional de muestra (plan Gratis). '
-              'Con el plan Taller haces todas las que quieras.',
+            child: Text(
+              tr('Esta es tu cotización profesional de muestra (plan Gratis). Con el plan Taller haces todas las que quieras.'),
               style: TextStyle(fontSize: 11, color: AppColors.ambar, fontWeight: FontWeight.w600))),
       ])),
-      _bloque('Cliente', Icons.person_outline, _cliente == null
+      _bloque(tr('Cliente'), Icons.person_outline, _cliente == null
         ? Column(children: [
             ElevatedButton.icon(onPressed: _seleccionarCliente,
-              icon: const Icon(Icons.person_search), label: const Text('Seleccionar cliente')),
+              icon: const Icon(Icons.person_search), label: Text(tr('Seleccionar cliente'))),
             const SizedBox(height: 8),
             OutlinedButton.icon(onPressed: _nuevoClienteRapido,
-              icon: const Icon(Icons.person_add_outlined), label: const Text('Agregar nuevo cliente')),
+              icon: const Icon(Icons.person_add_outlined), label: Text(tr('Agregar nuevo cliente'))),
           ])
         : ListTile(contentPadding: EdgeInsets.zero,
             leading: CircleAvatar(backgroundColor: AppColors.azulClaro,
@@ -633,8 +651,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                 style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
             title: Text(_cliente!.nombreCompleto, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
             subtitle: Text(_cliente!.tipoCliente),
-            trailing: TextButton(onPressed: _seleccionarCliente, child: const Text('Cambiar')))),
-      _bloque('Fecha de cotización', Icons.calendar_today_outlined,
+            trailing: TextButton(onPressed: _seleccionarCliente, child: Text(tr('Cambiar'))))),
+      _bloque(tr('Fecha de cotización'), Icons.calendar_today_outlined,
         GestureDetector(
           onTap: () async {
             final fecha = await showDatePicker(
@@ -650,15 +668,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.grisBorde)),
             child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text(DateFormat('dd/MM/yyyy').format(_fechaCotizacion),
+              Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(_fechaCotizacion),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               const Icon(Icons.edit_calendar, size: 16, color: AppColors.azul),
             ]))),
       ),
-      _bloque('Productos', Icons.inventory_2_outlined, Column(children: [
+      _bloque(tr('Productos'), Icons.inventory_2_outlined, Column(children: [
         if (_items.isEmpty)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text('Agrega productos a la cotización',
+          Padding(padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(tr('Agrega productos a la cotización'),
               style: TextStyle(color: AppColors.textoSecundario, fontSize: 12))),
         ..._items.map((item) => _ItemRow(
           key: ValueKey('${item.productoId}_${item.nombreProducto}'),
@@ -673,52 +691,52 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         const SizedBox(height: 8),
         Row(children: [
           Expanded(child: ElevatedButton.icon(onPressed: _agregarProducto,
-            icon: const Icon(Icons.add, size: 18), label: const Text('Del catálogo'))),
+            icon: const Icon(Icons.add, size: 18), label: Text(tr('Del catálogo')))),
           const SizedBox(width: 8),
           Expanded(child: OutlinedButton.icon(onPressed: _productoNuevo,
-            icon: const Icon(Icons.add_box_outlined, size: 18), label: const Text('Nuevo rápido'))),
+            icon: const Icon(Icons.add_box_outlined, size: 18), label: Text(tr('Nuevo rápido')))),
         ]),
       ])),
       if (_tipo == 'profesional') ...[
-        _bloquePro('Proyecto y resumen', Icons.folder_outlined, _camposProyecto),
-        _bloquePro('Alcance', Icons.checklist_outlined, _camposAlcance),
-        _bloquePro('Detalle técnico', Icons.straighten_outlined, _camposTecnicos),
-        _bloquePro('Especificaciones de fabricación', Icons.precision_manufacturing_outlined, _camposFabricacion),
-        _bloquePro('Calidad y cambios', Icons.verified_outlined, _camposCondiciones),
+        _bloquePro(tr('Proyecto y resumen'), Icons.folder_outlined, _camposProyecto),
+        _bloquePro(tr('Alcance'), Icons.checklist_outlined, _camposAlcance),
+        _bloquePro(tr('Detalle técnico'), Icons.straighten_outlined, _camposTecnicos),
+        _bloquePro(tr('Especificaciones de fabricación'), Icons.precision_manufacturing_outlined, _camposFabricacion),
+        _bloquePro(tr('Calidad y cambios'), Icons.verified_outlined, _camposCondiciones),
       ],
-      _bloque('Condiciones', Icons.local_shipping_outlined, Column(children: [
+      _bloque(tr('Condiciones'), Icons.local_shipping_outlined, Column(children: [
         Row(children: [
-          Expanded(child: _campo('Tiempo entrega', child: DropdownButtonFormField<String>(
+          Expanded(child: _campo(tr('Tiempo entrega'), child: DropdownButtonFormField<String>(
             value: _tiempos.contains(_tiempoEntrega) ? _tiempoEntrega : '15 días',
             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-            items: _tiempos.map((t) => DropdownMenuItem(value: t, child: Text(t, style: const TextStyle(fontSize: 13)))).toList(),
+            items: _tiempos.map((t) => DropdownMenuItem(value: t, child: Text(tr(t), style: const TextStyle(fontSize: 13)))).toList(),
             onChanged: (v) => setState(() => _tiempoEntrega = v!)))),
           const SizedBox(width: 8),
-          Expanded(child: _campo('Método de pago', child: DropdownButtonFormField<String>(
+          Expanded(child: _campo(tr('Método de pago'), child: DropdownButtonFormField<String>(
             value: _metodosPago.contains(_metodoPago) ? _metodoPago : _metodosPago.first,
             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-            items: _metodosPago.map((m) => DropdownMenuItem(value: m, child: Text(m, style: const TextStyle(fontSize: 11)))).toList(),
+            items: _metodosPago.map((m) => DropdownMenuItem(value: m, child: Text(tr(m), style: const TextStyle(fontSize: 11)))).toList(),
             onChanged: (v) => setState(() => _metodoPago = v!)))),
         ]),
         const SizedBox(height: 8),
-        _campo('Notas', child: TextFormField(
+        _campo(tr('Notas'), child: TextFormField(
           key: ValueKey('notas_$_envioVer'),
           initialValue: _notas,
-          decoration: const InputDecoration(hintText: 'Garantías, condiciones especiales...',
+          decoration: InputDecoration(hintText: tr('Garantías, condiciones especiales...'),
             contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
           maxLines: 2, style: const TextStyle(fontSize: 13),
           onChanged: (v) => _notas = v)),
       ])),
-      _bloque('Resumen financiero', Icons.calculate_outlined, Column(children: [
+      _bloque(tr('Resumen financiero'), Icons.calculate_outlined, Column(children: [
         Row(children: [
-          Expanded(child: _campo('Descuento %', child: TextFormField(
+          Expanded(child: _campo(tr('Descuento %'), child: TextFormField(
             initialValue: _descuentoPct > 0 ? _descuentoPct.toStringAsFixed(0) : '',
             decoration: const InputDecoration(hintText: '0', suffixText: '%',
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             keyboardType: TextInputType.number,
             onChanged: (v) => setState(() => _descuentoPct = double.tryParse(v) ?? 0)))),
           const SizedBox(width: 8),
-          Expanded(child: _campo('Envío', child: TextFormField(
+          Expanded(child: _campo(tr('Envío'), child: TextFormField(
             key: ValueKey('envio_$_envioVer'),
             initialValue: _costoEnvio > 0 ? _costoEnvio.toStringAsFixed(0) : '',
             decoration: const InputDecoration(hintText: '0', prefixText: '\$',
@@ -729,7 +747,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         Align(alignment: Alignment.centerRight, child: TextButton.icon(
           onPressed: _cotizarEnvioHetna,
           icon: const Icon(Icons.local_shipping_outlined, size: 16, color: AppColors.naranja),
-          label: Text(_envioDescripcion ?? 'Cotizar con Envíos HETNA',
+          label: Text(tr(_envioDescripcion ?? tr('Cotizar con Envíos HETNA')),
             style: const TextStyle(fontSize: 12, color: AppColors.naranja)))),
         const SizedBox(height: 4),
         Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -739,18 +757,18 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             border: Border.all(color: _aplicaIva ? AppColors.verde : AppColors.grisBorde)),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('IVA ${_ivaPct.toInt()}%', style: TextStyle(fontWeight: FontWeight.w600,
+              Text(trf('IVA {0}%', [pctTexto(_ivaPct)]), style: TextStyle(fontWeight: FontWeight.w600,
                 color: _aplicaIva ? AppColors.verde : AppColors.textoSecundario)),
-              Text(_aplicaIva ? 'Incluido en el total' : 'No aplica IVA',
+              Text(tr(_aplicaIva ? tr('Incluido en el total') : tr('No aplica IVA')),
                 style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             ]),
             Switch(value: _aplicaIva, onChanged: (v) => setState(() => _aplicaIva = v),
               activeColor: AppColors.verde),
           ])),
         const SizedBox(height: 10),
-        if (_descuentoPct > 0) _fila('Descuento ${_descuentoPct.toInt()}%', '-${fmt.format(_montoDescuento)}', AppColors.verde),
-        if (_aplicaIva) _fila('IVA ${_ivaPct.toInt()}%', fmt.format(_montoIva), AppColors.textoSecundario),
-        if (_costoEnvio > 0) _fila('Envío', fmt.format(_costoEnvio), AppColors.textoSecundario),
+        if (_descuentoPct > 0) _fila(trf('Descuento {0}%', [(_descuentoPct.toInt())]), '-${fmt.format(_montoDescuento)}', AppColors.verde),
+        if (_aplicaIva) _fila(trf('IVA {0}%', [pctTexto(_ivaPct)]), fmt.format(_montoIva), AppColors.textoSecundario),
+        if (_costoEnvio > 0) _fila(tr('Envío'), fmt.format(_costoEnvio), AppColors.textoSecundario),
         const Divider(),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('TOTAL', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.azul)),
@@ -762,25 +780,25 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         onPressed: _puedeAccionar && !_generando ? _generarPDF : null,
         icon: _generando ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
           : const Icon(Icons.picture_as_pdf),
-        label: const Text('Generar y ver PDF')),
+        label: Text(tr('Generar y ver PDF'))),
       const SizedBox(height: 8),
       ElevatedButton.icon(
         onPressed: _puedeAccionar ? _enviarWA : null,
         icon: const Icon(Icons.chat),
-        label: const Text('Enviar cotización por WhatsApp'),
+        label: Text(tr('Enviar cotización por WhatsApp')),
         style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366))),
       const SizedBox(height: 8),
       Row(children: [
         Expanded(child: OutlinedButton.icon(
           onPressed: _puedeAccionar && !_guardando ? _guardar : null,
           icon: const Icon(Icons.save_outlined),
-          label: Text(_esEdicion ? 'Guardar cambios' : 'Guardar borrador'))),
+          label: Text(tr(_esEdicion ? tr('Guardar cambios') : tr('Guardar borrador'))))),
         const SizedBox(width: 8),
         Expanded(child: ElevatedButton.icon(
           onPressed: _puedeAccionar && !_guardando ? _convertirPedido : null,
           icon: _guardando ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.check_circle_outline),
-          label: const Text('→ Convertir a PEDIDO'),
+          label: Text(tr('→ Convertir a PEDIDO')),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde))),
       ]),
       const SizedBox(height: 24),
@@ -794,7 +812,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     padding: const EdgeInsets.all(12),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [Icon(icon, size: 16, color: AppColors.azul), const SizedBox(width: 6),
-        Text(titulo, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.azul))]),
+        Text(tr(titulo), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.azul))]),
       const SizedBox(height: 10), contenido]));
 
   Widget _opcionTipo(String valor, String titulo, String desc) {
@@ -810,12 +828,12 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           border: Border.all(color: sel ? AppColors.azul : AppColors.grisBorde, width: sel ? 1.5 : 0.5)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Expanded(child: Text(titulo, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+            Expanded(child: Text(tr(titulo), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
               color: sel ? Colors.white : AppColors.textoPrincipal))),
             if (candado && !sel) const Icon(Icons.lock_outline, size: 14, color: Colors.amber),
           ]),
           const SizedBox(height: 2),
-          Text(desc, style: TextStyle(fontSize: 10,
+          Text(tr(desc), style: TextStyle(fontSize: 10,
             color: sel ? Colors.white70 : AppColors.textoSecundario)),
         ])));
   }
@@ -824,24 +842,24 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     _bloque(titulo, icon, Column(children: campos.map((f) => Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TextField(
-        controller: _ctrlPro(f.$1, f.$4),
+        controller: _ctrlPro(f.$1, tr(f.$4)),
         maxLines: f.$3,
         minLines: 1,
         style: const TextStyle(fontSize: 13),
         decoration: InputDecoration(
-          labelText: f.$2, isDense: true,
+          labelText: tr(f.$2), isDense: true,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))))).toList()));
 
   Widget _campo(String label, {required Widget child}) =>
     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      Text(tr(label), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       const SizedBox(height: 4), child]);
 
   Widget _fila(String label, String valor, Color color) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 3),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-      Text(valor, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
+      Text(tr(label), style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      Text(tr(valor), style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500)),
     ]));
 
   Future<void> _seleccionarCliente() async {
@@ -858,7 +876,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           Container(width: 36, height: 4,
             decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 16),
-          const Text('Seleccionar cliente',
+          Text(tr('Seleccionar cliente'),
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
           SizedBox(width: double.infinity,
@@ -875,7 +893,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                     onNuevo: _nuevoClienteRapido));
               },
               icon: const Icon(Icons.people_outline, color: Colors.white),
-              label: const Text('Clientes HETNA CNC',
+              label: Text(tr('Clientes HETNA CNC'),
                 style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.azul,
@@ -888,7 +906,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                 await _seleccionarDesdeContactos();
               },
               icon: const Icon(Icons.contact_phone_outlined, color: Colors.white),
-              label: const Text('Agenda del celular',
+              label: Text(tr('Agenda del celular'),
                 style: TextStyle(color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF7c3aed),
@@ -898,7 +916,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             child: OutlinedButton.icon(
               onPressed: () { Navigator.pop(context); _nuevoClienteRapido(); },
               icon: const Icon(Icons.person_add_outlined),
-              label: const Text('Nuevo cliente rapido'),
+              label: Text(tr('Nuevo cliente rapido')),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.azul,
                 side: const BorderSide(color: AppColors.azul),
@@ -911,7 +929,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       final permiso = await FlutterContacts.requestPermission(readonly: true);
       if (!permiso) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Permiso de contactos denegado'),
+          SnackBar(content: Text(tr('Permiso de contactos denegado')),
             backgroundColor: AppColors.rojo));
         return;
       }
@@ -950,7 +968,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           }));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al acceder contactos: $e'),
+        SnackBar(content: Text(trf('Error al acceder contactos: {0}', [e])),
           backgroundColor: AppColors.rojo));
     }
   }
@@ -974,7 +992,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
               Container(width: 36, height: 4, decoration: BoxDecoration(
                 color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 14),
-              const Text('Nuevo cliente rápido',
+              Text(tr('Nuevo cliente rápido'),
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               const SizedBox(height: 16),
               TextField(
@@ -982,7 +1000,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                 autofocus: true,
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
-                  labelText: 'Nombre *',
+                  labelText: tr('Nombre *'),
                   prefixIcon: const Icon(Icons.person_outline),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
               const SizedBox(height: 10),
@@ -991,7 +1009,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                 keyboardType: TextInputType.phone,
                 textInputAction: TextInputAction.done,
                 decoration: InputDecoration(
-                  labelText: 'WhatsApp',
+                  labelText: tr('WhatsApp'),
                   hintText: '2461234567',
                   prefixIcon: const Icon(Icons.phone_outlined),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
@@ -1017,7 +1035,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                     backgroundColor: AppColors.azul,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                  child: const Text('Guardar cliente',
+                  child: Text(tr('Guardar cliente'),
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
             ])))));
   }
@@ -1039,13 +1057,13 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('Producto / Servicio rápido', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Text(tr('Producto / Servicio rápido'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 12),
-            TextField(controller: n, decoration: const InputDecoration(labelText: 'Nombre *',
+            TextField(controller: n, decoration: InputDecoration(labelText: tr('Nombre *'),
               contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
             const SizedBox(height: 8),
             TextField(controller: p, keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Precio \$', prefixText: '\$',
+              decoration: InputDecoration(labelText: tr('Precio \$'), prefixText: '\$',
                 contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10))),
             const SizedBox(height: 12),
             ElevatedButton(onPressed: () async {
@@ -1054,19 +1072,21 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                 nombre: n.text.trim(), precioVenta: double.tryParse(p.text) ?? 0,
                 costo: 0, unidadMedida: 'Pieza', stockDisponible: 0));
               if (mounted) { setState(() => _items.add(CotizacionItem.fromProducto(prod))); Navigator.pop(context); }
-            }, child: const Text('Agregar a cotización')),
+            }, child: Text(tr('Agregar a cotización'))),
           ]))));
   }
 
   Future<void> _generarPDF() async {
+    final ingles = await PdfService.elegirIdioma(context);
+    if (ingles == null) return;
     setState(() => _generando = true);
     try {
       final cfg = await SupabaseService.getConfiguracion();
       final cot = _buildCotizacion();
-      final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg);
+      final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg, ingles: ingles);
       await PdfService.verPdf(bytes);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error PDF: $e')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Error PDF: {0}', [e]))));
     } finally {
       if (mounted) setState(() => _generando = false);
     }
@@ -1075,8 +1095,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   Future<void> _enviarWA() async {
     if (_cliente == null) return;
     final fmt = NumberFormat('\$#,##0', 'es_MX');
-    final itemsTexto = _items.map((i) => '• ${i.nombreProducto} x${i.cantidad} = ${fmt.format(i.subtotal)}').join('\n');
-    final msg = '¡Hola ${_cliente!.nombre}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n$itemsTexto\n\nSubtotal: ${fmt.format(_baseIva)}${_aplicaIva ? "\nIVA ${_ivaPct.toInt()}%: ${fmt.format(_montoIva)}" : ""}\n*TOTAL: ${fmt.format(_total)}*\n\nTiempo de entrega: $_tiempoEntrega\nMétodo de pago: $_metodoPago\n\n¿Te parece bien? 😊 — *HETNA CNC*';
+    final itemsTexto = _items.map((i) => trf('• {0} x{1} = {2}', [(i.nombreProducto), (i.cantidad), (fmt.format(i.subtotal))])).join('\n');
+    final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *HETNA CNC*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? trf('\nIVA {0}%: {1}', [pctTexto(_ivaPct), (fmt.format(_montoIva))]) : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago]);
     if (mounted) await WhatsAppService.abrirChatConSelector(context,
       numero: _cliente!.whatsappNumero, mensaje: msg);
   }
@@ -1088,7 +1108,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     if (n < Planes.limiteCotizacionesGratis) return true;
     if (!mounted) return false;
     await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
-      funcion: 'más de ${Planes.limiteCotizacionesGratis} cotizaciones al mes');
+      funcion: trf('más de {0} cotizaciones al mes', [(Planes.limiteCotizacionesGratis)]));
     return false;
   }
 
@@ -1103,16 +1123,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         await SupabaseService.actualizarCotizacion(cot, _items,
           incluirTipo: _tipoOriginal == 'profesional' || _tipo == 'profesional');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('✅ Cotización actualizada'), backgroundColor: AppColors.verde));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('✅ Cotización actualizada')), backgroundColor: AppColors.verde));
           widget.onGuardada?.call();
         }
       } else {
         final cot = _buildCotizacion(estado: 'Borrador');
         await SupabaseService.crearCotizacion(cot, _items);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('✅ Borrador guardado'), backgroundColor: AppColors.azul));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('✅ Borrador guardado')), backgroundColor: AppColors.azul));
           widget.onGuardada?.call();
           setState(() { _items = []; _cliente = null; });
         }
@@ -1139,8 +1159,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           incluirTipo: _tipoOriginal == 'profesional' || _tipo == 'profesional');
         await SupabaseService.convertirEnPedido(cotActualizada);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('✅ ¡Pedido actualizado! Visible en Avances'),
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('✅ ¡Pedido actualizado! Visible en Avances')),
             backgroundColor: AppColors.verde));
           widget.onGuardada?.call();
         }
@@ -1149,8 +1169,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         final cotGuardada = await SupabaseService.crearCotizacion(cot, _items);
         await SupabaseService.convertirEnPedido(cotGuardada);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('✅ ¡Pedido creado! Visible en Avances'),
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('✅ ¡Pedido creado! Visible en Avances')),
             backgroundColor: AppColors.verde));
           setState(() { _items = []; _cliente = null; _descuentoPct = 0; _costoEnvio = 0; _notas = ''; });
         }
@@ -1193,18 +1213,18 @@ class _ItemRow extends StatelessWidget {
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
         child: Container(padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Título y descripción', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            Text(tr('Título y descripción'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            const Text('Esto se imprime en el PDF que ve el cliente para esta línea.',
+            Text(tr('Esto se imprime en el PDF que ve el cliente para esta línea.'),
               style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             const SizedBox(height: 12),
             TextField(controller: tituloCtrl,
-              decoration: const InputDecoration(labelText: 'Título *', border: OutlineInputBorder())),
+              decoration: InputDecoration(labelText: tr('Título *'), border: OutlineInputBorder())),
             const SizedBox(height: 8),
             TextField(controller: descCtrl, maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Descripción (opcional)',
-                hintText: 'Ej. medidas, material, detalles del trabajo...',
+              decoration: InputDecoration(
+                labelText: tr('Descripción (opcional)'),
+                hintText: tr('Ej. medidas, material, detalles del trabajo...'),
                 border: OutlineInputBorder())),
             const SizedBox(height: 12),
             SizedBox(width: double.infinity, child: ElevatedButton(
@@ -1212,7 +1232,7 @@ class _ItemRow extends StatelessWidget {
                 if (tituloCtrl.text.trim().isEmpty) return;
                 Navigator.pop(ctx, true);
               },
-              child: const Text('Guardar'))),
+              child: Text(tr('Guardar')))),
           ]))));
     if (ok == true) {
       onDetalleChanged(tituloCtrl.text.trim(),
@@ -1253,7 +1273,7 @@ class _ItemRow extends StatelessWidget {
           Expanded(flex: 3, child: TextFormField(
             initialValue: item.precioUnitario.toStringAsFixed(0),
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(prefixText: '\$', labelText: 'Precio unit.', isDense: true,
+            decoration: InputDecoration(prefixText: '\$', labelText: tr('Precio unit.'), isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6)),
             style: const TextStyle(fontSize: 13),
             onChanged: (v) => onPrecioChanged(double.tryParse(v) ?? item.precioUnitario))),
@@ -1310,10 +1330,10 @@ class _SelectorClienteState extends State<_SelectorCliente> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       child: Column(children: [
         Padding(padding: const EdgeInsets.all(12), child: Column(children: [
-          const Text('Seleccionar cliente', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          Text(tr('Seleccionar cliente'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           TextField(autofocus: true,
-            decoration: InputDecoration(hintText: 'Buscar por nombre o empresa...',
+            decoration: InputDecoration(hintText: tr('Buscar por nombre o empresa...'),
               prefixIcon: const Icon(Icons.search, size: 20),
               filled: true, fillColor: AppColors.gris,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
@@ -1322,7 +1342,7 @@ class _SelectorClienteState extends State<_SelectorCliente> {
           OutlinedButton.icon(
             onPressed: () { Navigator.pop(context); widget.onNuevo(); },
             icon: const Icon(Icons.person_add_outlined, size: 16),
-            label: const Text('Agregar nuevo cliente')),
+            label: Text(tr('Agregar nuevo cliente'))),
         ])),
         Expanded(child: ListView.builder(
           itemCount: _filtrados.length,
@@ -1378,10 +1398,10 @@ class _SelectorProductoState extends State<_SelectorProducto> {
       child: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 6), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Seleccionar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          Text(tr('Seleccionar producto'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 10),
           TextField(autofocus: true,
-            decoration: InputDecoration(hintText: 'Buscar producto...',
+            decoration: InputDecoration(hintText: tr('Buscar producto...'),
               prefixIcon: const Icon(Icons.search, size: 20),
               filled: true, fillColor: AppColors.gris,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)),
@@ -1399,20 +1419,20 @@ class _SelectorProductoState extends State<_SelectorProducto> {
                     color: activo ? AppColors.azul : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: activo ? AppColors.azul : AppColors.grisBorde)),
-                  child: Text(cat, style: TextStyle(
+                  child: Text(tr(cat), style: TextStyle(
                     fontSize: 11, fontWeight: FontWeight.w600,
                     color: activo ? Colors.white : AppColors.textoSecundario))));
             }).toList())),
         ])),
         Expanded(child: _filtrados.isEmpty
-          ? const Center(child: Text('No hay productos', style: TextStyle(color: AppColors.textoSecundario)))
+          ? Center(child: Text(tr('No hay productos'), style: TextStyle(color: AppColors.textoSecundario)))
           : ListView.builder(
               itemCount: _filtrados.length,
               itemBuilder: (_, i) {
                 final p = _filtrados[i];
                 return ListTile(
                   title: Text(p.nombre, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                  subtitle: Text(p.categoriaNombre ?? p.unidadMedida, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                  subtitle: Text(tr(p.categoriaNombre ?? p.unidadMedida), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                   trailing: Text('\$${p.precioVenta.toStringAsFixed(0)}',
                     style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul, fontSize: 15)),
                   onTap: () { widget.onSeleccionado(p); Navigator.pop(context); });
@@ -1470,26 +1490,26 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
     String? categoria;
     final info = await showDialog<Map<String,String>>(context: context,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
-        title: const Text('Agregar PDF al catálogo', style: TextStyle(fontSize: 15)),
+        title: Text(tr('Agregar PDF al catálogo'), style: TextStyle(fontSize: 15)),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(controller: nombreCtrl, autofocus: true,
-            decoration: const InputDecoration(labelText: 'Nombre del catálogo *', border: OutlineInputBorder())),
+            decoration: InputDecoration(labelText: tr('Nombre del catálogo *'), border: OutlineInputBorder())),
           const SizedBox(height: 8),
           TextField(controller: urlCtrl,
-            decoration: const InputDecoration(
-              labelText: 'URL del PDF *',
+            decoration: InputDecoration(
+              labelText: tr('URL del PDF *'),
               hintText: 'https://drive.google.com/...',
               border: OutlineInputBorder()),
             keyboardType: TextInputType.url),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(value: categoria,
-            decoration: const InputDecoration(labelText: 'Categoría', border: OutlineInputBorder()),
-            hint: const Text('Seleccionar'),
-            items: cats.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+            decoration: InputDecoration(labelText: tr('Categoría'), border: OutlineInputBorder()),
+            hint: Text(tr('Seleccionar')),
+            items: cats.map((c) => DropdownMenuItem(value: c, child: Text(tr(c), style: const TextStyle(fontSize: 13)))).toList(),
             onChanged: (v) => setS(() => categoria = v)),
         ])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () {
               if (nombreCtrl.text.trim().isEmpty || urlCtrl.text.trim().isEmpty) return;
@@ -1500,7 +1520,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
               });
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-            child: const Text('Guardar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Guardar'), style: TextStyle(color: Colors.white))),
         ])));
     if (info == null) return;
     setState(() => _subiendo = true);
@@ -1508,8 +1528,8 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
       await SupabaseService.subirPdf(
         nombre: info['nombre']!, url: info['url']!, categoria: info['categoria']);
       await _cargar();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ PDF agregado al catálogo'), backgroundColor: AppColors.verde));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ PDF agregado al catálogo')), backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Error: $e'), backgroundColor: AppColors.rojo));
@@ -1536,16 +1556,16 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                 decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB)))),
                 child: Column(children: [
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('Nueva lista de productos', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+                    Text(tr('Nueva lista de productos'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                     IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx))]),
                   const SizedBox(height: 8),
                   TextField(controller: nombreCtrl,
-                    decoration: const InputDecoration(labelText: 'Nombre de la lista',
-                      hintText: 'Ej: Precios Junio 2026', border: OutlineInputBorder(),
+                    decoration: InputDecoration(labelText: tr('Nombre de la lista'),
+                      hintText: tr('Ej: Precios Junio 2026'), border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
                     style: const TextStyle(fontSize: 13)),
                   const SizedBox(height: 6),
-                  Text('${_seleccionados.length} productos seleccionados',
+                  Text(trf('{0} productos seleccionados', [(_seleccionados.length)]),
                     style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
                 ])),
               Expanded(child: ListView.builder(
@@ -1571,7 +1591,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                   child: ElevatedButton.icon(
                     onPressed: _seleccionados.isEmpty ? null : () async {
                       if (nombreCtrl.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Ingresa un nombre')));
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(tr('Ingresa un nombre'))));
                         return;
                       }
                       Navigator.pop(ctx);
@@ -1579,16 +1599,16 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                         await SupabaseService.crearCatalogoPersonalizado(
                           nombre: nombreCtrl.text.trim(), productoIds: _seleccionados.toList());
                         await _cargar();
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('✅ Lista creada'), backgroundColor: AppColors.verde));
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(tr('✅ Lista creada')), backgroundColor: AppColors.verde));
                       } catch (e) {
                         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                           content: Text('Error: $e'), backgroundColor: AppColors.rojo));
                       }
                     },
                     icon: const Icon(Icons.save_outlined, color: Colors.white),
-                    label: Text(_seleccionados.isEmpty ? 'Selecciona productos'
-                      : 'Guardar lista (${_seleccionados.length})',
+                    label: Text(tr(_seleccionados.isEmpty ? tr('Selecciona productos')
+                      : trf('Guardar lista ({0})', [(_seleccionados.length)])),
                       style: const TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                       disabledBackgroundColor: AppColors.grisBorde,
@@ -1601,13 +1621,13 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
     if (prods.isEmpty) return;
     final catNombre = cat['nombre'] as String? ?? '';
     final sb = StringBuffer();
-    sb.writeln('📋 *$catNombre* — HETNA CNC');
+    sb.writeln(trf('📋 *{0}* — HETNA CNC', [catNombre]));
     sb.writeln('━━━━━━━━━━━━━━━━━━');
     for (final p in prods) {
       sb.writeln('▪️ *${p.nombre}*  💰 ${_fmt.format(p.precioVenta)}');
     }
     sb.writeln('━━━━━━━━━━━━━━━━━━');
-    sb.writeln('🪵 Contáctanos para más información');
+    sb.writeln(tr('🪵 Contáctanos para más información'));
     final msg = Uri.encodeComponent(sb.toString());
     launchUrl(Uri.parse('https://wa.me/?text=$msg'), mode: LaunchMode.externalApplication);
   }
@@ -1618,7 +1638,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
       TabBar(controller: _tabCtrl,
         labelColor: AppColors.azul, unselectedLabelColor: AppColors.textoSecundario,
         indicatorColor: AppColors.azul, labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        tabs: const [Tab(text: 'PDFs'), Tab(text: 'Listas')]),
+        tabs: [Tab(text: tr('PDFs')), Tab(text: tr('Listas'))]),
       Expanded(child: TabBarView(controller: _tabCtrl, children: [
         Column(children: [
           Padding(padding: const EdgeInsets.all(12),
@@ -1628,7 +1648,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                 icon: _subiendo
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.upload_file, color: Colors.white),
-                label: Text(_subiendo ? 'Subiendo...' : 'Subir PDF de catálogo',
+                label: Text(tr(_subiendo ? tr('Subiendo...') : tr('Subir PDF de catálogo')),
                   style: const TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                   padding: const EdgeInsets.symmetric(vertical: 11))))),
@@ -1636,12 +1656,12 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
             child: _pdfs.isEmpty
               ? ListView(children: [Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                  child: const Column(children: [
+                  child: Column(children: [
                     Icon(Icons.picture_as_pdf, size: 48, color: AppColors.textoSecundario),
                     SizedBox(height: 8),
-                    Text('No hay PDFs subidos aún', style: TextStyle(color: AppColors.textoSecundario)),
+                    Text(tr('No hay PDFs subidos aún'), style: TextStyle(color: AppColors.textoSecundario)),
                     SizedBox(height: 4),
-                    Text('Sube PDFs de catálogos para enviar por WhatsApp',
+                    Text(tr('Sube PDFs de catálogos para enviar por WhatsApp'),
                       style: TextStyle(fontSize: 11, color: AppColors.textoSecundario), textAlign: TextAlign.center),
                   ]))])
               : ListView.builder(
@@ -1670,7 +1690,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                             Expanded(child: OutlinedButton.icon(
                               onPressed: () => launchUrl(Uri.parse(pdf.url), mode: LaunchMode.externalApplication),
                               icon: const Icon(Icons.open_in_new, size: 13),
-                              label: const Text('Ver', style: TextStyle(fontSize: 12)),
+                              label: Text(tr('Ver'), style: TextStyle(fontSize: 12)),
                               style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
                                 side: const BorderSide(color: AppColors.azul),
                                 padding: const EdgeInsets.symmetric(vertical: 6)))),
@@ -1678,7 +1698,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                             Expanded(child: ElevatedButton.icon(
                               onPressed: () => _enviarPdfWA(pdf),
                               icon: const Icon(Icons.chat, size: 13, color: Colors.white),
-                              label: const Text('Enviar WA', style: TextStyle(fontSize: 12, color: Colors.white)),
+                              label: Text(tr('Enviar WA'), style: TextStyle(fontSize: 12, color: Colors.white)),
                               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
                                 padding: const EdgeInsets.symmetric(vertical: 6)))),
                           ])),
@@ -1691,19 +1711,19 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
               child: ElevatedButton.icon(
                 onPressed: _productos.isEmpty ? null : _crearCatalogo,
                 icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text('Crear lista de productos', style: TextStyle(color: Colors.white)),
+                label: Text(tr('Crear lista de productos'), style: TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                   padding: const EdgeInsets.symmetric(vertical: 11))))),
           Expanded(child: RefreshIndicator(onRefresh: _cargar,
             child: _catalogos.isEmpty
               ? ListView(children: [Container(margin: const EdgeInsets.all(20), padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10)),
-                  child: const Column(children: [
+                  child: Column(children: [
                     Icon(Icons.list_alt_outlined, size: 48, color: AppColors.textoSecundario),
                     SizedBox(height: 8),
-                    Text('No hay listas creadas', style: TextStyle(color: AppColors.textoSecundario)),
+                    Text(tr('No hay listas creadas'), style: TextStyle(color: AppColors.textoSecundario)),
                     SizedBox(height: 4),
-                    Text('Crea listas de productos con precios y envíalas por WhatsApp',
+                    Text(tr('Crea listas de productos con precios y envíalas por WhatsApp'),
                       style: TextStyle(fontSize: 11, color: AppColors.textoSecundario), textAlign: TextAlign.center),
                   ]))])
               : ListView.builder(
@@ -1720,7 +1740,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                           leading: Container(width: 38, height: 38,
                             decoration: BoxDecoration(color: AppColors.azul.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
                             child: const Icon(Icons.list_alt, color: AppColors.azul, size: 20)),
-                          title: Text(cat['nombre'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                          title: Text(tr(cat['nombre'] ?? ''), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                           subtitle: Text('${ids.length} productos', style: const TextStyle(fontSize: 10)),
                           trailing: IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.textoSecundario),
                             onPressed: () async {
@@ -1732,7 +1752,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
                             child: ElevatedButton.icon(
                               onPressed: () => _enviarListaWA(cat),
                               icon: const Icon(Icons.chat, size: 13, color: Colors.white),
-                              label: const Text('Enviar por WhatsApp', style: TextStyle(fontSize: 12, color: Colors.white)),
+                              label: Text(tr('Enviar por WhatsApp'), style: TextStyle(fontSize: 12, color: Colors.white)),
                               style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
                                 padding: const EdgeInsets.symmetric(vertical: 8))))),
                       ]));
@@ -1756,6 +1776,8 @@ class _BtnPdfWA extends StatefulWidget {
 class _BtnPdfWAState extends State<_BtnPdfWA> {
   bool _generando = false;
   Future<void> _generar() async {
+    final ingles = await PdfService.elegirIdioma(context);
+    if (ingles == null) return;
     setState(() => _generando = true);
     try {
       Cotizacion cot = widget.cotizacion;
@@ -1764,12 +1786,12 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
         cot = cot.copiaConItems(items);
       }
       final cfg = await SupabaseService.getConfiguracion();
-      final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg);
+      final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg, ingles: ingles);
       final folio = cot.folio ?? 'cotizacion';
       if (mounted) await PdfService.mostrarOpcionesEnvio(context, bytes, '$folio.pdf');
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al generar PDF: $e'), backgroundColor: AppColors.rojo));
+        SnackBar(content: Text(trf('Error al generar PDF: {0}', [e])), backgroundColor: AppColors.rojo));
     }
     if (mounted) setState(() => _generando = false);
   }
@@ -1780,7 +1802,7 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
       icon: _generando
         ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
         : const Icon(Icons.share_outlined, size: 14, color: Colors.white),
-      label: Text(_generando ? 'Generando...' : 'PDF / WA',
+      label: Text(tr(_generando ? tr('Generando...') : tr('PDF / WA')),
         style: const TextStyle(fontSize: 11, color: Colors.white)),
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF25D366),
@@ -1823,13 +1845,13 @@ class _ContactosPickerState extends State<_ContactosPicker> {
             child: Row(children: [
               const Icon(Icons.contact_phone_outlined, color: AppColors.azul, size: 20),
               const SizedBox(width: 8),
-              Text('Contactos (${filtrados.length})',
+              Text(trf('Contactos ({0})', [(filtrados.length)]),
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ])),
           Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Buscar contacto...',
+                hintText: tr('Buscar contacto...'),
                 prefixIcon: const Icon(Icons.search, color: AppColors.textoSecundario),
                 isDense: true,
                 filled: true,
@@ -1853,7 +1875,7 @@ class _ContactosPickerState extends State<_ContactosPicker> {
                 leading: CircleAvatar(
                   backgroundColor: AppColors.azulClaro,
                   child: Text(
-                    c.displayName.isNotEmpty ? c.displayName[0].toUpperCase() : '?',
+                    tr(c.displayName.isNotEmpty ? c.displayName[0].toUpperCase() : '?'),
                     style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
                 title: Text(c.displayName,
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),

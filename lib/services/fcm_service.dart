@@ -7,6 +7,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../i18n/tr.dart';
 
 // ── Handler para mensajes en segundo plano ──────────────
 // DEBE estar fuera de cualquier clase (función top-level)
@@ -123,7 +124,7 @@ class FcmService {
 
     await _localNotif.show(
       message.hashCode,
-      notif.title ?? 'HETNA CNC',
+      notif.title ?? tr('HETNA CNC'),
       notif.body,
       NotificationDetails(
         android: AndroidNotificationDetails(

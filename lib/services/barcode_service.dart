@@ -15,6 +15,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mobile_scanner/mobile_scanner.dart';
+import '../i18n/tr.dart';
 
 class ProductoEscaneado {
   final String? nombre;
@@ -86,7 +87,7 @@ class _ScannerScreenState extends State<_ScannerScreen> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('Escanea el código de barras'),
+        title: Text(tr('Escanea el código de barras')),
       ),
       body: Stack(children: [
         MobileScanner(
@@ -104,8 +105,8 @@ class _ScannerScreenState extends State<_ScannerScreen> {
           decoration: BoxDecoration(
             border: Border.all(color: Colors.white, width: 2),
             borderRadius: BorderRadius.circular(12)))),
-        const Positioned(bottom: 40, left: 0, right: 0,
-          child: Text('Apunta la cámara al código de barras',
+        Positioned(bottom: 40, left: 0, right: 0,
+          child: Text(tr('Apunta la cámara al código de barras'),
             textAlign: TextAlign.center,
             style: TextStyle(color: Colors.white, fontSize: 14))),
       ]));

@@ -8,6 +8,7 @@ import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
+import '../i18n/tr.dart';
 
 class PedidosPublicosScreen extends StatefulWidget {
   const PedidosPublicosScreen({super.key});
@@ -89,14 +90,14 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
       if (p['tipo'] == 'catalogo' && p['items'] != null) {
         for (final item in (p['items'] as List)) {
           items.add(CotizacionItem(
-            nombreProducto: item['nombre'] ?? 'Producto',
+            nombreProducto: item['nombre'] ?? tr('Producto'),
             cantidad: (item['cantidad'] as num?)?.toInt() ?? 1,
             precioUnitario: (item['precio'] as num?)?.toDouble() ?? 0,
           ));
         }
       } else {
         items.add(CotizacionItem(
-          nombreProducto: p['descripcion_personalizada'] ?? 'Pedido personalizado',
+          nombreProducto: p['descripcion_personalizada'] ?? tr('Pedido personalizado'),
           cantidad: 1,
           precioUnitario: (p['monto_estimado'] as num?)?.toDouble() ?? 0,
         ));
@@ -106,7 +107,7 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
       final cot = Cotizacion(
         cliente: cliente, clienteId: cliente.id,
         items: items, estado: 'Pedido',
-        notas: 'Pedido recibido desde el enlace público de clientes.',
+        notas: tr('Pedido recibido desde el enlace público de clientes.'),
         createdAt: DateTime.now());
       final cotGuardada = await SupabaseService.crearCotizacion(cot, items);
       await SupabaseService.convertirEnPedido(cotGuardada);
@@ -114,12 +115,12 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
       // 4. Marcar el pedido público como convertido
       await _cambiarEstado(p['id'], 'convertido');
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ Pedido enviado a producción — visible en Avances'),
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ Pedido enviado a producción — visible en Avances')),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error al convertir: $e'), backgroundColor: AppColors.rojo));
+        content: Text(trf('Error al convertir: {0}', [e])), backgroundColor: AppColors.rojo));
     }
   }
 
@@ -133,7 +134,7 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.gris,
-      appBar: AppBar(title: const Text('Pedidos de clientes'),
+      appBar: AppBar(title: Text(tr('Pedidos de clientes')),
         backgroundColor: Colors.white, foregroundColor: Colors.black87, elevation: 0),
       body: Column(children: [
         Container(color: Colors.white, padding: const EdgeInsets.symmetric(vertical: 8),
@@ -157,9 +158,9 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
         Expanded(child: _cargando
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(onRefresh: _cargar, child: _filtrados.isEmpty
-              ? ListView(children: const [
+              ? ListView(children: [
                   Padding(padding: EdgeInsets.all(40),
-                    child: Center(child: Text('No hay pedidos en este estado',
+                    child: Center(child: Text(tr('No hay pedidos en este estado'),
                       style: TextStyle(color: AppColors.textoSecundario))))])
               : ListView.builder(padding: const EdgeInsets.all(12),
                   itemCount: _filtrados.length,
@@ -183,17 +184,17 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(p['nombre_cliente'] ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+              Text(tr(p['nombre_cliente'] ?? ''), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
               GestureDetector(
                 onTap: () => _abrirWhatsApp(p['telefono_cliente'] ?? ''),
                 child: Row(children: [
                   const Icon(Icons.chat, size: 12, color: AppColors.whatsapp),
                   const SizedBox(width: 4),
-                  Text(p['telefono_cliente'] ?? '',
+                  Text(tr(p['telefono_cliente'] ?? ''),
                     style: const TextStyle(fontSize: 11, color: AppColors.whatsapp)),
                 ])),
             ])),
-            if (fecha != null) Text(DateFormat('dd/MM HH:mm').format(fecha),
+            if (fecha != null) Text(DateFormat(enIngles ? 'MM/dd h:mm a' : 'dd/MM HH:mm').format(fecha),
               style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           ]),
           const SizedBox(height: 8),
@@ -202,9 +203,9 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
             child: esCatalogo
               ? Column(crossAxisAlignment: CrossAxisAlignment.start,
                   children: items.map((it) => Text(
-                    '• ${it['nombre']} x${it['cantidad']}',
+                    trf('• {0} x{1}', [(it['nombre']), (it['cantidad'])]),
                     style: const TextStyle(fontSize: 12))).toList())
-              : Text(p['descripcion_personalizada'] ?? '',
+              : Text(tr(p['descripcion_personalizada'] ?? ''),
                   style: const TextStyle(fontSize: 12))),
           if (p['monto_estimado'] != null) ...[
             const SizedBox(height: 6),
@@ -219,7 +220,7 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
   Widget _botonesAccion(Map<String, dynamic> p) {
     final estado = p['estado'];
     if (estado == 'convertido' || estado == 'rechazado') {
-      return Text(estado == 'convertido' ? '✅ Ya está en producción' : '❌ Rechazado',
+      return Text(tr(estado == 'convertido' ? tr('✅ Ya está en producción') : tr('❌ Rechazado')),
         style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario, fontStyle: FontStyle.italic));
     }
     return Wrap(spacing: 6, runSpacing: 6, children: [
@@ -228,26 +229,26 @@ class _PedidosPublicosScreenState extends State<PedidosPublicosScreen> {
           onPressed: () => _cambiarEstado(p['id'], 'confirmado'),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-          child: const Text('Confirmar', style: TextStyle(fontSize: 11, color: Colors.white))),
+          child: Text(tr('Confirmar'), style: TextStyle(fontSize: 11, color: Colors.white))),
       if (estado == 'confirmado')
         ElevatedButton(
           onPressed: () => _cambiarEstado(p['id'], 'pagado'),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-          child: const Text('Marcar pagado', style: TextStyle(fontSize: 11, color: Colors.white))),
+          child: Text(tr('Marcar pagado'), style: TextStyle(fontSize: 11, color: Colors.white))),
       if (estado == 'pagado' || estado == 'confirmado')
         ElevatedButton(
           onPressed: () => _convertirAProduccion(p),
           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF7c3aed),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-          child: const Text('→ Enviar a producción', style: TextStyle(fontSize: 11, color: Colors.white))),
+          child: Text(tr('→ Enviar a producción'), style: TextStyle(fontSize: 11, color: Colors.white))),
       if (estado == 'nuevo')
         OutlinedButton(
           onPressed: () => _cambiarEstado(p['id'], 'rechazado'),
           style: OutlinedButton.styleFrom(foregroundColor: AppColors.rojo,
             side: const BorderSide(color: AppColors.rojo),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-          child: const Text('Rechazar', style: TextStyle(fontSize: 11))),
+          child: Text(tr('Rechazar'), style: TextStyle(fontSize: 11))),
     ]);
   }
 }

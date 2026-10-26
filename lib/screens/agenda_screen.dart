@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
+import '../i18n/tr.dart';
 
 // ══════════════════════════════════════════════════════
 // MODELO EVENTO
@@ -66,7 +67,7 @@ class AgendaEvento {
       case 'pago_pendiente':     return 'Pago pendiente';
       case 'seguimiento':        return 'Seguimiento';
       case 'produccion':         return 'Producción';
-      default:                   return 'Evento';
+      default:                   return tr('Evento');
     }
   }
 
@@ -92,12 +93,12 @@ class AgendaEvento {
   }
 
   String get semaforoLabel {
-    if (completado) return 'Completado';
+    if (completado) return tr('Completado');
     final dias = fechaInicio.difference(DateTime.now()).inDays;
-    if (dias < 0)  return 'Vencido (${dias.abs()}d)';
+    if (dias < 0)  return trf('Vencido ({0}d)', [(dias.abs())]);
     if (dias == 0) return 'Hoy';
-    if (dias == 1) return 'Mañana';
-    return 'En $dias días';
+    if (dias == 1) return tr('Mañana');
+    return trf('En {0} días', [dias]);
   }
 }
 
@@ -202,8 +203,8 @@ class _AgendaScreenState extends State<AgendaScreen>
   List<AgendaEvento> _pendientes = [];
   bool _cargando = true;
 
-  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
-  final _fmtMes = DateFormat('MMMM yyyy', 'es_MX');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
+  final _fmtMes = DateFormat('MMMM yyyy', localeFormato);
   final _fmt = NumberFormat('\$#,##0', 'es_MX');
 
   @override
@@ -253,7 +254,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Agenda Inteligente',
+        title: Text(tr('Agenda Inteligente'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         actions: [
           IconButton(
@@ -269,9 +270,9 @@ class _AgendaScreenState extends State<AgendaScreen>
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           tabs: [
-            const Tab(text: '📅 Calendario'),
-            Tab(text: '☀️ Hoy (${_eventosDia.where((e) => !e.completado).length})'),
-            Tab(text: '⏳ Pendientes (${_pendientes.length})'),
+            Tab(text: tr('📅 Calendario')),
+            Tab(text: trf('☀️ Hoy ({0})', [(_eventosDia.where((e) => !e.completado).length)])),
+            Tab(text: trf('⏳ Pendientes ({0})', [(_pendientes.length)])),
           ]),
       ),
       body: _cargando
@@ -321,7 +322,7 @@ class _AgendaScreenState extends State<AgendaScreen>
         color: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(children: ['L','M','X','J','V','S','D'].map((d) =>
-          Expanded(child: Center(child: Text(d,
+          Expanded(child: Center(child: Text(tr(d),
             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
               color: d == 'D' || d == 'S' ? AppColors.rojo.withOpacity(0.6) : AppColors.textoSecundario))))).toList())),
 
@@ -397,13 +398,13 @@ class _AgendaScreenState extends State<AgendaScreen>
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(esHoy ? 'Hoy — $esTitulo' : esTitulo,
+            Text(tr(esHoy ? trf('Hoy — {0}', [esTitulo]) : esTitulo),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
             Text('${_eventosDia.length} evento${_eventosDia.length != 1 ? "s" : ""}',
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           ])),
         Expanded(child: _eventosDia.isEmpty
-          ? const Center(child: Text('Sin eventos este día',
+          ? Center(child: Text(tr('Sin eventos este día'),
               style: TextStyle(color: AppColors.textoSecundario, fontSize: 13)))
           : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -434,7 +435,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       child: ListView(padding: const EdgeInsets.all(14), children: [
         // Resumen visual
         Row(children: [
-          _kpiHoy('Vencidos', '${vencidos.length}', AppColors.rojo, Icons.warning_amber_outlined),
+          _kpiHoy(tr('Vencidos'), '${vencidos.length}', AppColors.rojo, Icons.warning_amber_outlined),
           const SizedBox(width: 8),
           _kpiHoy('Hoy', '${eventosHoy.length}', AppColors.ambar, Icons.today_outlined),
           const SizedBox(width: 8),
@@ -443,32 +444,32 @@ class _AgendaScreenState extends State<AgendaScreen>
         const SizedBox(height: 14),
 
         if (vencidos.isNotEmpty) ...[
-          _secLabel('🔴 VENCIDOS', AppColors.rojo),
+          _secLabel(tr('🔴 VENCIDOS'), AppColors.rojo),
           ...vencidos.map((e) => _cardEvento(e)),
           const SizedBox(height: 10),
         ],
         if (eventosHoy.isNotEmpty) ...[
-          _secLabel('☀️ HOY', AppColors.ambar),
+          _secLabel(tr('☀️ HOY'), AppColors.ambar),
           ...eventosHoy.map((e) => _cardEvento(e)),
           const SizedBox(height: 10),
         ],
         if (eventosManana.isNotEmpty) ...[
-          _secLabel('🌅 MAÑANA', AppColors.azul),
+          _secLabel(tr('🌅 MAÑANA'), AppColors.azul),
           ...eventosManana.map((e) => _cardEvento(e)),
           const SizedBox(height: 10),
         ],
         if (proximos.isNotEmpty) ...[
-          _secLabel('📆 PRÓXIMOS 7 DÍAS', AppColors.verde),
+          _secLabel(tr('📆 PRÓXIMOS 7 DÍAS'), AppColors.verde),
           ...proximos.map((e) => _cardEvento(e)),
         ],
         if (vencidos.isEmpty && eventosHoy.isEmpty && eventosManana.isEmpty && proximos.isEmpty)
           Container(
             margin: const EdgeInsets.only(top: 40),
             alignment: Alignment.center,
-            child: const Column(children: [
+            child: Column(children: [
               Text('🎉', style: TextStyle(fontSize: 48)),
               SizedBox(height: 12),
-              Text('¡Sin pendientes esta semana!',
+              Text(tr('¡Sin pendientes esta semana!'),
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.verde)),
             ])),
       ]));
@@ -496,13 +497,13 @@ class _AgendaScreenState extends State<AgendaScreen>
           Container(
             margin: const EdgeInsets.only(top: 60),
             alignment: Alignment.center,
-            child: const Column(children: [
+            child: Column(children: [
               Text('✅', style: TextStyle(fontSize: 48)),
               SizedBox(height: 12),
-              Text('Todo al día', style: TextStyle(
+              Text(tr('Todo al día'), style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.verde)),
               SizedBox(height: 8),
-              Text('No hay eventos pendientes', style: TextStyle(
+              Text(tr('No hay eventos pendientes'), style: TextStyle(
                 color: AppColors.textoSecundario)),
             ]))
         else
@@ -624,10 +625,10 @@ class _AgendaScreenState extends State<AgendaScreen>
                 fontSize: 11, fontWeight: FontWeight.w700, color: e.semaforo))),
           ]),
           const SizedBox(height: 16),
-          _detalleRow(Icons.calendar_today_outlined, 'Fecha', _fmtFecha.format(e.fechaInicio)),
-          if (e.clienteNombre != null) _detalleRow(Icons.person_outline, 'Cliente', e.clienteNombre!),
-          if (e.monto > 0) _detalleRow(Icons.attach_money_outlined, 'Monto', _fmt.format(e.monto)),
-          if (e.descripcion != null) _detalleRow(Icons.notes_outlined, 'Notas', e.descripcion!),
+          _detalleRow(Icons.calendar_today_outlined, tr('Fecha'), _fmtFecha.format(e.fechaInicio)),
+          if (e.clienteNombre != null) _detalleRow(Icons.person_outline, tr('Cliente'), e.clienteNombre!),
+          if (e.monto > 0) _detalleRow(Icons.attach_money_outlined, tr('Monto'), _fmt.format(e.monto)),
+          if (e.descripcion != null) _detalleRow(Icons.notes_outlined, tr('Notas'), e.descripcion!),
           const SizedBox(height: 16),
           if (!e.completado)
             SizedBox(width: double.infinity,
@@ -638,7 +639,7 @@ class _AgendaScreenState extends State<AgendaScreen>
                   _cargar();
                 },
                 icon: const Icon(Icons.check_circle_outline, color: Colors.white),
-                label: const Text('Marcar como completado',
+                label: Text(tr('Marcar como completado'),
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.verde,
@@ -652,7 +653,7 @@ class _AgendaScreenState extends State<AgendaScreen>
         Icon(icon, size: 16, color: AppColors.textoSecundario),
         const SizedBox(width: 10),
         Text('$label: ', style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
-        Expanded(child: Text(valor, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+        Expanded(child: Text(tr(valor), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
       ]));
 
   // ── NUEVO EVENTO MANUAL ─────────────────────────────
@@ -678,7 +679,7 @@ class _AgendaScreenState extends State<AgendaScreen>
             Container(width: 36, height: 4,
               decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
-            const Text('Nuevo evento', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(tr('Nuevo evento'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
             // Tipo
             Wrap(spacing: 6, runSpacing: 6,
@@ -702,7 +703,7 @@ class _AgendaScreenState extends State<AgendaScreen>
             TextField(
               controller: tituloCtrl,
               decoration: InputDecoration(
-                labelText: 'Título del evento',
+                labelText: tr('Título del evento'),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 isDense: true)),
             const SizedBox(height: 10),
@@ -724,7 +725,7 @@ class _AgendaScreenState extends State<AgendaScreen>
                 child: Row(children: [
                   const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.azul),
                   const SizedBox(width: 8),
-                  Text(DateFormat('dd/MM/yyyy').format(fechaSel),
+                  Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(fechaSel),
                     style: const TextStyle(fontSize: 13)),
                 ]))),
             const SizedBox(height: 10),
@@ -732,7 +733,7 @@ class _AgendaScreenState extends State<AgendaScreen>
               controller: notasCtrl,
               maxLines: 2,
               decoration: InputDecoration(
-                labelText: 'Notas (opcional)',
+                labelText: tr('Notas (opcional)'),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 isDense: true)),
             const SizedBox(height: 16),
@@ -751,7 +752,7 @@ class _AgendaScreenState extends State<AgendaScreen>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.azul,
                   padding: const EdgeInsets.symmetric(vertical: 12)),
-                child: const Text('Crear evento',
+                child: Text(tr('Crear evento'),
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
           ]))));
   }
@@ -766,13 +767,13 @@ class _AgendaScreenState extends State<AgendaScreen>
       child: Column(children: [
         Icon(icon, color: color, size: 20),
         const SizedBox(height: 6),
-        Text(valor, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
-        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+        Text(tr(valor), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+        Text(tr(label), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
       ])));
 
   Widget _secLabel(String texto, Color color) =>
     Padding(padding: const EdgeInsets.only(bottom: 8, top: 4),
-      child: Text(texto, style: TextStyle(
+      child: Text(tr(texto), style: TextStyle(
         fontSize: 10, fontWeight: FontWeight.w700,
         color: color, letterSpacing: 1)));
 }
@@ -794,8 +795,8 @@ class _AgendaBodyState extends State<AgendaBody>
   List<AgendaEvento> _pendientes = [];
   bool _cargando = true;
 
-  final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
-  final _fmtMes   = DateFormat('MMMM yyyy',  'es_MX');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy', localeFormato);
+  final _fmtMes   = DateFormat('MMMM yyyy', localeFormato);
   final _fmt       = NumberFormat(r'$#,##0',  'es_MX');
 
   @override
@@ -854,8 +855,8 @@ class _AgendaBodyState extends State<AgendaBody>
             indicatorColor: AppColors.azul,
             labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
             tabs: [
-              Tab(text: '📅 Mes'),
-              Tab(text: '☀️ Hoy (${_eventosDia.where((e) => !e.completado).length})'),
+              Tab(text: tr('📅 Mes')),
+              Tab(text: trf('☀️ Hoy ({0})', [(_eventosDia.where((e) => !e.completado).length)])),
               Tab(text: '⏳ (${_pendientes.length})'),
             ])),
           IconButton(
@@ -891,7 +892,7 @@ class _AgendaBodyState extends State<AgendaBody>
     // Días semana
     Container(color: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(children: ['L','M','X','J','V','S','D'].map((d) =>
-        Expanded(child: Center(child: Text(d, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+        Expanded(child: Center(child: Text(tr(d), style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
           color: d=='D'||d=='S' ? AppColors.rojo.withOpacity(0.7) : AppColors.textoSecundario))))).toList())),
     // Todo lo de abajo (cuadrícula completa + lista del día) vive dentro
     // de UN SOLO scroll — así el mes NUNCA se corta, sin importar
@@ -975,15 +976,15 @@ class _AgendaBodyState extends State<AgendaBody>
       child: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text(esTitulo, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.azul)),
+            Text(tr(esTitulo), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.azul)),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(20)),
-              child: Text('${_eventosDia.length} evento(s)',
+              child: Text(trf('{0} evento(s)', [(_eventosDia.length)]),
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.azul))),
           ])),
         _eventosDia.isEmpty
-          ? const Padding(padding: EdgeInsets.symmetric(vertical: 30),
-              child: Center(child: Text('Sin eventos este día',
+          ? Padding(padding: EdgeInsets.symmetric(vertical: 30),
+              child: Center(child: Text(tr('Sin eventos este día'),
                 style: TextStyle(color: AppColors.textoSecundario, fontSize: 13))))
           : ListView.builder(
               shrinkWrap: true,
@@ -1003,32 +1004,32 @@ class _AgendaBodyState extends State<AgendaBody>
     return RefreshIndicator(onRefresh: _cargar,
       child: ListView(padding: const EdgeInsets.all(12), children: [
         Row(children: [
-          _kpi('Vencidos', '${vencidos.length}', AppColors.rojo),
+          _kpi(tr('Vencidos'), '${vencidos.length}', AppColors.rojo),
           const SizedBox(width: 8),
           _kpi('Hoy', '${eventosHoy.length}', AppColors.ambar),
           const SizedBox(width: 8),
-          _kpi('7 días', '${proximos.length}', AppColors.azul),
+          _kpi(tr('7 días'), '${proximos.length}', AppColors.azul),
         ]),
         const SizedBox(height: 12),
-        if (vencidos.isNotEmpty) ...[_slab('🔴 VENCIDOS', AppColors.rojo), ...vencidos.map(_cardEvento)],
-        if (eventosHoy.isNotEmpty) ...[_slab('☀️ HOY', AppColors.ambar), ...eventosHoy.map(_cardEvento)],
-        if (proximos.isNotEmpty) ...[_slab('📆 PRÓXIMOS 7 DÍAS', AppColors.azul), ...proximos.map(_cardEvento)],
+        if (vencidos.isNotEmpty) ...[_slab(tr('🔴 VENCIDOS'), AppColors.rojo), ...vencidos.map(_cardEvento)],
+        if (eventosHoy.isNotEmpty) ...[_slab(tr('☀️ HOY'), AppColors.ambar), ...eventosHoy.map(_cardEvento)],
+        if (proximos.isNotEmpty) ...[_slab(tr('📆 PRÓXIMOS 7 DÍAS'), AppColors.azul), ...proximos.map(_cardEvento)],
         if (vencidos.isEmpty && eventosHoy.isEmpty && proximos.isEmpty)
-          const Padding(padding: EdgeInsets.only(top: 40),
+          Padding(padding: EdgeInsets.only(top: 40),
             child: Center(child: Column(children: [
               Text('🎉', style: TextStyle(fontSize: 40)),
               SizedBox(height: 8),
-              Text('Sin pendientes', style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
+              Text(tr('Sin pendientes'), style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
             ]))),
       ]));
   }
 
   Widget _tabPendientes() => RefreshIndicator(onRefresh: _cargar,
     child: _pendientes.isEmpty
-      ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Text('✅', style: TextStyle(fontSize: 40)),
           SizedBox(height: 8),
-          Text('Todo al día', style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
+          Text(tr('Todo al día'), style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)),
         ]))
       : ListView(padding: const EdgeInsets.all(12),
           children: _pendientes.map((e) => _cardEvento(e)).toList()));
@@ -1085,10 +1086,10 @@ class _AgendaBodyState extends State<AgendaBody>
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom + 16, left: 16, right: 16, top: 16),
         decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Nuevo evento', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+          Text(tr('Nuevo evento'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(height: 12),
           TextField(controller: tituloCtrl,
-            decoration: const InputDecoration(labelText: 'Título', isDense: true,
+            decoration: InputDecoration(labelText: tr('Título'), isDense: true,
               border: OutlineInputBorder())),
           const SizedBox(height: 10),
           GestureDetector(onTap: () async {
@@ -1100,7 +1101,7 @@ class _AgendaBodyState extends State<AgendaBody>
             child: Row(children: [
               const Icon(Icons.calendar_today_outlined, size: 14, color: AppColors.azul),
               const SizedBox(width: 8),
-              Text(DateFormat('dd/MM/yyyy').format(fechaSel), style: const TextStyle(fontSize: 13)),
+              Text(DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy').format(fechaSel), style: const TextStyle(fontSize: 13)),
             ]))),
           const SizedBox(height: 12),
           SizedBox(width: double.infinity,
@@ -1112,7 +1113,7 @@ class _AgendaBodyState extends State<AgendaBody>
                 _cargar();
               },
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul, padding: const EdgeInsets.symmetric(vertical: 10)),
-              child: const Text('Crear', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
+              child: Text(tr('Crear'), style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
         ]))));
   }
 
@@ -1121,10 +1122,10 @@ class _AgendaBodyState extends State<AgendaBody>
     decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(children: [
-      Text(val, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
-      Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+      Text(tr(val), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color)),
+      Text(tr(label), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
     ])));
 
   Widget _slab(String t, Color c) => Padding(padding: const EdgeInsets.only(bottom: 6, top: 4),
-    child: Text(t, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c, letterSpacing: 1)));
+    child: Text(tr(t), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: c, letterSpacing: 1)));
 }

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'supabase_service.dart';
+import '../i18n/tr.dart';
 
 class NotificacionesService {
   static final _plugin = FlutterLocalNotificationsPlugin();
@@ -86,10 +87,10 @@ class NotificacionesService {
         } else {
           await _mostrar(
             id: _idDesdeAlerta(alerta.id!),
-            titulo: alerta.titulo ?? '🔔 Alerta HETNA CNC',
-            cuerpo: nombre.isNotEmpty ? 'Cliente: $nombre' : 'Tienes una alerta pendiente',
+            titulo: alerta.titulo ?? tr('🔔 Alerta HETNA CNC'),
+            cuerpo: nombre.isNotEmpty ? 'Cliente: $nombre' : tr('Tienes una alerta pendiente'),
             canal: 'alertas',
-            nombreCanal: 'Alertas generales');
+            nombreCanal: tr('Alertas generales'));
         }
       }
 
@@ -141,12 +142,12 @@ class NotificacionesService {
     await _vibrar();
     await _mostrar(
       id: 1,
-      titulo: '🎉 Nueva cotización — $nombreCliente',
+      titulo: trf('🎉 Nueva cotización — {0}', [nombreCliente]),
       cuerpo: folio != null
           ? '$folio · \$${total.toStringAsFixed(0)}'
           : '\$${total.toStringAsFixed(0)}',
       canal: 'cotizaciones',
-      nombreCanal: 'Cotizaciones');
+      nombreCanal: tr('Cotizaciones'));
   }
 
   static Future<void> nuevoPedido({
@@ -157,10 +158,10 @@ class NotificacionesService {
     await _vibrar(fuerte: true);
     await _mostrar(
       id: 2,
-      titulo: '📦 Nuevo pedido confirmado',
+      titulo: tr('📦 Nuevo pedido confirmado'),
       cuerpo: '$nombreCliente — \$${total.toStringAsFixed(0)}',
       canal: 'pedidos',
-      nombreCanal: 'Pedidos');
+      nombreCanal: tr('Pedidos'));
   }
 
   static Future<void> alertaSeguimiento({
@@ -177,10 +178,10 @@ class NotificacionesService {
     };
     await _mostrar(
       id: 3,
-      titulo: titulos[tipo] ?? '📋 Alerta de seguimiento',
+      titulo: titulos[tipo] ?? tr('📋 Alerta de seguimiento'),
       cuerpo: 'Cliente: $nombreCliente${folio != null ? " · $folio" : ""}',
       canal: 'alertas',
-      nombreCanal: 'Alertas de seguimiento');
+      nombreCanal: tr('Alertas de seguimiento'));
   }
 
   static Future<void> alertaPago({
@@ -195,10 +196,10 @@ class NotificacionesService {
     };
     await _mostrar(
       id: 4,
-      titulo: titulos[tipo] ?? '💰 Alerta de pago',
+      titulo: titulos[tipo] ?? tr('💰 Alerta de pago'),
       cuerpo: 'Cliente: $nombreCliente${folio != null ? " · $folio" : ""}',
       canal: 'pagos',
-      nombreCanal: 'Alertas de pago');
+      nombreCanal: tr('Alertas de pago'));
   }
 
   static Future<void> alertaCita({
@@ -208,10 +209,10 @@ class NotificacionesService {
     await _vibrar();
     await _mostrar(
       id: 5,
-      titulo: '📅 Cita próxima',
-      cuerpo: 'Con $nombreCliente${hora != null ? " a las $hora" : ""}',
+      titulo: tr('📅 Cita próxima'),
+      cuerpo: trf('Con {0}{1}', [nombreCliente, (hora != null ? trf(' a las {0}', [hora]) : "")]),
       canal: 'citas',
-      nombreCanal: 'Recordatorios de cita');
+      nombreCanal: tr('Recordatorios de cita'));
   }
 
   static Future<void> cambioPedido({
@@ -231,10 +232,10 @@ class NotificacionesService {
     final emoji = emojis[nuevoEstado] ?? '📋';
     await _mostrar(
       id: 6,
-      titulo: '$emoji Pedido avanzó — $nuevoEstado',
+      titulo: trf('{0} Pedido avanzó — {1}', [emoji, nuevoEstado]),
       cuerpo: '$nombreCliente${folio != null ? " · $folio" : ""}',
       canal: 'pedidos',
-      nombreCanal: 'Pedidos');
+      nombreCanal: tr('Pedidos'));
   }
 
   // ════════════════════════════════════════
@@ -244,10 +245,10 @@ class NotificacionesService {
     await _vibrar(fuerte: true);
     await _mostrar(
       id: 99,
-      titulo: '✅ HETNA CNC — Notificaciones activas',
-      cuerpo: 'Las alertas y pedidos te llegarán aquí 🔔',
+      titulo: tr('✅ HETNA CNC — Notificaciones activas'),
+      cuerpo: tr('Las alertas y pedidos te llegarán aquí 🔔'),
       canal: 'alertas',
-      nombreCanal: 'Alertas de seguimiento');
+      nombreCanal: tr('Alertas de seguimiento'));
   }
 
   // ════════════════════════════════════════
@@ -281,7 +282,7 @@ class NotificacionesService {
     final androidDetails = AndroidNotificationDetails(
       canal,
       nombreCanal,
-      channelDescription: 'Notificaciones HETNA CNC',
+      channelDescription: tr('Notificaciones HETNA CNC'),
       importance: Importance.high,
       priority: Priority.high,
       playSound: true,

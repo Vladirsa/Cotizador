@@ -16,6 +16,7 @@ import 'dart:io';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
+import '../i18n/tr.dart';
 
 class BillingService {
   // 👉 Cambia esto por el ID real que configures en Play Console
@@ -41,7 +42,7 @@ class BillingService {
 
       _subscription = _iap.purchaseStream.listen(
         _procesarCompras,
-        onError: (e) => onError?.call('Error de compra: $e'),
+        onError: (e) => onError?.call(trf('Error de compra: {0}', [e])),
       );
 
       final respuesta = await _iap.queryProductDetails({idProductoPremium});
@@ -60,7 +61,7 @@ class BillingService {
   // Iniciar el flujo de compra (abre el diálogo nativo de Google Play)
   static Future<void> comprarPremium() async {
     if (!disponible || productoPremium == null) {
-      onError?.call('La suscripción todavía no está disponible. Intenta más tarde.');
+      onError?.call(tr('La suscripción todavía no está disponible. Intenta más tarde.'));
       return;
     }
     final param = PurchaseParam(productDetails: productoPremium!);
@@ -81,7 +82,7 @@ class BillingService {
       }
 
       if (compra.status == PurchaseStatus.error) {
-        onError?.call(compra.error?.message ?? 'Error al procesar la compra');
+        onError?.call(compra.error?.message ?? tr('Error al procesar la compra'));
       }
 
       if (compra.status == PurchaseStatus.purchased ||

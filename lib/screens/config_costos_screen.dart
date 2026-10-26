@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
+import '../i18n/tr.dart';
 
 String get _negocioId => AuthService.negocioId ?? '';
 
@@ -173,12 +174,12 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         }
       }
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ Configuración guardada'),
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ Configuración guardada')),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error al guardar: $e'), backgroundColor: AppColors.rojo));
+        content: Text(trf('Error al guardar: {0}', [e])), backgroundColor: AppColors.rojo));
     } finally {
       if (mounted) setState(() => _guardando = false);
     }
@@ -191,7 +192,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Configuración de Costos',
+        title: Text(tr('Configuración de Costos'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         actions: [
           TextButton(
@@ -199,7 +200,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
             child: _guardando
               ? const SizedBox(width: 18, height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Guardar',
+              : Text(tr('Guardar'),
                   style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul))),
         ],
         bottom: TabBar(
@@ -208,11 +209,11 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           isScrollable: true,
-          tabs: const [
-            Tab(text: '🏢 Empresa'),
-            Tab(text: '💰 Costos fijos'),
-            Tab(text: '⚙️ Máquinas'),
-            Tab(text: '👷 Operadores'),
+          tabs: [
+            Tab(text: tr('🏢 Empresa')),
+            Tab(text: tr('💰 Costos fijos')),
+            Tab(text: tr('⚙️ Máquinas')),
+            Tab(text: tr('👷 Operadores')),
           ])),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
@@ -226,11 +227,11 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
 
   // ── TAB EMPRESA ──────────────────────────────────
   Widget _tabEmpresa() => ListView(padding: const EdgeInsets.all(14), children: [
-    _card('Datos del negocio', [
-      _campo(_nombreCtrl, 'Nombre del negocio', Icons.business_outlined),
+    _card(tr('Datos del negocio'), [
+      _campo(_nombreCtrl, tr('Nombre del negocio'), Icons.business_outlined),
       const SizedBox(height: 10),
       Row(children: [
-        Expanded(child: _campoNum(_ivaCtrl, 'IVA %', sufijo: '%')),
+        Expanded(child: _campoNum(_ivaCtrl, tr('IVA %'), sufijo: '%')),
         const SizedBox(width: 10),
         Expanded(child: _campoNum(_horasDiaCtrl, 'Horas/día')),
         const SizedBox(width: 10),
@@ -238,16 +239,16 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
       ]),
     ]),
     const SizedBox(height: 12),
-    _card('Márgenes de utilidad', [
-      const Text(
-        'El precio de venta = Costo Total ÷ (1 - Margen)',
+    _card(tr('Márgenes de utilidad'), [
+      Text(
+        tr('El precio de venta = Costo Total ÷ (1 - Margen)'),
         style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
       const SizedBox(height: 12),
       Row(children: [
-        Expanded(child: _campoNum(_margenMinCtrl, 'Margen mínimo %',
+        Expanded(child: _campoNum(_margenMinCtrl, tr('Margen mínimo %'),
           color: AppColors.rojo, sufijo: '%')),
         const SizedBox(width: 10),
-        Expanded(child: _campoNum(_margenRecCtrl, 'Margen recomendado %',
+        Expanded(child: _campoNum(_margenRecCtrl, tr('Margen recomendado %'),
           color: AppColors.verde, sufijo: '%')),
       ]),
       const SizedBox(height: 10),
@@ -258,14 +259,14 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
           decoration: BoxDecoration(
             color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
           child: Column(children: [
-            const Text('Ejemplo: trabajo con costo de \$1,000',
+            Text(tr('Ejemplo: trabajo con costo de \$1,000'),
               style: TextStyle(fontSize: 11, color: AppColors.azul)),
             const SizedBox(height: 6),
             Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-              _previewMargen('Mínimo',
+              _previewMargen(tr('Mínimo'),
                 _calcPrecio(1000, double.tryParse(_margenMinCtrl.text) ?? 20),
                 AppColors.rojo),
-              _previewMargen('Recomendado',
+              _previewMargen(tr('Recomendado'),
                 _calcPrecio(1000, double.tryParse(_margenRecCtrl.text) ?? 35),
                 AppColors.verde),
             ]),
@@ -278,7 +279,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
     margen >= 100 ? costo * 2 : costo / (1 - margen / 100);
 
   Widget _previewMargen(String label, double precio, Color color) => Column(children: [
-    Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+    Text(tr(label), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
     Text(_fmt.format(precio),
       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
   ]);
@@ -292,26 +293,26 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         gradient: const LinearGradient(colors: [AppColors.azul, Color(0xFF2d5a8e)]),
         borderRadius: BorderRadius.circular(12)),
       child: Column(children: [
-        const Text('RESUMEN DE COSTOS FIJOS',
+        Text(tr('RESUMEN DE COSTOS FIJOS'),
           style: TextStyle(fontSize: 10, color: Colors.white70, letterSpacing: 1.5)),
         const SizedBox(height: 8),
         Text(_fmt.format(_costoFijoMensual),
           style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white)),
-        const Text('por mes', style: TextStyle(fontSize: 12, color: Colors.white60)),
+        Text(tr('por mes'), style: TextStyle(fontSize: 12, color: Colors.white60)),
         const SizedBox(height: 12),
         Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-          _kpiCosto('Por día', _fmt.format(_costoDiario)),
-          _kpiCosto('Por hora', _fmt.format(_costoHora)),
-          _kpiCosto('Por minuto', '\$${_costoMinuto.toStringAsFixed(4)}'),
+          _kpiCosto(tr('Por día'), _fmt.format(_costoDiario)),
+          _kpiCosto(tr('Por hora'), _fmt.format(_costoHora)),
+          _kpiCosto(tr('Por minuto'), '\$${_costoMinuto.toStringAsFixed(4)}'),
         ]),
       ])),
     const SizedBox(height: 14),
     // Campos de costos
-    _card('Costos fijos mensuales', [
+    _card(tr('Costos fijos mensuales'), [
       ...(_costosCtrls.entries.map((e) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Row(children: [
-          Expanded(child: Text(_costosLabels[e.key] ?? e.key,
+          Expanded(child: Text(tr(_costosLabels[e.key] ?? e.key),
             style: const TextStyle(fontSize: 13))),
           const SizedBox(width: 10),
           SizedBox(width: 120, child: TextFormField(
@@ -329,8 +330,8 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
   ]);
 
   Widget _kpiCosto(String label, String val) => Column(children: [
-    Text(val, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
-    Text(label, style: const TextStyle(fontSize: 10, color: Colors.white60)),
+    Text(tr(val), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white)),
+    Text(tr(label), style: const TextStyle(fontSize: 10, color: Colors.white60)),
   ]);
 
   // ── TAB MÁQUINAS ─────────────────────────────────
@@ -341,7 +342,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
       OutlinedButton.icon(
         onPressed: () => _editarMaquina(null),
         icon: const Icon(Icons.add, size: 16),
-        label: const Text('Agregar máquina'),
+        label: Text(tr('Agregar máquina')),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: AppColors.azul),
           foregroundColor: AppColors.azul)),
@@ -357,19 +358,18 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Row(children: [
-        Text(m['emoji'] ?? '⚙️', style: const TextStyle(fontSize: 28)),
+        Text(tr(m['emoji'] ?? '⚙️'), style: const TextStyle(fontSize: 28)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(m['nombre'] ?? '', style: const TextStyle(
+          Text(tr(m['nombre'] ?? ''), style: const TextStyle(
             fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
-          Text('${(m['horas_mes'] ?? 0).toStringAsFixed(0)} hrs/mes  •  '
-            '\$${(m['costo_kwh'] ?? 0).toStringAsFixed(2)}/kWh',
+          Text(trf('{0} hrs/mes  •  \${1}/kWh', [((m['horas_mes'] ?? 0).toStringAsFixed(0)), ((m['costo_kwh'] ?? 0).toStringAsFixed(2))]),
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ])),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(_fmt.format(costoHora),
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.verde)),
-          const Text('/ hora', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+          Text(tr('/ hora'), style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           const SizedBox(height: 4),
           GestureDetector(
             onTap: () => _editarMaquina(m),
@@ -436,7 +436,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
             Container(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(maquina == null ? 'Nueva máquina' : 'Editar ${maquina['nombre']}',
+                Text(tr(maquina == null ? tr('Nueva máquina') : trf('Editar {0}', [(maquina['nombre'])])),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 GestureDetector(onTap: () => Navigator.pop(ctx),
                   child: const Icon(Icons.close)),
@@ -457,31 +457,31 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: emojiSel == e ? AppColors.azul : AppColors.grisBorde)),
-                        child: Center(child: Text(e,
+                        child: Center(child: Text(tr(e),
                           style: const TextStyle(fontSize: 22)))))).toList()),
                 const SizedBox(height: 12),
-                _campo(nombreCtrl, 'Nombre de la máquina', Icons.precision_manufacturing_outlined),
+                _campo(nombreCtrl, tr('Nombre de la máquina'), Icons.precision_manufacturing_outlined),
                 const SizedBox(height: 10),
                 // Costos
                 Row(children: [
-                  Expanded(child: _campoNum2(valorCtrl, 'Valor de compra \$', setS)),
+                  Expanded(child: _campoNum2(valorCtrl, tr('Valor de compra \$'), setS)),
                   const SizedBox(width: 8),
-                  Expanded(child: _campoNum2(vidaCtrl, 'Vida útil (años)', setS)),
+                  Expanded(child: _campoNum2(vidaCtrl, tr('Vida útil (años)'), setS)),
                 ]),
                 const SizedBox(height: 10),
                 Row(children: [
-                  Expanded(child: _campoNum2(horasCtrl, 'Horas trabajo/mes', setS)),
+                  Expanded(child: _campoNum2(horasCtrl, tr('Horas trabajo/mes'), setS)),
                   const SizedBox(width: 8),
-                  Expanded(child: _campoNum2(kwhCtrl, 'Consumo (kWh/hr)', setS)),
+                  Expanded(child: _campoNum2(kwhCtrl, tr('Consumo (kWh/hr)'), setS)),
                 ]),
                 const SizedBox(height: 10),
                 Row(children: [
-                  Expanded(child: _campoNum2(costoKwhCtrl, 'Precio kWh \$', setS)),
+                  Expanded(child: _campoNum2(costoKwhCtrl, tr('Precio kWh \$'), setS)),
                   const SizedBox(width: 8),
-                  Expanded(child: _campoNum2(mantCtrl, 'Mantenimiento \$/mes', setS)),
+                  Expanded(child: _campoNum2(mantCtrl, tr('Mantenimiento \$/mes'), setS)),
                 ]),
                 const SizedBox(height: 10),
-                _campoNum2(consCtrl, 'Consumibles \$/hora (fresas, brocas...)', setS),
+                _campoNum2(consCtrl, tr('Consumibles \$/hora (fresas, brocas...)'), setS),
                 const SizedBox(height: 14),
                 // Preview costo/hora
                 Container(
@@ -491,7 +491,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.verde.withOpacity(0.3))),
                   child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('Costo/hora calculado:',
+                    Text(tr('Costo/hora calculado:'),
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                     Text(_fmt.format(previewCosto()),
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
@@ -523,7 +523,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
                       if (mounted) { Navigator.pop(ctx); _cargar(); }
                     },
                     icon: const Icon(Icons.save_outlined, color: Colors.white),
-                    label: const Text('Guardar máquina',
+                    label: Text(tr('Guardar máquina'),
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.azul,
@@ -541,7 +541,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
       OutlinedButton.icon(
         onPressed: () => _editarOperador(null),
         icon: const Icon(Icons.add, size: 16),
-        label: const Text('Agregar operador'),
+        label: Text(tr('Agregar operador')),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: AppColors.azul),
           foregroundColor: AppColors.azul)),
@@ -561,13 +561,12 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Row(children: [
-        Text(o['emoji'] ?? '👷', style: const TextStyle(fontSize: 28)),
+        Text(tr(o['emoji'] ?? '👷'), style: const TextStyle(fontSize: 28)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(o['nombre'] ?? '', style: const TextStyle(
+          Text(tr(o['nombre'] ?? ''), style: const TextStyle(
             fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
-          Text('Salario: ${_fmt.format(salario)}/mes  •  '
-            'Prestaciones: ${prest.toStringAsFixed(0)}%',
+          Text(trf('Salario: {0}/mes  •  Prestaciones: {1}%', [(_fmt.format(salario)), (prest.toStringAsFixed(0))]),
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           Text('${horas.toStringAsFixed(0)} horas/mes',
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
@@ -575,7 +574,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text(_fmt.format(costoHora),
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.naranja)),
-          const Text('/ hora', style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
+          Text(tr('/ hora'), style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           const SizedBox(height: 4),
           GestureDetector(
             onTap: () => _editarOperador(o),
@@ -611,7 +610,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
           child: Column(children: [
             Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text(op == null ? 'Nuevo operador' : 'Editar ${op['nombre']}',
+                Text(tr(op == null ? tr('Nuevo operador') : trf('Editar {0}', [(op['nombre'])])),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
                 GestureDetector(onTap: () => Navigator.pop(ctx),
                   child: const Icon(Icons.close)),
@@ -630,18 +629,18 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: emojiSel == e ? AppColors.azul : AppColors.grisBorde)),
-                        child: Center(child: Text(e,
+                        child: Center(child: Text(tr(e),
                           style: const TextStyle(fontSize: 22)))))).toList()),
                 const SizedBox(height: 12),
-                _campo(nombreCtrl, 'Nombre / Puesto', Icons.person_outlined),
+                _campo(nombreCtrl, tr('Nombre / Puesto'), Icons.person_outlined),
                 const SizedBox(height: 10),
                 Row(children: [
-                  Expanded(child: _campoNum2(salarioCtrl, 'Salario \$/mes', setS)),
+                  Expanded(child: _campoNum2(salarioCtrl, tr('Salario \$/mes'), setS)),
                   const SizedBox(width: 8),
-                  Expanded(child: _campoNum2(prestCtrl, 'Prestaciones %', setS)),
+                  Expanded(child: _campoNum2(prestCtrl, tr('Prestaciones %'), setS)),
                 ]),
                 const SizedBox(height: 10),
-                _campoNum2(horasCtrl, 'Horas laborales al mes', setS),
+                _campoNum2(horasCtrl, tr('Horas laborales al mes'), setS),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -649,7 +648,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
                     color: AppColors.naranja.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(10)),
                   child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('Costo/hora calculado:',
+                    Text(tr('Costo/hora calculado:'),
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                     Text(_fmt.format(costoHora()),
                       style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
@@ -676,7 +675,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
                       if (mounted) { Navigator.pop(ctx); _cargar(); }
                     },
                     icon: const Icon(Icons.save_outlined, color: Colors.white),
-                    label: const Text('Guardar operador',
+                    label: Text(tr('Guardar operador'),
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.azul,
@@ -693,7 +692,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
       borderRadius: BorderRadius.circular(12),
       border: Border.all(color: AppColors.grisBorde, width: 0.5)),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(titulo, style: const TextStyle(
+      Text(tr(titulo), style: const TextStyle(
         fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
       const SizedBox(height: 14),
       ...children,

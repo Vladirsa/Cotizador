@@ -8,6 +8,8 @@ import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
 import '../services/woocommerce_service.dart';
+import '../i18n/tr.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({super.key});
@@ -27,6 +29,9 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _direccionCtrl= TextEditingController();
   final _rfcCtrl      = TextEditingController();
   final _leyendaCtrl  = TextEditingController();
+  // Idioma, moneda e impuesto
+  final _impuestoCtrl = TextEditingController(text: '16');
+  String _moneda = 'MXN';
   String? _logoUrl;
   Uint8List? _logoPreview;
   bool _subiendoLogo = false;
@@ -73,14 +78,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
     _nombreCtrl.dispose(); _telefonoCtrl.dispose(); _correoCtrl.dispose();
     _direccionCtrl.dispose(); _rfcCtrl.dispose(); _leyendaCtrl.dispose();
     _apiKeyCtrl.dispose(); _apiUrlCtrl.dispose();
-    _rfcEmisorCtrl.dispose(); _serieCtrl.dispose();
+    _rfcEmisorCtrl.dispose(); _serieCtrl.dispose(); _impuestoCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _cargar() async {
     final cfg = await SupabaseService.getConfiguracion();
     setState(() {
-      _nombreCtrl.text    = cfg['nombre_comercial'] ?? 'HETNA CNC';
+      _nombreCtrl.text    = cfg['nombre_comercial'] ?? tr('HETNA CNC');
       _telefonoCtrl.text  = cfg['telefono'] ?? '';
       _correoCtrl.text    = cfg['correo'] ?? '';
       _direccionCtrl.text = cfg['direccion'] ?? '';
@@ -96,6 +101,11 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _serieCtrl.text     = cfg['factura_serie'] ?? 'A';
       _facturaActivo      = cfg['factura_activo'] ?? false;
       _proveedor          = cfg['factura_proveedor'] ?? 'Facturapi';
+      // Moneda e impuesto (si la base aún no tiene las columnas, quedan MXN / 16%)
+      final m = (cfg['moneda'] ?? 'MXN').toString().toUpperCase();
+      _moneda = m == 'USD' ? 'USD' : 'MXN';
+      final imp = double.tryParse('${cfg['impuesto_pct'] ?? 16}') ?? 16;
+      _impuestoCtrl.text = imp == imp.roundToDouble() ? imp.toInt().toString() : imp.toString();
       _regimenFiscal      = cfg['factura_regimen_fiscal'] ?? '612';
       _cargando = false;
     });
@@ -117,12 +127,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
       if (url != null) {
         setState(() { _logoUrl = url; _subiendoLogo = false; });
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ Logo actualizado — no olvides guardar'), backgroundColor: AppColors.azul));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('✅ Logo actualizado — no olvides guardar')), backgroundColor: AppColors.azul));
       } else {
         setState(() => _subiendoLogo = false);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No se pudo subir el logo'), backgroundColor: AppColors.rojo));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('No se pudo subir el logo')), backgroundColor: AppColors.rojo));
       }
     } catch (e) {
       setState(() => _subiendoLogo = false);
@@ -153,8 +163,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'factura_proveedor'     : _proveedor,
         'factura_regimen_fiscal': _regimenFiscal,
       });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ Configuración guardada'),
+      // Aparte, para que si la base todavía no tiene estas columnas no se
+      // pierda el resto de la configuración.
+      await SupabaseService.guardarConfiguracion({
+        'moneda'      : _moneda,
+        'impuesto_pct': double.tryParse(_impuestoCtrl.text.trim().replaceAll(',', '.')) ?? 16,
+      });
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ Configuración guardada')),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -167,7 +183,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Configuración', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        title: Text(tr('Configuración'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
@@ -176,44 +192,51 @@ class _ConfigScreenState extends State<ConfigScreen> {
             onPressed: _guardando ? null : _guardar,
             child: _guardando
               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul))),
+              : Text(tr('Guardar'), style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul))),
         ]),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
         : Form(key: _formKey,
             child: ListView(padding: const EdgeInsets.all(16), children: [
 
-              // ── DATOS DE LA EMPRESA ──
-              _seccion('🏢 DATOS DE LA EMPRESA'),
+              // ── IDIOMA, MONEDA E IMPUESTOS ──
+              _seccion(tr('🌎 IDIOMA, MONEDA E IMPUESTOS')),
               const SizedBox(height: 8),
-              _campo(_nombreCtrl, 'Nombre comercial', Icons.store_outlined, requerido: true),
-              _campo(_rfcCtrl, 'RFC', Icons.badge_outlined, mayusculas: true,
+              _seccionIdiomaMoneda(),
+
+              const SizedBox(height: 20),
+
+              // ── DATOS DE LA EMPRESA ──
+              _seccion(tr('🏢 DATOS DE LA EMPRESA')),
+              const SizedBox(height: 8),
+              _campo(_nombreCtrl, tr('Nombre comercial'), Icons.store_outlined, requerido: true),
+              _campo(_rfcCtrl, tr('RFC'), Icons.badge_outlined, mayusculas: true,
                 hint: 'XAXX010101000'),
-              _campo(_telefonoCtrl, 'Teléfono / WhatsApp', Icons.phone_outlined,
+              _campo(_telefonoCtrl, tr('Teléfono / WhatsApp'), Icons.phone_outlined,
                 tipo: TextInputType.phone),
-              _campo(_correoCtrl, 'Correo electrónico', Icons.email_outlined,
+              _campo(_correoCtrl, tr('Correo electrónico'), Icons.email_outlined,
                 tipo: TextInputType.emailAddress),
-              _campo(_direccionCtrl, 'Dirección', Icons.location_on_outlined, lineas: 2),
-              _campo(_leyendaCtrl, 'Leyenda en PDF', Icons.notes_outlined, lineas: 2,
-                hint: 'Ej: Garantía 6 meses en productos de madera'),
+              _campo(_direccionCtrl, tr('Dirección'), Icons.location_on_outlined, lineas: 2),
+              _campo(_leyendaCtrl, tr('Leyenda en PDF'), Icons.notes_outlined, lineas: 2,
+                hint: tr('Ej: Garantía 6 meses en productos de madera')),
 
               const SizedBox(height: 20),
 
               // ── WOOCOMMERCE ──
-              _seccion('🛍️ SINCRONIZAR CON TU TIENDA WOOCOMMERCE'),
+              _seccion(tr('🛍️ SINCRONIZAR CON TU TIENDA WOOCOMMERCE')),
               const SizedBox(height: 8),
               _CardWooCommerce(),
 
               const SizedBox(height: 20),
 
               // ── LOGO Y COLORES DE MARCA ──
-              _seccion('🎨 LOGO Y COLORES DE TUS PDFs'),
+              _seccion(tr('🎨 LOGO Y COLORES DE TUS PDFs')),
               const SizedBox(height: 8),
               Container(padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: AppColors.grisBorde, width: 0.5)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Logo', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text(tr('Logo'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Row(children: [
                     Container(width: 70, height: 70,
@@ -235,16 +258,16 @@ class _ConfigScreenState extends State<ConfigScreen> {
                         icon: _subiendoLogo
                           ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.upload_outlined, size: 16),
-                        label: Text(_subiendoLogo ? 'Subiendo...' : 'Cambiar logo'),
+                        label: Text(tr(_subiendoLogo ? tr('Subiendo...') : tr('Cambiar logo'))),
                         style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
                           side: const BorderSide(color: AppColors.azul))),
                       const SizedBox(height: 4),
-                      const Text('Aparecerá en cotizaciones y notas de compra',
+                      Text(tr('Aparecerá en cotizaciones y notas de compra'),
                         style: TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
                     ])),
                   ]),
                   const SizedBox(height: 16),
-                  const Text('Color de marca', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  Text(tr('Color de marca'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 8),
                   Wrap(spacing: 10, runSpacing: 10, children: _coloresDisponibles.map((c) {
                     final sel = _colorPrimario == c['primario'];
@@ -260,7 +283,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                             border: Border.all(color: sel ? Colors.black : Colors.transparent, width: 2.5)),
                           child: sel ? const Icon(Icons.check, color: Colors.white, size: 20) : null),
                         const SizedBox(height: 3),
-                        Text(c['nombre'] as String, style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario)),
+                        Text(tr(c['nombre'] as String), style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario)),
                       ]));
                   }).toList()),
                 ])),
@@ -268,7 +291,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
               const SizedBox(height: 20),
 
               // ── CATEGORÍAS DE PRODUCTOS ──
-              _seccion('🏷️ CATEGORÍAS DE PRODUCTOS'),
+              _seccion(tr('🏷️ CATEGORÍAS DE PRODUCTOS')),
               const SizedBox(height: 8),
               _CategoriasWidget(),
 
@@ -277,7 +300,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
               const SizedBox(height: 20),
 
               // ── NOTIFICACIONES ──
-              _seccion('🔔 NOTIFICACIONES'),
+              _seccion(tr('🔔 NOTIFICACIONES')),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -285,12 +308,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   color: Colors.white, borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: AppColors.grisBorde, width: 0.5)),
                 child: Column(children: [
-                  const Row(children: [
+                  Row(children: [
                     Icon(Icons.notifications_active_outlined, size: 18, color: AppColors.azul),
                     SizedBox(width: 10),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Alertas en tiempo real', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                      Text('Supabase Realtime activo — recibes notificaciones de nuevos pedidos, alertas y seguimientos automáticamente',
+                      Text(tr('Alertas en tiempo real'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      Text(tr('Supabase Realtime activo — recibes notificaciones de nuevos pedidos, alertas y seguimientos automáticamente'),
                         style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                     ])),
                   ]),
@@ -299,12 +322,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     child: OutlinedButton.icon(
                       onPressed: () async {
                         await NotificacionesService.probar();
-                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                          content: Text('✅ Notificación de prueba enviada — revisa tu barra'),
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text(tr('✅ Notificación de prueba enviada — revisa tu barra')),
                           backgroundColor: AppColors.verde));
                       },
                       icon: const Icon(Icons.notifications_outlined, size: 16),
-                      label: const Text('Probar notificación', style: TextStyle(fontSize: 13)),
+                      label: Text(tr('Probar notificación'), style: TextStyle(fontSize: 13)),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.azul,
                         side: const BorderSide(color: AppColors.azul),
@@ -314,7 +337,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
               const SizedBox(height: 20),
 
               // ── FACTURACIÓN ──
-              _seccion('🧾 FACTURACIÓN ELECTRÓNICA'),
+              _seccion(tr('🧾 FACTURACIÓN ELECTRÓNICA')),
               const SizedBox(height: 8),
 
               // Toggle activar facturación
@@ -327,9 +350,9 @@ class _ConfigScreenState extends State<ConfigScreen> {
                 child: Row(children: [
                   const Icon(Icons.receipt_long_outlined, size: 20, color: AppColors.azul),
                   const SizedBox(width: 10),
-                  const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Activar facturación', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    Text('Habilita el botón de facturar en pedidos',
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(tr('Activar facturación'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    Text(tr('Habilita el botón de facturar en pedidos'),
                       style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                   ])),
                   Switch(
@@ -349,11 +372,11 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     border: Border.all(color: AppColors.grisBorde, width: 0.5)),
                   child: DropdownButtonFormField<String>(
                     value: _proveedor,
-                    decoration: const InputDecoration(
-                      labelText: 'Proveedor de facturación',
+                    decoration: InputDecoration(
+                      labelText: tr('Proveedor de facturación'),
                       border: InputBorder.none,
                       prefixIcon: Icon(Icons.cloud_outlined, size: 18, color: AppColors.azul)),
-                    items: _proveedores.map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                    items: _proveedores.map((p) => DropdownMenuItem(value: p, child: Text(tr(p)))).toList(),
                     onChanged: (v) => setState(() => _proveedor = v!))),
 
                 const SizedBox(height: 8),
@@ -369,29 +392,28 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     Row(children: [
                       const Icon(Icons.info_outline, size: 14, color: AppColors.azul),
                       const SizedBox(width: 6),
-                      Text('Configuración de $_proveedor',
+                      Text(trf('Configuración de {0}', [_proveedor]),
                         style: const TextStyle(fontSize: 12, color: AppColors.azul, fontWeight: FontWeight.w600)),
                     ]),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Obtén tu API Key desde el panel de tu proveedor y pégala aquí. '
-                      'Cuando estés listo, la conexión se activa automáticamente.',
+                    Text(
+                      tr('Obtén tu API Key desde el panel de tu proveedor y pégala aquí. Cuando estés listo, la conexión se activa automáticamente.'),
                       style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                   ])),
 
                 const SizedBox(height: 8),
 
                 // API Key
-                _campoPassword(_apiKeyCtrl, 'API Key', Icons.key_outlined,
+                _campoPassword(_apiKeyCtrl, tr('API Key'), Icons.key_outlined,
                   hint: 'sk_live_xxxxxxxxxxxxxxxxxxxx'),
 
                 // API URL
-                _campo(_apiUrlCtrl, 'URL del API', Icons.link_outlined,
+                _campo(_apiUrlCtrl, tr('URL del API'), Icons.link_outlined,
                   tipo: TextInputType.url,
                   hint: 'https://api.facturapi.io/v2'),
 
                 // RFC emisor
-                _campo(_rfcEmisorCtrl, 'RFC del emisor (tu empresa)', Icons.badge_outlined,
+                _campo(_rfcEmisorCtrl, tr('RFC del emisor (tu empresa)'), Icons.badge_outlined,
                   mayusculas: true, hint: 'XAXX010101000'),
 
                 // Régimen fiscal
@@ -403,8 +425,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   child: DropdownButtonFormField<String>(
                     value: _regimenFiscal,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Régimen fiscal',
+                    decoration: InputDecoration(
+                      labelText: tr('Régimen fiscal'),
                       border: InputBorder.none,
                       prefixIcon: Icon(Icons.account_balance_outlined, size: 18, color: AppColors.azul)),
                     items: _regimenesFiscales.entries.map((e) =>
@@ -413,7 +435,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     onChanged: (v) => setState(() => _regimenFiscal = v!))),
 
                 // Serie
-                _campo(_serieCtrl, 'Serie de comprobante', Icons.tag_outlined,
+                _campo(_serieCtrl, tr('Serie de comprobante'), Icons.tag_outlined,
                   hint: 'A', mayusculas: true),
 
                 const SizedBox(height: 8),
@@ -437,9 +459,9 @@ class _ConfigScreenState extends State<ConfigScreen> {
                       color: _apiKeyCtrl.text.isNotEmpty ? AppColors.verde : AppColors.textoSecundario),
                     const SizedBox(width: 8),
                     Text(
-                      _apiKeyCtrl.text.isNotEmpty
-                        ? 'API Key configurada — lista para conectar'
-                        : 'Pendiente configurar API Key',
+                      tr(_apiKeyCtrl.text.isNotEmpty
+                        ? tr('API Key configurada — lista para conectar')
+                        : tr('Pendiente configurar API Key')),
                       style: TextStyle(
                         fontSize: 12,
                         color: _apiKeyCtrl.text.isNotEmpty ? AppColors.verde : AppColors.textoSecundario)),
@@ -450,9 +472,67 @@ class _ConfigScreenState extends State<ConfigScreen> {
             ])));
   }
 
+  Widget _seccionIdiomaMoneda() {
+    final idioma = idiomaActual.value.languageCode == 'en' ? 'en' : 'es';
+    return Container(padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(tr('Idioma de la app'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'es', label: Text('Español')),
+            ButtonSegment(value: 'en', label: Text('English')),
+          ],
+          selected: {idioma},
+          onSelectionChanged: (s) async {
+            final nuevo = s.first;
+            if (nuevo == idioma) return;
+            // Para que los correos (recuperar contraseña, etc.) lleguen en este idioma
+            try {
+              final auth = sb.Supabase.instance.client.auth;
+              if (auth.currentUser != null) {
+                await auth.updateUser(sb.UserAttributes(data: {'idioma': nuevo}));
+              }
+            } catch (_) {}
+            await cambiarIdioma(nuevo);
+          }),
+        const SizedBox(height: 4),
+        Text(tr('Se guarda en este dispositivo. El PDF de cada cotización te pregunta su idioma.'),
+          style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        const SizedBox(height: 14),
+        Text(tr('Moneda de tus cotizaciones'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'MXN', label: Text('MXN')),
+            ButtonSegment(value: 'USD', label: Text('USD')),
+          ],
+          selected: {_moneda},
+          onSelectionChanged: (s) => setState(() => _moneda = s.first)),
+        const SizedBox(height: 4),
+        Text(tr('Sale en el PDF de tus cotizaciones (pesos mexicanos o dólares).'),
+          style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        const SizedBox(height: 14),
+        TextFormField(
+          controller: _impuestoCtrl,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(
+            labelText: tr('Impuesto por defecto (%)'),
+            helperText: tr('IVA en México (16%) o sales tax de tu estado en EE. UU. (ej. 8.25)'),
+            prefixIcon: const Icon(Icons.percent, size: 18)),
+          validator: (v) {
+            final n = double.tryParse((v ?? '').trim().replaceAll(',', '.'));
+            if (n == null || n < 0 || n > 100) return tr('Escribe un porcentaje entre 0 y 100');
+            return null;
+          }),
+      ]));
+  }
+
   Widget _seccion(String titulo) => Padding(
     padding: const EdgeInsets.only(bottom: 2),
-    child: Text(titulo,
+    child: Text(tr(titulo),
       style: const TextStyle(fontSize: 11, color: AppColors.azul,
         fontWeight: FontWeight.w700, letterSpacing: 0.5)));
 
@@ -466,7 +546,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       keyboardType: tipo,
       maxLines: lineas,
       textCapitalization: mayusculas ? TextCapitalization.characters : TextCapitalization.sentences,
-      validator: requerido ? (v) => (v == null || v.trim().isEmpty) ? 'Campo requerido' : null : null,
+      validator: requerido ? (v) => (v == null || v.trim().isEmpty) ? tr('Campo requerido') : null : null,
       decoration: InputDecoration(
         labelText: label, hintText: hint,
         hintStyle: const TextStyle(fontSize: 12, color: AppColors.textoSecundario),
@@ -538,13 +618,13 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
     String colorSel = _colores.first;
     final result = await showDialog<String>(context: context,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
-        title: const Text('Nueva categoría', style: TextStyle(fontSize: 15)),
+        title: Text(tr('Nueva categoría'), style: TextStyle(fontSize: 15)),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(controller: nombreCtrl, autofocus: true,
-            decoration: const InputDecoration(labelText: 'Nombre *', border: OutlineInputBorder())),
+            decoration: InputDecoration(labelText: tr('Nombre *'), border: OutlineInputBorder())),
           const SizedBox(height: 12),
-          const Align(alignment: Alignment.centerLeft,
-            child: Text('Color', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
+          Align(alignment: Alignment.centerLeft,
+            child: Text(tr('Color'), style: TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
           const SizedBox(height: 6),
           Wrap(spacing: 8, runSpacing: 8, children: _colores.map((hex) {
             final color = Color(int.parse('FF${hex.replaceAll('#','')}', radix: 16));
@@ -557,14 +637,14 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
           }).toList()),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () {
               if (nombreCtrl.text.trim().isEmpty) return;
               Navigator.pop(ctx, nombreCtrl.text.trim());
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-            child: const Text('Agregar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Agregar'), style: TextStyle(color: Colors.white))),
         ])));
     if (result == null) return;
     try {
@@ -580,13 +660,13 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
     String colorSel = cat['color_hex'] ?? _colores.first;
     final result = await showDialog<String>(context: context,
       builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
-        title: const Text('Editar categoría', style: TextStyle(fontSize: 15)),
+        title: Text(tr('Editar categoría'), style: TextStyle(fontSize: 15)),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(controller: nombreCtrl,
-            decoration: const InputDecoration(labelText: 'Nombre', border: OutlineInputBorder())),
+            decoration: InputDecoration(labelText: tr('Nombre'), border: OutlineInputBorder())),
           const SizedBox(height: 12),
-          const Align(alignment: Alignment.centerLeft,
-            child: Text('Color', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
+          Align(alignment: Alignment.centerLeft,
+            child: Text(tr('Color'), style: TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
           const SizedBox(height: 6),
           Wrap(spacing: 8, runSpacing: 8, children: _colores.map((hex) {
             final color = Color(int.parse('FF${hex.replaceAll('#','')}', radix: 16));
@@ -599,11 +679,11 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
           }).toList()),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, nombreCtrl.text.trim()),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-            child: const Text('Guardar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Guardar'), style: TextStyle(color: Colors.white))),
         ])));
     if (result == null || result.isEmpty) return;
     try {
@@ -617,14 +697,14 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
   Future<void> _eliminar(Map<String, dynamic> cat) async {
     final ok = await showDialog<bool>(context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar categoría'),
-        content: Text('¿Eliminar "${cat['nombre']}"? Los productos de esta categoría quedarán sin categoría.'),
+        title: Text(tr('Eliminar categoría')),
+        content: Text(trf('¿Eliminar "{0}"? Los productos de esta categoría quedarán sin categoría.', [(cat['nombre'])])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
         ]));
     if (ok != true) return;
     try {
@@ -643,7 +723,7 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
         child: OutlinedButton.icon(
           onPressed: _agregar,
           icon: const Icon(Icons.add, size: 16),
-          label: const Text('Agregar categoría', style: TextStyle(fontSize: 13)),
+          label: Text(tr('Agregar categoría'), style: TextStyle(fontSize: 13)),
           style: OutlinedButton.styleFrom(
             foregroundColor: AppColors.azul,
             side: const BorderSide(color: AppColors.azul),
@@ -656,7 +736,7 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
         Container(padding: const EdgeInsets.all(16), alignment: Alignment.center,
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-          child: const Text('No hay categorías. Agrega la primera.',
+          child: Text(tr('No hay categorías. Agrega la primera.'),
             style: TextStyle(color: AppColors.textoSecundario, fontSize: 12)))
       else
         Container(
@@ -672,7 +752,7 @@ class _CategoriasWidgetState extends State<_CategoriasWidget> {
                 leading: Container(width: 32, height: 32,
                   decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
                   child: Icon(Icons.label_outline, color: color, size: 18)),
-                title: Text(cat['nombre'] ?? '', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                title: Text(tr(cat['nombre'] ?? ''), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.textoSecundario),
@@ -733,8 +813,8 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
   // ── Conexión automática — el usuario solo aprueba, sin copiar nada ──
   Future<void> _conectarAutomatico() async {
     if (_urlAutoCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Escribe la URL de tu tienda'), backgroundColor: AppColors.rojo));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Escribe la URL de tu tienda')), backgroundColor: AppColors.rojo));
       return;
     }
     setState(() => _conectandoAuto = true);
@@ -747,8 +827,8 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
       }
     });
     if (token == null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No se pudo abrir la página de autorización'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('No se pudo abrir la página de autorización')),
         backgroundColor: AppColors.rojo));
     }
   }
@@ -761,11 +841,11 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
     if (aprobado) {
       setState(() => _esperandoAprobacion = false);
       await _cargar();
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ ¡Tienda conectada!'), backgroundColor: AppColors.verde));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ ¡Tienda conectada!')), backgroundColor: AppColors.verde));
     } else {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Todavía no se ha aprobado. Termina el paso en tu navegador primero.'),
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('Todavía no se ha aprobado. Termina el paso en tu navegador primero.')),
         backgroundColor: AppColors.ambar));
     }
   }
@@ -787,7 +867,7 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
     setState(() {
       _resultadoOk = errorConexion == null;
       _conectado = _resultadoOk;
-      _resultadoPrueba = errorConexion ?? '✅ Conexión exitosa';
+      _resultadoPrueba = errorConexion ?? tr('✅ Conexión exitosa');
       _probando = false;
     });
   }
@@ -797,7 +877,7 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
     final resultado = await WooCommerceService.sincronizar();
     setState(() => _sincronizando = false);
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(resultado),
+      content: Text(tr(resultado)),
       backgroundColor: resultado.startsWith('✅') ? AppColors.verde : AppColors.rojo));
   }
 
@@ -817,11 +897,11 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
           Row(children: [
             const Icon(Icons.check_circle, color: AppColors.verde, size: 18),
             const SizedBox(width: 8),
-            Expanded(child: Text('Conectado a: ${_urlCtrl.text}',
+            Expanded(child: Text(trf('Conectado a: {0}', [(_urlCtrl.text)]),
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
             TextButton(
               onPressed: () => setState(() { _conectado = false; _resultadoOk = false; }),
-              child: const Text('Cambiar', style: TextStyle(fontSize: 11))),
+              child: Text(tr('Cambiar'), style: TextStyle(fontSize: 11))),
           ]),
           const SizedBox(height: 10),
           SizedBox(width: double.infinity, child: ElevatedButton(
@@ -830,7 +910,7 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
             child: _sincronizando
               ? const SizedBox(width: 16, height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Sincronizar productos ahora', style: TextStyle(color: Colors.white)))),
+              : Text(tr('Sincronizar productos ahora'), style: TextStyle(color: Colors.white)))),
         ]));
     }
 
@@ -838,16 +918,16 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Trae automáticamente tus productos desde tu tienda WooCommerce.',
+        Text(tr('Trae automáticamente tus productos desde tu tienda WooCommerce.'),
           style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         const SizedBox(height: 14),
 
         if (!_esperandoAprobacion) ...[
-          const Text('Solo escribe tu dirección — te llevaremos a tu propia tienda',
+          Text(tr('Solo escribe tu dirección — te llevaremos a tu propia tienda'),
             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.azul)),
           const SizedBox(height: 8),
           TextField(controller: _urlAutoCtrl,
-            decoration: const InputDecoration(labelText: 'URL de tu tienda',
+            decoration: InputDecoration(labelText: tr('URL de tu tienda'),
               hintText: 'https://mitienda.com', isDense: true, border: OutlineInputBorder())),
           const SizedBox(height: 10),
           SizedBox(width: double.infinity, child: ElevatedButton.icon(
@@ -856,20 +936,20 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
               ? const SizedBox(width: 14, height: 14,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : const Icon(Icons.link, color: Colors.white, size: 18),
-            label: const Text('Conectar mi tienda', style: TextStyle(color: Colors.white)),
+            label: Text(tr('Conectar mi tienda'), style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
               padding: const EdgeInsets.symmetric(vertical: 12)))),
         ] else ...[
           Container(padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10)),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('1. Se abrió tu tienda en el navegador',
+              Text(tr('1. Se abrió tu tienda en el navegador'),
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-              const Text('2. Inicia sesión si te lo pide',
+              Text(tr('2. Inicia sesión si te lo pide'),
                 style: TextStyle(fontSize: 12)),
-              const Text('3. Toca "Aprobar" cuando te lo muestre WooCommerce',
+              Text(tr('3. Toca "Aprobar" cuando te lo muestre WooCommerce'),
                 style: TextStyle(fontSize: 12)),
-              const Text('4. Regresa aquí y toca el botón de abajo',
+              Text(tr('4. Regresa aquí y toca el botón de abajo'),
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             ])),
           const SizedBox(height: 10),
@@ -879,34 +959,34 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
             child: _conectandoAuto
               ? const SizedBox(width: 16, height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Ya aprobé, verificar conexión', style: TextStyle(color: Colors.white)))),
+              : Text(tr('Ya aprobé, verificar conexión'), style: TextStyle(color: Colors.white)))),
           TextButton(
             onPressed: () => setState(() => _esperandoAprobacion = false),
-            child: const Text('Cancelar', style: TextStyle(fontSize: 11))),
+            child: Text(tr('Cancelar'), style: TextStyle(fontSize: 11))),
         ],
 
         const SizedBox(height: 14),
         GestureDetector(
           onTap: () => setState(() => _mostrarManual = !_mostrarManual),
-          child: Text(_mostrarManual ? '▲ Ocultar conexión manual' : '▼ ¿Prefieres ingresar las claves tú mismo?',
+          child: Text(tr(_mostrarManual ? tr('▲ Ocultar conexión manual') : tr('▼ ¿Prefieres ingresar las claves tú mismo?')),
             style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario,
               decoration: TextDecoration.underline))),
 
         if (_mostrarManual) ...[
           const SizedBox(height: 10),
-          const Text('WordPress → WooCommerce → Ajustes → Avanzado → API REST → Agregar clave',
+          Text(tr('WordPress → WooCommerce → Ajustes → Avanzado → API REST → Agregar clave'),
             style: TextStyle(fontSize: 10, color: AppColors.azul, fontStyle: FontStyle.italic)),
           const SizedBox(height: 8),
           TextField(controller: _urlCtrl,
-            decoration: const InputDecoration(labelText: 'URL de tu tienda',
+            decoration: InputDecoration(labelText: tr('URL de tu tienda'),
               hintText: 'https://mitienda.com', isDense: true, border: OutlineInputBorder())),
           const SizedBox(height: 10),
           TextField(controller: _keyCtrl,
-            decoration: const InputDecoration(labelText: 'Consumer Key',
+            decoration: InputDecoration(labelText: tr('Consumer Key'),
               hintText: 'ck_xxxxxxxxxxxx', isDense: true, border: OutlineInputBorder())),
           const SizedBox(height: 10),
           TextField(controller: _secretCtrl, obscureText: true,
-            decoration: const InputDecoration(labelText: 'Consumer Secret',
+            decoration: InputDecoration(labelText: tr('Consumer Secret'),
               hintText: 'cs_xxxxxxxxxxxx', isDense: true, border: OutlineInputBorder())),
           const SizedBox(height: 12),
 
@@ -924,7 +1004,7 @@ class _CardWooCommerceState extends State<_CardWooCommerce> {
             onPressed: _probando ? null : _guardarYProbar,
             child: _probando
               ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Text('Guardar y probar conexión'))),
+              : Text(tr('Guardar y probar conexión')))),
         ],
       ]));
   }

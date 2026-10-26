@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../main.dart';
 import '../services/supabase_service.dart';
+import '../i18n/tr.dart';
 
 class CuponesScreen extends StatefulWidget {
   const CuponesScreen({super.key});
@@ -14,7 +15,7 @@ class _CuponesScreenState extends State<CuponesScreen> {
   List<Map<String, dynamic>> _cupones = [];
   bool _cargando = true;
   final _fmt = NumberFormat('#,##0.00', 'es_MX');
-  final _fmtFecha = DateFormat('dd/MM/yyyy');
+  final _fmtFecha = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy');
 
   @override
   void initState() { super.initState(); _cargar(); }
@@ -36,14 +37,14 @@ class _CuponesScreenState extends State<CuponesScreen> {
   Future<void> _eliminarCupon(Map<String, dynamic> cupon) async {
     final ok = await showDialog<bool>(context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar cupón'),
-        content: Text('¿Eliminar el cupón "${cupon['codigo']}"?'),
+        title: Text(tr('Eliminar cupón')),
+        content: Text(trf('¿Eliminar el cupón "{0}"?', [(cupon['codigo'])])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Eliminar'), style: TextStyle(color: Colors.white))),
         ]));
     if (ok == true) {
       await SupabaseService.eliminarCupon(cupon['id'] as String);
@@ -58,7 +59,7 @@ class _CuponesScreenState extends State<CuponesScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Cupones de descuento',
+        title: Text(tr('Cupones de descuento'),
           style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
         actions: [
           IconButton(
@@ -71,12 +72,12 @@ class _CuponesScreenState extends State<CuponesScreen> {
           ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Icon(Icons.discount_outlined, size: 48, color: AppColors.grisBorde),
               const SizedBox(height: 12),
-              const Text('Sin cupones aún', style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
+              Text(tr('Sin cupones aún'), style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: () => _editarCupon(),
                 icon: const Icon(Icons.add, color: Colors.white),
-                label: const Text('Crear primer cupón', style: TextStyle(color: Colors.white)),
+                label: Text(tr('Crear primer cupón'), style: TextStyle(color: Colors.white)),
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul)),
             ]))
           : ListView.builder(
@@ -116,20 +117,20 @@ class _CuponesScreenState extends State<CuponesScreen> {
                           decoration: BoxDecoration(
                             color: (!activo || vencido) ? AppColors.textoSecundario : AppColors.azul,
                             borderRadius: BorderRadius.circular(8)),
-                          child: Text(c['codigo'] as String? ?? '',
+                          child: Text(tr(c['codigo'] as String? ?? ''),
                             style: const TextStyle(color: Colors.white, fontSize: 16,
                               fontWeight: FontWeight.w900, letterSpacing: 1))),
                         const SizedBox(width: 10),
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Text(
-                            tipo == 'porcentaje'
-                              ? '${valor.toStringAsFixed(0)}% de descuento'
-                              : '\$${_fmt.format(valor)} de descuento',
+                            tr(tipo == 'porcentaje'
+                              ? trf('{0}% de descuento', [(valor.toStringAsFixed(0))])
+                              : trf('\${0} de descuento', [(_fmt.format(valor))])),
                             style: TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w700,
                               color: (!activo || vencido) ? AppColors.textoSecundario : AppColors.azul)),
                           if (c['descripcion'] != null)
-                            Text(c['descripcion'] as String,
+                            Text(tr(c['descripcion'] as String),
                               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                         ])),
                         // Estado badge
@@ -141,7 +142,7 @@ class _CuponesScreenState extends State<CuponesScreen> {
                               : AppColors.verde.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(20)),
                           child: Text(
-                            vencido ? 'Vencido' : !activo ? 'Inactivo' : 'Activo',
+                            tr(vencido ? tr('Vencido') : !activo ? tr('Inactivo') : tr('Activo')),
                             style: TextStyle(
                               fontSize: 10, fontWeight: FontWeight.w700,
                               color: vencido ? AppColors.rojo
@@ -153,22 +154,22 @@ class _CuponesScreenState extends State<CuponesScreen> {
                       padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
                       child: Row(children: [
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          _detalle('Usos', maxUsos != null ? '$usos / $maxUsos' : '$usos / ∞'),
+                          _detalle(tr('Usos'), maxUsos != null ? '$usos / $maxUsos' : '$usos / ∞'),
                           if (c['minimo_compra'] != null && (c['minimo_compra'] as num) > 0)
-                            _detalle('Mínimo', '\$${_fmt.format(c['minimo_compra'])}'),
+                            _detalle(tr('Mínimo'), '\$${_fmt.format(c['minimo_compra'])}'),
                           if (fechaFin != null)
-                            _detalle('Vence', _fmtFecha.format(fechaFin)),
+                            _detalle(tr('Vence'), _fmtFecha.format(fechaFin)),
                         ])),
                         // Acciones
                         Row(children: [
                           // Copiar código
                           IconButton(
                             icon: const Icon(Icons.copy_outlined, size: 18, color: AppColors.azul),
-                            tooltip: 'Copiar código',
+                            tooltip: tr('Copiar código'),
                             onPressed: () {
                               Clipboard.setData(ClipboardData(text: c['codigo'] as String));
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Código "${c['codigo']}" copiado')));
+                                SnackBar(content: Text(trf('Código "{0}" copiado', [(c['codigo'])]))));
                             }),
                           // Toggle activo
                           IconButton(
@@ -203,7 +204,7 @@ class _CuponesScreenState extends State<CuponesScreen> {
     padding: const EdgeInsets.only(bottom: 3),
     child: Row(children: [
       Text('$label: ', style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-      Text(valor, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textoPrincipal)),
+      Text(tr(valor), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textoPrincipal)),
     ]));
 }
 
@@ -226,7 +227,7 @@ class _FormCuponState extends State<_FormCupon> {
   String _tipo = 'porcentaje';
   DateTime? _fechaFin;
   bool _guardando = false;
-  final _fmt = DateFormat('dd/MM/yyyy');
+  final _fmt = DateFormat(enIngles ? 'MM/dd/yyyy' : 'dd/MM/yyyy');
 
   @override
   void initState() {
@@ -255,7 +256,7 @@ class _FormCuponState extends State<_FormCupon> {
   Future<void> _guardar() async {
     if (_codigoCtrl.text.trim().isEmpty || _valorCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Código y valor son obligatorios')));
+        SnackBar(content: Text(tr('Código y valor son obligatorios'))));
       return;
     }
     setState(() => _guardando = true);
@@ -291,12 +292,12 @@ class _FormCuponState extends State<_FormCupon> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: Text(widget.cupon == null ? 'Nuevo cupón' : 'Editar cupón',
+        title: Text(tr(widget.cupon == null ? tr('Nuevo cupón') : tr('Editar cupón')),
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
         actions: [
           TextButton(
             onPressed: _guardando ? null : _guardar,
-            child: Text(_guardando ? 'Guardando...' : 'Guardar',
+            child: Text(tr(_guardando ? tr('Guardando...') : tr('Guardar')),
               style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
         ]),
       body: ListView(padding: const EdgeInsets.all(16), children: [
@@ -305,11 +306,11 @@ class _FormCuponState extends State<_FormCupon> {
           controller: _codigoCtrl,
           textCapitalization: TextCapitalization.characters,
           decoration: InputDecoration(
-            labelText: 'Código del cupón *',
-            hintText: 'Ej: HETNA10',
+            labelText: tr('Código del cupón *'),
+            hintText: tr('Ej: HETNA10'),
             prefixIcon: const Icon(Icons.discount_outlined),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            helperText: 'El cliente escribe este código al cotizar'),
+            helperText: tr('El cliente escribe este código al cotizar')),
           style: const TextStyle(letterSpacing: 2, fontWeight: FontWeight.w700)),
         const SizedBox(height: 12),
 
@@ -317,14 +318,14 @@ class _FormCuponState extends State<_FormCupon> {
         TextField(
           controller: _descripcionCtrl,
           decoration: InputDecoration(
-            labelText: 'Descripción (opcional)',
-            hintText: 'Ej: 10% de descuento por temporada',
+            labelText: tr('Descripción (opcional)'),
+            hintText: tr('Ej: 10% de descuento por temporada'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
           textCapitalization: TextCapitalization.sentences),
         const SizedBox(height: 16),
 
         // Tipo de descuento
-        const Text('Tipo de descuento',
+        Text(tr('Tipo de descuento'),
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Row(children: [
@@ -342,10 +343,10 @@ class _FormCuponState extends State<_FormCupon> {
                 Icon(Icons.percent, size: 28,
                   color: _tipo == 'porcentaje' ? AppColors.azul : AppColors.textoSecundario),
                 const SizedBox(height: 6),
-                Text('Porcentaje',
+                Text(tr('Porcentaje'),
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                     color: _tipo == 'porcentaje' ? AppColors.azul : AppColors.textoSecundario)),
-                Text('Ej: 10%',
+                Text(tr('Ej: 10%'),
                   style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
               ])))),
           const SizedBox(width: 10),
@@ -363,10 +364,10 @@ class _FormCuponState extends State<_FormCupon> {
                 Icon(Icons.attach_money, size: 28,
                   color: _tipo == 'monto_fijo' ? AppColors.azul : AppColors.textoSecundario),
                 const SizedBox(height: 6),
-                Text('Monto fijo',
+                Text(tr('Monto fijo'),
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                     color: _tipo == 'monto_fijo' ? AppColors.azul : AppColors.textoSecundario)),
-                Text('Ej: \$100',
+                Text(tr('Ej: \$100'),
                   style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
               ])))),
         ]),
@@ -377,7 +378,7 @@ class _FormCuponState extends State<_FormCupon> {
           controller: _valorCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
-            labelText: _tipo == 'porcentaje' ? 'Porcentaje de descuento *' : 'Monto de descuento *',
+            labelText: _tipo == 'porcentaje' ? tr('Porcentaje de descuento *') : tr('Monto de descuento *'),
             prefixText: _tipo == 'porcentaje' ? '' : '\$',
             suffixText: _tipo == 'porcentaje' ? '%' : '',
             hintText: _tipo == 'porcentaje' ? '10' : '100',
@@ -389,9 +390,9 @@ class _FormCuponState extends State<_FormCupon> {
           controller: _minimoCtrl,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
-            labelText: 'Mínimo de compra',
+            labelText: tr('Mínimo de compra'),
             prefixText: '\$',
-            hintText: '0 = sin mínimo',
+            hintText: tr('0 = sin mínimo'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
         const SizedBox(height: 12),
 
@@ -400,8 +401,8 @@ class _FormCuponState extends State<_FormCupon> {
           controller: _maxUsosCtrl,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            labelText: 'Límite de usos',
-            hintText: 'Vacío = ilimitado',
+            labelText: tr('Límite de usos'),
+            hintText: tr('Vacío = ilimitado'),
             prefixIcon: const Icon(Icons.repeat_outlined),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)))),
         const SizedBox(height: 12),
@@ -426,9 +427,9 @@ class _FormCuponState extends State<_FormCupon> {
               const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.azul),
               const SizedBox(width: 10),
               Expanded(child: Text(
-                _fechaFin != null
-                  ? 'Vence el ${_fmt.format(_fechaFin!)}'
-                  : 'Sin fecha de vencimiento',
+                tr(_fechaFin != null
+                  ? trf('Vence el {0}', [(_fmt.format(_fechaFin!))])
+                  : tr('Sin fecha de vencimiento')),
                 style: TextStyle(fontSize: 13,
                   color: _fechaFin != null ? AppColors.textoPrincipal : AppColors.textoSecundario))),
               if (_fechaFin != null)
@@ -446,7 +447,7 @@ class _FormCuponState extends State<_FormCupon> {
             backgroundColor: AppColors.azul,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-          child: Text(_guardando ? 'Guardando...' : 'Guardar cupón',
+          child: Text(tr(_guardando ? tr('Guardando...') : tr('Guardar cupón')),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
       ]));
   }

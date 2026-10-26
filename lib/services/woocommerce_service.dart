@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'auth_service.dart';
+import '../i18n/tr.dart';
 
 class WooCommerceService {
   static final _sb = Supabase.instance.client;
@@ -108,7 +109,7 @@ class WooCommerceService {
     required String consumerSecret,
   }) async {
     final negId = AuthService.negocioId;
-    if (negId == null) return 'Sin negocio activo';
+    if (negId == null) return tr('Sin negocio activo');
     try {
       final urlLimpia = url.trim().replaceAll(RegExp(r'/$'), ''); // sin / al final
       final existing = await _sb.from('configuracion_empresa')
@@ -127,7 +128,7 @@ class WooCommerceService {
       }
       return null;
     } catch (e) {
-      return 'Error al guardar: $e';
+      return trf('Error al guardar: {0}', [e]);
     }
   }
 
@@ -148,10 +149,10 @@ class WooCommerceService {
         });
       final res = await http.get(uri).timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) return null; // sin error = conexión OK
-      if (res.statusCode == 401) return 'Claves incorrectas — revisa el Consumer Key/Secret';
-      return 'Error ${res.statusCode}: no se pudo conectar';
+      if (res.statusCode == 401) return tr('Claves incorrectas — revisa el Consumer Key/Secret');
+      return trf('Error {0}: no se pudo conectar', [(res.statusCode)]);
     } catch (e) {
-      return 'No se pudo conectar: $e';
+      return trf('No se pudo conectar: {0}', [e]);
     }
   }
 
@@ -161,12 +162,12 @@ class WooCommerceService {
     void Function(int traidos, int total)? onProgreso,
   }) async {
     final negId = AuthService.negocioId;
-    if (negId == null) return 'Sin negocio activo';
+    if (negId == null) return tr('Sin negocio activo');
 
     final config = await obtenerConfig();
     if (config == null || config['woocommerce_url'] == null ||
         (config['woocommerce_url'] as String).isEmpty) {
-      return 'Primero configura tu tienda WooCommerce en Configuración';
+      return tr('Primero configura tu tienda WooCommerce en Configuración');
     }
 
     final url = config['woocommerce_url'] as String;
@@ -190,7 +191,7 @@ class WooCommerceService {
 
         final res = await http.get(uri).timeout(const Duration(seconds: 30));
         if (res.statusCode != 200) {
-          return 'Error al traer productos (código ${res.statusCode})';
+          return trf('Error al traer productos (código {0})', [(res.statusCode)]);
         }
 
         final productos = jsonDecode(res.body) as List;
@@ -207,9 +208,9 @@ class WooCommerceService {
         if (pagina > 20) break; // límite de seguridad (1000 productos)
       }
 
-      return '✅ $totalSincronizados productos sincronizados';
+      return trf('✅ {0} productos sincronizados', [totalSincronizados]);
     } catch (e) {
-      return 'Error al sincronizar: $e';
+      return trf('Error al sincronizar: {0}', [e]);
     }
   }
 
@@ -219,7 +220,7 @@ class WooCommerceService {
       final wooId = p['id'] as int?;
       if (wooId == null) return;
 
-      final nombre = (p['name'] as String?)?.trim() ?? 'Producto sin nombre';
+      final nombre = (p['name'] as String?)?.trim() ?? tr('Producto sin nombre');
       final precioTexto = (p['price'] as String?) ?? '0';
       final precio = double.tryParse(precioTexto) ?? 0;
       final sku = p['sku'] as String?;

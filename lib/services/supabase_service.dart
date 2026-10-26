@@ -2,6 +2,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
 import '../models/models.dart';
+import '../i18n/tr.dart';
 
 class SupabaseService {
   static final _db = Supabase.instance.client;
@@ -611,7 +612,7 @@ class SupabaseService {
       }).eq('id', materialId);
       return null; // sin error
     } catch (e) {
-      return 'Error al registrar movimiento: $e';
+      return trf('Error al registrar movimiento: {0}', [e]);
     }
   }
 
@@ -625,7 +626,7 @@ class SupabaseService {
       await _db.from('inventario_bodega').update(datos).eq('id', id);
       return null;
     } catch (e) {
-      return 'Error al actualizar: $e';
+      return trf('Error al actualizar: {0}', [e]);
     }
   }
 
@@ -634,7 +635,7 @@ class SupabaseService {
       await _db.from('inventario_bodega').delete().eq('id', id);
       return null;
     } catch (e) {
-      return 'Error al eliminar: $e';
+      return trf('Error al eliminar: {0}', [e]);
     }
   }
 

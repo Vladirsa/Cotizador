@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../main.dart';
 import '../services/supabase_service.dart';
 import '../services/barcode_service.dart';
+import '../i18n/tr.dart';
 
 class InventarioScreen extends StatefulWidget {
   const InventarioScreen({super.key});
@@ -18,7 +19,7 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
   final _fmt = NumberFormat('\$#,##0', 'es_MX');
 
   List<String> get _categorias {
-    final cats = _materiales.map((m) => m['categoria'] as String? ?? 'Otro').toSet().toList()..sort();
+    final cats = _materiales.map((m) => m['categoria'] as String? ?? tr('Otro')).toSet().toList()..sort();
     return ['Todas', ...cats];
   }
 
@@ -52,14 +53,14 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(
-        title: const Text('Inventario Bodega'),
+        title: Text(tr('Inventario Bodega')),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)],
         bottom: TabBar(controller: _tabs,
           labelColor: AppColors.azul, unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           tabs: [
-            Tab(text: 'Materiales (${_filtrados.length})'),
-            Tab(text: 'Movimientos'),
+            Tab(text: trf('Materiales ({0})', [(_filtrados.length)])),
+            Tab(text: tr('Movimientos')),
           ]),
       ),
       floatingActionButton: FloatingActionButton.small(
@@ -80,9 +81,9 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
       // Stats rápidos
       Container(color: Colors.white, padding: const EdgeInsets.all(10),
         child: Row(children: [
-          _miniStat('${_filtrados.length}', 'Materiales', AppColors.azul),
+          _miniStat('${_filtrados.length}', tr('Materiales'), AppColors.azul),
           _miniStat('${_bajos.length}', 'Stock bajo', _bajos.isEmpty ? AppColors.verde : AppColors.rojo),
-          _miniStat(_fmt.format(_valorTotal), 'Valor bodega', AppColors.azul),
+          _miniStat(_fmt.format(_valorTotal), tr('Valor bodega'), AppColors.azul),
         ])),
 
       // Filtros por categoría
@@ -120,13 +121,13 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
           child: Row(children: [
             const Icon(Icons.warning_amber, size: 16, color: AppColors.rojo),
             const SizedBox(width: 6),
-            Expanded(child: Text('${_bajos.length} material${_bajos.length > 1 ? "es" : ""} con stock bajo',
+            Expanded(child: Text(trf('{0} material{1} con stock bajo', [(_bajos.length), (_bajos.length > 1 ? "es" : "")]),
               style: const TextStyle(fontSize: 11, color: AppColors.rojo, fontWeight: FontWeight.w600))),
           ])),
 
       // Lista
       Expanded(child: RefreshIndicator(onRefresh: _cargar, child: _filtrados.isEmpty
-        ? const Center(child: Text('No hay materiales', style: TextStyle(color: AppColors.textoSecundario)))
+        ? Center(child: Text(tr('No hay materiales'), style: TextStyle(color: AppColors.textoSecundario)))
         : ListView.builder(
             padding: const EdgeInsets.all(10),
             itemCount: _filtrados.length,
@@ -140,13 +141,13 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
     return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       const Icon(Icons.swap_vert, size: 48, color: AppColors.textoSecundario),
       const SizedBox(height: 8),
-      const Text('Historial de movimientos', style: TextStyle(color: AppColors.textoSecundario)),
+      Text(tr('Historial de movimientos'), style: TextStyle(color: AppColors.textoSecundario)),
       const SizedBox(height: 4),
-      const Text('Entradas y salidas de materiales', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      Text(tr('Entradas y salidas de materiales'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       const SizedBox(height: 16),
       ElevatedButton.icon(
         onPressed: _registrarMovimiento,
-        icon: const Icon(Icons.add), label: const Text('Registrar movimiento')),
+        icon: const Icon(Icons.add), label: Text(tr('Registrar movimiento'))),
     ]));
   }
 
@@ -155,16 +156,16 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
     padding: const EdgeInsets.symmetric(vertical: 8),
     decoration: BoxDecoration(color: color.withOpacity(0.06), borderRadius: BorderRadius.circular(8)),
     child: Column(children: [
-      Text(valor, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color),
+      Text(tr(valor), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color),
         overflow: TextOverflow.ellipsis),
-      Text(label, style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario), textAlign: TextAlign.center),
+      Text(tr(label), style: const TextStyle(fontSize: 9, color: AppColors.textoSecundario), textAlign: TextAlign.center),
     ])));
 
   Future<void> _agregarMaterial() async {
     final n = TextEditingController(), unidad = TextEditingController(text: 'pieza');
     final minimo = TextEditingController(text: '1'), costo = TextEditingController();
     final stock = TextEditingController(text: '0');
-    String categoria = 'Madera';
+    String categoria = tr('Madera');
     final categoriasList = ['Madera', 'MDF', 'Acrílico', 'Consumibles', 'Acabados', 'Metal', 'Otro'];
 
     await showModalBottomSheet(context: context, isScrollControlled: true,
@@ -174,15 +175,15 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
         child: StatefulBuilder(builder: (ctx, setS) => Container(
           padding: const EdgeInsets.all(16),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('Agregar material', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+            Text(tr('Agregar material'), style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Align(alignment: Alignment.centerRight,
               child: TextButton.icon(
                 onPressed: () async {
                   final codigo = await BarcodeService.escanear(ctx);
                   if (codigo == null) return;
-                  ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                    content: Text('Buscando...'), duration: Duration(seconds: 2)));
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                    content: Text(tr('Buscando...')), duration: Duration(seconds: 2)));
                   final resultado = await BarcodeService.buscarProducto(codigo);
                   setS(() {
                     if (resultado?.nombre != null && resultado!.nombre!.isNotEmpty) {
@@ -190,41 +191,41 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                     }
                   });
                   if (resultado == null && context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                      content: Text('No se encontró — llena el nombre a mano'),
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(tr('No se encontró — llena el nombre a mano')),
                       backgroundColor: AppColors.ambar));
                   }
                 },
                 icon: const Icon(Icons.qr_code_scanner, size: 18),
-                label: const Text('Escanear código'))),
+                label: Text(tr('Escanear código')))),
             const SizedBox(height: 2),
-            TextField(controller: n, decoration: const InputDecoration(labelText: 'Nombre *', isDense: true,
+            TextField(controller: n, decoration: InputDecoration(labelText: tr('Nombre *'), isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8))),
             const SizedBox(height: 6),
             Row(children: [
               Expanded(child: DropdownButtonFormField<String>(
                 value: categoria, isDense: true,
-                decoration: const InputDecoration(labelText: 'Categoría',
+                decoration: InputDecoration(labelText: tr('Categoría'),
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
-                items: categoriasList.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                items: categoriasList.map((c) => DropdownMenuItem(value: c, child: Text(tr(c)))).toList(),
                 onChanged: (v) => setS(() => categoria = v!))),
               const SizedBox(width: 8),
-              Expanded(child: TextField(controller: unidad, decoration: const InputDecoration(
-                labelText: 'Unidad', isDense: true,
+              Expanded(child: TextField(controller: unidad, decoration: InputDecoration(
+                labelText: tr('Unidad'), isDense: true,
                 contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
             ]),
             const SizedBox(height: 6),
             Row(children: [
               Expanded(child: TextField(controller: stock, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Stock inicial', isDense: true,
+                decoration: InputDecoration(labelText: tr('Stock inicial'), isDense: true,
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
               const SizedBox(width: 8),
               Expanded(child: TextField(controller: minimo, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Stock mínimo', isDense: true,
+                decoration: InputDecoration(labelText: tr('Stock mínimo'), isDense: true,
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
               const SizedBox(width: 8),
               Expanded(child: TextField(controller: costo, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Costo unit.', prefixText: '\$', isDense: true,
+                decoration: InputDecoration(labelText: tr('Costo unit.'), prefixText: '\$', isDense: true,
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
             ]),
             const SizedBox(height: 12),
@@ -237,7 +238,7 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                 'costo_unitario': double.tryParse(costo.text) ?? 0,
               });
               if (mounted) { Navigator.pop(context); _cargar(); }
-            }, child: const Text('Guardar material')),
+            }, child: Text(tr('Guardar material'))),
           ])))));
   }
 
@@ -261,15 +262,15 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
           Container(width: 36, height: 4, margin: const EdgeInsets.only(bottom: 12),
             decoration: BoxDecoration(color: Colors.grey[300],
               borderRadius: BorderRadius.circular(2))),
-          const Text('Registrar movimiento',
+          Text(tr('Registrar movimiento'),
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
               value: materialId, isDense: true,
-              decoration: const InputDecoration(labelText: 'Material',
+              decoration: InputDecoration(labelText: tr('Material'),
                 contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
               items: _filtrados.map((m) => DropdownMenuItem(value: m['id'] as String,
-                child: Text(m['nombre'] ?? '', style: const TextStyle(fontSize: 13)))).toList(),
+                child: Text(tr(m['nombre'] ?? ''), style: const TextStyle(fontSize: 13)))).toList(),
               onChanged: (v) => setS(() => materialId = v)),
             const SizedBox(height: 6),
             Row(children: [
@@ -280,7 +281,7 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                     color: tipo == 'entrada' ? AppColors.verdeClaro : Colors.white,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: tipo == 'entrada' ? AppColors.verde : AppColors.grisBorde)),
-                  child: Center(child: Text('↑ Entrada', style: TextStyle(
+                  child: Center(child: Text(tr('↑ Entrada'), style: TextStyle(
                     color: tipo == 'entrada' ? AppColors.verde : Colors.grey, fontWeight: FontWeight.w600))))),),
               const SizedBox(width: 8),
               Expanded(child: GestureDetector(
@@ -290,17 +291,17 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                     color: tipo == 'salida' ? AppColors.rojoClaro : Colors.white,
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: tipo == 'salida' ? AppColors.rojo : AppColors.grisBorde)),
-                  child: Center(child: Text('↓ Salida', style: TextStyle(
+                  child: Center(child: Text(tr('↓ Salida'), style: TextStyle(
                     color: tipo == 'salida' ? AppColors.rojo : Colors.grey, fontWeight: FontWeight.w600)))))),
             ]),
             const SizedBox(height: 6),
             Row(children: [
               Expanded(child: TextField(controller: cant, keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Cantidad', isDense: true,
+                decoration: InputDecoration(labelText: tr('Cantidad'), isDense: true,
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
               const SizedBox(width: 8),
               Expanded(child: TextField(controller: motivo,
-                decoration: const InputDecoration(labelText: 'Motivo', isDense: true,
+                decoration: InputDecoration(labelText: tr('Motivo'), isDense: true,
                   contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)))),
             ]),
             const SizedBox(height: 12),
@@ -314,14 +315,14 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
                     motivo: motivo.text.trim());
                   if (error != null) {
                     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(error), backgroundColor: AppColors.rojo));
+                      SnackBar(content: Text(tr(error)), backgroundColor: AppColors.rojo));
                     return;
                   }
                   if (mounted) { Navigator.pop(context); _cargar(); }
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
                   minimumSize: const Size(double.infinity, 44)),
-                child: const Text('Registrar',
+                child: Text(tr('Registrar'),
                   style: TextStyle(color: Colors.white,
                     fontWeight: FontWeight.w600)))),
           const SizedBox(height: 8),
@@ -357,7 +358,7 @@ class _TarjetaMaterial extends StatelessWidget {
           child: Center(child: Icon(
             bajStock ? Icons.warning_amber : Icons.inventory_2_outlined,
             size: 18, color: bajStock ? AppColors.rojo : AppColors.azul))),
-        title: Text(material['nombre'] ?? '', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        title: Text(tr(material['nombre'] ?? ''), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         subtitle: Row(children: [
           Text('${material['categoria']}', style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario)),
           if (costo > 0) ...[
@@ -380,15 +381,15 @@ class _TarjetaMaterial extends StatelessWidget {
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         ListTile(
           leading: const Icon(Icons.swap_vert, color: AppColors.azul),
-          title: const Text('Registrar movimiento (entrada/salida)'),
+          title: Text(tr('Registrar movimiento (entrada/salida)')),
           onTap: () { Navigator.pop(ctx); _mostrarMovimiento(context); }),
         ListTile(
           leading: const Icon(Icons.edit_outlined, color: AppColors.azul),
-          title: const Text('Editar producto'),
+          title: Text(tr('Editar producto')),
           onTap: () { Navigator.pop(ctx); _mostrarEditar(context); }),
         ListTile(
           leading: const Icon(Icons.delete_outline, color: AppColors.rojo),
-          title: const Text('Eliminar producto', style: TextStyle(color: AppColors.rojo)),
+          title: Text(tr('Eliminar producto'), style: TextStyle(color: AppColors.rojo)),
           onTap: () { Navigator.pop(ctx); _confirmarEliminar(context); }),
       ])));
   }
@@ -403,9 +404,9 @@ class _TarjetaMaterial extends StatelessWidget {
       builder: (ctx, setS) => Container(
         padding: const EdgeInsets.all(16),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text(material['nombre'] ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+          Text(tr(material['nombre'] ?? ''), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          Text('Stock actual: $stockActual ${material['unidad']}',
+          Text(trf('Stock actual: {0} {1}', [stockActual, (material['unidad'])]),
             style: const TextStyle(color: AppColors.textoSecundario)),
           const SizedBox(height: 12),
           Row(children: [
@@ -416,7 +417,7 @@ class _TarjetaMaterial extends StatelessWidget {
                   color: tipo == 'entrada' ? AppColors.verdeClaro : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: tipo == 'entrada' ? AppColors.verde : AppColors.grisBorde)),
-                child: Center(child: Text('↑ Entrada', style: TextStyle(
+                child: Center(child: Text(tr('↑ Entrada'), style: TextStyle(
                   color: tipo == 'entrada' ? AppColors.verde : Colors.grey, fontWeight: FontWeight.w600)))))),
             const SizedBox(width: 8),
             Expanded(child: GestureDetector(
@@ -426,13 +427,13 @@ class _TarjetaMaterial extends StatelessWidget {
                   color: tipo == 'salida' ? AppColors.rojoClaro : Colors.white,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: tipo == 'salida' ? AppColors.rojo : AppColors.grisBorde)),
-                child: Center(child: Text('↓ Salida', style: TextStyle(
+                child: Center(child: Text(tr('↓ Salida'), style: TextStyle(
                   color: tipo == 'salida' ? AppColors.rojo : Colors.grey, fontWeight: FontWeight.w600)))))),
           ]),
           const SizedBox(height: 8),
           TextField(controller: cant, keyboardType: TextInputType.number,
             textAlign: TextAlign.center,
-            decoration: const InputDecoration(labelText: 'Cantidad', isDense: true,
+            decoration: InputDecoration(labelText: tr('Cantidad'), isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8))),
           const SizedBox(height: 12),
           ElevatedButton(onPressed: () async {
@@ -441,11 +442,11 @@ class _TarjetaMaterial extends StatelessWidget {
               cantidad: int.tryParse(cant.text) ?? 1);
             if (error != null) {
               if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
-                SnackBar(content: Text(error), backgroundColor: AppColors.rojo));
+                SnackBar(content: Text(tr(error)), backgroundColor: AppColors.rojo));
               return;
             }
             if (ctx.mounted) { Navigator.pop(ctx); onMovimiento(); }
-          }, child: const Text('Registrar movimiento')),
+          }, child: Text(tr('Registrar movimiento'))),
         ]))));
   }
 
@@ -465,30 +466,30 @@ class _TarjetaMaterial extends StatelessWidget {
         padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom,
           left: 16, right: 16, top: 20),
         child: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Editar producto', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(tr('Editar producto'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
           TextField(controller: nombreCtrl,
-            decoration: const InputDecoration(labelText: 'Nombre', isDense: true,
+            decoration: InputDecoration(labelText: tr('Nombre'), isDense: true,
               border: OutlineInputBorder())),
           const SizedBox(height: 10),
           TextField(controller: categoriaCtrl,
-            decoration: const InputDecoration(labelText: 'Categoría', isDense: true,
+            decoration: InputDecoration(labelText: tr('Categoría'), isDense: true,
               border: OutlineInputBorder())),
           const SizedBox(height: 10),
           Row(children: [
             Expanded(child: TextField(controller: costoCtrl,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(labelText: 'Costo unitario', isDense: true,
+              decoration: InputDecoration(labelText: tr('Costo unitario'), isDense: true,
                 prefixText: r'$', border: OutlineInputBorder()))),
             const SizedBox(width: 10),
             Expanded(child: TextField(controller: stockMinCtrl,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Stock mínimo', isDense: true,
+              decoration: InputDecoration(labelText: tr('Stock mínimo'), isDense: true,
                 border: OutlineInputBorder()))),
           ]),
           const SizedBox(height: 10),
           TextField(controller: unidadCtrl,
-            decoration: const InputDecoration(labelText: 'Unidad (pieza, m², kg...)', isDense: true,
+            decoration: InputDecoration(labelText: tr('Unidad (pieza, m², kg...)'), isDense: true,
               border: OutlineInputBorder())),
           const SizedBox(height: 20),
           SizedBox(width: double.infinity, child: ElevatedButton(
@@ -502,14 +503,14 @@ class _TarjetaMaterial extends StatelessWidget {
               });
               if (error != null) {
                 if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(
-                  SnackBar(content: Text(error), backgroundColor: AppColors.rojo));
+                  SnackBar(content: Text(tr(error)), backgroundColor: AppColors.rojo));
                 return;
               }
               if (ctx.mounted) { Navigator.pop(ctx); onMovimiento(); }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
               padding: const EdgeInsets.symmetric(vertical: 13)),
-            child: const Text('Guardar cambios', style: TextStyle(color: Colors.white,
+            child: Text(tr('Guardar cambios'), style: TextStyle(color: Colors.white,
               fontWeight: FontWeight.w700)))),
           const SizedBox(height: 20),
         ]))));
@@ -518,23 +519,22 @@ class _TarjetaMaterial extends StatelessWidget {
   // ── Confirmar y eliminar producto ────────────────────────
   void _confirmarEliminar(BuildContext context) {
     showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('¿Eliminar producto?'),
-      content: Text('Se eliminará "${material['nombre']}" permanentemente del inventario. '
-        'Esta acción no se puede deshacer.'),
+      title: Text(tr('¿Eliminar producto?')),
+      content: Text(trf('Se eliminará "{0}" permanentemente del inventario. Esta acción no se puede deshacer.', [(material['nombre'])])),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
         TextButton(
           onPressed: () async {
             Navigator.pop(ctx);
             final error = await SupabaseService.eliminarMaterial(material['id']);
             if (error != null) {
               if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(error), backgroundColor: AppColors.rojo));
+                SnackBar(content: Text(tr(error)), backgroundColor: AppColors.rojo));
               return;
             }
             onMovimiento();
           },
-          child: const Text('Eliminar', style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
+          child: Text(tr('Eliminar'), style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
       ]));
   }
 }

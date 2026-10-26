@@ -1,5 +1,6 @@
 // lib/services/whatsapp_service.dart
 import 'package:url_launcher/url_launcher.dart';
+import '../i18n/tr.dart';
 
 class WhatsAppService {
   /// Normaliza número de WhatsApp mexicano al formato correcto
@@ -71,16 +72,8 @@ class WhatsAppService {
   }) {
     final fmt = _fmt;
     final itemsTexto = items.join('\n');
-    final ivaLinea = aplicaIva ? '\nIVA ${ivaPct.toInt()}%: ${fmt(montoIva)}' : '';
-    return '¡Hola $nombreCliente! 👋\n\n'
-        'Te compartimos tu cotización de *HETNA CNC*:\n\n'
-        '$itemsTexto\n\n'
-        'Subtotal: ${fmt(subtotal)}$ivaLinea\n'
-        '*TOTAL: ${fmt(total)}*\n\n'
-        'Tiempo de entrega: $tiempoEntrega\n'
-        'Método de pago: $metodoPago\n\n'
-        '¿Te parece bien? Estamos para cualquier ajuste. 😊\n\n'
-        '_HETNA CNC — Router CNC · Láser CO₂ · Fibra · Plasma_';
+    final ivaLinea = aplicaIva ? trf('\nIVA {0}%: {1}', [(ivaPct.toInt()), (fmt(montoIva))]) : '';
+    return trf('¡Hola {0}! 👋\n\nTe compartimos tu cotización de *HETNA CNC*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? Estamos para cualquier ajuste. 😊\n\n_HETNA CNC — Router CNC · Láser CO₂ · Fibra · Plasma_', [nombreCliente, itemsTexto, (fmt(subtotal)), ivaLinea, (fmt(total)), tiempoEntrega, metodoPago]);
   }
 
   /// Mensaje de avance de pedido
@@ -103,7 +96,7 @@ class WhatsAppService {
       case 'Entregado':
         return '¡Hola $nombreCliente! 🎉 Tu pedido *$folio* fue entregado. ¡Gracias por confiar en *HETNA CNC*!\n\nSi necesitas algo más, con gusto te atendemos. 😊';
       default:
-        return '¡Hola $nombreCliente! Tu pedido *$folio* está en proceso. — *HETNA CNC*';
+        return trf('¡Hola {0}! Tu pedido *{1}* está en proceso. — *HETNA CNC*', [nombreCliente, folio]);
     }
   }
 
@@ -114,7 +107,7 @@ class WhatsAppService {
     String? folio,
     double? total,
   }) {
-    final folioTexto = folio != null ? 'cotización *$folio*' : 'tu cotización';
+    final folioTexto = folio != null ? trf('cotización *{0}*', [folio]) : tr('tu cotización');
     switch (tipo) {
       case 'seguimiento_dia3':
         return '¡Hola $nombreCliente! 😊 Te escribo de *HETNA CNC* para saber si pudiste revisar la $folioTexto. ¿Tienes alguna duda? Estamos para ayudarte.';
@@ -125,7 +118,7 @@ class WhatsAppService {
       case 'post_entrega':
         return '¡Hola $nombreCliente! Esperamos que estés disfrutando tu pedido de *HETNA CNC*. ¿Cómo te fue? 😊\n\nSíguenos en @hetna_cnc para ver proyectos y promociones.';
       default:
-        return '¡Hola $nombreCliente! Te escribo de *HETNA CNC*. ¿Podemos ayudarte con algo?';
+        return trf('¡Hola {0}! Te escribo de *HETNA CNC*. ¿Podemos ayudarte con algo?', [nombreCliente]);
     }
   }
 

@@ -18,6 +18,7 @@ import '../main.dart';
 import '../services/billing_service.dart';
 import '../services/auth_service.dart';
 import '../services/hetna_api.dart';
+import '../i18n/tr.dart';
 
 class PremiumScreen extends StatefulWidget {
   const PremiumScreen({super.key});
@@ -60,13 +61,13 @@ class _PremiumScreenState extends State<PremiumScreen> {
     BillingService.onError = (msg) {
       if (!mounted) return;
       setState(() => _ocupado = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: AppColors.rojo));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(msg)), backgroundColor: AppColors.rojo));
     };
     BillingService.onCompraExitosa = () {
       if (!mounted) return;
       setState(() => _ocupado = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ ¡Listo! Tu plan quedó activo'), backgroundColor: AppColors.verde));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ ¡Listo! Tu plan quedó activo')), backgroundColor: AppColors.verde));
       Navigator.pop(context);
     };
   }
@@ -76,13 +77,11 @@ class _PremiumScreenState extends State<PremiumScreen> {
   void _aviso(String texto, {bool error = false}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(texto), backgroundColor: error ? AppColors.rojo : AppColors.azul));
+      content: Text(tr(texto)), backgroundColor: error ? AppColors.rojo : AppColors.azul));
   }
 
   Future<void> _porWhatsApp(Plan p) async {
-    final msg = 'Hola, quiero contratar el plan ${Planes.nombres[p]} '
-      '(\$${Planes.precios[p]} al mes) del Cotizador HETNA.\n'
-      'Mi taller: ${AuthService.nombreUsuario ?? ''}\nID: ${AuthService.negocioId ?? ''}';
+    final msg = trf('Hola, quiero contratar el plan {0} (\${1} al mes) del Cotizador HETNA.\nMi taller: {2}\nID: {3}', [(Planes.nombres[p]), (Planes.precios[p]), (AuthService.nombreUsuario ?? ''), (AuthService.negocioId ?? '')]);
     final uri = Uri.parse('https://wa.me/${HetnaApi.whatsappHetna}?text=${Uri.encodeComponent(msg)}');
     await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
@@ -94,30 +93,30 @@ class _PremiumScreenState extends State<PremiumScreen> {
       return;
     }
     if (!AuthService.esAdmin) {
-      _aviso('Sólo el administrador del taller puede contratar el plan.', error: true);
+      _aviso(tr('Sólo el administrador del taller puede contratar el plan.'), error: true);
       return;
     }
     final token = AuthService.sesion?.accessToken;
     if (token == null) {
-      _aviso('Vuelve a iniciar sesión para contratar.', error: true);
+      _aviso(tr('Vuelve a iniciar sesión para contratar.'), error: true);
       return;
     }
 
     // 1) Forma de pago
     final usd = _usd(p);
     final forma = await showDialog<String>(context: context, builder: (ctx) => SimpleDialog(
-      title: Text('Plan ${Planes.nombres[p]}'),
+      title: Text(trf('Plan {0}', [(Planes.nombres[p])])),
       children: [
-        _opcionPago(ctx, 'mp', Icons.credit_card, 'Mercado Pago',
-          'México · \$${Planes.precios[p]} MXN al mes · tarjeta de crédito o débito'),
+        _opcionPago(ctx, 'mp', Icons.credit_card, tr('Mercado Pago'),
+          trf('México · \${0} MXN al mes · tarjeta de crédito o débito', [(Planes.precios[p])])),
         if (_hayPaypal && usd != null)
-          _opcionPago(ctx, 'paypal', Icons.public, 'PayPal',
-            'US\$$usd al mes · tarjeta internacional o cuenta PayPal'),
-        _opcionPago(ctx, 'whatsapp', Icons.chat_outlined, 'WhatsApp',
-          'Transferencia, factura o dudas'),
-        const Padding(
+          _opcionPago(ctx, 'paypal', Icons.public, tr('PayPal'),
+            trf('US\${0} al mes · tarjeta internacional o cuenta PayPal', [usd])),
+        _opcionPago(ctx, 'whatsapp', Icons.chat_outlined, tr('WhatsApp'),
+          tr('Transferencia, factura o dudas')),
+        Padding(
           padding: EdgeInsets.fromLTRB(24, 8, 24, 0),
-          child: Text('Se cobra cada mes. Puedes cancelar cuando quieras y conservas el plan hasta el fin del mes pagado.',
+          child: Text(tr('Se cobra cada mes. Puedes cancelar cuando quieras y conservas el plan hasta el fin del mes pagado.'),
             style: TextStyle(fontSize: 11, color: AppColors.textoSecundario, height: 1.4))),
       ]));
     if (forma == null) return;
@@ -128,34 +127,34 @@ class _PremiumScreenState extends State<PremiumScreen> {
     if (forma == 'mp') {
       final correoCtrl = TextEditingController(text: AuthService.usuarioActual?.email ?? '');
       final seguir = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-        title: Text('Mercado Pago · \$${Planes.precios[p]} MXN al mes'),
+        title: Text(trf('Mercado Pago · \${0} MXN al mes', [(Planes.precios[p])])),
         content: TextField(controller: correoCtrl, keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'Correo de tu cuenta de Mercado Pago',
-            helperText: 'Debe ser el mismo con el que entras a Mercado Pago',
+          decoration: InputDecoration(
+            labelText: tr('Correo de tu cuenta de Mercado Pago'),
+            helperText: tr('Debe ser el mismo con el que entras a Mercado Pago'),
             isDense: true, border: OutlineInputBorder())),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancelar'))),
           ElevatedButton(onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul),
-            child: const Text('Ir a pagar', style: TextStyle(color: Colors.white))),
+            child: Text(tr('Ir a pagar'), style: TextStyle(color: Colors.white))),
         ]));
       correoPago = correoCtrl.text.trim();
       correoCtrl.dispose();
       if (seguir != true) return;
     }
     final proveedor = forma == 'paypal' ? 'paypal' : 'mercadopago';
-    final nombreProveedor = forma == 'paypal' ? 'PayPal' : 'Mercado Pago';
+    final nombreProveedor = forma == 'paypal' ? tr('PayPal') : tr('Mercado Pago');
 
     setState(() => _ocupado = true);
     try {
       final url = await SuscripcionApi.crear(token, p.name, correoPago, proveedor: proveedor);
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-      _aviso('Cuando termines de pagar en $nombreProveedor, toca "Ya pagué — actualizar mi plan".');
+      _aviso(trf('Cuando termines de pagar en {0}, toca "Ya pagué — actualizar mi plan".', [nombreProveedor]));
     } on HetnaError catch (e) {
       _aviso(e.mensaje, error: true);
     } catch (_) {
-      _aviso('No pudimos abrir $nombreProveedor. Revisa tu conexión o escríbenos por WhatsApp.', error: true);
+      _aviso(trf('No pudimos abrir {0}. Revisa tu conexión o escríbenos por WhatsApp.', [nombreProveedor]), error: true);
     } finally {
       if (mounted) setState(() => _ocupado = false);
     }
@@ -169,9 +168,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
         Icon(icono, color: AppColors.azul, size: 22),
         const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(titulo, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+          Text(tr(titulo), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
           const SizedBox(height: 2),
-          Text(detalle, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+          Text(tr(detalle), style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
         ])),
       ]));
 
@@ -185,7 +184,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
     await AuthService.refrescarPerfil();
     if (!mounted) return;
     setState(() => _ocupado = false);
-    _aviso('Tu plan: ${Planes.nombres[AuthService.planActual]}');
+    _aviso(trf('Tu plan: {0}', [(Planes.nombres[AuthService.planActual])]));
   }
 
   Future<void> _cancelar() async {
@@ -193,25 +192,23 @@ class _PremiumScreenState extends State<PremiumScreen> {
     if (token == null) return;
     final renueva = AuthService.planRenueva;
     final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Cancelar suscripción'),
-      content: Text('Ya no se te cobrará. Conservas tu plan '
-        '${renueva != null ? 'hasta el ${_fecha(renueva)}' : 'hasta el fin del mes pagado'} '
-        'y después tu taller pasa a Gratis.'),
+      title: Text(tr('Cancelar suscripción')),
+      content: Text(trf('Ya no se te cobrará. Conservas tu plan {0} y después tu taller pasa a Gratis.', [(renueva != null ? trf('hasta el {0}', [(_fecha(renueva))]) : tr('hasta el fin del mes pagado'))])),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No, seguir')),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('No, seguir'))),
         TextButton(onPressed: () => Navigator.pop(ctx, true),
-          child: const Text('Sí, cancelar', style: TextStyle(color: AppColors.rojo))),
+          child: Text(tr('Sí, cancelar'), style: TextStyle(color: AppColors.rojo))),
       ]));
     if (ok != true) return;
     setState(() => _ocupado = true);
     try {
       await SuscripcionApi.cancelar(token);
       await AuthService.refrescarPerfil();
-      _aviso('Suscripción cancelada.');
+      _aviso(tr('Suscripción cancelada.'));
     } on HetnaError catch (e) {
       _aviso(e.mensaje, error: true);
     } catch (_) {
-      _aviso('No se pudo cancelar. Intenta de nuevo o escríbenos.', error: true);
+      _aviso(tr('No se pudo cancelar. Intenta de nuevo o escríbenos.'), error: true);
     } finally {
       if (mounted) setState(() => _ocupado = false);
     }
@@ -230,12 +227,12 @@ class _PremiumScreenState extends State<PremiumScreen> {
     Color color = AppColors.azul;
     if (estado == 'activa') {
       final r = AuthService.planRenueva;
-      texto = r != null ? 'Suscripción activa · se renueva el ${_fecha(r)}' : 'Suscripción activa';
+      texto = r != null ? trf('Suscripción activa · se renueva el {0}', [(_fecha(r))]) : tr('Suscripción activa');
     } else {
       final v = AuthService.planVence;
       texto = v != null && v.isAfter(DateTime.now())
-        ? 'Suscripción ${estado == 'pausada' ? 'pausada' : 'cancelada'} · tu plan sigue hasta el ${_fecha(v)}'
-        : 'Suscripción ${estado == 'pausada' ? 'pausada' : 'cancelada'}';
+        ? trf('Suscripción {0} · tu plan sigue hasta el {1}', [(estado == 'pausada' ? 'pausada' : 'cancelada'), (_fecha(v))])
+        : trf('Suscripción {0}', [(estado == 'pausada' ? 'pausada' : 'cancelada')]);
       color = AppColors.ambar;
     }
     return Container(
@@ -244,10 +241,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.grisBorde)),
       child: Row(children: [
-        Expanded(child: Text(texto, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600))),
+        Expanded(child: Text(tr(texto), style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600))),
         if (estado == 'activa' && AuthService.esAdmin)
           TextButton(onPressed: _ocupado ? null : _cancelar,
-            child: const Text('Cancelar', style: TextStyle(fontSize: 12, color: AppColors.rojo))),
+            child: Text(tr('Cancelar'), style: TextStyle(fontSize: 12, color: AppColors.rojo))),
       ]));
   }
 
@@ -256,7 +253,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
     final actual = AuthService.planActual;
     return Scaffold(
       backgroundColor: AppColors.gris,
-      appBar: AppBar(title: const Text('Planes HETNA'),
+      appBar: AppBar(title: Text(tr('Planes HETNA')),
         backgroundColor: Colors.white, foregroundColor: Colors.black87, elevation: 0),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         if (AuthService.plan == 'trial' || AuthService.plan == 'prueba')
@@ -264,9 +261,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(10)),
-            child: Text(AuthService.trialVencido
-                ? 'Tu prueba terminó. Elige un plan para seguir usando los módulos con candado.'
-                : 'Prueba: ${AuthService.diasTrialRestantes} días con todo abierto.',
+            child: Text(tr(AuthService.trialVencido
+                ? tr('Tu prueba terminó. Elige un plan para seguir usando los módulos con candado.')
+                : trf('Prueba: {0} días con todo abierto.', [(AuthService.diasTrialRestantes)])),
               style: const TextStyle(fontSize: 12, color: AppColors.ambar, fontWeight: FontWeight.w600))),
         if (_estadoSuscripcion() != null) _estadoSuscripcion()!,
         ...Plan.values.map((p) => _tarjeta(p, actual)),
@@ -274,10 +271,10 @@ class _PremiumScreenState extends State<PremiumScreen> {
         TextButton.icon(
           onPressed: _ocupado ? null : _actualizar,
           icon: const Icon(Icons.refresh, size: 18),
-          label: const Text('Ya pagué — actualizar mi plan')),
+          label: Text(tr('Ya pagué — actualizar mi plan'))),
         TextButton(
           onPressed: () => launchUrl(Uri.parse(HetnaApi.urlPlanes), mode: LaunchMode.externalApplication),
-          child: const Text('Ver planes en hetnacnc.com',
+          child: Text(tr('Ver planes en hetnacnc.com'),
             style: TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
       ]));
   }
@@ -301,14 +298,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
         Row(children: [
           Text(Planes.nombres[p]!, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.azul)),
           const Spacer(),
-          Text(Planes.precios[p] == 0 ? 'Gratis' : '\$${Planes.precios[p]}',
+          Text(tr(Planes.precios[p] == 0 ? tr('Gratis') : '\$${Planes.precios[p]}'),
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
           if (Planes.precios[p]! > 0)
             const Text(' /mes', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ]),
         if (_hayPaypal && _usd(p) != null && Planes.precios[p]! > 0)
           Align(alignment: Alignment.centerRight,
-            child: Text('o US\$${_usd(p)}/mes con PayPal',
+            child: Text(trf('o US\${0}/mes con PayPal', [(_usd(p))]),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
         const SizedBox(height: 8),
         ...(_incluye[p] ?? []).map((t) => Padding(
@@ -316,17 +313,17 @@ class _PremiumScreenState extends State<PremiumScreen> {
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Icon(Icons.check, size: 16, color: AppColors.verde),
             const SizedBox(width: 6),
-            Expanded(child: Text(t, style: const TextStyle(fontSize: 13))),
+            Expanded(child: Text(tr(t), style: const TextStyle(fontSize: 13))),
           ]))),
         const SizedBox(height: 8),
         if (esActual)
-          const Text('✓ Tu plan actual', style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w700))
+          Text(tr('✓ Tu plan actual'), style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w700))
         else if (puedeContratar)
           SizedBox(width: double.infinity, height: 42, child: ElevatedButton(
             onPressed: _ocupado ? null : () => _contratar(p),
             style: ElevatedButton.styleFrom(backgroundColor: destacado ? AppColors.naranja : AppColors.azul,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-            child: Text(_hayGooglePlay ? 'Suscribirme' : 'Contratar ${Planes.nombres[p]}',
+            child: Text(tr(_hayGooglePlay ? tr('Suscribirme') : trf('Contratar {0}', [(Planes.nombres[p])])),
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
       ]));
   }

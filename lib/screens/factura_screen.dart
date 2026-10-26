@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
+import '../i18n/tr.dart';
 
 class FacturaScreen extends StatefulWidget {
   final Pedido pedido;
@@ -134,8 +135,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
       await SupabaseService.crearFacturaPendiente(datosFactura);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ Datos guardados — factura lista para timbrar cuando configures tu proveedor'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('✅ Datos guardados — factura lista para timbrar cuando configures tu proveedor')),
           backgroundColor: AppColors.verde,
           duration: Duration(seconds: 4)));
         Navigator.pop(context);
@@ -151,7 +152,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Generar factura', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        title: Text(tr('Generar factura'), style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0),
@@ -183,7 +184,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                         style: const TextStyle(fontSize: 10, color: AppColors.verde, fontWeight: FontWeight.w700))),
                   ]),
                   const SizedBox(height: 8),
-                  Text(widget.pedido.cliente?.nombre ?? '—',
+                  Text(tr(widget.pedido.cliente?.nombre ?? '—'),
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const Divider(height: 16),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -191,7 +192,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     Text(_fmt.format(_subtotal), style: const TextStyle(fontSize: 12)),
                   ]),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    const Text('IVA 16%:', style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+                    Text(tr('IVA 16%:'), style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
                     Text(_fmt.format(_iva), style: const TextStyle(fontSize: 12)),
                   ]),
                   Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -212,36 +213,36 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     color: const Color(0xFFFFF3CD),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFFFE08A))),
-                  child: const Row(children: [
+                  child: Row(children: [
                     Icon(Icons.warning_amber_outlined, size: 18, color: Color(0xFF856404)),
                     SizedBox(width: 8),
                     Expanded(child: Text(
-                      'La facturación no está activada. Ve a Configuración → Facturación para conectar tu proveedor.',
+                      tr('La facturación no está activada. Ve a Configuración → Facturación para conectar tu proveedor.'),
                       style: TextStyle(fontSize: 11, color: Color(0xFF856404)))),
                   ])),
 
               // ── DATOS DEL RECEPTOR ──
-              _seccion('📋 DATOS FISCALES DEL RECEPTOR'),
+              _seccion(tr('📋 DATOS FISCALES DEL RECEPTOR')),
               const SizedBox(height: 8),
 
-              _campo(_rfcCtrl, 'RFC del receptor *', Icons.badge_outlined,
+              _campo(_rfcCtrl, tr('RFC del receptor *'), Icons.badge_outlined,
                 mayusculas: true, hint: 'XAXX010101000',
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'RFC requerido';
+                  if (v == null || v.trim().isEmpty) return tr('RFC requerido');
                   final rfc = v.trim().toUpperCase();
-                  if (rfc.length < 12 || rfc.length > 13) return 'RFC inválido (12-13 caracteres)';
+                  if (rfc.length < 12 || rfc.length > 13) return tr('RFC inválido (12-13 caracteres)');
                   return null;
                 }),
 
-              _campo(_razonCtrl, 'Razón social *', Icons.business_outlined,
-                hint: 'Nombre como aparece en el SAT',
-                validator: (v) => (v == null || v.trim().isEmpty) ? 'Campo requerido' : null),
+              _campo(_razonCtrl, tr('Razón social *'), Icons.business_outlined,
+                hint: tr('Nombre como aparece en el SAT'),
+                validator: (v) => (v == null || v.trim().isEmpty) ? tr('Campo requerido') : null),
 
-              _campo(_cpCtrl, 'Código postal fiscal *', Icons.location_on_outlined,
+              _campo(_cpCtrl, tr('Código postal fiscal *'), Icons.location_on_outlined,
                 tipo: TextInputType.number, hint: '12345',
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'CP requerido';
-                  if (v.trim().length != 5) return 'CP debe tener 5 dígitos';
+                  if (v == null || v.trim().isEmpty) return tr('CP requerido');
+                  if (v.trim().length != 5) return tr('CP debe tener 5 dígitos');
                   return null;
                 }),
 
@@ -255,8 +256,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   child: DropdownButtonFormField<String>(
                     value: _regimenReceptor,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Régimen fiscal receptor',
+                    decoration: InputDecoration(
+                      labelText: tr('Régimen fiscal receptor'),
                       border: InputBorder.none,
                       prefixIcon: Icon(Icons.account_balance_outlined, size: 18, color: AppColors.azul)),
                     items: _regimenes.entries.map((e) =>
@@ -274,8 +275,8 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   child: DropdownButtonFormField<String>(
                     value: _usoCFDI,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Uso del CFDI',
+                    decoration: InputDecoration(
+                      labelText: tr('Uso del CFDI'),
                       border: InputBorder.none,
                       prefixIcon: Icon(Icons.receipt_outlined, size: 18, color: AppColors.azul)),
                     items: _usosCFDI.entries.map((e) =>
@@ -292,11 +293,11 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   color: Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: AppColors.grisBorde)),
-                child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Icon(Icons.save_outlined, size: 14, color: AppColors.textoSecundario),
                   SizedBox(width: 8),
                   Expanded(child: Text(
-                    'Los datos fiscales se guardarán en el perfil del cliente para futuras facturas.',
+                    tr('Los datos fiscales se guardarán en el perfil del cliente para futuras facturas.'),
                     style: TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
                 ])),
 
@@ -309,7 +310,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
                   icon: _generando
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.receipt_long_outlined, color: Colors.white),
-                  label: Text(_generando ? 'Guardando...' : 'Guardar datos de factura',
+                  label: Text(tr(_generando ? tr('Guardando...') : tr('Guardar datos de factura')),
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1a3a5c),
@@ -323,12 +324,12 @@ class _FacturaScreenState extends State<FacturaScreen> {
                     onPressed: () {
                       Navigator.pop(context);
                       // Ir a Configuración — navegar desde home
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('Ve a Más → Configuración para activar la facturación'),
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(tr('Ve a Más → Configuración para activar la facturación')),
                         duration: Duration(seconds: 3)));
                     },
                     icon: const Icon(Icons.settings_outlined, size: 14),
-                    label: const Text('Ir a Configuración', style: TextStyle(fontSize: 13)),
+                    label: Text(tr('Ir a Configuración'), style: TextStyle(fontSize: 13)),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.azul,
                       side: const BorderSide(color: AppColors.azul),
@@ -340,7 +341,7 @@ class _FacturaScreenState extends State<FacturaScreen> {
 
   Widget _seccion(String titulo) => Padding(
     padding: const EdgeInsets.only(bottom: 4),
-    child: Text(titulo,
+    child: Text(tr(titulo),
       style: const TextStyle(fontSize: 11, color: AppColors.azul,
         fontWeight: FontWeight.w700, letterSpacing: 0.5)));
 

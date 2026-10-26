@@ -7,6 +7,7 @@ import '../services/whatsapp_service.dart';
 import '../services/pdf_service.dart';
 import '../services/auth_service.dart';
 import 'factura_screen.dart';
+import '../i18n/tr.dart';
 
 class AvancesScreen extends StatefulWidget {
   const AvancesScreen({super.key});
@@ -105,7 +106,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.gris,
-      appBar: AppBar(title: const Text('Avances de pedidos'),
+      appBar: AppBar(title: Text(tr('Avances de pedidos')),
         actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)]),
       body: Column(children: [
         // Búsqueda por nombre/folio + filtro de fechas
@@ -116,7 +117,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
               controller: _busquedaCtrl,
               onChanged: (v) => setState(() => _busqueda = v),
               decoration: InputDecoration(
-                hintText: 'Buscar por cliente o folio...',
+                hintText: tr('Buscar por cliente o folio...'),
                 hintStyle: const TextStyle(fontSize: 12),
                 prefixIcon: const Icon(Icons.search, size: 18),
                 suffixIcon: _busqueda.isNotEmpty
@@ -157,7 +158,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
           Container(width: double.infinity, color: Colors.white,
             padding: const EdgeInsets.only(left: 12, right: 12, bottom: 6),
             child: Text(
-              '${DateFormat('dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat('dd/MM/yy').format(_rangoFechas!.end)}',
+              '${DateFormat(enIngles ? 'MM/dd/yy' : 'dd/MM/yy').format(_rangoFechas!.start)} - ${DateFormat(enIngles ? 'MM/dd/yy' : 'dd/MM/yy').format(_rangoFechas!.end)}',
               style: const TextStyle(fontSize: 10, color: AppColors.azul, fontWeight: FontWeight.w600))),
 
         // Filtros por etapa
@@ -179,7 +180,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: activo ? color : AppColors.grisBorde)),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(label, style: TextStyle(fontSize: 11,
+                    Text(tr(label), style: TextStyle(fontSize: 11,
                       color: activo ? Colors.white : AppColors.textoSecundario,
                       fontWeight: activo ? FontWeight.w700 : FontWeight.normal)),
                     if (count > 0) ...[
@@ -215,7 +216,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
   Widget _vacia() => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
     const Icon(Icons.local_shipping_outlined, size: 56, color: AppColors.textoSecundario),
     const SizedBox(height: 12),
-    Text(_filtro == 'Activos' ? 'No hay pedidos activos' : 'No hay pedidos en "$_filtro"',
+    Text(tr(_filtro == 'Activos' ? tr('No hay pedidos activos') : trf('No hay pedidos en "{0}"', [_filtro])),
       style: const TextStyle(color: AppColors.textoSecundario)),
   ]));
 }
@@ -248,7 +249,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0', 'es_MX');
-    final nombre = widget.pedido.cliente?.nombre ?? widget.pedido.cliente?.empresa ?? 'Sin cliente';
+    final nombre = widget.pedido.cliente?.nombre ?? widget.pedido.cliente?.empresa ?? tr('Sin cliente');
     final tieneWA = (widget.pedido.cliente?.whatsappNumero ?? '').isNotEmpty;
     final siguienteEtapa = _siguienteEtapa;
     final etiquetaSiguiente = siguienteEtapa != null ? (widget.etiquetas[siguienteEtapa] ?? siguienteEtapa) : '';
@@ -265,7 +266,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         // Header
         Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(nombre, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
+            Text(tr(nombre), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
             if (widget.pedido.cliente?.empresa != null)
               Text(widget.pedido.cliente!.empresa!, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             Text(widget.pedido.folio, style: const TextStyle(fontSize: 10, color: AppColors.azul)),
@@ -282,7 +283,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             const SizedBox(height: 2),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: _colorActual.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(_etiquetaActual, style: TextStyle(fontSize: 10, color: _colorActual, fontWeight: FontWeight.w700))),
+              child: Text(tr(_etiquetaActual), style: TextStyle(fontSize: 10, color: _colorActual, fontWeight: FontWeight.w700))),
           ]),
         ]),
 
@@ -311,7 +312,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
                 shape: BoxShape.circle,
                 color: esActual ? color : (pasada ? AppColors.verde.withOpacity(0.6) : Colors.grey.shade300))),
               const SizedBox(height: 2),
-              Text(etiquetaCorta, style: TextStyle(fontSize: 8,
+              Text(tr(etiquetaCorta), style: TextStyle(fontSize: 8,
                 color: esActual ? color : (pasada ? AppColors.verde : AppColors.textoSecundario),
                 fontWeight: esActual ? FontWeight.w700 : FontWeight.normal)),
             ]));
@@ -324,7 +325,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
           Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(color: const Color(0xFF6b7280).withOpacity(0.1),
               borderRadius: BorderRadius.circular(8)),
-            child: const Center(child: Text('❌ Pedido cancelado',
+            child: Center(child: Text(tr('❌ Pedido cancelado'),
               style: TextStyle(color: Color(0xFF6b7280), fontWeight: FontWeight.w700, fontSize: 12)))),
 
         // Botones
@@ -350,7 +351,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
           SizedBox(width: double.infinity, child: TextButton.icon(
             onPressed: _cambiando ? null : _confirmarCancelar,
             icon: const Icon(Icons.cancel_outlined, size: 14, color: AppColors.rojo),
-            label: const Text('Cancelar pedido',
+            label: Text(tr('Cancelar pedido'),
               style: TextStyle(fontSize: 12, color: AppColors.rojo, fontWeight: FontWeight.w600)))),
         ],
 
@@ -362,7 +363,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             icon: _generandoPdf
               ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.picture_as_pdf_outlined, size: 14),
-            label: Text(_generandoPdf ? 'Generando...' : 'Ver pedido PDF',
+            label: Text(tr(_generandoPdf ? tr('Generando...') : tr('Ver pedido PDF')),
               style: const TextStyle(fontSize: 12)),
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF1a3a5c),
@@ -376,7 +377,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
           SizedBox(width: double.infinity, child: ElevatedButton.icon(
             onPressed: () async {
               if (!AuthService.puede('facturacion')) {
-                await AuthService.exigirModulo(context, 'facturacion', funcion: 'Facturación (CFDI)');
+                await AuthService.exigirModulo(context, 'facturacion', funcion: tr('Facturación (CFDI)'));
                 return;
               }
               Navigator.push(context, MaterialPageRoute(
@@ -384,7 +385,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             },
             icon: Icon(AuthService.puede('facturacion') ? Icons.receipt_long_outlined : Icons.lock_outline,
               size: 14, color: Colors.white),
-            label: const Text('Generar factura', style: TextStyle(fontSize: 12, color: Colors.white)),
+            label: Text(tr('Generar factura'), style: TextStyle(fontSize: 12, color: Colors.white)),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF1a3a5c),
               padding: const EdgeInsets.symmetric(vertical: 8)))),
@@ -399,25 +400,25 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             : ElevatedButton.icon(
                 onPressed: () async {
                   if (!AuthService.esPremiumActivo) {
-                    await AuthService.exigirPremium(context, funcion: 'Notificaciones automáticas de WhatsApp');
+                    await AuthService.exigirPremium(context, funcion: tr('Notificaciones automáticas de WhatsApp'));
                     return;
                   }
                   _notificarCliente();
                 },
                 icon: Icon(AuthService.esPremiumActivo ? Icons.chat : Icons.lock_outline, size: 14, color: Colors.white),
-                label: const Text('Notificar WA', style: TextStyle(fontSize: 12, color: Colors.white)),
+                label: Text(tr('Notificar WA'), style: TextStyle(fontSize: 12, color: Colors.white)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF25D366), padding: const EdgeInsets.symmetric(vertical: 8)))),
           if (tieneWA && !_esEntregado && !_cancelado) const SizedBox(width: 6),
           if (!_esEntregado && !_cancelado) Expanded(child: OutlinedButton.icon(
             onPressed: () => _cambiarEtapa('Entregado'),
             icon: const Icon(Icons.check_circle_outline, size: 14),
-            label: const Text('Entregado', style: TextStyle(fontSize: 12)),
+            label: Text(tr('Entregado'), style: TextStyle(fontSize: 12)),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.verde,
               side: const BorderSide(color: AppColors.verde),
               padding: const EdgeInsets.symmetric(vertical: 8)))),
-          if (_esEntregado) const Expanded(child: Center(child: Text('✅ Pedido entregado',
+          if (_esEntregado) Expanded(child: Center(child: Text(tr('✅ Pedido entregado'),
             style: TextStyle(color: AppColors.verde, fontWeight: FontWeight.w600)))),
         ]),
         if (_esEntregado) ...[
@@ -426,7 +427,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             child: ElevatedButton.icon(
               onPressed: _generarNotaCompra,
               icon: const Icon(Icons.task_alt_outlined, size: 14, color: Colors.white),
-              label: const Text('Generar nota de compra', style: TextStyle(fontSize: 12, color: Colors.white)),
+              label: Text(tr('Generar nota de compra'), style: TextStyle(fontSize: 12, color: Colors.white)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.verde,
                 padding: const EdgeInsets.symmetric(vertical: 10)))),
@@ -435,6 +436,8 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
   }
 
   Future<void> _generarNotaCompra() async {
+    final ingles = await PdfService.elegirIdioma(context);
+    if (ingles == null) return;
     try {
       final pedido = widget.pedido;
       // Construir cotizacion desde el pedido
@@ -448,15 +451,16 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         }
       }
       if (cot == null) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('No se encontró la cotización del pedido')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('No se encontró la cotización del pedido'))));
         return;
       }
       final cfg = await SupabaseService.getConfiguracion();
       final bytes = await PdfService.generarNotaCompra(
         cotizacion: cot,
         empresa: cfg,
-        folioPedido: pedido.folio);
+        folioPedido: pedido.folio,
+        ingles: ingles);
       if (mounted) await PdfService.mostrarOpcionesEnvio(
         context, bytes, 'nota_compra_${pedido.folio ?? "nota"}.pdf');
     } catch (e) {
@@ -468,24 +472,24 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
   void _confirmarCancelar() {
     final motivoCtrl = TextEditingController();
     showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('¿Cancelar este pedido?'),
+      title: Text(tr('¿Cancelar este pedido?')),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-        const Text('Esta acción marcará el pedido como cancelado. Podrás seguir viéndolo en el filtro "Cancelado".',
+        Text(tr('Esta acción marcará el pedido como cancelado. Podrás seguir viéndolo en el filtro "Cancelado".'),
           style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
         const SizedBox(height: 12),
         TextField(controller: motivoCtrl,
-          decoration: const InputDecoration(labelText: 'Motivo (opcional)', isDense: true,
+          decoration: InputDecoration(labelText: tr('Motivo (opcional)'), isDense: true,
             border: OutlineInputBorder())),
       ]),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('No cancelar')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('No cancelar'))),
         TextButton(
           onPressed: () {
             Navigator.pop(ctx);
             _cambiarEtapa('Cancelado');
           },
-          child: const Text('Sí, cancelar pedido',
+          child: Text(tr('Sí, cancelar pedido'),
             style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
       ]));
   }
@@ -509,7 +513,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     try {
       final msg = await WhatsAppService.getPlantillaAvance(
         etapa: etapa ?? widget.pedido.estado,
-        nombreCliente: widget.pedido.cliente?.nombre ?? 'Cliente',
+        nombreCliente: widget.pedido.cliente?.nombre ?? tr('Cliente'),
         folio: widget.pedido.folio,
         montoTotal: widget.pedido.total,
         pedidoId: widget.pedido.id,
@@ -524,6 +528,8 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
 
   Future<void> _verPdfCotizacion() async {
     if (widget.pedido.cotizacionId == null) return;
+    final ingles = await PdfService.elegirIdioma(context);
+    if (ingles == null) return;
     setState(() => _generandoPdf = true);
     try {
       // Cargar cotización con items
@@ -538,11 +544,11 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
         cotFinal = cot.copiaConItems(items);
       }
       final cfg = await SupabaseService.getConfiguracion();
-      final bytes = await PdfService.generarCotizacion(cotizacion: cotFinal, empresa: cfg);
+      final bytes = await PdfService.generarCotizacion(cotizacion: cotFinal, empresa: cfg, ingles: ingles);
       await PdfService.verPdf(bytes);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al generar PDF: $e'), backgroundColor: Colors.red));
+        SnackBar(content: Text(trf('Error al generar PDF: {0}', [e])), backgroundColor: Colors.red));
     } finally {
       if (mounted) setState(() => _generandoPdf = false);
     }

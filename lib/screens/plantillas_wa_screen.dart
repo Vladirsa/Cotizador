@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
+import '../i18n/tr.dart';
 
 // ══════════════════════════════════════════════════════
 // MODELO
@@ -137,7 +138,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Plantillas WhatsApp',
+        title: Text(tr('Plantillas WhatsApp'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         actions: [
           IconButton(
@@ -149,9 +150,9 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
-          tabs: const [
-            Tab(text: '💬 Mensajes'),
-            Tab(text: '⚙️ Configuración'),
+          tabs: [
+            Tab(text: tr('💬 Mensajes')),
+            Tab(text: tr('⚙️ Configuración')),
           ])),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
@@ -168,11 +169,11 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
       Container(
         color: AppColors.azulClaro,
         padding: const EdgeInsets.all(12),
-        child: const Row(children: [
+        child: Row(children: [
           Text('💡', style: TextStyle(fontSize: 16)),
           SizedBox(width: 8),
           Expanded(child: Text(
-            'Personaliza cada mensaje. Usa *NOMBRE*, *FOLIO*, *MONTO*, *EMPRESA*, *TELEFONO* como variables — se reemplazan automáticamente al enviar.',
+            tr('Personaliza cada mensaje. Usa *NOMBRE*, *FOLIO*, *MONTO*, *EMPRESA*, *TELEFONO* como variables — se reemplazan automáticamente al enviar.'),
             style: TextStyle(fontSize: 11, color: AppColors.azul))),
         ])),
       // Lista de plantillas
@@ -211,7 +212,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
               decoration: BoxDecoration(
                 color: AppColors.azul,
                 borderRadius: BorderRadius.circular(20)),
-              child: const Text('Editar',
+              child: Text(tr('Editar'),
                 style: TextStyle(fontSize: 11, color: Colors.white,
                   fontWeight: FontWeight.w600)))),
         ])),
@@ -232,7 +233,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
               decoration: BoxDecoration(
                 color: AppColors.verde.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10)),
-              child: Text(v, style: const TextStyle(
+              child: Text(tr(v), style: const TextStyle(
                 fontSize: 10, color: AppColors.verde, fontWeight: FontWeight.w600))))
             .toList())),
     ]));
@@ -242,13 +243,13 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
     children: [
       const Text('💬', style: TextStyle(fontSize: 48)),
       const SizedBox(height: 12),
-      const Text('No hay plantillas configuradas',
+      Text(tr('No hay plantillas configuradas'),
         style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
       const SizedBox(height: 8),
       ElevatedButton.icon(
         onPressed: _crearPlantillasDefault,
         icon: const Icon(Icons.add, color: Colors.white, size: 16),
-        label: const Text('Crear plantillas default',
+        label: Text(tr('Crear plantillas default'),
           style: TextStyle(color: Colors.white)),
         style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul)),
     ]));
@@ -258,57 +259,57 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
     padding: const EdgeInsets.all(14),
     children: [
       // Número de WhatsApp del taller
-      _seccionCard('📱 Número de WhatsApp del taller',
-        'Este número se usa para enviar mensajes a tus clientes.',
+      _seccionCard(tr('📱 Número de WhatsApp del taller'),
+        tr('Este número se usa para enviar mensajes a tus clientes.'),
         child: Column(children: [
           TextField(
             controller: _numCtrl,
             keyboardType: TextInputType.phone,
             decoration: InputDecoration(
-              labelText: 'Número (10 dígitos)',
+              labelText: tr('Número (10 dígitos)'),
               hintText: '2461217072',
               prefixText: '+52 ',
               prefixIcon: const Icon(Icons.phone_outlined, size: 18),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               isDense: true)),
           const SizedBox(height: 8),
-          const Text(
-            'Solo el número, sin +52. Ej: 2461217072',
+          Text(
+            tr('Solo el número, sin +52. Ej: 2461217072'),
             style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         ])),
 
       const SizedBox(height: 14),
 
       // Modo de envío
-      _seccionCard('🔄 Modo de envío',
-        'Cómo quieres enviar los mensajes.',
+      _seccionCard(tr('🔄 Modo de envío'),
+        tr('Cómo quieres enviar los mensajes.'),
         child: Column(children: [
-          _cardModo('app', '📱 Abrir WhatsApp',
-            'Abre la app de WhatsApp en el celular. El mensaje se prepara automáticamente.',
-            'Gratis, sin configuración'),
+          _cardModo('app', tr('📱 Abrir WhatsApp'),
+            tr('Abre la app de WhatsApp en el celular. El mensaje se prepara automáticamente.'),
+            tr('Gratis, sin configuración')),
           const SizedBox(height: 8),
-          _cardModo('api', '🚀 WhatsApp Business API',
-            'Envía directamente desde tu número Business. No abre la app.',
-            'Requiere cuenta Meta Business + token'),
+          _cardModo('api', tr('🚀 WhatsApp Business API'),
+            tr('Envía directamente desde tu número Business. No abre la app.'),
+            tr('Requiere cuenta Meta Business + token')),
         ])),
 
       if (_modo == 'api') ...[
         const SizedBox(height: 14),
-        _seccionCard('🔑 Token de acceso Meta',
-          'Token permanente de tu cuenta de WhatsApp Business API.',
+        _seccionCard(tr('🔑 Token de acceso Meta'),
+          tr('Token permanente de tu cuenta de WhatsApp Business API.'),
           child: Column(children: [
             TextField(
               controller: _tokenCtrl,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: 'Token de acceso',
-                hintText: 'EAAxxxxxxxxx...',
+                labelText: tr('Token de acceso'),
+                hintText: tr('EAAxxxxxxxxx...'),
                 prefixIcon: const Icon(Icons.key_outlined, size: 18),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                 isDense: true)),
             const SizedBox(height: 8),
-            const Text(
-              'Encuéntralo en: Meta Business → WhatsApp → Configuración API → Token de acceso permanente',
+            Text(
+              tr('Encuéntralo en: Meta Business → WhatsApp → Configuración API → Token de acceso permanente'),
               style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           ])),
       ],
@@ -323,7 +324,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
             ? const SizedBox(width: 16, height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
             : const Icon(Icons.save_outlined, color: Colors.white, size: 18),
-          label: Text(_guardando ? 'Guardando...' : 'Guardar configuración',
+          label: Text(tr(_guardando ? tr('Guardando...') : tr('Guardar configuración')),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.verde,
@@ -338,7 +339,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
           color: AppColors.azulClaro,
           borderRadius: BorderRadius.circular(12)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Variables disponibles en los mensajes:',
+          Text(tr('Variables disponibles en los mensajes:'),
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.azul)),
           const SizedBox(height: 10),
           ...PlantillaWa.variables.map((v) => Padding(
@@ -349,7 +350,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
                 decoration: BoxDecoration(
                   color: AppColors.azul,
                   borderRadius: BorderRadius.circular(10)),
-                child: Text(v, style: const TextStyle(
+                child: Text(tr(v), style: const TextStyle(
                   fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600))),
               const SizedBox(width: 10),
               Text(_descripcionVariable(v),
@@ -375,13 +376,13 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
             color: sel ? Colors.white : AppColors.textoSecundario, size: 18),
           const SizedBox(width: 10),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(titulo, style: TextStyle(
+            Text(tr(titulo), style: TextStyle(
               fontSize: 13, fontWeight: FontWeight.w700,
               color: sel ? Colors.white : AppColors.textoPrincipal)),
-            Text(desc, style: TextStyle(
+            Text(tr(desc), style: TextStyle(
               fontSize: 11,
               color: sel ? Colors.white70 : AppColors.textoSecundario)),
-            Text(nota, style: TextStyle(
+            Text(tr(nota), style: TextStyle(
               fontSize: 10, fontStyle: FontStyle.italic,
               color: sel ? Colors.white60 : AppColors.textoSecundario)),
           ])),
@@ -396,9 +397,9 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(titulo, style: const TextStyle(
+        Text(tr(titulo), style: const TextStyle(
           fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.azul)),
-        Text(subtitulo, style: const TextStyle(
+        Text(tr(subtitulo), style: const TextStyle(
           fontSize: 11, color: AppColors.textoSecundario)),
         const SizedBox(height: 14),
         child,
@@ -434,7 +435,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
                   child: const Icon(Icons.close, color: AppColors.azul, size: 20)),
               ]),
               const SizedBox(height: 4),
-              const Text('Toca las variables para insertarlas en el mensaje:',
+              Text(tr('Toca las variables para insertarlas en el mensaje:'),
                 style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
               const SizedBox(height: 8),
               // Chips de variables
@@ -455,7 +456,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
                     decoration: BoxDecoration(
                       color: AppColors.azul,
                       borderRadius: BorderRadius.circular(20)),
-                    child: Text(v, style: const TextStyle(
+                    child: Text(tr(v), style: const TextStyle(
                       fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600))))).toList()),
             ])),
 
@@ -470,7 +471,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
               textAlignVertical: TextAlignVertical.top,
               style: const TextStyle(fontSize: 13, height: 1.6),
               decoration: InputDecoration(
-                hintText: 'Escribe el mensaje...',
+                hintText: tr('Escribe el mensaje...'),
                 filled: true,
                 fillColor: AppColors.gris,
                 border: OutlineInputBorder(
@@ -487,7 +488,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
                 style: OutlinedButton.styleFrom(
                   side: const BorderSide(color: AppColors.grisBorde),
                   padding: const EdgeInsets.symmetric(vertical: 12)),
-                child: const Text('Cancelar',
+                child: Text(tr('Cancelar'),
                   style: TextStyle(color: AppColors.textoSecundario)))),
               const SizedBox(width: 10),
               Expanded(flex: 2, child: ElevatedButton.icon(
@@ -496,7 +497,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
                   if (mounted) Navigator.pop(ctx);
                 },
                 icon: const Icon(Icons.save_outlined, color: Colors.white, size: 16),
-                label: const Text('Guardar mensaje',
+                label: Text(tr('Guardar mensaje'),
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.verde,
@@ -530,8 +531,8 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
         final idx = _plantillas.indexWhere((pl) => pl.tipo == p.tipo);
         if (idx >= 0) _plantillas[idx].mensaje = nuevoMensaje;
       });
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ Mensaje guardado'),
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ Mensaje guardado')),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -549,8 +550,8 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
         'whatsapp_modo': _modo,
       }).eq('negocio_id', AuthService.negocioId ?? '');
 
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('✅ Configuración guardada'),
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ Configuración guardada')),
         backgroundColor: AppColors.verde));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -564,24 +565,24 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
   Future<void> _crearPlantillasDefault() async {
     setState(() => _cargando = true);
     final defaults = [
-      {'tipo': 'seguimiento_dia3', 'nombre': 'Seguimiento día 3',
-       'mensaje': '¡Hola *NOMBRE*! 😊\n\nTe escribo de *EMPRESA* sobre tu cotización *FOLIO*.\n\n¿Tienes alguna duda? Estamos aquí.\n\n📱 *TELEFONO*'},
-      {'tipo': 'seguimiento_dia5', 'nombre': 'Seguimiento día 5',
-       'mensaje': '¡Hola *NOMBRE*! 👋\n\nTe contacto de *EMPRESA* sobre *FOLIO*.\n\nPodemos ajustar lo que necesites. ¿Cuándo platicamos?\n\n📱 *TELEFONO*'},
-      {'tipo': 'seguimiento_dia7', 'nombre': 'Seguimiento día 7',
-       'mensaje': '¡Hola *NOMBRE*! ⏰\n\nLa cotización *FOLIO* vence pronto.\n\n📱 *TELEFONO* — *EMPRESA*'},
-      {'tipo': 'post_entrega', 'nombre': 'Post entrega',
-       'mensaje': '¡Hola *NOMBRE*! 🎉\n\nEsperamos que disfrutes tu pedido de *EMPRESA*. ¿Cómo te fue? 🙏'},
-      {'tipo': 'pago_anticipo_pendiente', 'nombre': 'Anticipo pendiente',
-       'mensaje': '¡Hola *NOMBRE*! 💰\n\nAnticipo del pedido *FOLIO* pendiente.\nMonto: *MONTO*\n\n📱 *TELEFONO*'},
-      {'tipo': 'pago_final_pendiente', 'nombre': 'Pago final',
-       'mensaje': '¡Hola *NOMBRE*! 📦\n\nTu pedido *FOLIO* está LISTO.\nMonto: *MONTO*\n\n📱 *TELEFONO*'},
-      {'tipo': 'avance_produccion', 'nombre': 'En producción',
-       'mensaje': '¡Hola *NOMBRE*! 🔧 Tu pedido *FOLIO* está en producción. — *EMPRESA*'},
-      {'tipo': 'avance_entrega', 'nombre': 'Listo para entrega',
-       'mensaje': '¡Hola *NOMBRE*! 📦 Tu pedido *FOLIO* está LISTO. ¿Cuándo coordinamos? 📱 *TELEFONO*'},
-      {'tipo': 'avance_entregado', 'nombre': 'Entregado',
-       'mensaje': '¡Hola *NOMBRE*! 🎉 Tu pedido *FOLIO* fue entregado. ¡Gracias por confiar en *EMPRESA*! 💙'},
+      {'tipo': 'seguimiento_dia3', 'nombre': tr('Seguimiento día 3'),
+       'mensaje': tr('¡Hola *NOMBRE*! 😊\n\nTe escribo de *EMPRESA* sobre tu cotización *FOLIO*.\n\n¿Tienes alguna duda? Estamos aquí.\n\n📱 *TELEFONO*')},
+      {'tipo': 'seguimiento_dia5', 'nombre': tr('Seguimiento día 5'),
+       'mensaje': tr('¡Hola *NOMBRE*! 👋\n\nTe contacto de *EMPRESA* sobre *FOLIO*.\n\nPodemos ajustar lo que necesites. ¿Cuándo platicamos?\n\n📱 *TELEFONO*')},
+      {'tipo': 'seguimiento_dia7', 'nombre': tr('Seguimiento día 7'),
+       'mensaje': tr('¡Hola *NOMBRE*! ⏰\n\nLa cotización *FOLIO* vence pronto.\n\n📱 *TELEFONO* — *EMPRESA*')},
+      {'tipo': 'post_entrega', 'nombre': tr('Post entrega'),
+       'mensaje': tr('¡Hola *NOMBRE*! 🎉\n\nEsperamos que disfrutes tu pedido de *EMPRESA*. ¿Cómo te fue? 🙏')},
+      {'tipo': 'pago_anticipo_pendiente', 'nombre': tr('Anticipo pendiente'),
+       'mensaje': tr('¡Hola *NOMBRE*! 💰\n\nAnticipo del pedido *FOLIO* pendiente.\nMonto: *MONTO*\n\n📱 *TELEFONO*')},
+      {'tipo': 'pago_final_pendiente', 'nombre': tr('Pago final'),
+       'mensaje': tr('¡Hola *NOMBRE*! 📦\n\nTu pedido *FOLIO* está LISTO.\nMonto: *MONTO*\n\n📱 *TELEFONO*')},
+      {'tipo': 'avance_produccion', 'nombre': tr('En producción'),
+       'mensaje': tr('¡Hola *NOMBRE*! 🔧 Tu pedido *FOLIO* está en producción. — *EMPRESA*')},
+      {'tipo': 'avance_entrega', 'nombre': tr('Listo para entrega'),
+       'mensaje': tr('¡Hola *NOMBRE*! 📦 Tu pedido *FOLIO* está LISTO. ¿Cuándo coordinamos? 📱 *TELEFONO*')},
+      {'tipo': 'avance_entregado', 'nombre': tr('Entregado'),
+       'mensaje': tr('¡Hola *NOMBRE*! 🎉 Tu pedido *FOLIO* fue entregado. ¡Gracias por confiar en *EMPRESA*! 💙')},
     ];
 
     for (final d in defaults) {

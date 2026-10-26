@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../services/auth_service.dart';
 import '../services/barcode_service.dart';
+import '../i18n/tr.dart';
 
 class ProductosScreen extends StatefulWidget {
   const ProductosScreen({super.key});
@@ -58,13 +59,13 @@ class _ProductosScreenState extends State<ProductosScreen> with SingleTickerProv
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(
-        title: const Text('Productos y Catálogo'),
+        title: Text(tr('Productos y Catálogo')),
         bottom: TabBar(
           controller: _tabs,
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
-          tabs: const [Tab(text: 'Catálogo'), Tab(text: 'Nuevo producto')],
+          tabs: [Tab(text: tr('Catálogo')), Tab(text: tr('Nuevo producto'))],
         ),
       ),
       body: TabBarView(controller: _tabs, children: [
@@ -78,7 +79,7 @@ class _ProductosScreenState extends State<ProductosScreen> with SingleTickerProv
     Container(color: Colors.white, padding: const EdgeInsets.all(12), child: Column(children: [
       TextField(
         decoration: InputDecoration(
-          hintText: 'Buscar producto o SKU...',
+          hintText: tr('Buscar producto o SKU...'),
           prefixIcon: const Icon(Icons.search, size: 20),
           filled: true, fillColor: AppColors.gris,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
@@ -97,9 +98,9 @@ class _ProductosScreenState extends State<ProductosScreen> with SingleTickerProv
           ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Icon(Icons.inventory_2_outlined, size: 48, color: AppColors.textoSecundario),
               const SizedBox(height: 8),
-              const Text('No hay productos', style: TextStyle(color: AppColors.textoSecundario)),
+              Text(tr('No hay productos'), style: TextStyle(color: AppColors.textoSecundario)),
               const SizedBox(height: 12),
-              ElevatedButton(onPressed: () => _tabs.animateTo(1), child: const Text('Agregar primer producto')),
+              ElevatedButton(onPressed: () => _tabs.animateTo(1), child: Text(tr('Agregar primer producto'))),
             ]))
           : ListView.builder(
               padding: const EdgeInsets.all(12),
@@ -120,7 +121,7 @@ class _ProductosScreenState extends State<ProductosScreen> with SingleTickerProv
         color: _categoriaFiltro == nombre ? AppColors.azul : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _categoriaFiltro == nombre ? AppColors.azul : AppColors.grisBorde)),
-      child: Text(nombre, style: TextStyle(fontSize: 11,
+      child: Text(tr(nombre), style: TextStyle(fontSize: 11,
         color: _categoriaFiltro == nombre ? Colors.white : AppColors.textoSecundario)),
     ),
   );
@@ -138,11 +139,10 @@ class _ProductosScreenState extends State<ProductosScreen> with SingleTickerProv
 
   void _confirmarEliminar(Producto producto) {
     showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('¿Eliminar producto?'),
-      content: Text('Se eliminará "${producto.nombre}" del catálogo. '
-        'No aparecerá más en cotizaciones ni en el catálogo público.'),
+      title: Text(tr('¿Eliminar producto?')),
+      content: Text(trf('Se eliminará "{0}" del catálogo. No aparecerá más en cotizaciones ni en el catálogo público.', [(producto.nombre)])),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
         TextButton(
           onPressed: () async {
             Navigator.pop(ctx);
@@ -150,15 +150,15 @@ class _ProductosScreenState extends State<ProductosScreen> with SingleTickerProv
               await SupabaseService.eliminarProducto(producto.id!);
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text('✅ "${producto.nombre}" eliminado'), backgroundColor: AppColors.verde));
+                  content: Text(trf('✅ "{0}" eliminado', [(producto.nombre)])), backgroundColor: AppColors.verde));
                 _cargar();
               }
             } catch (e) {
               if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text('Error al eliminar: $e'), backgroundColor: AppColors.rojo));
+                content: Text(trf('Error al eliminar: {0}', [e])), backgroundColor: AppColors.rojo));
             }
           },
-          child: const Text('Eliminar', style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
+          child: Text(tr('Eliminar'), style: TextStyle(color: AppColors.rojo, fontWeight: FontWeight.w700))),
       ]));
   }
 }
@@ -192,7 +192,7 @@ class _TarjetaProducto extends StatelessWidget {
               margin: const EdgeInsets.only(top: 4),
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(color: AppColors.rojoClaro, borderRadius: BorderRadius.circular(4)),
-              child: const Text('Stock bajo', style: TextStyle(fontSize: 10, color: AppColors.rojo))),
+              child: Text(tr('Stock bajo'), style: TextStyle(fontSize: 10, color: AppColors.rojo))),
           ]),
         ]),
         trailing: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -257,14 +257,14 @@ class _FormProductoState extends State<_FormProducto> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: Text(widget.producto == null ? 'Nuevo producto' : 'Editar producto'),
+        title: Text(tr(widget.producto == null ? tr('Nuevo producto') : tr('Editar producto'))),
         leading: widget.producto != null ? IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)) : null,
         actions: [TextButton(onPressed: _guardar, child: _guardando
           ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-          : const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w600)))],
+          : Text(tr('Guardar'), style: TextStyle(fontWeight: FontWeight.w600)))],
       ),
       body: Form(key: _form, child: ListView(padding: const EdgeInsets.all(14), children: [
-        _seccion('Foto del producto'),
+        _seccion(tr('Foto del producto')),
         Center(child: GestureDetector(
           onTap: _subiendoImagen ? null : _elegirImagen,
           child: Container(width: 140, height: 140,
@@ -280,60 +280,60 @@ class _FormProductoState extends State<_FormProducto> {
                       child: Image.network(_imagenUrl!, fit: BoxFit.cover, width: 140, height: 140,
                         errorBuilder: (_, __, ___) => const Icon(Icons.image_not_supported_outlined,
                           color: AppColors.textoSecundario, size: 32)))
-                  : const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       Icon(Icons.add_a_photo_outlined, color: AppColors.textoSecundario, size: 28),
                       SizedBox(height: 6),
-                      Text('Agregar foto', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                      Text(tr('Agregar foto'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                     ])))),
         const SizedBox(height: 16),
-        _seccion('Información básica'),
+        _seccion(tr('Información básica')),
         Align(alignment: Alignment.centerRight,
           child: TextButton.icon(
             onPressed: _escanearYLlenar,
             icon: const Icon(Icons.qr_code_scanner, size: 18),
-            label: const Text('Escanear código de barras'))),
-        _campo('Nombre del producto *', _nombre, obligatorio: true),
+            label: Text(tr('Escanear código de barras')))),
+        _campo(tr('Nombre del producto *'), _nombre, obligatorio: true),
         Row(children: [
-          Expanded(child: _campo('SKU / Código', _sku)),
+          Expanded(child: _campo(tr('SKU / Código'), _sku)),
           const SizedBox(width: 8),
-          Expanded(child: _campo('Marca', _marca)),
+          Expanded(child: _campo(tr('Marca'), _marca)),
         ]),
-        _campo('Descripción', _descripcion, lineas: 2),
-        _seccion('Categoría y clasificación'),
-        _dropCampo('Categoría', _categoriaId,
+        _campo(tr('Descripción'), _descripcion, lineas: 2),
+        _seccion(tr('Categoría y clasificación')),
+        _dropCampo(tr('Categoría'), _categoriaId,
           widget.categorias.map((c) => DropdownMenuItem(value: c.id, child: Text(c.nombre, style: const TextStyle(fontSize: 13)))).toList(),
           (v) => setState(() => _categoriaId = v)),
         Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Unidad de medida', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            Text(tr('Unidad de medida'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             const SizedBox(height: 4),
             DropdownButtonFormField<String>(value: _unidad,
               decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-              items: _unidades.map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13)))).toList(),
+              items: _unidades.map((u) => DropdownMenuItem(value: u, child: Text(tr(u), style: const TextStyle(fontSize: 13)))).toList(),
               onChanged: (v) => setState(() => _unidad = v!)),
           ])),
           const SizedBox(width: 8),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Aplica IVA', style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            Text(tr('Aplica IVA'), style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             Switch(value: _aplicaIva, onChanged: (v) => setState(() => _aplicaIva = v), activeColor: AppColors.verde),
           ])),
         ]),
-        _seccion('Precios'),
+        _seccion(tr('Precios')),
         Row(children: [
-          Expanded(child: _campo('Costo \$', _costo, tipo: TextInputType.number)),
+          Expanded(child: _campo(tr('Costo \$'), _costo, tipo: TextInputType.number)),
           const SizedBox(width: 8),
-          Expanded(child: _campo('Precio venta \$', _precio, tipo: TextInputType.number, obligatorio: true)),
+          Expanded(child: _campo(tr('Precio venta \$'), _precio, tipo: TextInputType.number, obligatorio: true)),
         ]),
-        _seccion('Inventario'),
+        _seccion(tr('Inventario')),
         Row(children: [
-          Expanded(child: _campo('Stock disponible', _stock, tipo: TextInputType.number)),
+          Expanded(child: _campo(tr('Stock disponible'), _stock, tipo: TextInputType.number)),
           const SizedBox(width: 8),
-          Expanded(child: _campo('Stock mínimo', _stockMin, tipo: TextInputType.number)),
+          Expanded(child: _campo(tr('Stock mínimo'), _stockMin, tipo: TextInputType.number)),
         ]),
-        _campo('Ubicación física', _ubicacion),
+        _campo(tr('Ubicación física'), _ubicacion),
         const SizedBox(height: 8),
         ElevatedButton(onPressed: _guardar,
-          child: Text(widget.producto == null ? 'Guardar producto' : 'Actualizar producto')),
+          child: Text(tr(widget.producto == null ? tr('Guardar producto') : tr('Actualizar producto')))),
         const SizedBox(height: 20),
       ])),
     );
@@ -344,21 +344,21 @@ class _FormProductoState extends State<_FormProducto> {
 
   Widget _campo(String label, TextEditingController ctrl, {bool obligatorio = false, TextInputType tipo = TextInputType.text, int lineas = 1}) =>
     Padding(padding: const EdgeInsets.only(bottom: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      Text(tr(label), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       const SizedBox(height: 4),
       TextFormField(controller: ctrl, keyboardType: tipo, maxLines: lineas,
-        validator: obligatorio ? (v) => v?.isEmpty == true ? 'Requerido' : null : null,
+        validator: obligatorio ? (v) => v?.isEmpty == true ? tr('Requerido') : null : null,
         decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
         style: const TextStyle(fontSize: 13)),
     ]));
 
   Widget _dropCampo(String label, String? value, List<DropdownMenuItem<String>> items, ValueChanged<String?> onChanged) =>
     Padding(padding: const EdgeInsets.only(bottom: 10), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      Text(tr(label), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
       const SizedBox(height: 4),
       DropdownButtonFormField<String>(value: value,
         decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
-        hint: const Text('Seleccionar', style: TextStyle(fontSize: 13)),
+        hint: Text(tr('Seleccionar'), style: TextStyle(fontSize: 13)),
         items: items, onChanged: onChanged),
     ]));
 
@@ -366,8 +366,8 @@ class _FormProductoState extends State<_FormProducto> {
     final codigo = await BarcodeService.escanear(context);
     if (codigo == null || !mounted) return; // canceló
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Buscando producto...'), duration: Duration(seconds: 2)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(tr('Buscando producto...')), duration: Duration(seconds: 2)));
 
     final resultado = await BarcodeService.buscarProducto(codigo);
     if (!mounted) return;
@@ -377,8 +377,8 @@ class _FormProductoState extends State<_FormProducto> {
       // especializados no van a estar en la base de datos externa,
       // pero el código escaneado sigue siendo útil para identificarlo.
       setState(() => _sku.text = codigo);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No se encontró en la base de datos — se guardó el código como SKU, llena el resto a mano.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('No se encontró en la base de datos — se guardó el código como SKU, llena el resto a mano.')),
         backgroundColor: AppColors.ambar));
       return;
     }
@@ -390,8 +390,8 @@ class _FormProductoState extends State<_FormProducto> {
       if (resultado.marca != null && resultado.marca!.isNotEmpty) _marca.text = resultado.marca!;
       if (resultado.imagenUrl != null && resultado.imagenUrl!.isNotEmpty) _imagenUrl = resultado.imagenUrl;
     });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('✅ Producto encontrado, revisa y ajusta los datos'), backgroundColor: AppColors.verde));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(tr('✅ Producto encontrado, revisa y ajusta los datos')), backgroundColor: AppColors.verde));
   }
 
   Future<void> _elegirImagen() async {
@@ -412,7 +412,7 @@ class _FormProductoState extends State<_FormProducto> {
           if ((conFoto as List).length >= 5) {
             if (mounted) {
               await AuthService.exigirPremium(context,
-                funcion: 'Fotos de productos (límite de 5 en plan Gratis)');
+                funcion: tr('Fotos de productos (límite de 5 en plan Gratis)'));
             }
             return;
           }
@@ -441,7 +441,7 @@ class _FormProductoState extends State<_FormProducto> {
     } catch (e) {
       setState(() => _subiendoImagen = false);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Error al subir foto: $e'), backgroundColor: AppColors.rojo));
+        content: Text(trf('Error al subir foto: {0}', [e])), backgroundColor: AppColors.rojo));
     }
   }
 

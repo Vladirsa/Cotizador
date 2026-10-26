@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
 import 'home_screen.dart';
+import '../i18n/tr.dart';
 
 class RegistroTallerScreen extends StatefulWidget {
   const RegistroTallerScreen({super.key});
@@ -72,13 +73,13 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         if (_paso > 0)
           GestureDetector(
             onTap: _pasoAnterior,
-            child: const Row(children: [
+            child: Row(children: [
               Icon(Icons.arrow_back_ios, size: 14, color: AppColors.azul),
-              Text('Atrás', style: TextStyle(fontSize: 13, color: AppColors.azul)),
+              Text(tr('Atrás'), style: TextStyle(fontSize: 13, color: AppColors.azul)),
             ]))
         else
           const SizedBox(width: 60),
-        Text('Paso ${_paso + 1} de $_totalPasos',
+        Text(trf('Paso {0} de {1}', [(_paso + 1), _totalPasos]),
           style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
         const SizedBox(width: 60),
       ]),
@@ -95,15 +96,15 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
 
   // ── PASO 0: CÓDIGO DE INVITACIÓN ────────────────────
   Widget _paso0Codigo() => _wrapPaso(
-    titulo: '¡Bienvenido!',
-    subtitulo: 'Ingresa tu código de acceso beta para crear tu taller.',
+    titulo: tr('¡Bienvenido!'),
+    subtitulo: tr('Ingresa tu código de acceso beta para crear tu taller.'),
     icon: '🎟️',
     child: Column(children: [
       TextField(
         textCapitalization: TextCapitalization.characters,
         onChanged: (v) => setState(() => _codigo = v.toUpperCase()),
         decoration: InputDecoration(
-          labelText: 'Código de acceso beta',
+          labelText: tr('Código de acceso beta'),
           hintText: 'HETNA-BETA-001',
           prefixIcon: const Icon(Icons.vpn_key_outlined, color: AppColors.azul),
           filled: true, fillColor: Colors.white,
@@ -117,11 +118,11 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         _widgetError(_error!),
       ],
       const SizedBox(height: 16),
-      _btnPrimario('Verificar código', _validarCodigo),
+      _btnPrimario(tr('Verificar código'), _validarCodigo),
       const SizedBox(height: 16),
       const Divider(),
       const SizedBox(height: 8),
-      const Text('¿Ya tienes cuenta?',
+      Text(tr('¿Ya tienes cuenta?'),
         style: TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
       const SizedBox(height: 8),
       OutlinedButton(
@@ -129,22 +130,22 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: AppColors.azul),
           minimumSize: const Size(double.infinity, 44)),
-        child: const Text('Iniciar sesión',
+        child: Text(tr('Iniciar sesión'),
           style: TextStyle(color: AppColors.azul, fontWeight: FontWeight.w600))),
     ]));
 
   // ── PASO 1: DATOS DEL TALLER ────────────────────────
   Widget _paso1DatosTaller() => _wrapPaso(
-    titulo: 'Tu taller',
-    subtitulo: 'Información básica de tu negocio.',
+    titulo: tr('Tu taller'),
+    subtitulo: tr('Información básica de tu negocio.'),
     icon: '🏭',
     child: Column(children: [
-      _campo('Nombre del taller *', (v) => _nombreTaller = v,
-        hint: 'Ej: Taller CNC García', icon: Icons.storefront_outlined),
+      _campo(tr('Nombre del taller *'), (v) => _nombreTaller = v,
+        hint: tr('Ej: Taller CNC García'), icon: Icons.storefront_outlined),
       const SizedBox(height: 12),
       // Giro
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Giro del negocio *',
+        Text(tr('Giro del negocio *'),
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
             color: AppColors.textoPrincipal)),
         const SizedBox(height: 8),
@@ -158,31 +159,31 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: _giro == g ? AppColors.azul : AppColors.grisBorde)),
-              child: Text(g, style: TextStyle(
+              child: Text(tr(g), style: TextStyle(
                 fontSize: 11,
                 color: _giro == g ? Colors.white : AppColors.textoSecundario,
                 fontWeight: _giro == g ? FontWeight.w600 : FontWeight.normal))))).toList()),
       ]),
       const SizedBox(height: 12),
-      _campo('Teléfono / WhatsApp', (v) => _telefono = v,
+      _campo(tr('Teléfono / WhatsApp'), (v) => _telefono = v,
         hint: '246 121 7072', icon: Icons.phone_outlined,
         tipo: TextInputType.phone),
       if (_error != null) ...[const SizedBox(height: 10), _widgetError(_error!)],
       const SizedBox(height: 16),
-      _btnPrimario('Continuar', _validarPaso1),
+      _btnPrimario(tr('Continuar'), _validarPaso1),
     ]));
 
   // ── PASO 2: DATOS DEL ADMINISTRADOR ─────────────────
   Widget _paso2DatosAdmin() => _wrapPaso(
-    titulo: 'Tu cuenta',
-    subtitulo: 'Crea tu acceso de administrador.',
+    titulo: tr('Tu cuenta'),
+    subtitulo: tr('Crea tu acceso de administrador.'),
     icon: '👤',
     child: Column(children: [
-      _campo('Nombre completo *', (v) => _nombreAdmin = v,
-        hint: 'Ej: Juan García', icon: Icons.person_outline,
+      _campo(tr('Nombre completo *'), (v) => _nombreAdmin = v,
+        hint: tr('Ej: Juan García'), icon: Icons.person_outline,
         capitalizar: TextCapitalization.words),
       const SizedBox(height: 12),
-      _campo('Correo electrónico *', (v) => _correo = v,
+      _campo(tr('Correo electrónico *'), (v) => _correo = v,
         hint: 'correo@ejemplo.com', icon: Icons.email_outlined,
         tipo: TextInputType.emailAddress),
       const SizedBox(height: 12),
@@ -191,8 +192,8 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         obscureText: !_verPassword,
         onChanged: (v) => _password = v,
         decoration: InputDecoration(
-          labelText: 'Contraseña *',
-          hintText: 'Mínimo 8 caracteres',
+          labelText: tr('Contraseña *'),
+          hintText: tr('Mínimo 8 caracteres'),
           prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textoSecundario),
           suffixIcon: IconButton(
             icon: Icon(_verPassword
@@ -209,7 +210,7 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         obscureText: true,
         onChanged: (v) => _passwordConfirm = v,
         decoration: InputDecoration(
-          labelText: 'Confirmar contraseña *',
+          labelText: tr('Confirmar contraseña *'),
           prefixIcon: const Icon(Icons.lock_outline, color: AppColors.textoSecundario),
           filled: true, fillColor: Colors.white,
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -218,13 +219,13 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
             borderSide: const BorderSide(color: AppColors.grisBorde)))),
       if (_error != null) ...[const SizedBox(height: 10), _widgetError(_error!)],
       const SizedBox(height: 16),
-      _btnPrimario('Crear mi taller', _registrar),
+      _btnPrimario(tr('Crear mi taller'), _registrar),
     ]));
 
   // ── PASO 3: CONFIRMACIÓN ─────────────────────────────
   Widget _paso3Confirmacion() => _requiereConfirmar ? _paso3ConfirmarCorreo() : _wrapPaso(
-    titulo: '¡Listo!',
-    subtitulo: 'Tu taller ha sido creado exitosamente.',
+    titulo: tr('¡Listo!'),
+    subtitulo: tr('Tu taller ha sido creado exitosamente.'),
     icon: '🎉',
     child: Column(children: [
       Container(
@@ -236,40 +237,40 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         child: Column(children: [
           const Icon(Icons.check_circle_outline, color: AppColors.verde, size: 56),
           const SizedBox(height: 12),
-          Text(_nombreTaller,
+          Text(tr(_nombreTaller),
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
               color: AppColors.azul), textAlign: TextAlign.center),
           const SizedBox(height: 4),
-          Text(_giro, style: const TextStyle(
+          Text(tr(_giro), style: const TextStyle(
             fontSize: 13, color: AppColors.textoSecundario)),
           const SizedBox(height: 16),
-          _lineaInfo('👤 Administrador', _nombreAdmin),
-          _lineaInfo('📧 Correo', _correo),
-          if (_telefono.isNotEmpty) _lineaInfo('📱 WhatsApp', _telefono),
+          _lineaInfo(tr('👤 Administrador'), _nombreAdmin),
+          _lineaInfo(tr('📧 Correo'), _correo),
+          if (_telefono.isNotEmpty) _lineaInfo(tr('📱 WhatsApp'), _telefono),
         ])),
       const SizedBox(height: 20),
       Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.azulClaro, borderRadius: BorderRadius.circular(10)),
-        child: const Column(children: [
-          Text('Lo que puedes hacer ahora:',
+        child: Column(children: [
+          Text(tr('Lo que puedes hacer ahora:'),
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
               color: AppColors.azul)),
           SizedBox(height: 10),
-          _ItemOnboarding('📋', 'Crea tu primera cotización'),
-          _ItemOnboarding('⚙️', 'Configura tus tarifas en el simulador'),
-          _ItemOnboarding('👥', 'Invita a tu equipo de trabajo'),
-          _ItemOnboarding('🏭', 'Agrega tus productos al catálogo'),
+          _ItemOnboarding('📋', tr('Crea tu primera cotización')),
+          _ItemOnboarding('⚙️', tr('Configura tus tarifas en el simulador')),
+          _ItemOnboarding('👥', tr('Invita a tu equipo de trabajo')),
+          _ItemOnboarding('🏭', tr('Agrega tus productos al catálogo')),
         ])),
       const SizedBox(height: 20),
-      _btnPrimario('Entrar a mi taller', _entrarAlApp),
+      _btnPrimario(tr('Entrar a mi taller'), _entrarAlApp),
     ]));
 
   // ── PASO 3 (con confirmación de correo) ─────────────
   Widget _paso3ConfirmarCorreo() => _wrapPaso(
-    titulo: '¡Ya casi!',
-    subtitulo: 'Tu taller está creado. Falta confirmar tu correo para entrar.',
+    titulo: tr('¡Ya casi!'),
+    subtitulo: tr('Tu taller está creado. Falta confirmar tu correo para entrar.'),
     icon: '📧',
     child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Container(
@@ -277,12 +278,10 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         decoration: BoxDecoration(
           color: AppColors.azulClaro, borderRadius: BorderRadius.circular(14)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Te enviamos un correo a ${_correo.trim()}',
+          Text(trf('Te enviamos un correo a {0}', [(_correo.trim())]),
             style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.azul)),
           const SizedBox(height: 10),
-          const Text('1. Ábrelo (si no aparece, revisa spam o promociones).\n'
-            '2. Toca "Confirmar mi correo".\n'
-            '3. Regresa aquí e inicia sesión con tu correo y contraseña.',
+          Text(tr('1. Ábrelo (si no aparece, revisa spam o promociones).\n2. Toca "Confirmar mi correo".\n3. Regresa aquí e inicia sesión con tu correo y contraseña.'),
             style: TextStyle(fontSize: 13, height: 1.5)),
         ])),
       const SizedBox(height: 16),
@@ -293,13 +292,13 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
           if (!mounted) return;
           setState(() => _cargando = false);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(error ?? '✅ Te enviamos otro correo.'),
+            content: Text(tr(error ?? tr('✅ Te enviamos otro correo.'))),
             backgroundColor: error == null ? AppColors.verde : AppColors.rojo));
         },
         icon: const Icon(Icons.mark_email_unread_outlined, size: 18),
-        label: const Text('No me llegó, reenviar el correo')),
+        label: Text(tr('No me llegó, reenviar el correo'))),
       const SizedBox(height: 8),
-      _btnPrimario('Ir a iniciar sesión', () => Navigator.of(context).pop()),
+      _btnPrimario(tr('Ir a iniciar sesión'), () => Navigator.of(context).pop()),
     ]));
 
   // ── LÓGICA ───────────────────────────────────────────
@@ -311,10 +310,10 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
       if (result['valido'] == true) {
         _siguientePaso();
       } else {
-        setState(() => _error = result['mensaje'] ?? 'Código inválido');
+        setState(() => _error = result['mensaje'] ?? tr('Código inválido'));
       }
     } catch (e) {
-      setState(() => _error = 'Error al validar: $e');
+      setState(() => _error = trf('Error al validar: {0}', [e]));
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -323,7 +322,7 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
   void _validarPaso1() {
     setState(() => _error = null);
     if (_nombreTaller.trim().isEmpty) {
-      setState(() => _error = 'El nombre del taller es obligatorio');
+      setState(() => _error = tr('El nombre del taller es obligatorio'));
       return;
     }
     _siguientePaso();
@@ -334,19 +333,19 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
 
     // Validaciones
     if (_nombreAdmin.trim().isEmpty || _correo.trim().isEmpty || _password.isEmpty) {
-      setState(() { _error = 'Todos los campos con * son obligatorios'; _cargando = false; });
+      setState(() { _error = tr('Todos los campos con * son obligatorios'); _cargando = false; });
       return;
     }
     if (!_correo.contains('@')) {
-      setState(() { _error = 'Correo electrónico inválido'; _cargando = false; });
+      setState(() { _error = tr('Correo electrónico inválido'); _cargando = false; });
       return;
     }
     if (_password.length < 8) {
-      setState(() { _error = 'La contraseña debe tener mínimo 8 caracteres'; _cargando = false; });
+      setState(() { _error = tr('La contraseña debe tener mínimo 8 caracteres'); _cargando = false; });
       return;
     }
     if (_password != _passwordConfirm) {
-      setState(() { _error = 'Las contraseñas no coinciden'; _cargando = false; });
+      setState(() { _error = tr('Las contraseñas no coinciden'); _cargando = false; });
       return;
     }
 
@@ -359,7 +358,7 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         emailRedirectTo: AuthService.urlRegreso);
 
       if (authResult.user == null) {
-        setState(() { _error = 'Error al crear la cuenta. Intenta con otro correo.'; _cargando = false; });
+        setState(() { _error = tr('Error al crear la cuenta. Intenta con otro correo.'); _cargando = false; });
         return;
       }
 
@@ -446,12 +445,12 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
   }) => SingleChildScrollView(
     padding: const EdgeInsets.all(20),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(icon, style: const TextStyle(fontSize: 40)),
+      Text(tr(icon), style: const TextStyle(fontSize: 40)),
       const SizedBox(height: 12),
-      Text(titulo, style: const TextStyle(
+      Text(tr(titulo), style: const TextStyle(
         fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.azul)),
       const SizedBox(height: 6),
-      Text(subtitulo, style: const TextStyle(
+      Text(tr(subtitulo), style: const TextStyle(
         fontSize: 14, color: AppColors.textoSecundario, height: 1.4)),
       const SizedBox(height: 24),
       child,
@@ -484,7 +483,7 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
         child: _cargando
           ? const SizedBox(width: 22, height: 22,
               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-          : Text(texto, style: const TextStyle(
+          : Text(tr(texto), style: const TextStyle(
               fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white))));
 
   Widget _widgetError(String msg) => Container(
@@ -495,15 +494,15 @@ class _RegistroTallerScreenState extends State<RegistroTallerScreen> {
     child: Row(children: [
       const Icon(Icons.error_outline, color: AppColors.rojo, size: 16),
       const SizedBox(width: 8),
-      Expanded(child: Text(msg, style: const TextStyle(
+      Expanded(child: Text(tr(msg), style: const TextStyle(
         fontSize: 12, color: AppColors.rojo))),
     ]));
 
   Widget _lineaInfo(String label, String valor) =>
     Padding(padding: const EdgeInsets.only(bottom: 6),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-        Text(valor, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        Text(tr(label), style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+        Text(tr(valor), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
       ]));
 }
 
@@ -515,8 +514,8 @@ class _ItemOnboarding extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 8),
     child: Row(children: [
-      Text(emoji, style: const TextStyle(fontSize: 16)),
+      Text(tr(emoji), style: const TextStyle(fontSize: 16)),
       const SizedBox(width: 10),
-      Text(texto, style: const TextStyle(fontSize: 13, color: AppColors.azul)),
+      Text(tr(texto), style: const TextStyle(fontSize: 13, color: AppColors.azul)),
     ]));
 }

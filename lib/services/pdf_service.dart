@@ -14,7 +14,44 @@ import '../main.dart';
 
 class PdfService {
   static final _fmt = NumberFormat('#,##0.00', 'es_MX');
-  static final _fmtFecha = DateFormat('dd/MM/yyyy', 'es_MX');
+
+  // Idioma del documento que se está generando. Cada cotización puede salir en
+  // español o en inglés sin importar el idioma de la app (ver elegirIdioma).
+  static bool _en = false;
+  static String _t(String es) => trIdioma(es, _en);
+  static String _tf(String es, List<Object?> valores) => trfIdioma(es, _en, valores);
+  static DateFormat get _fmtFecha =>
+      _en ? DateFormat('MM/dd/yyyy', 'en_US') : DateFormat('dd/MM/yyyy', 'es_MX');
+
+  /// Moneda del documento: la de la cotización si la trae; si no, la de
+  /// Configuración (MXN o USD).
+  static String _moneda(Map<String, dynamic> empresa) {
+    final m = (empresa['moneda'] ?? '').toString().trim().toUpperCase();
+    return m.isEmpty ? 'MXN' : m;
+  }
+
+  /// Pregunta en qué idioma sale el PDF. Devuelve null si el usuario cierra
+  /// el diálogo sin elegir.
+  static Future<bool?> elegirIdioma(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(tr('¿En qué idioma sale el PDF?')),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Padding(padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('🇲🇽  Español', style: TextStyle(fontSize: 15))),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Padding(padding: EdgeInsets.symmetric(vertical: 6),
+              child: Text('🇺🇸  English', style: TextStyle(fontSize: 15))),
+          ),
+        ],
+      ),
+    );
+  }
 
   // Convierte un color hex ('#1a3a5c') a PdfColor. Si no hay valor
   // configurado o falla, usa el color por defecto (azul HETNA).
@@ -94,7 +131,7 @@ class PdfService {
           Center(child: Container(width: 36, height: 4,
             decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 16),
-          const Text('¿Cómo quieres enviarlo?',
+          Text(tr('¿Cómo quieres enviarlo?'),
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
           SizedBox(width: double.infinity, child: ElevatedButton.icon(
@@ -102,13 +139,13 @@ class PdfService {
               Navigator.pop(ctx);
               final ok = await compartirPdfWhatsAppBusiness(bytes, nombre);
               if (!ok && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('No se encontró WhatsApp Business instalado — usa "Otra app"'),
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('No se encontró WhatsApp Business instalado — usa "Otra app"')),
                   backgroundColor: AppColors.ambar));
               }
             },
             icon: const Icon(Icons.chat, color: Colors.white),
-            label: const Text('WhatsApp Business', style: TextStyle(color: Colors.white)),
+            label: Text(tr('WhatsApp Business'), style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
               padding: const EdgeInsets.symmetric(vertical: 12)))),
           const SizedBox(height: 10),
@@ -118,7 +155,7 @@ class PdfService {
               await compartirPdf(bytes, nombre);
             },
             icon: const Icon(Icons.share_outlined),
-            label: const Text('Otra app'),
+            label: Text(tr('Otra app')),
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)))),
           const SizedBox(height: 8),
         ])));
@@ -127,11 +164,13 @@ class PdfService {
   static Future<Uint8List> generarCotizacion({
     required Cotizacion cotizacion,
     required Map<String, dynamic> empresa,
+    bool? ingles,
   }) async {
+    _en = ingles ?? enIngles;
     // La profesional tiene su propio formato; todas las pantallas que generan
     // el PDF de una cotización pasan por aquí, así que no hay que tocarlas.
     if (cotizacion.esProfesional) {
-      return generarCotizacionProfesional(cotizacion: cotizacion, empresa: empresa);
+      return generarCotizacionProfesional(cotizacion: cotizacion, empresa: empresa, ingles: _en);
     }
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
@@ -147,7 +186,7 @@ class PdfService {
     const verde = PdfColor.fromInt(0xFF1d9e75);
     const blanco70 = PdfColor.fromInt(0xB3FFFFFF);
 
-    final nombreEmpresa = empresa['nombre_comercial'] ?? 'HETNA CNC';
+    final nombreEmpresa = empresa['nombre_comercial'] ?? _t('HETNA CNC');
     final rfcEmpresa = empresa['rfc'] ?? '';
     final direccion = empresa['direccion'] ?? '';
     final tel1 = empresa['telefono1'] ?? '';
@@ -183,10 +222,10 @@ class PdfService {
                   pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
                 pw.SizedBox(height: 8),
                 if (rfcEmpresa.isNotEmpty)
-                  pw.Text('RFC: $rfcEmpresa', style: pw.TextStyle(fontSize: 8, color: blanco70)),
+                  pw.Text(_tf('RFC: {0}', [rfcEmpresa]), style: pw.TextStyle(fontSize: 8, color: blanco70)),
                 if (direccion.isNotEmpty)
                   pw.Text(direccion, style: pw.TextStyle(fontSize: 8, color: blanco70)),
-                pw.Text('Tel: $tel1${tel2.isNotEmpty ? " / $tel2" : ""}', style: pw.TextStyle(fontSize: 8, color: blanco70)),
+                pw.Text(_tf('Tel: {0}', ['$tel1${tel2.isNotEmpty ? " / $tel2" : ""}']), style: pw.TextStyle(fontSize: 8, color: blanco70)),
                 if (correoEmpresa.isNotEmpty)
                   pw.Text(correoEmpresa, style: pw.TextStyle(fontSize: 8, color: blanco70)),
                 pw.Text(web, style: pw.TextStyle(fontSize: 8, color: PdfColors.white)),
@@ -195,12 +234,12 @@ class PdfService {
                 padding: const pw.EdgeInsets.all(12),
                 decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(6)),
                 child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                  pw.Text('COTIZACIÓN', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
+                  pw.Text(_t('COTIZACIÓN'), style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
                   pw.SizedBox(height: 4),
                   pw.Text(folio, style: pw.TextStyle(fontSize: 10, color: azul)),
                   pw.SizedBox(height: 6),
-                  pw.Row(children: [pw.Text('Fecha: ', style: pw.TextStyle(fontSize: 9, color: grisTexto)), pw.Text(fecha, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: grisTexto))]),
-                  pw.Row(children: [pw.Text('Vigencia: ', style: pw.TextStyle(fontSize: 9, color: grisTexto)), pw.Text(fechaVigencia, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: grisTexto))]),
+                  pw.Row(children: [pw.Text(_t('Fecha: '), style: pw.TextStyle(fontSize: 9, color: grisTexto)), pw.Text(fecha, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: grisTexto))]),
+                  pw.Row(children: [pw.Text(_t('Vigencia: '), style: pw.TextStyle(fontSize: 9, color: grisTexto)), pw.Text(fechaVigencia, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: grisTexto))]),
                 ])),
             ])),
         pw.SizedBox(height: 14),
@@ -209,16 +248,16 @@ class PdfService {
           padding: const pw.EdgeInsets.all(12),
           decoration: pw.BoxDecoration(color: grisClaro, borderRadius: pw.BorderRadius.circular(6), border: pw.Border.all(color: PdfColors.grey300)),
           child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Text('CLIENTE', style: pw.TextStyle(fontSize: 9, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+            pw.Text(_t('CLIENTE'), style: pw.TextStyle(fontSize: 9, color: grisTexto, fontWeight: pw.FontWeight.bold)),
             pw.SizedBox(height: 4),
-            pw.Text(cliente?.nombreCompleto ?? 'Sin cliente', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
-            if (cliente?.rfc != null) pw.Text('RFC: ${cliente!.rfc}', style: pw.TextStyle(fontSize: 9, color: grisTexto)),
+            pw.Text(cliente?.nombreCompleto ?? _t('Sin cliente'), style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
+            if (cliente?.rfc != null) pw.Text(_tf('RFC: {0}', [cliente!.rfc]), style: pw.TextStyle(fontSize: 9, color: grisTexto)),
             if (cliente?.correo != null) pw.Text(cliente!.correo!, style: pw.TextStyle(fontSize: 9, color: grisTexto)),
-            if (cliente?.telefono != null) pw.Text('Tel: ${cliente!.telefono}', style: pw.TextStyle(fontSize: 9, color: grisTexto)),
+            if (cliente?.telefono != null) pw.Text(_tf('Tel: {0}', [cliente!.telefono]), style: pw.TextStyle(fontSize: 9, color: grisTexto)),
           ])),
         pw.SizedBox(height: 14),
         // ─── TABLA PRODUCTOS ────────────────
-        pw.Text('DETALLE DE LA COTIZACIÓN', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+        pw.Text(_t('DETALLE DE LA COTIZACIÓN'), style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
         pw.SizedBox(height: 6),
         pw.Table(
           border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
@@ -230,7 +269,7 @@ class PdfService {
           },
           children: [
             pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
-              _cH('TÍTULO / DESCRIPCIÓN'), _cH('CANT.'), _cH('PRECIO'), _cH('SUBTOTAL'),
+              _cH(_t('TÍTULO / DESCRIPCIÓN')), _cH(_t('CANT.')), _cH(_t('PRECIO')), _cH(_t('SUBTOTAL')),
             ]),
             ...List.generate(cotizacion.items.length, (i) {
               final item = cotizacion.items[i];
@@ -262,13 +301,13 @@ class PdfService {
         // ─── TOTALES ────────────────────────
         pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
           pw.Container(width: 220, child: pw.Column(children: [
-            if (cotizacion.descuentoPct > 0) _tR('Subtotal', '\$${_fmt.format(cotizacion.subtotal)}', grisTexto),
-            if (cotizacion.descuentoPct > 0) _tR('Descuento ${cotizacion.descuentoPct.toInt()}%', '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-            if (cotizacion.ivaPct > 0) _tR('IVA ${cotizacion.ivaPct.toInt()}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
-            if (cotizacion.costoEnvio > 0) _tR('Envío', '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
+            if (cotizacion.descuentoPct > 0) _tR(_t('Subtotal'), '\$${_fmt.format(cotizacion.subtotal)}', grisTexto),
+            if (cotizacion.descuentoPct > 0) _tR(_tf('Descuento {0}%', [(cotizacion.descuentoPct.toInt())]), '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
+            if (cotizacion.ivaPct > 0) _tR(_tf('IVA {0}%', [pctTexto(cotizacion.ivaPct)]), '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
+            if (cotizacion.costoEnvio > 0) _tR(_t('Envío'), '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
             pw.Divider(color: azul),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-              pw.Text('TOTAL', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
+              pw.Text('TOTAL ${_moneda(empresa)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
               pw.Text('\$${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
             ]),
           ])),
@@ -279,12 +318,12 @@ class PdfService {
           padding: const pw.EdgeInsets.all(12),
           decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(6)),
           child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Text('CONDICIONES', style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
+            pw.Text(_t('CONDICIONES'), style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
             pw.SizedBox(height: 6),
-            if (cotizacion.metodoPago != null) _cond('Pago:', cotizacion.metodoPago!, grisTexto),
-            if (cotizacion.condicionEntrega != null) _cond('Entrega:', _limpiarTexto(cotizacion.condicionEntrega!), grisTexto),
-            _cond('Vigencia:', '$vigenciaDias días hábiles', grisTexto),
-            if (cotizacion.notas != null && cotizacion.notas!.isNotEmpty) _cond('Notas:', cotizacion.notas!, grisTexto),
+            if (cotizacion.metodoPago != null) _cond(_t('Pago:'), _t(cotizacion.metodoPago!), grisTexto),
+            if (cotizacion.condicionEntrega != null) _cond(_t('Entrega:'), _limpiarTexto(_t(cotizacion.condicionEntrega!)), grisTexto),
+            _cond(_t('Vigencia:'), _tf('{0} días hábiles', [vigenciaDias]), grisTexto),
+            if (cotizacion.notas != null && cotizacion.notas!.isNotEmpty) _cond(_t('Notas:'), cotizacion.notas!, grisTexto),
             if ((empresa['leyenda_pdf'] as String?)?.isNotEmpty == true)
               pw.Padding(padding: const pw.EdgeInsets.only(top: 6),
                 child: pw.Text(_limpiarTexto(empresa['leyenda_pdf']),
@@ -297,8 +336,8 @@ class PdfService {
           decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(6)),
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('¡Gracias por su preferencia!', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
-              pw.Text(_limpiarTexto('Estamos para servirle — $nombreEmpresa'), style: pw.TextStyle(fontSize: 9, color: blanco70)),
+              pw.Text(_t('¡Gracias por su preferencia!'), style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_limpiarTexto(_tf('Estamos para servirle — {0}', [nombreEmpresa])), style: pw.TextStyle(fontSize: 9, color: blanco70)),
             ]),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
               pw.Text(web, style: pw.TextStyle(fontSize: 9, color: PdfColors.white)),
@@ -321,7 +360,9 @@ class PdfService {
   static Future<Uint8List> generarCotizacionProfesional({
     required Cotizacion cotizacion,
     required Map<String, dynamic> empresa,
+    bool? ingles,
   }) async {
+    _en = ingles ?? enIngles;
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
     try {
@@ -343,7 +384,7 @@ class PdfService {
       .map((l) => l.trim().replaceFirst(RegExp(r'^[-*]\s*'), ''))
       .where((l) => l.isNotEmpty).toList();
 
-    final nombreEmpresa = _limpiarTexto(empresa['nombre_comercial'] ?? 'HETNA CNC');
+    final nombreEmpresa = _limpiarTexto(empresa['nombre_comercial'] ?? _t('HETNA CNC'));
     final rfcEmpresa = empresa['rfc'] ?? '';
     final direccion = _limpiarTexto(empresa['direccion'] ?? '');
     final tel1 = empresa['telefono1'] ?? '';
@@ -352,7 +393,7 @@ class PdfService {
     final cliente = cotizacion.cliente;
     final folio = cotizacion.folio ?? 'COT-${DateTime.now().millisecondsSinceEpoch}';
     final revision = v('revision').isEmpty ? 'A' : v('revision');
-    final moneda = v('moneda').isEmpty ? 'MXN' : v('moneda');
+    final moneda = v('moneda').isEmpty ? _moneda(empresa) : v('moneda');
     final fecha = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
     final vigenciaDias = cotizacion.vigenciaDias;
     final fechaVigencia = _fmtFecha.format(
@@ -401,25 +442,25 @@ class PdfService {
     final incluye = lineas('incluye');
     final noIncluye = lineas('no_incluye');
     final tecnicos = <(String, String)>[
-      ('Material', v('material')), ('Medidas / espesor', v('medidas')),
-      ('Tolerancia general', v('tolerancia')), ('Acabado', v('acabado')),
-      ('Archivo recibido', v('archivo')), ('Norma / especificación', v('norma')),
+      (_t('Material'), v('material')), (_t('Medidas / espesor'), v('medidas')),
+      (_t('Tolerancia general'), v('tolerancia')), (_t('Acabado'), v('acabado')),
+      (_t('Archivo recibido'), v('archivo')), (_t('Norma / especificación'), v('norma')),
     ];
     final fabricacion = <(String, String)>[
-      ('Proceso', v('proceso')), ('Máquina', v('maquina')),
-      ('Operaciones', v('operaciones')), ('Setups', v('setups')),
-      ('Inspección', v('inspeccion')),
+      (_t('Proceso'), v('proceso')), (_t('Máquina'), v('maquina')),
+      (_t('Operaciones'), v('operaciones')), (_t('Setups'), v('setups')),
+      (_t('Inspección'), v('inspeccion')),
     ];
     final hay = (List<(String, String)> l) => l.any((f) => f.$2.isNotEmpty);
     final comerciales = <(String, String)>[
-      ('Forma de pago', _limpiarTexto(cotizacion.metodoPago ?? '')),
-      ('Tiempo de entrega', v('tiempo_entrega')),
-      ('Lugar de entrega', _limpiarTexto(cotizacion.condicionEntrega ?? '')),
-      ('Vigencia de la oferta', '$vigenciaDias días (hasta $fechaVigencia)'),
-      ('Moneda', moneda),
-      ('Impuestos', cotizacion.ivaPct > 0 ? 'IVA ${cotizacion.ivaPct.toInt()}% incluido en el total' : 'Precios sin IVA'),
-      ('Cambios y cancelaciones', v('cambios')),
-      ('Notas', _limpiarTexto(cotizacion.notas ?? '')),
+      (_t('Forma de pago'), _limpiarTexto(_t(cotizacion.metodoPago ?? ''))),
+      (_t('Tiempo de entrega'), _t(v('tiempo_entrega'))),
+      (_t('Lugar de entrega'), _limpiarTexto(_t(cotizacion.condicionEntrega ?? ''))),
+      (_t('Vigencia de la oferta'), _tf('{0} días (hasta {1})', [vigenciaDias, fechaVigencia])),
+      (_t('Moneda'), moneda),
+      (_t('Impuestos'), cotizacion.ivaPct > 0 ? _tf('IVA {0}% incluido en el total', [pctTexto(cotizacion.ivaPct)]) : _t('Precios sin IVA')),
+      (_t('Cambios y cancelaciones'), _t(v('cambios'))),
+      (_t('Notas'), _limpiarTexto(cotizacion.notas ?? '')),
     ];
 
     int n = 0;
@@ -432,12 +473,12 @@ class PdfService {
         padding: const pw.EdgeInsets.only(top: 6),
         decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: grisLinea, width: 0.5))),
         child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-          pw.Text('$folio  ·  Rev $revision  ·  $nombreEmpresa',
+          pw.Text(_tf('{0}  ·  Rev {1}  ·  {2}', [folio, revision, nombreEmpresa]),
             style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
           if (esMuestra)
-            pw.Text('Cotización profesional de muestra · HETNA Taller · hetnacnc.com',
+            pw.Text(_t('Cotización profesional de muestra · HETNA Taller · hetnacnc.com'),
               style: pw.TextStyle(fontSize: 7, color: azul, fontWeight: pw.FontWeight.bold)),
-          pw.Text('Página ${ctx.pageNumber} de ${ctx.pagesCount}',
+          pw.Text(_tf('Página {0} de {1}', [(ctx.pageNumber), (ctx.pagesCount)]),
             style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
         ])),
       build: (ctx) => [
@@ -450,9 +491,9 @@ class PdfService {
               pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: azul)),
             pw.SizedBox(height: 6),
             pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-            if (rfcEmpresa.isNotEmpty) pw.Text('RFC: $rfcEmpresa', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+            if (rfcEmpresa.isNotEmpty) pw.Text(_tf('RFC: {0}', [rfcEmpresa]), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
             if (direccion.isNotEmpty) pw.Text(direccion, style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
-            pw.Text([if (tel1.isNotEmpty) 'Tel: $tel1', if (correoEmpresa.isNotEmpty) correoEmpresa, web].join('  ·  '),
+            pw.Text([if (tel1.isNotEmpty) _tf('Tel: {0}', [tel1]), if (correoEmpresa.isNotEmpty) correoEmpresa, web].join('  ·  '),
               style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
           ])),
           pw.Container(
@@ -461,12 +502,12 @@ class PdfService {
               borderRadius: pw.BorderRadius.circular(4)),
             child: pw.Column(children: [
               pw.Container(width: double.infinity, color: azul, padding: const pw.EdgeInsets.all(6),
-                child: pw.Text('COTIZACIÓN', textAlign: pw.TextAlign.center,
+                child: pw.Text(_t('COTIZACIÓN'), textAlign: pw.TextAlign.center,
                   style: pw.TextStyle(fontSize: 13, color: PdfColors.white, fontWeight: pw.FontWeight.bold))),
               pw.Padding(padding: const pw.EdgeInsets.all(6), child: pw.Column(children: [
-                _filaEnc('Folio', folio, azul), _filaEnc('Revisión', revision, azul),
-                _filaEnc('Fecha', fecha, azul), _filaEnc('Vigente hasta', fechaVigencia, azul),
-                _filaEnc('Moneda', moneda, azul),
+                _filaEnc(_t('Folio'), folio, azul), _filaEnc(_t('Revisión'), revision, azul),
+                _filaEnc(_t('Fecha'), fecha, azul), _filaEnc(_t('Vigente hasta'), fechaVigencia, azul),
+                _filaEnc(_t('Moneda'), moneda, azul),
               ])),
             ])),
         ]),
@@ -478,20 +519,20 @@ class PdfService {
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(color: grisClaro, borderRadius: pw.BorderRadius.circular(4)),
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('CLIENTE', style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_t('CLIENTE'), style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 3),
-              pw.Text(_limpiarTexto(cliente?.nombreCompleto ?? 'Sin cliente'),
+              pw.Text(_limpiarTexto(cliente?.nombreCompleto ?? _t('Sin cliente')),
                 style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: azul)),
-              if (cliente?.rfc != null) pw.Text('RFC: ${cliente!.rfc}', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+              if (cliente?.rfc != null) pw.Text(_tf('RFC: {0}', [cliente!.rfc]), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
               if (cliente?.correo != null) pw.Text(cliente!.correo!, style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
-              if (cliente?.telefono != null) pw.Text('Tel: ${cliente!.telefono}', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+              if (cliente?.telefono != null) pw.Text(_tf('Tel: {0}', [cliente!.telefono]), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
             ]))),
           pw.SizedBox(width: 8),
           pw.Expanded(child: pw.Container(
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(color: grisClaro, borderRadius: pw.BorderRadius.circular(4)),
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('PROYECTO', style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_t('PROYECTO'), style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 3),
               pw.Text(v('proyecto').isEmpty ? '-' : v('proyecto'),
                 style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: azul)),
@@ -500,28 +541,28 @@ class PdfService {
 
         // ─── 1. RESUMEN ─────────────────────
         if (v('resumen').isNotEmpty) ...[
-          titulo(sig(), 'RESUMEN'),
+          titulo(sig(), _t('RESUMEN')),
           pw.Text(v('resumen'), style: const pw.TextStyle(fontSize: 9, lineSpacing: 2)),
         ],
 
         // ─── 2. ALCANCE ─────────────────────
         if (incluye.isNotEmpty || noIncluye.isNotEmpty) ...[
-          titulo(sig(), 'ALCANCE DEL TRABAJO'),
+          titulo(sig(), _t('ALCANCE DEL TRABAJO')),
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Expanded(child: lista('INCLUYE', incluye, verde)),
+            pw.Expanded(child: lista(_t('INCLUYE'), incluye, verde)),
             pw.SizedBox(width: 8),
-            pw.Expanded(child: lista('NO INCLUYE', noIncluye, rojo)),
+            pw.Expanded(child: lista(_t('NO INCLUYE'), noIncluye, rojo)),
           ]),
         ],
 
         // ─── 3. DETALLE TÉCNICO ─────────────
-        if (hay(tecnicos)) ...[titulo(sig(), 'DETALLE TÉCNICO'), datos(tecnicos)],
+        if (hay(tecnicos)) ...[titulo(sig(), _t('DETALLE TÉCNICO')), datos(tecnicos)],
 
         // ─── 4. FABRICACIÓN ─────────────────
-        if (hay(fabricacion)) ...[titulo(sig(), 'ESPECIFICACIONES DE FABRICACIÓN'), datos(fabricacion)],
+        if (hay(fabricacion)) ...[titulo(sig(), _t('ESPECIFICACIONES DE FABRICACIÓN')), datos(fabricacion)],
 
         // ─── 5. PROPUESTA ECONÓMICA ─────────
-        titulo(sig(), 'PROPUESTA ECONÓMICA ($moneda)'),
+        titulo(sig(), _tf('PROPUESTA ECONÓMICA ({0})', [moneda])),
         pw.Table(
           border: pw.TableBorder.all(color: grisLinea, width: 0.5),
           columnWidths: {
@@ -533,7 +574,7 @@ class PdfService {
           },
           children: [
             pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
-              _cH('#'), _cH('CONCEPTO'), _cH('CANT.'), _cH('P. UNITARIO'), _cH('IMPORTE'),
+              _cH('#'), _cH(_t('CONCEPTO')), _cH(_t('CANT.')), _cH(_t('P. UNITARIO')), _cH(_t('IMPORTE')),
             ]),
             ...List.generate(cotizacion.items.length, (i) {
               final item = cotizacion.items[i];
@@ -548,7 +589,7 @@ class PdfService {
                         style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
                       if (desc.isNotEmpty) pw.Text(_limpiarTexto(desc), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
                       if (item.sku != null && item.sku!.isNotEmpty)
-                        pw.Text('No. de parte: ${item.sku}', style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
+                        pw.Text(_tf('No. de parte: {0}', [(item.sku)]), style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
                     ])),
                   _cD('${item.cantidad}', center: true),
                   _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
@@ -559,12 +600,12 @@ class PdfService {
         pw.SizedBox(height: 8),
         pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
           pw.Container(width: 230, child: pw.Column(children: [
-            _tR('Subtotal', '\$${_fmt.format(cotizacion.subtotal)}', grisTexto),
+            _tR(_t('Subtotal'), '\$${_fmt.format(cotizacion.subtotal)}', grisTexto),
             if (cotizacion.montoDescuento > 0)
-              _tR('Descuento${cotizacion.descuentoPct > 0 ? " ${cotizacion.descuentoPct.toInt()}%" : ""}',
+              _tR(_tf('Descuento{0}', [(cotizacion.descuentoPct > 0 ? " ${cotizacion.descuentoPct.toInt()}%" : "")]),
                 '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-            if (cotizacion.ivaPct > 0) _tR('IVA ${cotizacion.ivaPct.toInt()}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
-            if (cotizacion.costoEnvio > 0) _tR('Envío', '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
+            if (cotizacion.ivaPct > 0) _tR(_tf('IVA {0}%', [pctTexto(cotizacion.ivaPct)]), '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
+            if (cotizacion.costoEnvio > 0) _tR(_t('Envío'), '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
             pw.Divider(color: azul),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
               pw.Text('TOTAL $moneda', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
@@ -574,20 +615,20 @@ class PdfService {
         ]),
 
         // ─── 6. CONDICIONES COMERCIALES ─────
-        titulo(sig(), 'CONDICIONES COMERCIALES'),
+        titulo(sig(), _t('CONDICIONES COMERCIALES')),
         datos(comerciales),
 
         // ─── 7. CALIDAD ─────────────────────
         if (v('calidad').isNotEmpty || v('tolerancia').isNotEmpty) ...[
-          titulo(sig(), 'CONDICIONES TÉCNICAS Y DE CALIDAD'),
+          titulo(sig(), _t('CONDICIONES TÉCNICAS Y DE CALIDAD')),
           pw.Container(
             width: double.infinity,
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(4)),
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              if (v('calidad').isNotEmpty) pw.Text(v('calidad'), style: const pw.TextStyle(fontSize: 9)),
+              if (v('calidad').isNotEmpty) pw.Text(_t(v('calidad')), style: const pw.TextStyle(fontSize: 9)),
               if (v('tolerancia').isNotEmpty)
-                pw.Text('Tolerancia general: ${v('tolerancia')}', style: const pw.TextStyle(fontSize: 9)),
+                pw.Text(_tf('Tolerancia general: {0}', [(v('tolerancia'))]), style: const pw.TextStyle(fontSize: 9)),
               if ((empresa['leyenda_pdf'] as String?)?.isNotEmpty == true)
                 pw.Padding(padding: const pw.EdgeInsets.only(top: 4),
                   child: pw.Text(_limpiarTexto(empresa['leyenda_pdf']),
@@ -596,16 +637,16 @@ class PdfService {
         ],
 
         // ─── 8. APROBACIÓN ──────────────────
-        titulo(sig(), 'APROBACIÓN DEL CLIENTE'),
-        pw.Text('Al firmar, el cliente acepta el alcance, el precio y las condiciones de esta cotización (folio $folio, revisión $revision).',
+        titulo(sig(), _t('APROBACIÓN DEL CLIENTE')),
+        pw.Text(_tf('Al firmar, el cliente acepta el alcance, el precio y las condiciones de esta cotización (folio {0}, revisión {1}).', [folio, revision]),
           style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
         pw.SizedBox(height: 26),
         pw.Row(children: [
-          pw.Expanded(child: _lineaFirma('Nombre y cargo')),
+          pw.Expanded(child: _lineaFirma(_t('Nombre y cargo'))),
           pw.SizedBox(width: 14),
-          pw.Expanded(child: _lineaFirma('Firma')),
+          pw.Expanded(child: _lineaFirma(_t('Firma'))),
           pw.SizedBox(width: 14),
-          pw.Expanded(child: _lineaFirma('Fecha')),
+          pw.Expanded(child: _lineaFirma(_t('Fecha'))),
         ]),
       ],
     ));
@@ -679,7 +720,9 @@ class PdfService {
     required String nombreLista,
     required List<Producto> productos,
     required Map<String, dynamic> empresa,
+    bool? ingles,
   }) async {
+    _en = ingles ?? enIngles;
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
     try {
@@ -693,7 +736,7 @@ class PdfService {
     const grisTexto = PdfColor.fromInt(0xFF6B7280);
     const verde = PdfColor.fromInt(0xFF1d9e75);
 
-    final nombreEmpresa = empresa['nombre_comercial'] ?? 'HETNA CNC';
+    final nombreEmpresa = empresa['nombre_comercial'] ?? _t('HETNA CNC');
     final tel = empresa['telefono'] ?? '';
     final correo = empresa['correo'] ?? '';
     final web = empresa['sitio_web'] ?? 'hetnacnc.com';
@@ -722,9 +765,9 @@ class PdfService {
               pw.Text(nombreEmpresa,
                 style: pw.TextStyle(color: PdfColors.white,
                   fontSize: 18, fontWeight: pw.FontWeight.bold)),
-              pw.Text(_limpiarTexto('Lista de Precios — $nombreLista'),
+              pw.Text(_limpiarTexto(_tf('Lista de Precios — {0}', [nombreLista])),
                 style: const pw.TextStyle(color: PdfColors.white, fontSize: 11)),
-              pw.Text('Fecha: $fecha',
+              pw.Text(_tf('Fecha: {0}', [fecha]),
                 style: const pw.TextStyle(color: PdfColors.white, fontSize: 9)),
             ])),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
@@ -752,8 +795,8 @@ class PdfService {
             pw.TableRow(
               decoration: pw.BoxDecoration(color: azul),
               children: [
-                _celdaHeader('PRODUCTO / DESCRIPCIÓN'),
-                _celdaHeader('CATEGORÍA'),
+                _celdaHeader(_t('PRODUCTO / DESCRIPCIÓN')),
+                _celdaHeader(_t('CATEGORÍA')),
                 _celdaHeader('UNIDAD'),
                 _celdaHeader('PRECIO'),
               ]),
@@ -789,13 +832,13 @@ class PdfService {
           padding: const pw.EdgeInsets.all(12),
           decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(8)),
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-            pw.Text('Total de productos: ${productos.length}',
+            pw.Text(_tf('Total de productos: {0}', [(productos.length)]),
               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
-            pw.Text('Los precios no incluyen IVA',
+            pw.Text(_t('Los precios no incluyen IVA'),
               style: const pw.TextStyle(fontSize: 9, color: grisTexto)),
           ])),
         pw.SizedBox(height: 8),
-        pw.Text('Para pedidos o más información: $tel • $correo • $web',
+        pw.Text(_tf('Para pedidos o más información: {0} • {1} • {2}', [tel, correo, web]),
           style: const pw.TextStyle(fontSize: 9, color: grisTexto),
           textAlign: pw.TextAlign.center),
       ]));
@@ -814,7 +857,9 @@ class PdfService {
     required Cotizacion cotizacion,
     required Map<String, dynamic> empresa,
     String? folioPedido,
+    bool? ingles,
   }) async {
+    _en = ingles ?? enIngles;
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
     try {
@@ -829,13 +874,13 @@ class PdfService {
     const verde      = PdfColor.fromInt(0xFF1d9e75);
     const verdeClaro = PdfColor.fromInt(0xFFe6f7f0);
 
-    final nombreEmpresa    = empresa['nombre_comercial'] ?? 'HETNA CNC';
+    final nombreEmpresa    = empresa['nombre_comercial'] ?? _t('HETNA CNC');
     final telEmpresa       = empresa['telefono'] ?? empresa['telefono2'] ?? '';
     final direccionEmpresa = empresa['direccion'] ?? '';
     final correo           = empresa['correo']   ?? '';
     final web              = empresa['sitio_web'] ?? 'hetnacnc.com';
     final fecha            = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
-    final clienteNombre    = _limpiarTexto(cotizacion.cliente?.nombreCompleto ?? cotizacion.cliente?.nombre ?? 'Cliente');
+    final clienteNombre    = _limpiarTexto(cotizacion.cliente?.nombreCompleto ?? cotizacion.cliente?.nombre ?? _t('Cliente'));
     final folio            = folioPedido ?? cotizacion.folio ?? 'N/A';
 
     pdf.addPage(pw.Page(
@@ -878,13 +923,13 @@ class PdfService {
                 color: PdfColors.white,
                 borderRadius: pw.BorderRadius.circular(6)),
               child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-                pw.Text('NOTA DE COMPRA',
+                pw.Text(_t('NOTA DE COMPRA'),
                   style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
                 pw.SizedBox(height: 4),
                 pw.Text('Folio: $folio',
                   style: pw.TextStyle(fontSize: 10, color: azul)),
                 pw.SizedBox(height: 4),
-                pw.Text('Fecha: $fecha',
+                pw.Text(_tf('Fecha: {0}', [fecha]),
                   style: pw.TextStyle(fontSize: 9, color: grisTexto)),
                 pw.SizedBox(height: 6),
                 pw.Container(
@@ -892,7 +937,7 @@ class PdfService {
                   decoration: pw.BoxDecoration(
                     color: verde,
                     borderRadius: pw.BorderRadius.circular(4)),
-                  child: pw.Text('ENTREGADO',
+                  child: pw.Text(_t('ENTREGADO'),
                     style: pw.TextStyle(fontSize: 9, color: PdfColors.white,
                       fontWeight: pw.FontWeight.bold))),
               ])),
@@ -904,10 +949,10 @@ class PdfService {
           decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(6)),
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('CLIENTE', style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_t('CLIENTE'), style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)),
               pw.Text(clienteNombre, style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
             ]),
-            pw.Text('Nota de entrega', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+            pw.Text(_t('Nota de entrega'), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
           ])),
         pw.SizedBox(height: 12),
         // Tabla
@@ -921,7 +966,7 @@ class PdfService {
           },
           children: [
             pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
-              _cH('TÍTULO / DESCRIPCIÓN'), _cH('CANT.'), _cH('PRECIO'), _cH('SUBTOTAL'),
+              _cH(_t('TÍTULO / DESCRIPCIÓN')), _cH(_t('CANT.')), _cH(_t('PRECIO')), _cH(_t('SUBTOTAL')),
             ]),
             ...List.generate(cotizacion.items.length, (i) {
               final item = cotizacion.items[i];
@@ -956,11 +1001,11 @@ class PdfService {
             decoration: pw.BoxDecoration(color: verdeClaro, borderRadius: pw.BorderRadius.circular(8),
               border: pw.Border.all(color: verde, width: 1)),
             child: pw.Column(children: [
-              if (cotizacion.descuentoPct > 0) _tR('Descuento', '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-              if (cotizacion.ivaPct > 0) _tR('IVA ${cotizacion.ivaPct.toInt()}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
+              if (cotizacion.descuentoPct > 0) _tR(_t('Descuento'), '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
+              if (cotizacion.ivaPct > 0) _tR(_tf('IVA {0}%', [pctTexto(cotizacion.ivaPct)]), '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
               pw.Divider(color: verde),
               pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                pw.Text('TOTAL PAGADO', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: verde)),
+                pw.Text(_t('TOTAL PAGADO'), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: verde)),
                 pw.Text('\$${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: verde)),
               ]),
             ])),
@@ -972,7 +1017,7 @@ class PdfService {
             pw.Container(height: 40, decoration: const pw.BoxDecoration(
               border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey400)))),
             pw.SizedBox(height: 4),
-            pw.Text('Firma del cliente', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+            pw.Text(_t('Firma del cliente'), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
             pw.Text(clienteNombre, style: pw.TextStyle(fontSize: 9, color: grisTexto)),
           ])),
           pw.SizedBox(width: 40),
@@ -980,7 +1025,7 @@ class PdfService {
             pw.Container(height: 40, decoration: const pw.BoxDecoration(
               border: pw.Border(bottom: pw.BorderSide(color: PdfColors.grey400)))),
             pw.SizedBox(height: 4),
-            pw.Text('Firma de entrega', style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
+            pw.Text(_t('Firma de entrega'), style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey)),
             pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 9, color: grisTexto)),
           ])),
         ]),
@@ -991,7 +1036,7 @@ class PdfService {
           decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(6)),
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('Gracias por su preferencia', style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Text(_t('Gracias por su preferencia'), style: pw.TextStyle(fontSize: 10, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
               pw.Text('$telEmpresa  $correo', style: const pw.TextStyle(fontSize: 8, color: PdfColors.white)),
             ]),
             pw.Text(web, style: pw.TextStyle(fontSize: 9, color: PdfColors.white)),

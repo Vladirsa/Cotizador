@@ -6,6 +6,7 @@
 // - Enlaces del ecosistema: tienda, foro, laboratorio CAM, licitaciones
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../i18n/tr.dart';
 
 class HetnaApi {
   static const base = 'https://hetnacnc.com';
@@ -42,7 +43,7 @@ class HetnaApi {
     if (_cache != null) return _cache!;
     final r = await http.get(Uri.parse('$base/api/app/calculadora')).timeout(_timeout);
     final d = _leer(r);
-    if (r.statusCode != 200) throw HetnaError(_error(d, 'No se pudo cargar la calculadora.'));
+    if (r.statusCode != 200) throw HetnaError(_error(d, tr('No se pudo cargar la calculadora.')));
     _cache = ((d['calculadoras'] as List?) ?? [])
       .map((j) => CalcDef.fromJson(j as Map<String, dynamic>)).toList();
     return _cache!;
@@ -53,7 +54,7 @@ class HetnaApi {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'id': id, 'entrada': entrada})).timeout(_timeout);
     final d = _leer(r);
-    if (r.statusCode != 200) throw HetnaError(_error(d, 'No se pudo calcular.'));
+    if (r.statusCode != 200) throw HetnaError(_error(d, tr('No se pudo calcular.')));
     return CalcResultado.fromJson((d['resultado'] as Map<String, dynamic>?) ?? {});
   }
 
@@ -61,7 +62,7 @@ class HetnaApi {
   static Future<InfoCP> codigoPostal(String cp) async {
     final r = await http.get(Uri.parse('$base/api/app/envios?cp=$cp')).timeout(_timeout);
     final d = _leer(r);
-    if (r.statusCode != 200) throw HetnaError(_error(d, 'No encontramos ese código postal.'));
+    if (r.statusCode != 200) throw HetnaError(_error(d, tr('No encontramos ese código postal.')));
     return InfoCP.fromJson(d);
   }
 
@@ -79,7 +80,7 @@ class HetnaApi {
         'tipo': tipo, 'peso': peso, 'largo': largo, 'ancho': ancho, 'alto': alto,
       })).timeout(_timeout);
     final d = _leer(r);
-    if (r.statusCode != 200) throw HetnaError(_error(d, 'No pudimos cotizar el envío.'));
+    if (r.statusCode != 200) throw HetnaError(_error(d, tr('No pudimos cotizar el envío.')));
     return CotizacionEnvio.fromJson(d);
   }
 
@@ -105,7 +106,7 @@ class SuscripcionApi {
       if (j is Map<String, dynamic>) d = j;
     } catch (_) {}
     if (r.statusCode != 200) {
-      throw HetnaError((d['error'] ?? d['message'] ?? 'No se pudo completar. Intenta de nuevo.').toString());
+      throw HetnaError((d['error'] ?? d['message'] ?? tr('No se pudo completar. Intenta de nuevo.')).toString());
     }
     return d;
   }
@@ -115,7 +116,7 @@ class SuscripcionApi {
   static Future<Map<String, dynamic>> precios() async {
     final r = await http.get(Uri.parse(_ruta)).timeout(const Duration(seconds: 15));
     final j = jsonDecode(utf8.decode(r.bodyBytes));
-    if (r.statusCode != 200 || j is! Map<String, dynamic>) throw HetnaError('No se pudieron cargar los precios.');
+    if (r.statusCode != 200 || j is! Map<String, dynamic>) throw HetnaError(tr('No se pudieron cargar los precios.'));
     return j;
   }
 
@@ -125,7 +126,7 @@ class SuscripcionApi {
     final d = await _post(_ruta, token, {'plan': plan, 'correo_pago': correoPago, 'proveedor': proveedor});
     final url = d['url'] as String?;
     if (url == null || url.isEmpty) {
-      throw HetnaError('${proveedor == 'paypal' ? 'PayPal' : 'Mercado Pago'} no devolvió el enlace de pago.');
+      throw HetnaError(trf('{0} no devolvió el enlace de pago.', [(proveedor == 'paypal' ? tr('PayPal') : tr('Mercado Pago'))]));
     }
     return url;
   }

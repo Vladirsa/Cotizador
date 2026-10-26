@@ -28,6 +28,7 @@ import 'calculadora_cnc_screen.dart';
 import 'envios_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/hetna_api.dart';
+import '../i18n/tr.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -90,11 +91,11 @@ class _HomeScreenState extends State<HomeScreen> {
     decoration: const BoxDecoration(color: Colors.white,
       border: Border(top: BorderSide(color: AppColors.grisBorde, width: 0.5))),
     child: SafeArea(child: SizedBox(height: 58, child: Row(children: [
-      _btn(0, Icons.dashboard_outlined, 'Inicio'),
-      _btn(1, Icons.notifications_outlined, 'Alertas', badge: _alertas),
-      _btn(2, Icons.description_outlined, 'Cotizar'),
-      _btn(3, Icons.local_shipping_outlined, 'Avances'),
-      _btn(4, Icons.calculate_outlined, 'Simular', plan: 'simulador'),
+      _btn(0, Icons.dashboard_outlined, tr('Inicio')),
+      _btn(1, Icons.notifications_outlined, tr('Alertas'), badge: _alertas),
+      _btn(2, Icons.description_outlined, tr('Cotizar')),
+      _btn(3, Icons.local_shipping_outlined, tr('Avances')),
+      _btn(4, Icons.calculate_outlined, tr('Simular'), plan: 'simulador'),
       // Botón Más
       Expanded(child: Builder(builder: (ctx) => GestureDetector(
         onTap: () => Scaffold.of(ctx).openDrawer(),
@@ -103,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Icon(Icons.grid_view_outlined, size: 22,
             color: _tab >= 5 ? AppColors.azul : AppColors.textoSecundario),
           const SizedBox(height: 2),
-          Text('Más', style: TextStyle(fontSize: 9,
+          Text(tr('Más'), style: TextStyle(fontSize: 9,
             color: _tab >= 5 ? AppColors.azul : AppColors.textoSecundario,
             fontWeight: _tab >= 5 ? FontWeight.w600 : FontWeight.normal)),
         ])))),
@@ -137,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Icon(Icons.lock, size: 10, color: Colors.amber)),
         ]),
         const SizedBox(height: 2),
-        Text(label, style: TextStyle(fontSize: 9,
+        Text(tr(label), style: TextStyle(fontSize: 9,
           color: bloqueado
             ? AppColors.textoSecundario.withOpacity(0.4)
             : (active ? AppColors.azul : AppColors.textoSecundario),
@@ -151,11 +152,11 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: const BoxDecoration(color: AppColors.azul),
         padding: const EdgeInsets.fromLTRB(16, 40, 16, 16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('HETNA CNC',
+          Text(tr('HETNA CNC'),
             style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-          Text(AuthService.nombreUsuario ?? 'Usuario',
+          Text(tr(AuthService.nombreUsuario ?? tr('Usuario')),
             style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-          Text(AuthService.rol ?? '',
+          Text(tr(AuthService.rol ?? ''),
             style: const TextStyle(color: Colors.white60, fontSize: 11)),
           // Aviso de plan / trial
           if ((AuthService.plan == 'trial' || AuthService.plan == 'prueba') && !AuthService.trialVencido) ...[
@@ -163,7 +164,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(color: Colors.white.withOpacity(0.15),
                 borderRadius: BorderRadius.circular(20)),
-              child: Text('🎁 Prueba: ${AuthService.diasTrialRestantes} días restantes',
+              child: Text(trf('🎁 Prueba: {0} días restantes', [(AuthService.diasTrialRestantes)]),
                 style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w600))),
           ],
           if (AuthService.trialVencido) ...[
@@ -171,37 +172,37 @@ class _HomeScreenState extends State<HomeScreen> {
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(color: Colors.amber.withOpacity(0.9),
                 borderRadius: BorderRadius.circular(20)),
-              child: const Text('⏰ Prueba vencida — actualiza tu plan',
+              child: Text(tr('⏰ Prueba vencida — actualiza tu plan'),
                 style: TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.w700))),
           ],
         ])),
-      _dItem(Icons.people_outline,         'CRM Clientes',        5, modulo: 'clientes'),
-      _dItem(Icons.inventory_2_outlined,   'Productos y Catálogo',6, modulo: 'productos'),
-      _dItem(Icons.warehouse_outlined,     'Inventario Bodega',   7, plan: 'inventario', modulo: 'inventario'),
-      _dItem(Icons.receipt_long_outlined,  'Gastos y Compras',    8, plan: 'gastos', modulo: 'gastos'),
-      _dItem(Icons.campaign_outlined,      'Marketing',           9, plan: 'marketing', modulo: 'marketing'),
-      _dItem(Icons.group_outlined,         'Mi equipo',          10, plan: 'equipo', modulo: 'equipo'),
+      _dItem(Icons.people_outline,         tr('CRM Clientes'),        5, modulo: 'clientes'),
+      _dItem(Icons.inventory_2_outlined,   tr('Productos y Catálogo'),6, modulo: 'productos'),
+      _dItem(Icons.warehouse_outlined,     tr('Inventario Bodega'),   7, plan: 'inventario', modulo: 'inventario'),
+      _dItem(Icons.receipt_long_outlined,  tr('Gastos y Compras'),    8, plan: 'gastos', modulo: 'gastos'),
+      _dItem(Icons.campaign_outlined,      tr('Marketing'),           9, plan: 'marketing', modulo: 'marketing'),
+      _dItem(Icons.group_outlined,         tr('Mi equipo'),          10, plan: 'equipo', modulo: 'equipo'),
       const Divider(height: 1),
-      _dItem(Icons.bar_chart_outlined,     'Reportes Excel',     11, plan: 'reportes', modulo: 'reportes'),
-      _dItem(Icons.settings_outlined,      'Configuración',      12, modulo: 'config'),
-      _dItem(Icons.tune_outlined,          'Config Simulador',   13, plan: 'config_simulador'),
-      _dItem(Icons.calculate_outlined,     'Costos del taller',  14, plan: 'costos_taller'),
+      _dItem(Icons.bar_chart_outlined,     tr('Reportes Excel'),     11, plan: 'reportes', modulo: 'reportes'),
+      _dItem(Icons.settings_outlined,      tr('Configuración'),      12, modulo: 'config'),
+      _dItem(Icons.tune_outlined,          tr('Config Simulador'),   13, plan: 'config_simulador'),
+      _dItem(Icons.calculate_outlined,     tr('Costos del taller'),  14, plan: 'costos_taller'),
       // ── Herramientas HETNA (abiertas en todos los planes) ──
       const Divider(height: 1),
-      _seccion('HERRAMIENTAS HETNA'),
-      _dPush(Icons.precision_manufacturing_outlined, 'Calculadora CNC', const CalculadoraCncScreen()),
-      _dPush(Icons.local_shipping_outlined, 'Envíos HETNA', const EnviosScreen()),
+      _seccion(tr('HERRAMIENTAS HETNA')),
+      _dPush(Icons.precision_manufacturing_outlined, tr('Calculadora CNC'), const CalculadoraCncScreen()),
+      _dPush(Icons.local_shipping_outlined, tr('Envíos HETNA'), const EnviosScreen()),
       // ── Ecosistema hetnacnc.com ──
       const Divider(height: 1),
-      _seccion('HETNA CNC'),
-      _dLink(Icons.storefront_outlined, 'Tienda', HetnaApi.urlTienda),
-      _dLink(Icons.forum_outlined, 'Foro CNC', HetnaApi.urlForo),
-      _dLink(Icons.science_outlined, 'Laboratorio CAM', HetnaApi.urlLaboratorio),
-      _dLink(Icons.gavel_outlined, 'Licitaciones (RFQ)', HetnaApi.urlLicitaciones),
+      _seccion(tr('HETNA CNC')),
+      _dLink(Icons.storefront_outlined, tr('Tienda'), HetnaApi.urlTienda),
+      _dLink(Icons.forum_outlined, tr('Foro CNC'), HetnaApi.urlForo),
+      _dLink(Icons.science_outlined, tr('Laboratorio CAM'), HetnaApi.urlLaboratorio),
+      _dLink(Icons.gavel_outlined, tr('Licitaciones (RFQ)'), HetnaApi.urlLicitaciones),
       const Divider(height: 1),
       ListTile(
         leading: const Icon(Icons.workspace_premium_outlined, color: AppColors.naranja, size: 22),
-        title: const Text('Mi plan', style: TextStyle(fontSize: 14)),
+        title: Text(tr('Mi plan'), style: TextStyle(fontSize: 14)),
         trailing: Text(Planes.nombres[AuthService.planActual]!,
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.naranja)),
         onTap: () {
@@ -211,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (AuthService.esAdmin)
         ListTile(
           leading: const Icon(Icons.admin_panel_settings_outlined, color: AppColors.textoSecundario, size: 22),
-          title: const Text('Permisos por rol', style: TextStyle(fontSize: 14)),
+          title: Text(tr('Permisos por rol'), style: TextStyle(fontSize: 14)),
           onTap: () {
             Navigator.pop(context);
             Navigator.push(context, MaterialPageRoute(builder: (_) => const PermisosScreen()));
@@ -219,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const Divider(height: 1),
       ListTile(
         leading: const Icon(Icons.logout_outlined, color: AppColors.rojo, size: 22),
-        title: const Text('Cerrar sesión',
+        title: Text(tr('Cerrar sesión'),
           style: TextStyle(fontSize: 14, color: AppColors.rojo)),
         onTap: () async {
           Navigator.pop(context);
@@ -231,12 +232,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _seccion(String t) => Padding(
     padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-    child: Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+    child: Text(tr(t), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
       color: AppColors.textoSecundario, letterSpacing: 0.8)));
 
   Widget _dPush(IconData icon, String label, Widget pantalla) => ListTile(
     leading: Icon(icon, color: AppColors.naranja, size: 22),
-    title: Text(label, style: const TextStyle(fontSize: 14)),
+    title: Text(tr(label), style: const TextStyle(fontSize: 14)),
     onTap: () {
       Navigator.pop(context);
       Navigator.push(context, MaterialPageRoute(builder: (_) => pantalla));
@@ -244,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _dLink(IconData icon, String label, String url) => ListTile(
     leading: Icon(icon, color: AppColors.azul, size: 22),
-    title: Text(label, style: const TextStyle(fontSize: 14)),
+    title: Text(tr(label), style: const TextStyle(fontSize: 14)),
     trailing: const Icon(Icons.open_in_new, size: 16, color: AppColors.textoSecundario),
     onTap: () {
       Navigator.pop(context);
@@ -260,7 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
       leading: Icon(icon,
         color: bloqueado ? AppColors.textoSecundario.withOpacity(0.4)
           : (active ? AppColors.azul : AppColors.textoSecundario), size: 22),
-      title: Text(label, style: TextStyle(fontSize: 14,
+      title: Text(tr(label), style: TextStyle(fontSize: 14,
         color: bloqueado ? AppColors.textoSecundario.withOpacity(0.4)
           : (active ? AppColors.azul : Colors.black),
         fontWeight: active ? FontWeight.w600 : FontWeight.normal)),
@@ -275,7 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         if (sinPermisoRol) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('No tienes permiso para ver "$label". Pide a tu administrador que te lo active.'),
+            content: Text(trf('No tienes permiso para ver "{0}". Pide a tu administrador que te lo active.', [label])),
             backgroundColor: AppColors.rojo));
           return;
         }
@@ -313,7 +314,7 @@ class _AlertasAgendaScreenState extends State<_AlertasAgendaScreen>
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Alertas y Agenda',
+        title: Text(tr('Alertas y Agenda'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
             color: AppColors.azul)),
         bottom: TabBar(
@@ -321,10 +322,10 @@ class _AlertasAgendaScreenState extends State<_AlertasAgendaScreen>
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
-          tabs: const [
-            Tab(icon: Icon(Icons.calendar_month_outlined, size: 18), text: 'Agenda'),
-            Tab(icon: Icon(Icons.notifications_outlined, size: 18), text: 'Alertas'),
-            Tab(icon: Icon(Icons.event_outlined, size: 18), text: 'Citas'),
+          tabs: [
+            Tab(icon: Icon(Icons.calendar_month_outlined, size: 18), text: tr('Agenda')),
+            Tab(icon: Icon(Icons.notifications_outlined, size: 18), text: tr('Alertas')),
+            Tab(icon: Icon(Icons.event_outlined, size: 18), text: tr('Citas')),
           ])),
       body: TabBarView(
         controller: _tabs,

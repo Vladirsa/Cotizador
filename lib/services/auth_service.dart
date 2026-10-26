@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/premium_screen.dart';
 import 'planes.dart';
+import '../i18n/tr.dart';
 export 'planes.dart' show Plan, Planes;
 
 class AuthService {
@@ -100,21 +101,21 @@ class AuthService {
         email: correo,
         password: password,
       );
-      if (res.user == null) return AuthResult.error('Credenciales incorrectas');
+      if (res.user == null) return AuthResult.error(tr('Credenciales incorrectas'));
       await _cargarPerfil();
       if (_negocioId == null) {
         await _sb.auth.signOut();
-        return AuthResult.error('Usuario sin negocio asignado. Contacta al administrador.');
+        return AuthResult.error(tr('Usuario sin negocio asignado. Contacta al administrador.'));
       }
       return AuthResult.ok();
     } on AuthException catch (e) {
       if (e.message.contains('Email not confirmed')) {
         return AuthResult.confirmar(
-          'Falta confirmar tu correo. Abre el enlace que te enviamos (revisa también spam) y vuelve a entrar.');
+          tr('Falta confirmar tu correo. Abre el enlace que te enviamos (revisa también spam) y vuelve a entrar.'));
       }
       return AuthResult.error(_traducirError(e.message));
     } catch (e) {
-      return AuthResult.error('Error de conexión. Verifica tu internet.');
+      return AuthResult.error(tr('Error de conexión. Verifica tu internet.'));
     }
   }
 
@@ -128,7 +129,7 @@ class AuthService {
     } on AuthException catch (e) {
       return _traducirError(e.message);
     } catch (e) {
-      return 'No se pudo reenviar el correo. Intenta de nuevo en un minuto.';
+      return tr('No se pudo reenviar el correo. Intenta de nuevo en un minuto.');
     }
   }
 
@@ -303,7 +304,7 @@ class AuthService {
   // Guardar de un jalón todos los permisos de un rol (reemplaza los
   // anteriores) — se llama al tocar "Guardar" en la pantalla de permisos
   static Future<String?> guardarPermisosDeRol(String rol, Set<String> modulosActivos) async {
-    if (_negocioId == null) return 'Sin negocio activo';
+    if (_negocioId == null) return tr('Sin negocio activo');
     try {
       // Borrar los permisos viejos del rol y escribir los nuevos
       await _sb.from('permisos_rol')
@@ -325,7 +326,7 @@ class AuthService {
       }
       return null;
     } catch (e) {
-      return 'Error al guardar permisos: $e';
+      return trf('Error al guardar permisos: {0}', [e]);
     }
   }
 
@@ -348,13 +349,13 @@ class AuthService {
       title: Row(children: [
         const Icon(Icons.lock_outline, color: Colors.amber),
         const SizedBox(width: 8),
-        Expanded(child: Text('Disponible en plan $nombre', style: const TextStyle(fontSize: 16))),
+        Expanded(child: Text(trf('Disponible en plan {0}', [nombre]), style: const TextStyle(fontSize: 16))),
       ]),
-      content: Text(esTrialVencido
-        ? 'Tu prueba gratuita terminó. Para seguir usando $funcion activa el plan $nombre (\$$precio al mes).'
-        : 'Para usar $funcion necesitas el plan $nombre (\$$precio al mes).'),
+      content: Text(tr(esTrialVencido
+        ? trf('Tu prueba gratuita terminó. Para seguir usando {0} activa el plan {1} (\${2} al mes).', [funcion, nombre, precio])
+        : trf('Para usar {0} necesitas el plan {1} (\${2} al mes).', [funcion, nombre, precio]))),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cerrar'))),
         ElevatedButton(
           onPressed: () {
             Navigator.pop(ctx);
@@ -362,7 +363,7 @@ class AuthService {
               MaterialPageRoute(builder: (_) => const PremiumScreen()));
           },
           style: ElevatedButton.styleFrom(backgroundColor: Colors.amber.shade700),
-          child: const Text('Ver planes', style: TextStyle(color: Colors.white))),
+          child: Text(tr('Ver planes'), style: TextStyle(color: Colors.white))),
       ]));
     return false;
   }
@@ -378,7 +379,7 @@ class AuthService {
     } on AuthException catch (e) {
       return _traducirError(e.message);
     } catch (_) {
-      return 'Error al cambiar contraseña';
+      return tr('Error al cambiar contraseña');
     }
   }
 
@@ -391,7 +392,7 @@ class AuthService {
     required String rol,
   }) async {
     try {
-      if (_negocioId == null) return 'Sin negocio activo';
+      if (_negocioId == null) return tr('Sin negocio activo');
       // Upsert: si ya existe la fila del usuario, actualiza en vez de duplicar
       await _sb.from('usuarios_negocio').upsert({
         'user_id'   : userId,
@@ -508,7 +509,7 @@ class AuthService {
         params: {'p_codigo': codigoLimpio});
 
       if (validacion['valido'] != true) {
-        return AuthResult.error(validacion['mensaje'] ?? 'Código de invitación no válido');
+        return AuthResult.error(validacion['mensaje'] ?? tr('Código de invitación no válido'));
       }
 
       // 2. Crear la cuenta en Supabase Auth
@@ -516,14 +517,14 @@ class AuthService {
       // correo, aún no hay sesión para canjearlo; se canjea al primer login.
       final res = await _sb.auth.signUp(
         email: correo, password: password,
-        data: {'nombre': nombre, 'invitacion': codigoLimpio},
+        data: {'nombre': nombre, 'invitacion': codigoLimpio, 'idioma': idiomaActual.value.languageCode},
         emailRedirectTo: urlRegreso);
       if (res.user == null) {
-        return AuthResult.error('No se pudo crear la cuenta');
+        return AuthResult.error(tr('No se pudo crear la cuenta'));
       }
       if (res.session == null) {
         return AuthResult.confirmar(
-          'Te enviamos un correo a $correo. Ábrelo, toca "Confirmar mi correo" y luego inicia sesión: entrarás directo a tu taller.');
+          trf('Te enviamos un correo a {0}. Ábrelo, toca "Confirmar mi correo" y luego inicia sesión: entrarás directo a tu taller.', [correo]));
       }
 
       // 3. Canjear el código ya autenticado: vincula al taller y
@@ -536,19 +537,19 @@ class AuthService {
 
       if (canje['exito'] != true) {
         return AuthResult.error(canje['mensaje'] ??
-          'La cuenta se creó pero no se pudo vincular al taller. Contacta al administrador.');
+          tr('La cuenta se creó pero no se pudo vincular al taller. Contacta al administrador.'));
       }
 
       // 4. Cargar el perfil recién creado en memoria
       await _cargarPerfil();
       if (_negocioId == null) {
-        return AuthResult.error('La cuenta se creó pero no se pudo vincular al taller. Contacta al administrador.');
+        return AuthResult.error(tr('La cuenta se creó pero no se pudo vincular al taller. Contacta al administrador.'));
       }
       return AuthResult.ok();
     } on AuthException catch (e) {
       return AuthResult.error(_traducirError(e.message));
     } catch (e) {
-      return AuthResult.error('Error al crear la cuenta: $e');
+      return AuthResult.error(trf('Error al crear la cuenta: {0}', [e]));
     }
   }
 
@@ -573,11 +574,11 @@ class AuthService {
 
   // ── Traducir errores de Supabase Auth al español ──────
   static String _traducirError(String msg) {
-    if (msg.contains('Invalid login credentials')) return 'Correo o contraseña incorrectos';
-    if (msg.contains('Email not confirmed'))       return 'Confirma tu correo antes de entrar';
-    if (msg.contains('Too many requests'))         return 'Demasiados intentos. Espera unos minutos';
-    if (msg.contains('User not found'))            return 'Usuario no encontrado';
-    if (msg.contains('network'))                   return 'Sin conexión a internet';
+    if (msg.contains('Invalid login credentials')) return tr('Correo o contraseña incorrectos');
+    if (msg.contains('Email not confirmed'))       return tr('Confirma tu correo antes de entrar');
+    if (msg.contains('Too many requests'))         return tr('Demasiados intentos. Espera unos minutos');
+    if (msg.contains('User not found'))            return tr('Usuario no encontrado');
+    if (msg.contains('network'))                   return tr('Sin conexión a internet');
     return msg;
   }
 }

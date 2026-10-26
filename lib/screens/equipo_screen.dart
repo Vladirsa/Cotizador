@@ -6,6 +6,7 @@ import '../main.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/auth_service.dart';
 import 'premium_screen.dart';
+import '../i18n/tr.dart';
 
 // ══════════════════════════════════════════════════════
 // MODELO
@@ -168,14 +169,14 @@ class _EquipoScreenState extends State<EquipoScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Mi equipo',
+        title: Text(tr('Mi equipo'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.azul)),
         actions: [
           if (esAdmin)
             TextButton.icon(
               onPressed: _invitarUsuario,
               icon: const Icon(Icons.person_add_outlined, color: AppColors.azul, size: 18),
-              label: const Text('Invitar', style: TextStyle(color: AppColors.azul, fontWeight: FontWeight.w600))),
+              label: Text(tr('Invitar'), style: TextStyle(color: AppColors.azul, fontWeight: FontWeight.w600))),
         ]),
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
@@ -184,12 +185,12 @@ class _EquipoScreenState extends State<EquipoScreen> {
             child: ListView(padding: const EdgeInsets.all(14), children: [
 
               // ── Mi perfil ──
-              _seccion('MI PERFIL'),
+              _seccion(tr('MI PERFIL')),
               _cardMiPerfil(),
               const SizedBox(height: 16),
 
               // ── Equipo ──
-              _seccion('EQUIPO DEL TALLER (${_usuarios.length})'),
+              _seccion(trf('EQUIPO DEL TALLER ({0})', [(_usuarios.length)])),
               if (_usuarios.isEmpty)
                 _cardVacio()
               else
@@ -198,14 +199,14 @@ class _EquipoScreenState extends State<EquipoScreen> {
               // ── Invitaciones pendientes (solo admin) ──
               if (esAdmin && _invitacionesPendientes.isNotEmpty) ...[
                 const SizedBox(height: 16),
-                _seccion('INVITACIONES PENDIENTES (${_invitacionesPendientes.length})'),
+                _seccion(trf('INVITACIONES PENDIENTES ({0})', [(_invitacionesPendientes.length)])),
                 ..._invitacionesPendientes.map((inv) => _cardInvitacionPendiente(inv)),
               ],
 
               const SizedBox(height: 16),
 
               // ── Roles y permisos (info) ──
-              _seccion('ROLES Y PERMISOS'),
+              _seccion(tr('ROLES Y PERMISOS')),
               _cardRolesInfo(),
 
               const SizedBox(height: 20),
@@ -226,7 +227,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
-          child: Text(codigo, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
+          child: Text(tr(codigo), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800,
             letterSpacing: 2, color: AppColors.azul, fontFamily: 'monospace'))),
         const SizedBox(width: 10),
         Expanded(child: Text('${uTmp.rolEmoji} ${uTmp.rolLabel}',
@@ -242,7 +243,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
 
   // ── Mi perfil ──────────────────────────────────────
   Widget _cardMiPerfil() {
-    final nombre = AuthService.nombreUsuario ?? 'Usuario';
+    final nombre = AuthService.nombreUsuario ?? tr('Usuario');
     final rol = AuthService.rol ?? '';
     final correo = AuthService.usuarioActual?.email ?? '';
     final usu = UsuarioNegocio(
@@ -259,9 +260,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
         _avatar(nombre, usu.rolColor(context), size: 50),
         const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(nombre, style: const TextStyle(
+          Text(tr(nombre), style: const TextStyle(
             fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white)),
-          Text(correo, style: const TextStyle(
+          Text(tr(correo), style: const TextStyle(
             fontSize: 12, color: Colors.white70)),
           const SizedBox(height: 6),
           Container(
@@ -310,7 +311,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Text(u.nombre ?? 'Sin nombre', style: TextStyle(
+            Text(tr(u.nombre ?? tr('Sin nombre')), style: TextStyle(
               fontSize: 14, fontWeight: FontWeight.w700,
               color: u.activo ? AppColors.textoPrincipal : AppColors.textoSecundario)),
             if (esMismoUsuario) ...[
@@ -320,7 +321,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.azulClaro,
                   borderRadius: BorderRadius.circular(10)),
-                child: const Text('Tú', style: TextStyle(fontSize: 9, color: AppColors.azul, fontWeight: FontWeight.w700))),
+                child: Text(tr('Tú'), style: TextStyle(fontSize: 9, color: AppColors.azul, fontWeight: FontWeight.w700))),
             ],
           ]),
           if (u.correo != null)
@@ -339,16 +340,16 @@ class _EquipoScreenState extends State<EquipoScreen> {
             icon: const Icon(Icons.more_vert, color: AppColors.textoSecundario, size: 20),
             onSelected: (accion) => _accionUsuario(accion, u),
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'cambiar_rol', child: Row(children: [
+              PopupMenuItem(value: 'cambiar_rol', child: Row(children: [
                 Icon(Icons.manage_accounts_outlined, size: 16), SizedBox(width: 8),
-                Text('Cambiar rol', style: TextStyle(fontSize: 13)),
+                Text(tr('Cambiar rol'), style: TextStyle(fontSize: 13)),
               ])),
               PopupMenuItem(value: u.activo ? 'desactivar' : 'activar',
                 child: Row(children: [
                   Icon(u.activo ? Icons.block_outlined : Icons.check_circle_outline, size: 16,
                     color: u.activo ? AppColors.rojo : AppColors.verde),
                   const SizedBox(width: 8),
-                  Text(u.activo ? 'Desactivar' : 'Activar',
+                  Text(tr(u.activo ? tr('Desactivar') : tr('Activar')),
                     style: TextStyle(fontSize: 13, color: u.activo ? AppColors.rojo : AppColors.verde)),
                 ])),
             ]),
@@ -363,13 +364,13 @@ class _EquipoScreenState extends State<EquipoScreen> {
     child: Column(children: [
       const Icon(Icons.group_outlined, size: 48, color: AppColors.grisBorde),
       const SizedBox(height: 12),
-      const Text('No hay usuarios registrados',
+      Text(tr('No hay usuarios registrados'),
         style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
       const SizedBox(height: 8),
       TextButton.icon(
         onPressed: _invitarUsuario,
         icon: const Icon(Icons.person_add_outlined, size: 16),
-        label: const Text('Invitar primer usuario')),
+        label: Text(tr('Invitar primer usuario'))),
     ]));
 
   // ── Roles info ──────────────────────────────────────
@@ -381,7 +382,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         border: Border.all(color: AppColors.grisBorde, width: 0.5)),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        title: const Text('Ver permisos por rol',
+        title: Text(tr('Ver permisos por rol'),
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.azul)),
         leading: const Icon(Icons.shield_outlined, color: AppColors.azul),
         children: roles.map((rol) {
@@ -401,7 +402,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
               const SizedBox(height: 8),
               ...permisos.map((p) => Padding(
                 padding: const EdgeInsets.only(bottom: 3),
-                child: Text(p, style: const TextStyle(fontSize: 12, color: AppColors.textoPrincipal)))),
+                child: Text(tr(p), style: const TextStyle(fontSize: 12, color: AppColors.textoPrincipal)))),
             ]));
         }).toList()));
   }
@@ -412,12 +413,11 @@ class _EquipoScreenState extends State<EquipoScreen> {
     final limite = Planes.usuarios[AuthService.planActual];
     final ocupados = _usuarios.where((u) => u.activo).length + _invitacionesPendientes.length;
     if (limite != null && ocupados >= limite) {
-      final siguiente = AuthService.planActual == Plan.pro ? 'Industrial' : 'Pro';
+      final siguiente = AuthService.planActual == Plan.pro ? tr('Industrial') : tr('Pro');
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Tu plan ${Planes.nombres[AuthService.planActual]} permite $limite '
-          '${limite == 1 ? 'usuario' : 'usuarios'}. Sube a $siguiente para agregar más.'),
+        content: Text(trf('Tu plan {0} permite {1} {2}. Sube a {3} para agregar más.', [(Planes.nombres[AuthService.planActual]), limite, (limite == 1 ? 'usuario' : 'usuarios'), siguiente])),
         backgroundColor: AppColors.ambar,
-        action: SnackBarAction(label: 'Ver planes', textColor: Colors.white,
+        action: SnackBarAction(label: tr('Ver planes'), textColor: Colors.white,
           onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen())))));
       return;
     }
@@ -439,17 +439,17 @@ class _EquipoScreenState extends State<EquipoScreen> {
             Container(width: 36, height: 4,
               decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
-            const Text('Invitar a alguien al taller',
+            Text(tr('Invitar a alguien al taller'),
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            const Text('Genera un código y compártelo. La persona lo usa para crear su propia cuenta.',
+            Text(tr('Genera un código y compártelo. La persona lo usa para crear su propia cuenta.'),
               style: TextStyle(fontSize: 12, color: AppColors.textoSecundario),
               textAlign: TextAlign.center),
             const SizedBox(height: 16),
 
             // Rol
-            const Align(alignment: Alignment.centerLeft,
-              child: Text('Rol que tendrá:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+            Align(alignment: Alignment.centerLeft,
+              child: Text(tr('Rol que tendrá:'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
             const SizedBox(height: 8),
             Wrap(spacing: 6, runSpacing: 6,
               children: ['vendedor','operador_cnc','almacenista','contador','administrador'].map((r) {
@@ -478,7 +478,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                   final resultado = await AuthService.crearInvitacion(rol: rolSel);
                   if (resultado['error'] != null) {
                     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(resultado['error'] as String),
+                      content: Text(tr(resultado['error'] as String)),
                       backgroundColor: AppColors.rojo));
                     return;
                   }
@@ -487,7 +487,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                   _cargarInvitaciones();
                 },
                 icon: const Icon(Icons.qr_code_2, color: Colors.white, size: 18),
-                label: const Text('Generar código de invitación',
+                label: Text(tr('Generar código de invitación'),
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.azul,
@@ -501,7 +501,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Código generado'),
+        title: Text(tr('Código generado')),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           Text('Rol: ${uTmp.rolEmoji} ${uTmp.rolLabel}',
             style: const TextStyle(fontSize: 13, color: AppColors.textoSecundario)),
@@ -513,25 +513,25 @@ class _EquipoScreenState extends State<EquipoScreen> {
               color: AppColors.azulClaro,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.azul.withOpacity(0.3))),
-            child: Text(codigo,
+            child: Text(tr(codigo),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800,
                 letterSpacing: 4, color: AppColors.azul))),
           const SizedBox(height: 12),
-          const Text('Válido por 7 días. La persona lo ingresa al crear su cuenta en la app.',
+          Text(tr('Válido por 7 días. La persona lo ingresa al crear su cuenta en la app.'),
             style: TextStyle(fontSize: 11, color: AppColors.textoSecundario),
             textAlign: TextAlign.center),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cerrar')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('Cerrar'))),
           ElevatedButton.icon(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: codigo));
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                content: Text('Código copiado')));
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(tr('Código copiado'))));
             },
             icon: const Icon(Icons.copy, size: 16, color: Colors.white),
-            label: const Text('Copiar', style: TextStyle(color: Colors.white)),
+            label: Text(tr('Copiar'), style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul)),
         ]));
   }
@@ -543,13 +543,13 @@ class _EquipoScreenState extends State<EquipoScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Editar mi nombre'),
+        title: Text(tr('Editar mi nombre')),
         content: TextField(
           controller: ctrl,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(labelText: 'Nombre completo')),
+          decoration: InputDecoration(labelText: tr('Nombre completo'))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('Cancelar'))),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
@@ -565,7 +565,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                 _cargar();
               } catch (_) {}
             },
-            child: const Text('Guardar')),
+            child: Text(tr('Guardar'))),
         ]));
   }
 
@@ -577,14 +577,14 @@ class _EquipoScreenState extends State<EquipoScreen> {
       final conf = await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
-          title: const Text('Desactivar usuario'),
-          content: Text('¿Desactivar a ${u.nombre ?? u.correo}? Ya no podrá acceder a la app.'),
+          title: Text(tr('Desactivar usuario')),
+          content: Text(trf('¿Desactivar a {0}? Ya no podrá acceder a la app.', [(u.nombre ?? u.correo)])),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(tr('Cancelar'))),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(backgroundColor: AppColors.rojo),
-              child: const Text('Desactivar', style: TextStyle(color: Colors.white))),
+              child: Text(tr('Desactivar'), style: TextStyle(color: Colors.white))),
           ]));
       if (conf == true) {
         await AuthService.desactivarUsuario(u.id);
@@ -621,7 +621,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
             Container(width: 36, height: 4,
               decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 16),
-            Text('Cambiar rol de ${u.nombre ?? "usuario"}',
+            Text(trf('Cambiar rol de {0}', [(u.nombre ?? "usuario")]),
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
             Wrap(spacing: 8, runSpacing: 8,
@@ -652,12 +652,12 @@ class _EquipoScreenState extends State<EquipoScreen> {
                     nuevoRol: rolSel);
                   if (error != null) {
                     if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(error),
+                      SnackBar(content: Text(tr(error)),
                         backgroundColor: AppColors.rojo));
                   } else {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text('✅ Rol actualizado'),
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(tr('✅ Rol actualizado')),
                         backgroundColor: AppColors.verde));
                       _cargar();
                     }
@@ -666,7 +666,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.azul,
                   padding: const EdgeInsets.symmetric(vertical: 12)),
-                child: const Text('Guardar cambio',
+                child: Text(tr('Guardar cambio'),
                   style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
           ]))));
   }
@@ -677,14 +677,14 @@ class _EquipoScreenState extends State<EquipoScreen> {
     return Container(
       width: size, height: size,
       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(size / 4)),
-      child: Center(child: Text(inicial,
+      child: Center(child: Text(tr(inicial),
         style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700,
           fontSize: size * 0.4))));
   }
 
   Widget _seccion(String titulo) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
-    child: Text(titulo, style: const TextStyle(
+    child: Text(tr(titulo), style: const TextStyle(
       fontSize: 10, fontWeight: FontWeight.w700,
       color: AppColors.textoSecundario, letterSpacing: 1.5)));
 }

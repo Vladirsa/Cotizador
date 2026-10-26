@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
+import '../i18n/tr.dart';
 
 class AlertasScreen extends StatefulWidget {
   const AlertasScreen({super.key});
@@ -68,7 +69,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         title: Row(children: [
-          const Text('Alertas',
+          Text(tr('Alertas'),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
           if (_alertas.isNotEmpty) ...[
             const SizedBox(width: 8),
@@ -85,7 +86,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
             onPressed: _cargar),
           IconButton(
             icon: const Icon(Icons.add_alert_outlined, color: AppColors.azul),
-            tooltip: 'Nueva alerta',
+            tooltip: tr('Nueva alerta'),
             onPressed: _nuevaAlerta),
         ]),
       body: _cargando
@@ -124,13 +125,13 @@ class _AlertasScreenState extends State<AlertasScreen> {
               ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                   const Icon(Icons.notifications_off_outlined, size: 48, color: AppColors.grisBorde),
                   const SizedBox(height: 12),
-                  const Text('Sin alertas pendientes',
+                  Text(tr('Sin alertas pendientes'),
                     style: TextStyle(fontSize: 14, color: AppColors.textoSecundario)),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
                     onPressed: _nuevaAlerta,
                     icon: const Icon(Icons.add_alert_outlined, color: Colors.white),
-                    label: const Text('Crear recordatorio', style: TextStyle(color: Colors.white)),
+                    label: Text(tr('Crear recordatorio'), style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul)),
                 ]))
               : ListView.builder(
@@ -184,14 +185,14 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
       builder: (_) => SizedBox(
         height: MediaQuery.of(context).size.height * 0.6,
         child: Column(children: [
-          const Padding(padding: EdgeInsets.all(14),
-            child: Text('Seleccionar cliente',
+          Padding(padding: EdgeInsets.all(14),
+            child: Text(tr('Seleccionar cliente'),
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700))),
           Expanded(child: ListView.builder(
             itemCount: clientes.length,
             itemBuilder: (_, i) => ListTile(
               title: Text(clientes[i].nombre),
-              subtitle: Text(clientes[i].empresa ?? ''),
+              subtitle: Text(tr(clientes[i].empresa ?? '')),
               onTap: () {
                 setState(() {
                   _clienteId = clientes[i].id;
@@ -223,7 +224,7 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
   Future<void> _guardar() async {
     if (_tituloCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Escribe el título de la alerta')));
+        SnackBar(content: Text(tr('Escribe el título de la alerta'))));
       return;
     }
     setState(() => _guardando = true);
@@ -239,8 +240,8 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
       widget.onGuardada();
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('✅ Alerta creada'),
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('✅ Alerta creada')),
           backgroundColor: Color(0xFF1d9e75)));
       }
     } catch (e) {
@@ -257,17 +258,17 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text('Nueva alerta',
+        title: Text(tr('Nueva alerta'),
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textoPrincipal)),
         actions: [
           TextButton(
             onPressed: _guardando ? null : _guardar,
-            child: Text(_guardando ? 'Guardando...' : 'Guardar',
+            child: Text(tr(_guardando ? tr('Guardando...') : tr('Guardar')),
               style: const TextStyle(color: AppColors.azul, fontWeight: FontWeight.w700))),
         ]),
       body: ListView(padding: const EdgeInsets.all(16), children: [
         // Tipo
-        const Text('Tipo de alerta',
+        Text(tr('Tipo de alerta'),
           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         ..._tiposNuevo.entries.map((e) {
@@ -298,8 +299,8 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
         TextField(
           controller: _tituloCtrl,
           decoration: InputDecoration(
-            labelText: 'Título / descripción *',
-            hintText: 'Ej: Llamar a Juan sobre la tabla de cocina',
+            labelText: tr('Título / descripción *'),
+            hintText: tr('Ej: Llamar a Juan sobre la tabla de cocina'),
             prefixIcon: const Icon(Icons.title_outlined),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
           textCapitalization: TextCapitalization.sentences),
@@ -318,7 +319,7 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
               const Icon(Icons.person_outline, size: 18, color: AppColors.textoSecundario),
               const SizedBox(width: 10),
               Expanded(child: Text(
-                _clienteNombre.isEmpty ? 'Vincular cliente (opcional)' : _clienteNombre,
+                tr(_clienteNombre.isEmpty ? tr('Vincular cliente (opcional)') : _clienteNombre),
                 style: TextStyle(fontSize: 13,
                   color: _clienteNombre.isEmpty ? AppColors.textoSecundario : AppColors.textoPrincipal))),
               const Icon(Icons.chevron_right, size: 16, color: AppColors.textoSecundario),
@@ -337,10 +338,10 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
             child: Row(children: [
               const Icon(Icons.calendar_today_outlined, size: 18, color: AppColors.azul),
               const SizedBox(width: 10),
-              Text(DateFormat('dd/MM/yyyy HH:mm').format(_fecha),
+              Text(DateFormat(enIngles ? 'MM/dd/yyyy h:mm a' : 'dd/MM/yyyy HH:mm').format(_fecha),
                 style: const TextStyle(fontSize: 13, color: AppColors.azul, fontWeight: FontWeight.w600)),
               const Spacer(),
-              const Text('Cambiar', style: TextStyle(fontSize: 11, color: AppColors.azul)),
+              Text(tr('Cambiar'), style: TextStyle(fontSize: 11, color: AppColors.azul)),
             ]))),
         const SizedBox(height: 12),
 
@@ -349,8 +350,8 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
           controller: _notasCtrl,
           maxLines: 3,
           decoration: InputDecoration(
-            labelText: 'Notas (opcional)',
-            hintText: 'Detalles adicionales...',
+            labelText: tr('Notas (opcional)'),
+            hintText: tr('Detalles adicionales...'),
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(10))),
           textCapitalization: TextCapitalization.sentences),
         const SizedBox(height: 24),
@@ -362,7 +363,7 @@ class _NuevaAlertaScreenState extends State<_NuevaAlertaScreen> {
             backgroundColor: AppColors.azul,
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-          child: Text(_guardando ? 'Guardando...' : 'Crear alerta',
+          child: Text(tr(_guardando ? tr('Guardando...') : tr('Crear alerta')),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
       ]));
   }
@@ -398,7 +399,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
   void initState() { super.initState(); _mensaje = _buildMensaje(); }
 
   String _buildMensaje() {
-    final nombre = widget.alerta.clienteNombre ?? 'Cliente';
+    final nombre = widget.alerta.clienteNombre ?? tr('Cliente');
     final folio  = widget.alerta.cotizacionFolio ?? '';
     switch (widget.alerta.tipo) {
       case 'seguimiento_dia3':
@@ -422,7 +423,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
       case 'nuevo_contacto_wa':
         return 'Hola *$nombre* 👋 Gracias por contactar a *HETNA CNC*. ¿En qué podemos ayudarte?';
       default:
-        return 'Hola *$nombre*, somos *HETNA CNC*. ¿En qué podemos ayudarte? 😊';
+        return trf('Hola *{0}*, somos *HETNA CNC*. ¿En qué podemos ayudarte? 😊', [nombre]);
     }
   }
 
@@ -433,7 +434,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
     final a = widget.alerta;
     final info = widget.tipos[a.tipo] ?? widget.tipos['seguimiento_dia3']!;
     final color = info['color'] as Color;
-    final fmt   = DateFormat('dd/MM/yy HH:mm');
+    final fmt   = DateFormat(enIngles ? 'MM/dd/yy h:mm a' : 'dd/MM/yy HH:mm');
     final vencida = a.fechaProgramada != null && a.fechaProgramada!.isBefore(DateTime.now());
 
     return Dismissible(
@@ -445,10 +446,10 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
         decoration: BoxDecoration(
           color: AppColors.verde,
           borderRadius: BorderRadius.circular(12)),
-        child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(Icons.check_circle_outline, color: Colors.white, size: 28),
           SizedBox(height: 4),
-          Text('Completada', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(tr('Completada'), style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
         ])),
       confirmDismiss: (_) async {
         await SupabaseService.marcarAlertaCompletada(a.id!);
@@ -478,7 +479,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
             const SizedBox(width: 10),
             // Info
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(a.titulo ?? (info['label'] as String),
+              Text(tr(a.titulo ?? (info['label'] as String)),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
               if (a.clienteNombre != null)
@@ -554,11 +555,11 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
           bottom: MediaQuery.of(context).viewInsets.bottom + 16),
         child: Column(children: [
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Editar mensaje WA',
+            Text(tr('Editar mensaje WA'),
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancelar')),
+              child: Text(tr('Cancelar'))),
           ]),
           const SizedBox(height: 10),
           Expanded(child: TextField(
@@ -579,7 +580,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
                 setState(() => _mensaje = ctrl.text);
                 Navigator.pop(context);
               },
-              child: const Text('Guardar'))),
+              child: Text(tr('Guardar')))),
             const SizedBox(width: 8),
             Expanded(child: ElevatedButton.icon(
               onPressed: () {
@@ -590,7 +591,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF25D366)),
               icon: const Icon(Icons.chat, size: 16, color: Colors.white),
-              label: const Text('Enviar WA',
+              label: Text(tr('Enviar WA'),
                 style: TextStyle(color: Colors.white)))),
           ]),
         ])));
@@ -677,7 +678,7 @@ class _AlertasBodyState extends State<AlertasBody> {
                     color: sel ? color : Colors.transparent,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: sel ? color : AppColors.grisBorde)),
-                  child: Text(e.value['label'] as String,
+                  child: Text(tr(e.value['label'] as String),
                     style: TextStyle(fontSize: 11,
                       color: sel ? Colors.white : AppColors.textoSecundario,
                       fontWeight: sel ? FontWeight.w600 : FontWeight.normal))));
@@ -694,10 +695,10 @@ class _AlertasBodyState extends State<AlertasBody> {
       Expanded(child: _cargando
         ? const Center(child: CircularProgressIndicator())
         : _filtradas.isEmpty
-          ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               Text('🎉', style: TextStyle(fontSize: 40)),
               SizedBox(height: 8),
-              Text('Sin alertas pendientes', style: TextStyle(color: AppColors.textoSecundario)),
+              Text(tr('Sin alertas pendientes'), style: TextStyle(color: AppColors.textoSecundario)),
             ]))
           : RefreshIndicator(
               onRefresh: _cargar,
