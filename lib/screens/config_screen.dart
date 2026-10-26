@@ -9,6 +9,7 @@ import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
 import '../services/woocommerce_service.dart';
 import '../i18n/tr.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 class ConfigScreen extends StatefulWidget {
   const ConfigScreen({super.key});
@@ -488,6 +489,13 @@ class _ConfigScreenState extends State<ConfigScreen> {
           onSelectionChanged: (s) async {
             final nuevo = s.first;
             if (nuevo == idioma) return;
+            // Para que los correos (recuperar contraseña, etc.) lleguen en este idioma
+            try {
+              final auth = sb.Supabase.instance.client.auth;
+              if (auth.currentUser != null) {
+                await auth.updateUser(sb.UserAttributes(data: {'idioma': nuevo}));
+              }
+            } catch (_) {}
             await cambiarIdioma(nuevo);
           }),
         const SizedBox(height: 4),
