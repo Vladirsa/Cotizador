@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
 import '../main.dart';
+import '../i18n/tr.dart';
 
 class WhatsAppService {
 
@@ -92,7 +93,7 @@ class WhatsAppService {
           Center(child: Container(width: 36, height: 4,
             decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
           const SizedBox(height: 16),
-          const Text('¿Con cuál WhatsApp quieres escribirle?',
+          Text(tr('¿Con cuál WhatsApp quieres escribirle?'),
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(height: 16),
           SizedBox(width: double.infinity, child: ElevatedButton.icon(
@@ -100,13 +101,13 @@ class WhatsAppService {
               Navigator.pop(ctx);
               final ok = await _abrirWhatsAppBusiness(numero, mensaje);
               if (!ok && ctx.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text('No se encontró WhatsApp Business — usa "Otra app"'),
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('No se encontró WhatsApp Business — usa "Otra app"')),
                   backgroundColor: AppColors.ambar));
               }
             },
             icon: const Icon(Icons.chat, color: Colors.white),
-            label: const Text('WhatsApp Business', style: TextStyle(color: Colors.white)),
+            label: Text(tr('WhatsApp Business'), style: TextStyle(color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
               padding: const EdgeInsets.symmetric(vertical: 12)))),
           const SizedBox(height: 10),
@@ -116,7 +117,7 @@ class WhatsAppService {
               await _abrirWhatsAppGenerico(numero, mensaje);
             },
             icon: const Icon(Icons.share_outlined),
-            label: const Text('Otra app'),
+            label: Text(tr('Otra app')),
             style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)))),
           const SizedBox(height: 8),
         ])));
@@ -286,7 +287,7 @@ class WhatsAppService {
         .select('mensaje, cuerpo, tipo, categoria')
         .eq('negocio_id', negocioId)
         .eq('activo', true)
-        .or('tipo.eq.$tipo,categoria.eq.$tipo')
+        .or('tipo.eq.${tipo},categoria.eq.${tipo}')
         .limit(1);
 
       final list = rows as List;
@@ -386,7 +387,7 @@ class WhatsAppService {
         .select('mensaje, cuerpo, tipo, categoria')
         .eq('negocio_id', negocioId)
         .eq('activo', true)
-        .or('tipo.eq.$claveEtapa,categoria.eq.$claveEtapa')
+        .or('tipo.eq.${claveEtapa},categoria.eq.${claveEtapa}')
         .limit(1);
 
       final list = rows as List;
@@ -432,10 +433,10 @@ class WhatsAppService {
     String? empresa,    // nombre del negocio (configurable)
     String? telefono,   // teléfono del negocio
   }) {
-    final biz = empresa ?? 'HETNA CNC';
+    final biz = empresa ?? tr('HETNA CNC');
     final tel = telefono ?? '2461217072';
     final folioTexto = folio != null && folio.isNotEmpty
-      ? 'cotización *$folio*' : 'tu cotización';
+      ? trf('cotización *{0}*', [folio]) : tr('tu cotización');
 
     switch (tipo) {
       // ── Día 3: recordatorio suave ──
@@ -539,7 +540,7 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
 📱 *$tel*''';
 
       default:
-        return '¡Hola *$nombreCliente*! Te escribo de *$biz*. ¿Podemos ayudarte con algo?\n📱 $tel';
+        return trf('¡Hola *{0}*! Te escribo de *{1}*. ¿Podemos ayudarte con algo?\n📱 {2}', [nombreCliente, biz, tel]);
     }
   }
 
@@ -554,12 +555,12 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     double? total,
     String? empresa,
   }) {
-    final biz = empresa ?? 'HETNA CNC';
+    final biz = empresa ?? tr('HETNA CNC');
     final montoTotal = total ?? 0;
     final anticipo = montoTotal / 2;
     final restante = montoTotal - anticipo;
     final txtAnticipo = montoTotal > 0 ? ' (\$${anticipo.toStringAsFixed(2)})' : '';
-    final txtRestante = montoTotal > 0 ? ' de \$${restante.toStringAsFixed(2)}' : '';
+    final txtRestante = montoTotal > 0 ? trf(' de \${0}', [(restante.toStringAsFixed(2))]) : '';
     switch (etapa) {
       case 'Pago50':
         return '¡Hola $nombreCliente! ✅ Recibimos tu anticipo del 50%$txtAnticipo del pedido *$folio*. ¡Empezamos a producir! 🔧\n\nRecuerda que el saldo restante$txtRestante se liquida antes de la entrega. — *$biz*';
@@ -576,7 +577,7 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
       case 'Cancelado':
         return 'Hola $nombreCliente, te confirmamos que tu pedido *$folio* fue cancelado. Si tienes dudas o quieres retomarlo más adelante, contáctanos. — *$biz*';
       default:
-        return '¡Hola $nombreCliente! Tu pedido *$folio* está en proceso. — *$biz*';
+        return trf('¡Hola {0}! Tu pedido *{1}* está en proceso. — *{2}*', [nombreCliente, folio, biz]);
     }
   }
 
@@ -588,14 +589,7 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     required String empresa,
   }) async {
     final folio = cotizacion?.folio ?? '';
-    final msg = '''¡Hola *$nombreCliente*! 😊
-
-Te comparto la cotización *$folio* de *HETNA CNC*.
-
-Incluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.
-
-¡Quedamos a tus órdenes! 💙
-📱 2461217072''';
+    final msg = trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *HETNA CNC*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! 💙\n📱 2461217072', [nombreCliente, folio]);
     await abrirChat(numero: whatsapp, mensaje: msg);
   }
 
