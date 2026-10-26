@@ -517,7 +517,7 @@ class AuthService {
       // correo, aún no hay sesión para canjearlo; se canjea al primer login.
       final res = await _sb.auth.signUp(
         email: correo, password: password,
-        data: {'nombre': nombre, 'invitacion': codigoLimpio},
+        data: {'nombre': nombre, 'invitacion': codigoLimpio, 'idioma': idiomaActual.value.languageCode},
         emailRedirectTo: urlRegreso);
       if (res.user == null) {
         return AuthResult.error(tr('No se pudo crear la cuenta'));
