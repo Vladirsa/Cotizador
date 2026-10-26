@@ -41,12 +41,12 @@ class PdfService {
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, false),
             child: const Padding(padding: EdgeInsets.symmetric(vertical: 6),
-              child: Text('🇲🇽  Español', style: TextStyle(fontSize: 15))),
+              child: Text('Español', style: TextStyle(fontSize: 15))),
           ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Padding(padding: EdgeInsets.symmetric(vertical: 6),
-              child: Text('🇺🇸  English', style: TextStyle(fontSize: 15))),
+              child: Text('English', style: TextStyle(fontSize: 15))),
           ),
         ],
       ),
