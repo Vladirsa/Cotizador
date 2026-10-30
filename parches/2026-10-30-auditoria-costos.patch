@@ -1,0 +1,870 @@
+From 1532617ff3e366f92a06e3ea9985209ac8f08eee Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 30 Oct 2026 15:15:03 -0600
+Subject: [PATCH] =?UTF-8?q?Auditor=C3=ADa=20de=20costos=20del=20simulador,?=
+ =?UTF-8?q?=20croquis=20acotado=20en=20PDF,=20anticipo=20configurable=20y?=
+ =?UTF-8?q?=20tarjetas=20m=C3=A1s=20peque=C3=B1as?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Simulador: el costo ahora es el costo real (material con merma + máquina +
+  operador + consumibles + gastos fijos + acabados + extras) y el precio
+  recomendado es el mayor entre la tarifa de mercado y costo ÷ (1 − margen).
+  Antes la utilidad siempre salía en $0 porque el costo era la propia tarifa.
+- Gastos fijos repartidos entre días y horas trabajados (no 30 días).
+- Tiempo de máquina por área/metro/pieza con minutos configurables (antes
+  0 h en router por área y 6 min/m en plasma); desgaste de tubo se cobra.
+- Merma y ganancia del material configurables; anticipo % configurable en
+  Costos del taller y usado en cotizaciones y WhatsApp (*PCT_ANTICIPO*).
+- Cotización profesional: croquis acotado (largo, ancho, espesor, barrenos).
+- Tarjetas del simulador responsivas (2 a 6 por fila según el ancho).
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Nrxd2irjfgFTrkPRkerbXc
+---
+ lib/i18n/en.dart                      |  25 ++++
+ lib/screens/alertas_screen.dart       |   2 +-
+ lib/screens/avances_screen.dart       |   6 +-
+ lib/screens/config_costos_screen.dart |  47 +++++++-
+ lib/screens/cotizar_screen.dart       |  42 +++++++
+ lib/screens/simulador_screen.dart     | 164 ++++++++++++++++----------
+ lib/services/pdf_service.dart         | 144 +++++++++++++++++++++-
+ lib/services/whatsapp_service.dart    |  35 ++++--
+ 8 files changed, 387 insertions(+), 78 deletions(-)
+
+diff --git a/lib/i18n/en.dart b/lib/i18n/en.dart
+index add1692..67e5caf 100644
+--- a/lib/i18n/en.dart
++++ b/lib/i18n/en.dart
+@@ -1899,4 +1899,29 @@ const Map<String, String> textosEn = {
+   '🪨 Materiales': '🪨 Materials',
+   '🪵 *HETNA CNC* — Productos personalizados en madera, MDF y acrílico': '🪵 *HETNA CNC* — Custom products in wood, MDF and acrylic',
+   '🪵 Contáctanos para más información': '🪵 Contact us for more information',
++  'Anticipo recibido': 'Deposit received',
++  'Anticipo': 'Deposit',
++  'Hola *{0}* 👋 Te recordamos que el anticipo del pedido *{1}* está pendiente. Para iniciar producción necesitamos confirmarlo. — *HETNA CNC*': 'Hi *{0}* 👋 Just a reminder that the deposit for order *{1}* is pending. We need it confirmed to start production. — *HETNA CNC*',
++  'Material y cobro': 'Material and payment',
++  'Merma %': 'Waste %',
++  'Ganancia material %': 'Material markup %',
++  'Anticipo %': 'Deposit %',
++  'Merma: % de material que se desperdicia en recortes y pruebas. Ganancia del material: % que le subes al material al incluirlo en el precio. Anticipo: % que pides para empezar (se usa en cotizaciones y mensajes de WhatsApp).': 'Waste: % of material lost to offcuts and tests. Material markup: % you add to the material when including it in the price. Deposit: % you ask for upfront (used in quotes and WhatsApp messages).',
++  '💡 Configura tus costos del taller (5 datos)': '💡 Set up your shop costs (5 fields)',
++  'Gastos fijos al mes, horas y días que trabajas, una máquina y un operador. Con eso el simulador sabe cuánto te cuesta cada hora y si la tarifa deja ganancia.': 'Monthly fixed costs, hours and days you work, one machine and one operator. With that the simulator knows what each hour costs you and whether the rate leaves a profit.',
++  '📈 Tu tarifa ({0}) no cubre costo + margen ({1})': '📈 Your rate ({0}) does not cover cost + margin ({1})',
++  'El precio recomendado se calculó con tu costo real. Revisa la tarifa de este servicio o tus costos del taller.': 'The recommended price was calculated from your real cost. Review this service rate or your shop costs.',
++  '💵 Precio por tarifa: {0} · por costo + margen: {1}': '💵 Price by rate: {0} · by cost + margin: {1}',
++  'Costo real del trabajo: {0}. La tarifa deja margen de sobra.': 'Real cost of the job: {0}. The rate leaves plenty of margin.',
++  'Croquis con medidas (opcional)': 'Dimensioned sketch (optional)',
++  'Largo (mm)': 'Length (mm)',
++  'Ancho (mm)': 'Width (mm)',
++  'Espesor (mm)': 'Thickness (mm)',
++  'Diámetro de barrenos (mm, opcional)': 'Hole diameter (mm, optional)',
++  'Número de barrenos (opcional)': 'Number of holes (optional)',
++  'Con largo y ancho la cotización en PDF lleva un dibujo con las cotas, como en un plano.': 'With length and width the PDF quote includes a drawing with dimensions, like a blueprint.',
++  'CROQUIS DE LA PIEZA': 'PART SKETCH',
++  'Vista superior': 'Top view',
++  'Vista lateral': 'Side view',
++  'Medidas en mm. Croquis ilustrativo, no a escala.': 'Dimensions in mm. Illustrative sketch, not to scale.',
+ };
+diff --git a/lib/screens/alertas_screen.dart b/lib/screens/alertas_screen.dart
+index 34dda07..0991834 100644
+--- a/lib/screens/alertas_screen.dart
++++ b/lib/screens/alertas_screen.dart
+@@ -411,7 +411,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
+       case 'post_entrega':
+         return 'Hola *$nombre* ✅ Esperamos que estés disfrutando tu pedido. Tu opinión es importante para nosotros. ¡Gracias! — *HETNA CNC*';
+       case 'pago_anticipo_pendiente':
+-        return 'Hola *$nombre* 👋 Te recordamos que el anticipo del 50% del pedido *$folio* está pendiente. Para iniciar producción necesitamos confirmarlo. — *HETNA CNC*';
++        return 'Hola *$nombre* 👋 Te recordamos que el anticipo del pedido *$folio* está pendiente. Para iniciar producción necesitamos confirmarlo. — *HETNA CNC*';
+       case 'pago_final_pendiente':
+         return 'Hola *$nombre* ✅ Tu pedido *$folio* está listo. Para proceder con la entrega necesitamos el saldo restante. — *HETNA CNC*';
+       case 'produccion_sin_avance':
+diff --git a/lib/screens/avances_screen.dart b/lib/screens/avances_screen.dart
+index de94971..fcfb50a 100644
+--- a/lib/screens/avances_screen.dart
++++ b/lib/screens/avances_screen.dart
+@@ -26,7 +26,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
+   static const _etapas = ['Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado'];
+   static const _etiquetas = {
+     'Pedido': 'Pedido recibido',
+-    'Pago50': 'Pago 50% anticipo',
++    'Pago50': 'Anticipo recibido',
+     'Produccion': 'En producción',
+     'Pruebas': 'Control de calidad',
+     'PagoCompleto': 'Pago 100% completado',
+@@ -47,7 +47,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
+ 
+   final _filtros = ['Activos', 'Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado', 'Cancelado', 'Todos'];
+   final _etiquetasFiltro = {
+-    'Pago50': 'Pago 50%',
++    'Pago50': 'Anticipo',
+     'Produccion': 'Producción',
+     'PagoCompleto': 'Pago 100%',
+   };
+@@ -304,7 +304,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
+             final pasada = i < _idx;
+             final color = widget.colores[etapa] ?? AppColors.azul;
+             final etiquetaCorta = {
+-              'Pedido': 'Pedido', 'Pago50': 'Pago 50%', 'Produccion': 'Prod.',
++              'Pedido': 'Pedido', 'Pago50': 'Anticipo', 'Produccion': 'Prod.',
+               'Pruebas': 'QC', 'PagoCompleto': 'Pago 100%', 'Entrega': 'Entrega', 'Entregado': '✅',
+             }[etapa] ?? etapa;
+             return Padding(padding: const EdgeInsets.only(right: 8), child: Column(children: [
+diff --git a/lib/screens/config_costos_screen.dart b/lib/screens/config_costos_screen.dart
+index 3d942bf..0b12505 100644
+--- a/lib/screens/config_costos_screen.dart
++++ b/lib/screens/config_costos_screen.dart
+@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
+ import '../main.dart';
+ import '../services/auth_service.dart';
+ import '../i18n/tr.dart';
++import '../services/whatsapp_service.dart';
+ 
+ String get _negocioId => AuthService.negocioId ?? '';
+ 
+@@ -27,6 +28,9 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
+   // ── EMPRESA ──────────────────────────────────────
+   final _nombreCtrl    = TextEditingController();
+   final _margenMinCtrl = TextEditingController(text: '20');
++  final _mermaCtrl = TextEditingController(text: '15');
++  final _markupMatCtrl = TextEditingController(text: '20');
++  final _anticipoCtrl = TextEditingController(text: '50');
+   final _margenRecCtrl = TextEditingController(text: '35');
+   final _ivaCtrl       = TextEditingController(text: '16');
+   final _horasDiaCtrl  = TextEditingController(text: '8');
+@@ -109,6 +113,9 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
+         _ivaCtrl.text = (cfg['iva_pct'] ?? 16).toString();
+         _horasDiaCtrl.text = (cfg['horas_dia'] ?? 8).toString();
+         _diasSemCtrl.text = (cfg['dias_semana'] ?? 6).toString();
++        _mermaCtrl.text = (cfg['merma_pct'] ?? 15).toString();
++        _markupMatCtrl.text = (cfg['markup_material_pct'] ?? 20).toString();
++        _anticipoCtrl.text = (cfg['anticipo_pct'] ?? 50).toString();
+         for (final key in _costosCtrls.keys) {
+           _costosCtrls[key]!.text =
+             ((cfg[key] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
+@@ -132,11 +139,15 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
+       total += double.tryParse(c.text) ?? 0;
+     }
+     final horas = double.tryParse(_horasDiaCtrl.text) ?? 8;
++    final diasSem = double.tryParse(_diasSemCtrl.text) ?? 6;
++    // Los gastos fijos se reparten sólo entre los días y horas que de
++    // verdad se trabajan (no entre 30 días del mes)
++    final diasMes = diasSem * 4.33;
+     setState(() {
+       _costoFijoMensual = total;
+-      _costoDiario = total / 30;
+-      _costoHora = total / (30 * horas);
+-      _costoMinuto = total / (30 * horas * 60);
++      _costoDiario = diasMes > 0 ? total / diasMes : 0;
++      _costoHora = diasMes > 0 && horas > 0 ? total / (diasMes * horas) : 0;
++      _costoMinuto = _costoHora / 60;
+     });
+   }
+ 
+@@ -156,6 +167,15 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
+         datos[key] = double.tryParse(_costosCtrls[key]!.text) ?? 0;
+       }
+ 
++      // Columnas nuevas (merma, ganancia del material, anticipo): se
++      // guardan aparte para que, si la base todavía no las tiene, no se
++      // pierda el resto de la configuración.
++      final datosNuevos = <String, dynamic>{
++        'merma_pct': double.tryParse(_mermaCtrl.text) ?? 15,
++        'markup_material_pct': double.tryParse(_markupMatCtrl.text) ?? 20,
++        'anticipo_pct': double.tryParse(_anticipoCtrl.text) ?? 50,
++      };
++
+       // Buscar TODAS las filas existentes (por si hay duplicados de ejecuciones SQL previas)
+       final existingRows = await _sb.from('empresa_config')
+         .select('id').eq('negocio_id', _negocioId);
+@@ -163,10 +183,16 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
+ 
+       if (rows.isEmpty) {
+         await _sb.from('empresa_config').insert(datos);
++        try {
++          await _sb.from('empresa_config').update(datosNuevos).eq('negocio_id', _negocioId);
++        } catch (_) {}
+       } else {
+         // Actualizar la primera fila y borrar duplicados si existieran
+         final idPrincipal = rows.first['id'];
+         await _sb.from('empresa_config').update(datos).eq('id', idPrincipal);
++        try {
++          await _sb.from('empresa_config').update(datosNuevos).eq('id', idPrincipal);
++        } catch (_) {}
+         if (rows.length > 1) {
+           for (int i = 1; i < rows.length; i++) {
+             await _sb.from('empresa_config').delete().eq('id', rows[i]['id']);
+@@ -174,6 +200,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
+         }
+       }
+ 
++      WhatsAppService.olvidarAnticipo(); // para que los mensajes usen el % nuevo
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+         content: Text(tr('✅ Configuración guardada')),
+         backgroundColor: AppColors.verde));
+@@ -239,6 +266,20 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
+       ]),
+     ]),
+     const SizedBox(height: 12),
++    _card(tr('Material y cobro'), [
++      Text(tr('Merma: % de material que se desperdicia en recortes y pruebas. Ganancia del material: % que le subes al material al incluirlo en el precio. Anticipo: % que pides para empezar (se usa en cotizaciones y mensajes de WhatsApp).'),
++        style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
++      const SizedBox(height: 12),
++      Row(children: [
++        Expanded(child: _campoNum(_mermaCtrl, tr('Merma %'), sufijo: '%')),
++        const SizedBox(width: 10),
++        Expanded(child: _campoNum(_markupMatCtrl, tr('Ganancia material %'), sufijo: '%')),
++        const SizedBox(width: 10),
++        Expanded(child: _campoNum(_anticipoCtrl, tr('Anticipo %'), sufijo: '%',
++          color: AppColors.naranja)),
++      ]),
++    ]),
++    const SizedBox(height: 12),
+     _card(tr('Márgenes de utilidad'), [
+       Text(
+         tr('El precio de venta = Costo Total ÷ (1 - Margen)'),
+diff --git a/lib/screens/cotizar_screen.dart b/lib/screens/cotizar_screen.dart
+index 47254c9..dafbb04 100644
+--- a/lib/screens/cotizar_screen.dart
++++ b/lib/screens/cotizar_screen.dart
+@@ -439,6 +439,14 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+     ('archivo', 'Archivo recibido (DXF, STEP, plano...)', 1, ''),
+     ('norma', 'Norma o especificación (si aplica)', 1, ''),
+   ];
++  // Croquis: con largo y ancho el PDF dibuja la pieza acotada (como plano)
++  static const _camposCroquis = [
++    ('croquis_largo', 'Largo (mm)', 1, ''),
++    ('croquis_ancho', 'Ancho (mm)', 1, ''),
++    ('croquis_espesor', 'Espesor (mm)', 1, ''),
++    ('croquis_barreno_d', 'Diámetro de barrenos (mm, opcional)', 1, ''),
++    ('croquis_barrenos', 'Número de barrenos (opcional)', 1, ''),
++  ];
+   static const _camposFabricacion = [
+     ('proceso', 'Proceso (ej. router CNC 3 ejes)', 1, ''),
+     ('maquina', 'Máquina', 1, ''),
+@@ -525,7 +533,26 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+   double get _montoIva => _aplicaIva ? _baseIva * _ivaPct / 100 : 0;
+   double get _total => _baseIva + _montoIva + _costoEnvio;
+   bool get _puedeAccionar => _items.isNotEmpty && _cliente != null;
++  // La primera opción usa el % de anticipo configurado por el taller
++  // (Más → Costos del taller → Material y cobro); al editar una cotización
++  // vieja se conserva el texto que tenía.
+   final _metodosPago = ['50% anticipo / 50% entrega', 'Pago total anticipado', 'Crédito 30 días', 'Transferencia bancaria'];
++  String _opcionAnticipo(double pct) {
++    final a = WhatsAppService.pctTexto(pct);
++    final r = WhatsAppService.pctTexto(100 - pct);
++    return '$a% anticipo / $r% entrega';
++  }
++  Future<void> _cargarAnticipo() async {
++    final pct = await WhatsAppService.anticipoPct();
++    if (!mounted) return;
++    final nueva = _opcionAnticipo(pct);
++    setState(() {
++      final vieja = _metodosPago.first;
++      _metodosPago[0] = nueva;
++      if (_metodoPago == vieja || (!_esEdicion && _metodoPago == '50% anticipo / 50% entrega')) _metodoPago = nueva;
++      if (!_metodosPago.contains(_metodoPago)) _metodosPago.add(_metodoPago);
++    });
++  }
+   final _condiciones = ['LAB — En planta HETNA', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
+   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
+   String _tiempoEntrega = '15 días';
+@@ -551,6 +578,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+   void initState() {
+     super.initState();
+     if (widget.cotizacionEditar == null) _cargarImpuestoDefault();
++    _cargarAnticipo();
+     if (widget.itemInicial != null) {
+       try {
+         final item = widget.itemInicial!;
+@@ -701,6 +729,20 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+         _bloquePro(tr('Proyecto y resumen'), Icons.folder_outlined, _camposProyecto),
+         _bloquePro(tr('Alcance'), Icons.checklist_outlined, _camposAlcance),
+         _bloquePro(tr('Detalle técnico'), Icons.straighten_outlined, _camposTecnicos),
++        _bloque(tr('Croquis con medidas (opcional)'), Icons.architecture_outlined, Column(children: [
++          Padding(padding: const EdgeInsets.only(bottom: 8),
++            child: Text(tr('Con largo y ancho la cotización en PDF lleva un dibujo con las cotas, como en un plano.'),
++              style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
++          ..._camposCroquis.map((f) => Padding(
++            padding: const EdgeInsets.only(bottom: 8),
++            child: TextField(
++              controller: _ctrlPro(f.$1, f.$4),
++              keyboardType: const TextInputType.numberWithOptions(decimal: true),
++              style: const TextStyle(fontSize: 13),
++              decoration: InputDecoration(
++                labelText: tr(f.$2), isDense: true,
++                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))))),
++        ])),
+         _bloquePro(tr('Especificaciones de fabricación'), Icons.precision_manufacturing_outlined, _camposFabricacion),
+         _bloquePro(tr('Calidad y cambios'), Icons.verified_outlined, _camposCondiciones),
+       ],
+diff --git a/lib/screens/simulador_screen.dart b/lib/screens/simulador_screen.dart
+index ee50220..34c7c31 100644
+--- a/lib/screens/simulador_screen.dart
++++ b/lib/screens/simulador_screen.dart
+@@ -161,10 +161,17 @@ class CostosTaller {
+   final double margenRecomendado;
+   final double margenMinimo;
+   final double ivaPct;
++  // % de material que se desperdicia (recortes, pruebas) y % que se le
++  // gana al material al revenderlo dentro del trabajo
++  final double mermaPct;
++  final double markupMaterialPct;
++  // true si el taller ya capturó costos fijos, máquina u operador
++  final bool configurado;
+ 
+   CostosTaller({this.costoHoraTaller = 0, this.costoHoraMaquina = 0,
+     this.costoHoraOperador = 0, this.margenRecomendado = 35,
+-    this.margenMinimo = 20, this.ivaPct = 16});
++    this.margenMinimo = 20, this.ivaPct = 16, this.mermaPct = 15,
++    this.markupMaterialPct = 20, this.configurado = false});
+ 
+   double get costoHoraTotal => costoHoraTaller + costoHoraMaquina + costoHoraOperador;
+ }
+@@ -187,6 +194,9 @@ class ResultadoSimulador {
+   final double pvMinimo, pvRecomendado, pvPremium;
+   final double utilidad, margenReal, gananciaHora, tiempoHoras;
+   final double cm, cmo, cmaq, cc, ca, ci;
++  // Precio que sale de la tarifa de mercado del servicio y precio que sale
++  // del costo real + margen; el recomendado es el mayor de los dos
++  final double precioTarifa, precioCosto;
+   final Map<String, double> costosDesglose;
+   final bool incluyeIva;
+   final String? materialNombre;
+@@ -204,7 +214,8 @@ class ResultadoSimulador {
+     required this.cc, required this.ca, required this.ci,
+     required this.costosDesglose, this.incluyeIva = false,
+     this.materialNombre, this.maquila = 0, this.extras = 0,
+-    this.acabado = 0, this.costoMaterial = 0});
++    this.acabado = 0, this.costoMaterial = 0,
++    this.precioTarifa = 0, this.precioCosto = 0});
+ }
+ 
+ // ══════════════════════════════════════════════════════
+@@ -269,8 +280,15 @@ class SimuladorDataService {
+       final cfg = await _sb.from('empresa_config')
+         .select().eq('negocio_id', _negId).maybeSingle();
+       final horasDia = (cfg?['horas_dia'] as num?)?.toDouble() ?? 8;
++      final diasSemana = (cfg?['dias_semana'] as num?)?.toDouble() ?? 6;
+       final costoFijo = (cfg?['costo_fijo_mensual'] as num?)?.toDouble() ?? 0;
+-      final costoHoraTaller = costoFijo > 0 ? costoFijo / (30 * horasDia) : 0;
++      // Los costos fijos se reparten entre las horas que de verdad se
++      // trabajan al mes (antes se dividían entre 30 días, como si el
++      // taller abriera todos los días: el costo por hora salía ~25% bajo)
++      final horasMes = diasSemana * 4.33 * horasDia;
++      final costoHoraTaller = costoFijo > 0 && horasMes > 0 ? costoFijo / horasMes : 0;
++      final mermaPct = (cfg?['merma_pct'] as num?)?.toDouble() ?? 15;
++      final markupMat = (cfg?['markup_material_pct'] as num?)?.toDouble() ?? 20;
+       final margenRec = (cfg?['margen_recomendado'] as num?)?.toDouble() ?? 35;
+       final margenMin = (cfg?['margen_minimo'] as num?)?.toDouble() ?? 20;
+       final ivaPct = (cfg?['iva_pct'] as num?)?.toDouble() ?? 16;
+@@ -304,7 +322,8 @@ class SimuladorDataService {
+       return CostosTaller(costoHoraTaller: costoHoraTaller.toDouble(),
+         costoHoraMaquina: costoHoraMaq.toDouble(), costoHoraOperador: costoHoraOp.toDouble(),
+         margenRecomendado: margenRec.toDouble(), margenMinimo: margenMin.toDouble(),
+-        ivaPct: ivaPct.toDouble());
++        ivaPct: ivaPct.toDouble(), mermaPct: mermaPct, markupMaterialPct: markupMat,
++        configurado: costoFijo > 0 || costoHoraMaq > 0 || costoHoraOp > 0);
+     } catch (_) { return CostosTaller(); }
+   }
+ 
+@@ -435,6 +454,12 @@ class MotorCalculo {
+         }
+         desglose['area_m2'] = areaM2;
+         desglose['tarifa_m2'] = tarifaM2.toDouble();
++        // Tiempo de máquina: minutos por m² (configurable) + preparación.
++        // Antes este caso dejaba el tiempo en 0 y el costo real salía en $0.
++        final minM2 = cfg.getTarifa('min_por_m2') > 0 ? cfg.getTarifa('min_por_m2')
++          : (esPlasma ? 12.0 : (esCelosia ? 90.0 : 40.0));
++        final minSetup = cfg.getTarifa('min_setup') > 0 ? cfg.getTarifa('min_setup') : 10.0;
++        tiempoHoras = (areaM2 * minM2 * cantidad + minSetup) / 60;
+         // Extras Router 2D
+         if (horasLijado > 0) {
+           final tl = cfg.getTarifa('costo_lijado_hora') > 0 ? cfg.getTarifa('costo_lijado_hora') : 150;
+@@ -613,6 +638,7 @@ class MotorCalculo {
+           }
+           final costoTubo = cfg.getTarifa('costo_tubo_min') > 0 ? cfg.getTarifa('costo_tubo_min') : 0.80;
+           desglose['desgaste_tubo'] = (minEst * costoTubo * cantidad).toDouble();
++          // (se suma al precio más abajo; antes sólo se anotaba y no se cobraba)
+         } else {
+           minEst = minutos > 0 ? minutos : areaM2min * 60 * tipo.factor;
+         }
+@@ -628,7 +654,7 @@ class MotorCalculo {
+           tarifaMinuto = cfg.getTarifa('tarifa_min') > 0 ? cfg.getTarifa('tarifa_min') : 10;
+         }
+         tiempoHoras = minEst / 60 * cantidad;
+-        precioMaquila = minEst * tarifaMinuto * cantidad;
++        precioMaquila = minEst * tarifaMinuto * cantidad + (desglose['desgaste_tubo'] ?? 0.0);
+         desglose['minutos_estimados'] = (minEst * cantidad).toDouble();
+         desglose['tarifa_min'] = tarifaMinuto.toDouble();
+         break;
+@@ -653,7 +679,11 @@ class MotorCalculo {
+           tarifaMt = cfg.getTarifa('tarifa_metro') > 0 ? cfg.getTarifa('tarifa_metro').toDouble() : 100.0;
+         }
+         precioMaquila = metros * tarifaMt * cantidad;
+-        tiempoHoras = metros * 0.1 * cantidad;
++        // m/min de corte (plasma ~1.2 en lámina delgada) + preparación;
++        // antes se asumían 6 min por metro, 5 veces más de lo real
++        final velM = cfg.getTarifa('vel_corte_m_min') > 0 ? cfg.getTarifa('vel_corte_m_min') : 1.2;
++        final setupM = cfg.getTarifa('min_setup') > 0 ? cfg.getTarifa('min_setup') : 10.0;
++        tiempoHoras = (metros * cantidad / velM + setupM) / 60;
+         desglose['metros'] = metros;
+         desglose['tarifa_metro'] = tarifaMt;
+         break;
+@@ -701,12 +731,14 @@ class MotorCalculo {
+           final minAp2 = cfg.getTarifa('minimo_apertura') > 0 ? cfg.getTarifa('minimo_apertura') : 150;
+           if (precioMaquila < minAp2) precioMaquila = minAp2.toDouble();
+         }
+-        tiempoHoras = tipo.factor * cantidad / 60;
++        final minPza = cfg.getTarifa('min_por_pieza') > 0 ? cfg.getTarifa('min_por_pieza') : 1.5;
++        final setupP = cfg.getTarifa('min_setup') > 0 ? cfg.getTarifa('min_setup') : 10.0;
++        tiempoHoras = (minPza * tipo.factor * cantidad + setupP) / 60;
+         break;
+ 
+       case 'precio_fijo':
+         precioMaquila = cfg.getTarifa('precio_fijo') * cantidad;
+-        tiempoHoras = 1.0;
++        tiempoHoras = 0.5 * cantidad;
+         break;
+ 
+       default:
+@@ -759,11 +791,10 @@ class MotorCalculo {
+     if (!clienteTreMaterial) {
+       if (usarInventario && materialInv != null) {
+         cm = ((materialInv['costo_unitario'] as num?)?.toDouble() ?? 0) * cantidad;
+-        // Agregar merma 15%
+-        cm *= 1.15;
++        cm *= 1 + costos.mermaPct / 100; // merma configurable (recortes, pruebas)
+         materialNombre = materialInv['nombre'] as String?;
+       } else if (!usarInventario && materialLibrePrecio > 0) {
+-        cm = materialLibrePrecio * cantidad * 1.15; // +15% merma
++        cm = materialLibrePrecio * cantidad * (1 + costos.mermaPct / 100); // + merma
+         materialNombre = materialLibreNombre.isNotEmpty ? materialLibreNombre : 'Material';
+       }
+     }
+@@ -796,48 +827,38 @@ class MotorCalculo {
+       extrasTotal += e.precio * cantidad;
+     }
+ 
+-    // ── COSTO TOTAL ─────────────────────────────────
+-    // Para Router y Diseño: el precioMaquila YA incluye la ganancia
+-    // Solo sumamos materiales y acabados como costo adicional
+-    double costoTotal;
+-    if (precioMaquila > 0) {
+-      // Modo directo: maquila + material + acabado + extras
+-      costoTotal = precioMaquila + cm + ca + extrasTotal + extrasRouter + extrasPlasma;
+-      // Registrar en desglose
+-      if (precioMaquila > 0) {
+-        final desglMap = {'Maquila/Producción': precioMaquila};
+-        if (cm > 0) desglMap['Material'] = cm;
+-        if (ca > 0) desglMap['Acabado'] = ca;
+-        if (extrasRouter > 0) desglMap['Mano de obra'] = extrasRouter;
+-        if (extrasTotal > 0) desglMap['Extras'] = extrasTotal;
+-      }
+-    } else {
+-      // Modo costo real: suma todos los componentes
+-      costoTotal = cm + cmaq + cmo + cc + ca + ci + extrasTotal;
+-    }
+-
+-    // ── 3 PRECIOS CON MARGEN ─────────────────────────
+-    // Para Diseño y Láser de Fibra por pieza, usar tarifas directas si están configuradas
+-    double baseMin, baseRec, basePrem;
+-
+-    // ── 3 PRECIOS ────────────────────────────────────
+-    // Para Router/Diseño: el precio de maquila ya está calculado
+-    // Solo aplicamos márgenes sobre el costo total
+-    final mMin  = costos.margenMinimo / 100;
+-    final mRec  = costos.margenRecomendado / 100;
+-    final mPrem = (costos.margenRecomendado + 15) / 100;
+-
+-    if (precioMaquila > 0) {
+-      // El precio recomendado = maquila + material + acabados
+-      baseRec  = costoTotal;
+-      baseMin  = costoTotal * (1 - (mRec - mMin));
+-      basePrem = costoTotal * (1 + (mPrem - mRec));
+-    } else {
+-      // Fórmula maestra: PV = Costo ÷ (1 - Margen)
+-      baseMin  = costoTotal > 0 ? costoTotal / (1 - mMin)  : 0;
+-      baseRec  = costoTotal > 0 ? costoTotal / (1 - mRec)  : 0;
+-      basePrem = costoTotal > 0 ? costoTotal / (1 - mPrem) : 0;
+-    }
++    // ── COSTO REAL ──────────────────────────────────
++    // Lo que de verdad le cuesta al taller hacer el trabajo: material con
++    // merma + máquina + operador + consumibles + parte de los gastos fijos
++    // + acabados + extras. Es independiente de la tarifa que se cobre.
++    // (Antes, cuando había tarifa, el "costo" era la propia tarifa y la
++    // utilidad siempre salía en $0.)
++    final costoReal = cm + cmaq + cmo + cc + ci + ca + extrasTotal + extrasRouter + extrasPlasma;
++    final costoTotal = costoReal;
++
++    // ── PRECIOS ──────────────────────────────────────
++    final mMin  = (costos.margenMinimo / 100).clamp(0.0, 0.85);
++    final mRec  = (costos.margenRecomendado / 100).clamp(0.0, 0.85);
++    final mPrem = ((costos.margenRecomendado + 15) / 100).clamp(0.0, 0.9);
++
++    // a) Por tarifa de mercado: maquila + material (con la ganancia del
++    //    material) + acabados + extras
++    final cmVenta = cm * (1 + costos.markupMaterialPct / 100);
++    final precioTarifa = precioMaquila > 0
++      ? precioMaquila + cmVenta + ca + extrasTotal + extrasRouter + extrasPlasma : 0.0;
++    // b) Por costo real + margen (fórmula PV = Costo ÷ (1 − margen))
++    final precioCosto = costoReal > 0 ? costoReal / (1 - mRec) : 0.0;
++
++    // Recomendado: el mayor de los dos. Si la tarifa no cubre costo +
++    // margen, se sube al precio por costo (y se avisa en observaciones).
++    final baseRec  = precioTarifa > precioCosto ? precioTarifa : precioCosto;
++    // Mínimo: nunca por debajo del costo + margen mínimo
++    final minPorCosto = costoReal > 0 ? costoReal / (1 - mMin) : 0.0;
++    double baseMin = baseRec * 0.9;
++    if (baseMin < minPorCosto) baseMin = minPorCosto;
++    if (baseMin > baseRec) baseMin = baseRec;
++    final premPorCosto = costoReal > 0 ? costoReal / (1 - mPrem) : 0.0;
++    final basePrem = (baseRec * 1.15) > premPorCosto ? baseRec * 1.15 : premPorCosto;
+ 
+     // IVA
+     final iva = aplicarIva ? baseRec * (costos.ivaPct / 100) : 0.0;
+@@ -862,11 +883,12 @@ class MotorCalculo {
+       costosDesglose: {
+         'Material': cm, 'Máquina': cmaq, 'Operador': cmo,
+         'Consumibles': cc, 'Acabado': ca, 'Taller (CI)': ci,
+-        'Extras': extrasTotal,
++        'Extras': extrasTotal + extrasRouter + extrasPlasma,
+       },
+       incluyeIva: aplicarIva,
+       materialNombre: materialNombre,
+-      maquila: baseRec, costoMaterial: cm, acabado: ca, extras: extrasTotal);
++      maquila: baseRec, costoMaterial: cm, acabado: ca, extras: extrasTotal,
++      precioTarifa: precioTarifa, precioCosto: precioCosto);
+   }
+ }
+ 
+@@ -962,17 +984,23 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
+               const SizedBox(height: 14),
+ 
+               // Grid de servicios
+-              GridView.builder(
++              // Tarjetas de ~170 px: en celular salen 2 por fila y en
++              // pantalla ancha 4-5 (antes siempre eran 2 y en la
++              // computadora quedaban enormes)
++              LayoutBuilder(builder: (ctx, cons) {
++                final cols = (cons.maxWidth / 170).floor().clamp(2, 6);
++                return GridView.builder(
+                 shrinkWrap: true,
+                 physics: const NeverScrollableScrollPhysics(),
+-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+-                  crossAxisCount: 2, childAspectRatio: 1.55,
++                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
++                  crossAxisCount: cols, childAspectRatio: 1.45,
+                   crossAxisSpacing: 10, mainAxisSpacing: 10),
+                 itemCount: _servicios.length + 1,
+                 itemBuilder: (_, i) {
+                   if (i == _servicios.length) return _cardAgregar();
+                   return _cardServicio(_servicios[i]);
+-                }),
++                });
++              }),
+ 
+               // Carrito
+               if (_carrito.isNotEmpty) ...[
+@@ -3347,6 +3375,17 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
+   List<Widget> _generarObservaciones(ResultadoSimulador r, NumberFormat fmt) {
+     final obs = <Widget>[];
+ 
++    // Tarifa de mercado vs costo real
++    if (r.precioTarifa > 0 && r.precioCosto > 0) {
++      if (r.precioTarifa < r.precioCosto) {
++        obs.add(_obs(trf('📈 Tu tarifa ({0}) no cubre costo + margen ({1})', [fmt.format(r.precioTarifa), fmt.format(r.precioCosto)]),
++          tr('El precio recomendado se calculó con tu costo real. Revisa la tarifa de este servicio o tus costos del taller.'), AppColors.rojo));
++      } else {
++        obs.add(_obs(trf('💵 Precio por tarifa: {0} · por costo + margen: {1}', [fmt.format(r.precioTarifa), fmt.format(r.precioCosto)]),
++          trf('Costo real del trabajo: {0}. La tarifa deja margen de sobra.', [fmt.format(r.costoTotal)]), AppColors.verde));
++      }
++    }
++
+     // Observación margen
+     if (r.margenReal < 20) {
+       obs.add(_obs(trf('⚠️ Margen bajo ({0}%)', [(r.margenReal.toStringAsFixed(1))]),
+@@ -3375,10 +3414,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
+     }
+ 
+     // Observación costos taller
+-    final pctCI = r.costoTotal > 0 ? (r.ci / r.costoTotal * 100) : 0;
+-    if (pctCI < 5 && (_costosTaller?.costoHoraTaller ?? 0) < 1) {
+-      obs.add(_obs(tr('💡 Configura tus costos fijos'),
+-        tr('Ve a "Costos del taller" y agrega renta, luz y salarios para calcular el precio real.'),
++    if (!(_costosTaller?.configurado ?? false)) {
++      obs.add(_obs(tr('💡 Configura tus costos del taller (5 datos)'),
++        tr('Gastos fijos al mes, horas y días que trabajas, una máquina y un operador. Con eso el simulador sabe cuánto te cuesta cada hora y si la tarifa deja ganancia.'),
+         AppColors.ambar));
+     }
+ 
+diff --git a/lib/services/pdf_service.dart b/lib/services/pdf_service.dart
+index b1b2b1f..177e1fe 100644
+--- a/lib/services/pdf_service.dart
++++ b/lib/services/pdf_service.dart
+@@ -463,6 +463,12 @@ class PdfService {
+       (_t('Notas'), _limpiarTexto(cotizacion.notas ?? '')),
+     ];
+ 
++    double numPro(String k) => double.tryParse(v(k).replaceAll(',', '.')) ?? 0;
++    final croquis = _croquisPieza(
++      largo: numPro('croquis_largo'), ancho: numPro('croquis_ancho'),
++      espesor: numPro('croquis_espesor'), barrenoD: numPro('croquis_barreno_d'),
++      barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto);
++
+     int n = 0;
+     String sig() => '${++n}';
+ 
+@@ -556,7 +562,11 @@ class PdfService {
+         ],
+ 
+         // ─── 3. DETALLE TÉCNICO ─────────────
+-        if (hay(tecnicos)) ...[titulo(sig(), _t('DETALLE TÉCNICO')), datos(tecnicos)],
++        if (hay(tecnicos) || croquis != null) ...[
++          titulo(sig(), _t('DETALLE TÉCNICO')),
++          if (hay(tecnicos)) datos(tecnicos),
++          if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
++        ],
+ 
+         // ─── 4. FABRICACIÓN ─────────────────
+         if (hay(fabricacion)) ...[titulo(sig(), _t('ESPECIFICACIONES DE FABRICACIÓN')), datos(fabricacion)],
+@@ -689,6 +699,138 @@ class PdfService {
+         pw.Expanded(child: pw.Text(valor, style: pw.TextStyle(fontSize: 9, color: color))),
+       ]));
+ 
++  // ── Croquis acotado de la pieza (vista superior + lateral) ──
++  // Dibuja un rectángulo de largo × ancho con sus cotas, barrenos opcionales
++  // y, si hay espesor, una vista lateral. Ilustrativo, no a escala real.
++  static pw.Widget? _croquisPieza({
++    required double largo, required double ancho, required double espesor,
++    required double barrenoD, required int barrenos,
++    required PdfColor azul, required PdfColor gris,
++  }) {
++    if (largo <= 0 || ancho <= 0) return null;
++    const double W = 480, H = 190;
++    // Caja disponible para la vista superior
++    const double boxW = 250, boxH = 120, ox = 50, oy = 40; // ox/oy: margen para cotas
++    final esc = (boxW / largo) < (boxH / ancho) ? boxW / largo : boxH / ancho;
++    final rw = largo * esc, rh = ancho * esc;
++    final rx = ox + (boxW - rw) / 2;
++    final ryTop = oy + (boxH - rh) / 2; // desde arriba (coordenadas de Stack)
++    // Vista lateral a la derecha
++    final tieneLado = espesor > 0;
++    final lx = ox + boxW + 60;
++    final lw = rw > 90 ? 90.0 : rw;
++    double lh = espesor * (lw / largo);
++    if (lh < 6) lh = 6;
++    if (lh > 60) lh = 60;
++    final lyTop = ryTop + (rh - lh) / 2;
++    String mm(double x) => x == x.roundToDouble() ? x.toStringAsFixed(0) : x.toStringAsFixed(1);
++    final estilo = pw.TextStyle(fontSize: 8, color: azul, fontWeight: pw.FontWeight.bold);
++    final estiloGris = pw.TextStyle(fontSize: 7, color: gris);
++
++    // Barrenos: hasta 4 en las esquinas (o 1 al centro)
++    final nB = barrenos.clamp(0, 4).toInt();
++    final holes = <(double, double)>[];
++    final rB = barrenoD > 0 ? (barrenoD * esc / 2).clamp(2.0, 12.0).toDouble() : 0.0;
++    if (barrenoD > 0 && nB > 0) {
++      final ins = rB + 6;
++      if (nB == 1) holes.add((rx + rw / 2, ryTop + rh / 2));
++      else {
++        final cands = [(rx + ins, ryTop + ins), (rx + rw - ins, ryTop + ins),
++          (rx + ins, ryTop + rh - ins), (rx + rw - ins, ryTop + rh - ins)];
++        holes.addAll(cands.take(nB));
++      }
++    }
++
++    return pw.Container(
++      decoration: pw.BoxDecoration(border: pw.Border.all(color: const PdfColor.fromInt(0xFFD1D5DB), width: 0.5),
++        borderRadius: pw.BorderRadius.circular(4)),
++      padding: const pw.EdgeInsets.all(6),
++      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
++        pw.Text(_t('CROQUIS DE LA PIEZA'), style: pw.TextStyle(fontSize: 8, color: gris, fontWeight: pw.FontWeight.bold)),
++        pw.SizedBox(
++          width: W, height: H,
++          child: pw.Stack(children: [
++            pw.Positioned(left: 0, top: 0, child: pw.CustomPaint(
++              size: const PdfPoint(W, H),
++              painter: (PdfGraphics c, PdfPoint size) {
++                // El lienzo del PDF tiene el origen abajo-izquierda
++                double Y(double top) => H - top;
++                void linea(double x1, double t1, double x2, double t2) {
++                  c.drawLine(x1, Y(t1), x2, Y(t2));
++                  c.strokePath();
++                }
++                void flecha(double x, double t, double dx, double dt) {
++                  // punta de flecha en (x,t) apuntando en dirección (dx,dt)
++                  const a = 4.0;
++                  if (dt == 0) { linea(x, t, x - dx * a, t - 2); linea(x, t, x - dx * a, t + 2); }
++                  else { linea(x, t, x - 2, t - dt * a); linea(x, t, x + 2, t - dt * a); }
++                }
++                void cotaH(double x1, double x2, double t) {
++                  linea(x1, t, x2, t); flecha(x1, t, -1, 0); flecha(x2, t, 1, 0);
++                }
++                void cotaV(double x, double t1, double t2) {
++                  linea(x, t1, x, t2); flecha(x, t1, 0, -1); flecha(x, t2, 0, 1);
++                }
++                // Pieza (vista superior)
++                c.setStrokeColor(azul);
++                c.setLineWidth(1.2);
++                c.drawRect(rx, Y(ryTop + rh), rw, rh);
++                c.strokePath();
++                // Barrenos
++                c.setLineWidth(0.8);
++                for (final h in holes) {
++                  c.drawEllipse(h.$1, Y(h.$2), rB, rB);
++                  c.strokePath();
++                  c.setLineWidth(0.3);
++                  linea(h.$1 - rB - 3, h.$2, h.$1 + rB + 3, h.$2);
++                  linea(h.$1, h.$2 - rB - 3, h.$1, h.$2 + rB + 3);
++                  c.setLineWidth(0.8);
++                }
++                // Cotas
++                c.setStrokeColor(gris);
++                c.setLineWidth(0.5);
++                // extensión y cota del largo (arriba)
++                linea(rx, ryTop - 4, rx, ryTop - 24);
++                linea(rx + rw, ryTop - 4, rx + rw, ryTop - 24);
++                cotaH(rx, rx + rw, ryTop - 18);
++                // extensión y cota del ancho (izquierda)
++                linea(rx - 4, ryTop, rx - 28, ryTop);
++                linea(rx - 4, ryTop + rh, rx - 28, ryTop + rh);
++                cotaV(rx - 22, ryTop, ryTop + rh);
++                // Vista lateral
++                if (tieneLado) {
++                  c.setStrokeColor(azul);
++                  c.setLineWidth(1.2);
++                  c.drawRect(lx, Y(lyTop + lh), lw, lh);
++                  c.strokePath();
++                  c.setStrokeColor(gris);
++                  c.setLineWidth(0.5);
++                  linea(lx + lw + 4, lyTop, lx + lw + 26, lyTop);
++                  linea(lx + lw + 4, lyTop + lh, lx + lw + 26, lyTop + lh);
++                  cotaV(lx + lw + 20, lyTop, lyTop + lh);
++                }
++              })),
++            // Etiquetas de las cotas
++            pw.Positioned(left: rx, top: ryTop - 31, child: pw.SizedBox(width: rw,
++              child: pw.Text(mm(largo), style: estilo, textAlign: pw.TextAlign.center))),
++            pw.Positioned(left: rx - 48, top: ryTop + rh / 2 - 5, child: pw.SizedBox(width: 22,
++              child: pw.Text(mm(ancho), style: estilo, textAlign: pw.TextAlign.right))),
++            pw.Positioned(left: rx, top: ryTop + rh + 6, child: pw.SizedBox(width: rw,
++              child: pw.Text(_t('Vista superior'), style: estiloGris, textAlign: pw.TextAlign.center))),
++            if (holes.isNotEmpty)
++              pw.Positioned(left: rx, top: ryTop + rh + 16, child: pw.SizedBox(width: rw,
++                child: pw.Text('${holes.length} x Ø${mm(barrenoD)}', style: estilo, textAlign: pw.TextAlign.center))),
++            if (tieneLado) ...[
++              pw.Positioned(left: lx + lw + 28, top: lyTop + lh / 2 - 5,
++                child: pw.Text(mm(espesor), style: estilo)),
++              pw.Positioned(left: lx, top: lyTop + lh + 6, child: pw.SizedBox(width: lw,
++                child: pw.Text(_t('Vista lateral'), style: estiloGris, textAlign: pw.TextAlign.center))),
++            ],
++          ])),
++        pw.Text(_t('Medidas en mm. Croquis ilustrativo, no a escala.'), style: estiloGris),
++      ]));
++  }
++
+   // Fix 3: Limpiar caracteres especiales que aparecen como "tachas" en el PDF
+   static String _limpiarTexto(String texto) {
+     return texto
+diff --git a/lib/services/whatsapp_service.dart b/lib/services/whatsapp_service.dart
+index edcd8af..5899c0d 100644
+--- a/lib/services/whatsapp_service.dart
++++ b/lib/services/whatsapp_service.dart
+@@ -366,8 +366,26 @@ class WhatsAppService {
+   // son: Pago50, Produccion, Pruebas, PagoCompleto, Entrega, Entregado,
+   // Cancelado (ej. "avance_pago50", "avance_produccion"). Variables
+   // disponibles además de las de siempre: *MONTO* (total), *ANTICIPO*
+-  // (50%), *RESTANTE* (lo que falta). Si no existe plantilla
++  // (según el % configurado), *PCT_ANTICIPO* (ese %), *RESTANTE* (lo que falta). Si no existe plantilla
+   // personalizada, cae al mensaje por defecto de mensajeAvance().
++  // % de anticipo que pide el taller (Más → Costos del taller → Material y
++  // cobro). Se guarda en empresa_config.anticipo_pct; si no existe, 50%.
++  static double? _anticipoCache;
++  static Future<double> anticipoPct() async {
++    if (_anticipoCache != null) return _anticipoCache!;
++    try {
++      final negocioId = AuthService.negocioId;
++      if (negocioId == null) return 50;
++      final row = await Supabase.instance.client.from('empresa_config')
++        .select('anticipo_pct').eq('negocio_id', negocioId).maybeSingle();
++      final v = (row?['anticipo_pct'] as num?)?.toDouble();
++      _anticipoCache = (v == null || v <= 0 || v > 100) ? 50 : v;
++    } catch (_) { _anticipoCache = 50; }
++    return _anticipoCache!;
++  }
++  static void olvidarAnticipo() => _anticipoCache = null;
++  static String pctTexto(double p) => p == p.roundToDouble() ? p.toStringAsFixed(0) : p.toStringAsFixed(1);
++
+   static Future<String> getPlantillaAvance({
+     required String etapa,
+     required String nombreCliente,
+@@ -377,6 +395,7 @@ class WhatsAppService {
+     String? pedidoId,
+   }) async {
+     String msgFinal;
++    final pctAnt = await anticipoPct();
+     try {
+       final negocioId = AuthService.negocioId;
+       if (negocioId == null) throw Exception('sin negocio activo');
+@@ -396,13 +415,14 @@ class WhatsAppService {
+         final rawMsg = data['mensaje'] as String? ?? data['cuerpo'] as String? ?? '';
+         if (rawMsg.isNotEmpty) {
+           final total = montoTotal ?? 0;
+-          final anticipo = total / 2;
++          final anticipo = total * pctAnt / 100;
+           final restante = total - anticipo;
+           var msg = rawMsg;
+           msg = msg.replaceAll('*NOMBRE*', nombreCliente);
+           msg = msg.replaceAll('*FOLIO*', folio);
+           msg = msg.replaceAll('*MONTO*', total > 0 ? '\$${total.toStringAsFixed(2)}' : '');
+           msg = msg.replaceAll('*ANTICIPO*', total > 0 ? '\$${anticipo.toStringAsFixed(2)}' : '');
++          msg = msg.replaceAll('*PCT_ANTICIPO*', '${pctTexto(pctAnt)}%');
+           msg = msg.replaceAll('*RESTANTE*', total > 0 ? '\$${restante.toStringAsFixed(2)}' : '');
+           msg = msg.replaceAll('*EMPRESA*', empresa ?? 'HETNA CNC');
+           msg = msg.replaceAll('*FECHA*', DateTime.now().toString().substring(0, 10));
+@@ -410,17 +430,17 @@ class WhatsAppService {
+         } else {
+           msgFinal = mensajeAvance(
+             nombreCliente: nombreCliente, folio: folio, etapa: etapa,
+-            total: montoTotal, empresa: empresa);
++            total: montoTotal, empresa: empresa, anticipoPct: pctAnt);
+         }
+       } else {
+         msgFinal = mensajeAvance(
+           nombreCliente: nombreCliente, folio: folio, etapa: etapa,
+-          total: montoTotal, empresa: empresa);
++          total: montoTotal, empresa: empresa, anticipoPct: pctAnt);
+       }
+     } catch (_) {
+       msgFinal = mensajeAvance(
+         nombreCliente: nombreCliente, folio: folio, etapa: etapa,
+-        total: montoTotal, empresa: empresa);
++        total: montoTotal, empresa: empresa, anticipoPct: pctAnt);
+     }
+     return msgFinal;
+   }
+@@ -554,16 +574,17 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
+     required String etapa,
+     double? total,
+     String? empresa,
++    double anticipoPct = 50,
+   }) {
+     final biz = empresa ?? tr('HETNA CNC');
+     final montoTotal = total ?? 0;
+-    final anticipo = montoTotal / 2;
++    final anticipo = montoTotal * anticipoPct / 100;
+     final restante = montoTotal - anticipo;
+     final txtAnticipo = montoTotal > 0 ? ' (\$${anticipo.toStringAsFixed(2)})' : '';
+     final txtRestante = montoTotal > 0 ? trf(' de \${0}', [(restante.toStringAsFixed(2))]) : '';
+     switch (etapa) {
+       case 'Pago50':
+-        return '¡Hola $nombreCliente! ✅ Recibimos tu anticipo del 50%$txtAnticipo del pedido *$folio*. ¡Empezamos a producir! 🔧\n\nRecuerda que el saldo restante$txtRestante se liquida antes de la entrega. — *$biz*';
++        return '¡Hola $nombreCliente! ✅ Recibimos tu anticipo del ${pctTexto(anticipoPct)}%$txtAnticipo del pedido *$folio*. ¡Empezamos a producir! 🔧\n\nRecuerda que el saldo restante$txtRestante se liquida antes de la entrega. — *$biz*';
+       case 'Produccion':
+         return '¡Hola $nombreCliente! 🔧 Tu pedido *$folio* está en producción. Te avisamos cuando esté listo. — *$biz*';
+       case 'Pruebas':
+-- 
+2.43.0
+
