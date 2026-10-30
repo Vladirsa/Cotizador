@@ -274,7 +274,7 @@ jobs:
       - run: cp -r lib/* tmp_app/lib/ && cp pubspec.yaml tmp_app/pubspec.yaml && cp l10n.yaml tmp_app/l10n.yaml
       - run: flutter pub get
         working-directory: tmp_app
-      - run: flutter build web --release --base-href /cotizador/ --pwa-strategy=none
+      - run: flutter build web --release --base-href /cotizador/ --pwa-strategy=offline-first
         working-directory: tmp_app
       - name: Usar el ícono personalizado "Cotizador"
         run: |
@@ -283,6 +283,8 @@ jobs:
           cp branding/icons/Icon-maskable-192.png tmp_app/build/web/icons/Icon-maskable-192.png
           cp branding/icons/Icon-maskable-512.png tmp_app/build/web/icons/Icon-maskable-512.png
           cp branding/icons/favicon.png tmp_app/build/web/favicon.png
+      - name: App instalable desde el navegador (manifest, título y aviso de instalación)
+        run: bash branding/pwa.sh tmp_app/build/web
       - name: Evitar cache vieja del navegador (.htaccess)
         run: |
           cat > tmp_app/build/web/.htaccess << 'HTACCESS'
