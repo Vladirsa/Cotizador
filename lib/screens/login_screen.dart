@@ -36,6 +36,20 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    // hetnacnc.com/app manda a /cotizador/?registro=1 para abrir directo el
+    // registro del taller (en Android/iOS Uri.base no trae parámetros: no pasa nada)
+    if (Uri.base.queryParameters['registro'] == '1') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        Navigator.push(context,
+          MaterialPageRoute(builder: (_) => const RegistroTallerScreen()));
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _correoCtrl.dispose();
     _passCtrl.dispose();
@@ -313,7 +327,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           color: AppColors.textoSecundario)))),
                   const SizedBox(height: 24),
 
-                  Text(tr('Acceso restringido - Solo personal autorizado'),
+                  Text(tr('Gratis para talleres · hetnacnc.com/app'),
                     style: TextStyle(fontSize: 11, color: Colors.white38),
                     textAlign: TextAlign.center),
                 ],
