@@ -296,39 +296,52 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontWeight: FontWeight.w600)))),
                     ])),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
+                  // Esta parte va sobre el fondo azul marino: los botones tienen
+                  // que ser claros (antes iban azul sobre azul y no se veían).
+                  const Divider(height: 1, color: Colors.white24),
                   const SizedBox(height: 16),
-                  const Divider(height: 1, color: Color(0xFFE5E7EB)),
-                  const SizedBox(height: 16),
-                  Text(tr('Nuevo taller'),
-                    style: TextStyle(fontSize: 13, color: AppColors.textoSecundario),
+                  Text(tr('¿Todavía no tienes cuenta?'),
+                    style: const TextStyle(fontSize: 14, color: Colors.white,
+                      fontWeight: FontWeight.w600),
                     textAlign: TextAlign.center),
-                  const SizedBox(height: 8),
-                  SizedBox(width: double.infinity, height: 44,
-                    child: OutlinedButton.icon(
+                  const SizedBox(height: 4),
+                  Text(tr('Registra tu taller gratis en un minuto'),
+                    style: const TextStyle(fontSize: 12, color: Colors.white70),
+                    textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  SizedBox(width: double.infinity, height: 48,
+                    child: ElevatedButton.icon(
                       onPressed: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const RegistroTallerScreen())),
-                      icon: const Icon(Icons.store_outlined, color: AppColors.azul, size: 18),
+                      icon: const Icon(Icons.store_outlined, color: AppColors.azul, size: 20),
                       label: Text(AppLocalizations.of(context)!.loginRegistrarTaller,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
                           color: AppColors.azul)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.azul),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFC53D),
+                        foregroundColor: AppColors.azul,
+                        elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10))))),
                   const SizedBox(height: 10),
                   SizedBox(width: double.infinity, height: 44,
-                    child: TextButton.icon(
+                    child: OutlinedButton.icon(
                       onPressed: () => Navigator.push(context,
                         MaterialPageRoute(builder: (_) => const UnirseEquipoScreen())),
-                      icon: const Icon(Icons.qr_code_2, color: AppColors.textoSecundario, size: 18),
+                      icon: const Icon(Icons.qr_code_2, color: Colors.white, size: 18),
                       label: Text(AppLocalizations.of(context)!.loginTengoCodigo,
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                          color: AppColors.textoSecundario)))),
+                          color: Colors.white)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white54),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10))))),
                   const SizedBox(height: 24),
 
                   Text(tr('Gratis para talleres · hetnacnc.com/app'),
-                    style: TextStyle(fontSize: 11, color: Colors.white38),
+                    style: const TextStyle(fontSize: 11, color: Colors.white60),
                     textAlign: TextAlign.center),
                 ],
               ),
