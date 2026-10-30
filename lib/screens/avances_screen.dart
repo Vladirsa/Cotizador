@@ -26,7 +26,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
   static const _etapas = ['Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado'];
   static const _etiquetas = {
     'Pedido': 'Pedido recibido',
-    'Pago50': 'Pago 50% anticipo',
+    'Pago50': 'Anticipo recibido',
     'Produccion': 'En producción',
     'Pruebas': 'Control de calidad',
     'PagoCompleto': 'Pago 100% completado',
@@ -47,7 +47,7 @@ class _AvancesScreenState extends State<AvancesScreen> {
 
   final _filtros = ['Activos', 'Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado', 'Cancelado', 'Todos'];
   final _etiquetasFiltro = {
-    'Pago50': 'Pago 50%',
+    'Pago50': 'Anticipo',
     'Produccion': 'Producción',
     'PagoCompleto': 'Pago 100%',
   };
@@ -304,7 +304,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             final pasada = i < _idx;
             final color = widget.colores[etapa] ?? AppColors.azul;
             final etiquetaCorta = {
-              'Pedido': 'Pedido', 'Pago50': 'Pago 50%', 'Produccion': 'Prod.',
+              'Pedido': 'Pedido', 'Pago50': 'Anticipo', 'Produccion': 'Prod.',
               'Pruebas': 'QC', 'PagoCompleto': 'Pago 100%', 'Entrega': 'Entrega', 'Entregado': '✅',
             }[etapa] ?? etapa;
             return Padding(padding: const EdgeInsets.only(right: 8), child: Column(children: [

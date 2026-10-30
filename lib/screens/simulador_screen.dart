@@ -161,10 +161,17 @@ class CostosTaller {
   final double margenRecomendado;
   final double margenMinimo;
   final double ivaPct;
+  // % de material que se desperdicia (recortes, pruebas) y % que se le
+  // gana al material al revenderlo dentro del trabajo
+  final double mermaPct;
+  final double markupMaterialPct;
+  // true si el taller ya capturó costos fijos, máquina u operador
+  final bool configurado;
 
   CostosTaller({this.costoHoraTaller = 0, this.costoHoraMaquina = 0,
     this.costoHoraOperador = 0, this.margenRecomendado = 35,
-    this.margenMinimo = 20, this.ivaPct = 16});
+    this.margenMinimo = 20, this.ivaPct = 16, this.mermaPct = 15,
+    this.markupMaterialPct = 20, this.configurado = false});
 
   double get costoHoraTotal => costoHoraTaller + costoHoraMaquina + costoHoraOperador;
 }
@@ -187,6 +194,9 @@ class ResultadoSimulador {
   final double pvMinimo, pvRecomendado, pvPremium;
   final double utilidad, margenReal, gananciaHora, tiempoHoras;
   final double cm, cmo, cmaq, cc, ca, ci;
+  // Precio que sale de la tarifa de mercado del servicio y precio que sale
+  // del costo real + margen; el recomendado es el mayor de los dos
+  final double precioTarifa, precioCosto;
   final Map<String, double> costosDesglose;
   final bool incluyeIva;
   final String? materialNombre;
@@ -204,7 +214,8 @@ class ResultadoSimulador {
     required this.cc, required this.ca, required this.ci,
     required this.costosDesglose, this.incluyeIva = false,
     this.materialNombre, this.maquila = 0, this.extras = 0,
-    this.acabado = 0, this.costoMaterial = 0});
+    this.acabado = 0, this.costoMaterial = 0,
+    this.precioTarifa = 0, this.precioCosto = 0});
 }
 
 // ══════════════════════════════════════════════════════
@@ -269,8 +280,15 @@ class SimuladorDataService {
       final cfg = await _sb.from('empresa_config')
         .select().eq('negocio_id', _negId).maybeSingle();
       final horasDia = (cfg?['horas_dia'] as num?)?.toDouble() ?? 8;
+      final diasSemana = (cfg?['dias_semana'] as num?)?.toDouble() ?? 6;
       final costoFijo = (cfg?['costo_fijo_mensual'] as num?)?.toDouble() ?? 0;
-      final costoHoraTaller = costoFijo > 0 ? costoFijo / (30 * horasDia) : 0;
+      // Los costos fijos se reparten entre las horas que de verdad se
+      // trabajan al mes (antes se dividían entre 30 días, como si el
+      // taller abriera todos los días: el costo por hora salía ~25% bajo)
+      final horasMes = diasSemana * 4.33 * horasDia;
+      final costoHoraTaller = costoFijo > 0 && horasMes > 0 ? costoFijo / horasMes : 0;
+      final mermaPct = (cfg?['merma_pct'] as num?)?.toDouble() ?? 15;
+      final markupMat = (cfg?['markup_material_pct'] as num?)?.toDouble() ?? 20;
       final margenRec = (cfg?['margen_recomendado'] as num?)?.toDouble() ?? 35;
       final margenMin = (cfg?['margen_minimo'] as num?)?.toDouble() ?? 20;
       final ivaPct = (cfg?['iva_pct'] as num?)?.toDouble() ?? 16;
@@ -304,7 +322,8 @@ class SimuladorDataService {
       return CostosTaller(costoHoraTaller: costoHoraTaller.toDouble(),
         costoHoraMaquina: costoHoraMaq.toDouble(), costoHoraOperador: costoHoraOp.toDouble(),
         margenRecomendado: margenRec.toDouble(), margenMinimo: margenMin.toDouble(),
-        ivaPct: ivaPct.toDouble());
+        ivaPct: ivaPct.toDouble(), mermaPct: mermaPct, markupMaterialPct: markupMat,
+        configurado: costoFijo > 0 || costoHoraMaq > 0 || costoHoraOp > 0);
     } catch (_) { return CostosTaller(); }
   }
 
@@ -435,6 +454,12 @@ class MotorCalculo {
         }
         desglose['area_m2'] = areaM2;
         desglose['tarifa_m2'] = tarifaM2.toDouble();
+        // Tiempo de máquina: minutos por m² (configurable) + preparación.
+        // Antes este caso dejaba el tiempo en 0 y el costo real salía en $0.
+        final minM2 = cfg.getTarifa('min_por_m2') > 0 ? cfg.getTarifa('min_por_m2')
+          : (esPlasma ? 12.0 : (esCelosia ? 90.0 : 40.0));
+        final minSetup = cfg.getTarifa('min_setup') > 0 ? cfg.getTarifa('min_setup') : 10.0;
+        tiempoHoras = (areaM2 * minM2 * cantidad + minSetup) / 60;
         // Extras Router 2D
         if (horasLijado > 0) {
           final tl = cfg.getTarifa('costo_lijado_hora') > 0 ? cfg.getTarifa('costo_lijado_hora') : 150;
@@ -613,6 +638,7 @@ class MotorCalculo {
           }
           final costoTubo = cfg.getTarifa('costo_tubo_min') > 0 ? cfg.getTarifa('costo_tubo_min') : 0.80;
           desglose['desgaste_tubo'] = (minEst * costoTubo * cantidad).toDouble();
+          // (se suma al precio más abajo; antes sólo se anotaba y no se cobraba)
         } else {
           minEst = minutos > 0 ? minutos : areaM2min * 60 * tipo.factor;
         }
@@ -628,7 +654,7 @@ class MotorCalculo {
           tarifaMinuto = cfg.getTarifa('tarifa_min') > 0 ? cfg.getTarifa('tarifa_min') : 10;
         }
         tiempoHoras = minEst / 60 * cantidad;
-        precioMaquila = minEst * tarifaMinuto * cantidad;
+        precioMaquila = minEst * tarifaMinuto * cantidad + (desglose['desgaste_tubo'] ?? 0.0);
         desglose['minutos_estimados'] = (minEst * cantidad).toDouble();
         desglose['tarifa_min'] = tarifaMinuto.toDouble();
         break;
@@ -653,7 +679,11 @@ class MotorCalculo {
           tarifaMt = cfg.getTarifa('tarifa_metro') > 0 ? cfg.getTarifa('tarifa_metro').toDouble() : 100.0;
         }
         precioMaquila = metros * tarifaMt * cantidad;
-        tiempoHoras = metros * 0.1 * cantidad;
+        // m/min de corte (plasma ~1.2 en lámina delgada) + preparación;
+        // antes se asumían 6 min por metro, 5 veces más de lo real
+        final velM = cfg.getTarifa('vel_corte_m_min') > 0 ? cfg.getTarifa('vel_corte_m_min') : 1.2;
+        final setupM = cfg.getTarifa('min_setup') > 0 ? cfg.getTarifa('min_setup') : 10.0;
+        tiempoHoras = (metros * cantidad / velM + setupM) / 60;
         desglose['metros'] = metros;
         desglose['tarifa_metro'] = tarifaMt;
         break;
@@ -701,12 +731,14 @@ class MotorCalculo {
           final minAp2 = cfg.getTarifa('minimo_apertura') > 0 ? cfg.getTarifa('minimo_apertura') : 150;
           if (precioMaquila < minAp2) precioMaquila = minAp2.toDouble();
         }
-        tiempoHoras = tipo.factor * cantidad / 60;
+        final minPza = cfg.getTarifa('min_por_pieza') > 0 ? cfg.getTarifa('min_por_pieza') : 1.5;
+        final setupP = cfg.getTarifa('min_setup') > 0 ? cfg.getTarifa('min_setup') : 10.0;
+        tiempoHoras = (minPza * tipo.factor * cantidad + setupP) / 60;
         break;
 
       case 'precio_fijo':
         precioMaquila = cfg.getTarifa('precio_fijo') * cantidad;
-        tiempoHoras = 1.0;
+        tiempoHoras = 0.5 * cantidad;
         break;
 
       default:
@@ -759,11 +791,10 @@ class MotorCalculo {
     if (!clienteTreMaterial) {
       if (usarInventario && materialInv != null) {
         cm = ((materialInv['costo_unitario'] as num?)?.toDouble() ?? 0) * cantidad;
-        // Agregar merma 15%
-        cm *= 1.15;
+        cm *= 1 + costos.mermaPct / 100; // merma configurable (recortes, pruebas)
         materialNombre = materialInv['nombre'] as String?;
       } else if (!usarInventario && materialLibrePrecio > 0) {
-        cm = materialLibrePrecio * cantidad * 1.15; // +15% merma
+        cm = materialLibrePrecio * cantidad * (1 + costos.mermaPct / 100); // + merma
         materialNombre = materialLibreNombre.isNotEmpty ? materialLibreNombre : 'Material';
       }
     }
@@ -796,48 +827,38 @@ class MotorCalculo {
       extrasTotal += e.precio * cantidad;
     }
 
-    // ── COSTO TOTAL ─────────────────────────────────
-    // Para Router y Diseño: el precioMaquila YA incluye la ganancia
-    // Solo sumamos materiales y acabados como costo adicional
-    double costoTotal;
-    if (precioMaquila > 0) {
-      // Modo directo: maquila + material + acabado + extras
-      costoTotal = precioMaquila + cm + ca + extrasTotal + extrasRouter + extrasPlasma;
-      // Registrar en desglose
-      if (precioMaquila > 0) {
-        final desglMap = {'Maquila/Producción': precioMaquila};
-        if (cm > 0) desglMap['Material'] = cm;
-        if (ca > 0) desglMap['Acabado'] = ca;
-        if (extrasRouter > 0) desglMap['Mano de obra'] = extrasRouter;
-        if (extrasTotal > 0) desglMap['Extras'] = extrasTotal;
-      }
-    } else {
-      // Modo costo real: suma todos los componentes
-      costoTotal = cm + cmaq + cmo + cc + ca + ci + extrasTotal;
-    }
+    // ── COSTO REAL ──────────────────────────────────
+    // Lo que de verdad le cuesta al taller hacer el trabajo: material con
+    // merma + máquina + operador + consumibles + parte de los gastos fijos
+    // + acabados + extras. Es independiente de la tarifa que se cobre.
+    // (Antes, cuando había tarifa, el "costo" era la propia tarifa y la
+    // utilidad siempre salía en $0.)
+    final costoReal = cm + cmaq + cmo + cc + ci + ca + extrasTotal + extrasRouter + extrasPlasma;
+    final costoTotal = costoReal;
 
-    // ── 3 PRECIOS CON MARGEN ─────────────────────────
-    // Para Diseño y Láser de Fibra por pieza, usar tarifas directas si están configuradas
-    double baseMin, baseRec, basePrem;
+    // ── PRECIOS ──────────────────────────────────────
+    final mMin  = (costos.margenMinimo / 100).clamp(0.0, 0.85);
+    final mRec  = (costos.margenRecomendado / 100).clamp(0.0, 0.85);
+    final mPrem = ((costos.margenRecomendado + 15) / 100).clamp(0.0, 0.9);
 
-    // ── 3 PRECIOS ────────────────────────────────────
-    // Para Router/Diseño: el precio de maquila ya está calculado
-    // Solo aplicamos márgenes sobre el costo total
-    final mMin  = costos.margenMinimo / 100;
-    final mRec  = costos.margenRecomendado / 100;
-    final mPrem = (costos.margenRecomendado + 15) / 100;
+    // a) Por tarifa de mercado: maquila + material (con la ganancia del
+    //    material) + acabados + extras
+    final cmVenta = cm * (1 + costos.markupMaterialPct / 100);
+    final precioTarifa = precioMaquila > 0
+      ? precioMaquila + cmVenta + ca + extrasTotal + extrasRouter + extrasPlasma : 0.0;
+    // b) Por costo real + margen (fórmula PV = Costo ÷ (1 − margen))
+    final precioCosto = costoReal > 0 ? costoReal / (1 - mRec) : 0.0;
 
-    if (precioMaquila > 0) {
-      // El precio recomendado = maquila + material + acabados
-      baseRec  = costoTotal;
-      baseMin  = costoTotal * (1 - (mRec - mMin));
-      basePrem = costoTotal * (1 + (mPrem - mRec));
-    } else {
-      // Fórmula maestra: PV = Costo ÷ (1 - Margen)
-      baseMin  = costoTotal > 0 ? costoTotal / (1 - mMin)  : 0;
-      baseRec  = costoTotal > 0 ? costoTotal / (1 - mRec)  : 0;
-      basePrem = costoTotal > 0 ? costoTotal / (1 - mPrem) : 0;
-    }
+    // Recomendado: el mayor de los dos. Si la tarifa no cubre costo +
+    // margen, se sube al precio por costo (y se avisa en observaciones).
+    final baseRec  = precioTarifa > precioCosto ? precioTarifa : precioCosto;
+    // Mínimo: nunca por debajo del costo + margen mínimo
+    final minPorCosto = costoReal > 0 ? costoReal / (1 - mMin) : 0.0;
+    double baseMin = baseRec * 0.9;
+    if (baseMin < minPorCosto) baseMin = minPorCosto;
+    if (baseMin > baseRec) baseMin = baseRec;
+    final premPorCosto = costoReal > 0 ? costoReal / (1 - mPrem) : 0.0;
+    final basePrem = (baseRec * 1.15) > premPorCosto ? baseRec * 1.15 : premPorCosto;
 
     // IVA
     final iva = aplicarIva ? baseRec * (costos.ivaPct / 100) : 0.0;
@@ -862,11 +883,12 @@ class MotorCalculo {
       costosDesglose: {
         'Material': cm, 'Máquina': cmaq, 'Operador': cmo,
         'Consumibles': cc, 'Acabado': ca, 'Taller (CI)': ci,
-        'Extras': extrasTotal,
+        'Extras': extrasTotal + extrasRouter + extrasPlasma,
       },
       incluyeIva: aplicarIva,
       materialNombre: materialNombre,
-      maquila: baseRec, costoMaterial: cm, acabado: ca, extras: extrasTotal);
+      maquila: baseRec, costoMaterial: cm, acabado: ca, extras: extrasTotal,
+      precioTarifa: precioTarifa, precioCosto: precioCosto);
   }
 }
 
@@ -962,17 +984,23 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
               const SizedBox(height: 14),
 
               // Grid de servicios
-              GridView.builder(
+              // Tarjetas de ~170 px: en celular salen 2 por fila y en
+              // pantalla ancha 4-5 (antes siempre eran 2 y en la
+              // computadora quedaban enormes)
+              LayoutBuilder(builder: (ctx, cons) {
+                final cols = (cons.maxWidth / 170).floor().clamp(2, 6);
+                return GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, childAspectRatio: 1.55,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cols, childAspectRatio: 1.45,
                   crossAxisSpacing: 10, mainAxisSpacing: 10),
                 itemCount: _servicios.length + 1,
                 itemBuilder: (_, i) {
                   if (i == _servicios.length) return _cardAgregar();
                   return _cardServicio(_servicios[i]);
-                }),
+                });
+              }),
 
               // Carrito
               if (_carrito.isNotEmpty) ...[
@@ -3347,6 +3375,17 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   List<Widget> _generarObservaciones(ResultadoSimulador r, NumberFormat fmt) {
     final obs = <Widget>[];
 
+    // Tarifa de mercado vs costo real
+    if (r.precioTarifa > 0 && r.precioCosto > 0) {
+      if (r.precioTarifa < r.precioCosto) {
+        obs.add(_obs(trf('📈 Tu tarifa ({0}) no cubre costo + margen ({1})', [fmt.format(r.precioTarifa), fmt.format(r.precioCosto)]),
+          tr('El precio recomendado se calculó con tu costo real. Revisa la tarifa de este servicio o tus costos del taller.'), AppColors.rojo));
+      } else {
+        obs.add(_obs(trf('💵 Precio por tarifa: {0} · por costo + margen: {1}', [fmt.format(r.precioTarifa), fmt.format(r.precioCosto)]),
+          trf('Costo real del trabajo: {0}. La tarifa deja margen de sobra.', [fmt.format(r.costoTotal)]), AppColors.verde));
+      }
+    }
+
     // Observación margen
     if (r.margenReal < 20) {
       obs.add(_obs(trf('⚠️ Margen bajo ({0}%)', [(r.margenReal.toStringAsFixed(1))]),
@@ -3375,10 +3414,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     }
 
     // Observación costos taller
-    final pctCI = r.costoTotal > 0 ? (r.ci / r.costoTotal * 100) : 0;
-    if (pctCI < 5 && (_costosTaller?.costoHoraTaller ?? 0) < 1) {
-      obs.add(_obs(tr('💡 Configura tus costos fijos'),
-        tr('Ve a "Costos del taller" y agrega renta, luz y salarios para calcular el precio real.'),
+    if (!(_costosTaller?.configurado ?? false)) {
+      obs.add(_obs(tr('💡 Configura tus costos del taller (5 datos)'),
+        tr('Gastos fijos al mes, horas y días que trabajas, una máquina y un operador. Con eso el simulador sabe cuánto te cuesta cada hora y si la tarifa deja ganancia.'),
         AppColors.ambar));
     }
 

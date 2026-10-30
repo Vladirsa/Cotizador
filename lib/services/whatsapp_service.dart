@@ -366,8 +366,26 @@ class WhatsAppService {
   // son: Pago50, Produccion, Pruebas, PagoCompleto, Entrega, Entregado,
   // Cancelado (ej. "avance_pago50", "avance_produccion"). Variables
   // disponibles además de las de siempre: *MONTO* (total), *ANTICIPO*
-  // (50%), *RESTANTE* (lo que falta). Si no existe plantilla
+  // (según el % configurado), *PCT_ANTICIPO* (ese %), *RESTANTE* (lo que falta). Si no existe plantilla
   // personalizada, cae al mensaje por defecto de mensajeAvance().
+  // % de anticipo que pide el taller (Más → Costos del taller → Material y
+  // cobro). Se guarda en empresa_config.anticipo_pct; si no existe, 50%.
+  static double? _anticipoCache;
+  static Future<double> anticipoPct() async {
+    if (_anticipoCache != null) return _anticipoCache!;
+    try {
+      final negocioId = AuthService.negocioId;
+      if (negocioId == null) return 50;
+      final row = await Supabase.instance.client.from('empresa_config')
+        .select('anticipo_pct').eq('negocio_id', negocioId).maybeSingle();
+      final v = (row?['anticipo_pct'] as num?)?.toDouble();
+      _anticipoCache = (v == null || v <= 0 || v > 100) ? 50 : v;
+    } catch (_) { _anticipoCache = 50; }
+    return _anticipoCache!;
+  }
+  static void olvidarAnticipo() => _anticipoCache = null;
+  static String pctTexto(double p) => p == p.roundToDouble() ? p.toStringAsFixed(0) : p.toStringAsFixed(1);
+
   static Future<String> getPlantillaAvance({
     required String etapa,
     required String nombreCliente,
@@ -377,6 +395,7 @@ class WhatsAppService {
     String? pedidoId,
   }) async {
     String msgFinal;
+    final pctAnt = await anticipoPct();
     try {
       final negocioId = AuthService.negocioId;
       if (negocioId == null) throw Exception('sin negocio activo');
@@ -396,13 +415,14 @@ class WhatsAppService {
         final rawMsg = data['mensaje'] as String? ?? data['cuerpo'] as String? ?? '';
         if (rawMsg.isNotEmpty) {
           final total = montoTotal ?? 0;
-          final anticipo = total / 2;
+          final anticipo = total * pctAnt / 100;
           final restante = total - anticipo;
           var msg = rawMsg;
           msg = msg.replaceAll('*NOMBRE*', nombreCliente);
           msg = msg.replaceAll('*FOLIO*', folio);
           msg = msg.replaceAll('*MONTO*', total > 0 ? '\$${total.toStringAsFixed(2)}' : '');
           msg = msg.replaceAll('*ANTICIPO*', total > 0 ? '\$${anticipo.toStringAsFixed(2)}' : '');
+          msg = msg.replaceAll('*PCT_ANTICIPO*', '${pctTexto(pctAnt)}%');
           msg = msg.replaceAll('*RESTANTE*', total > 0 ? '\$${restante.toStringAsFixed(2)}' : '');
           msg = msg.replaceAll('*EMPRESA*', empresa ?? 'HETNA CNC');
           msg = msg.replaceAll('*FECHA*', DateTime.now().toString().substring(0, 10));
@@ -410,17 +430,17 @@ class WhatsAppService {
         } else {
           msgFinal = mensajeAvance(
             nombreCliente: nombreCliente, folio: folio, etapa: etapa,
-            total: montoTotal, empresa: empresa);
+            total: montoTotal, empresa: empresa, anticipoPct: pctAnt);
         }
       } else {
         msgFinal = mensajeAvance(
           nombreCliente: nombreCliente, folio: folio, etapa: etapa,
-          total: montoTotal, empresa: empresa);
+          total: montoTotal, empresa: empresa, anticipoPct: pctAnt);
       }
     } catch (_) {
       msgFinal = mensajeAvance(
         nombreCliente: nombreCliente, folio: folio, etapa: etapa,
-        total: montoTotal, empresa: empresa);
+        total: montoTotal, empresa: empresa, anticipoPct: pctAnt);
     }
     return msgFinal;
   }
@@ -554,16 +574,17 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     required String etapa,
     double? total,
     String? empresa,
+    double anticipoPct = 50,
   }) {
     final biz = empresa ?? tr('HETNA CNC');
     final montoTotal = total ?? 0;
-    final anticipo = montoTotal / 2;
+    final anticipo = montoTotal * anticipoPct / 100;
     final restante = montoTotal - anticipo;
     final txtAnticipo = montoTotal > 0 ? ' (\$${anticipo.toStringAsFixed(2)})' : '';
     final txtRestante = montoTotal > 0 ? trf(' de \${0}', [(restante.toStringAsFixed(2))]) : '';
     switch (etapa) {
       case 'Pago50':
-        return '¡Hola $nombreCliente! ✅ Recibimos tu anticipo del 50%$txtAnticipo del pedido *$folio*. ¡Empezamos a producir! 🔧\n\nRecuerda que el saldo restante$txtRestante se liquida antes de la entrega. — *$biz*';
+        return '¡Hola $nombreCliente! ✅ Recibimos tu anticipo del ${pctTexto(anticipoPct)}%$txtAnticipo del pedido *$folio*. ¡Empezamos a producir! 🔧\n\nRecuerda que el saldo restante$txtRestante se liquida antes de la entrega. — *$biz*';
       case 'Produccion':
         return '¡Hola $nombreCliente! 🔧 Tu pedido *$folio* está en producción. Te avisamos cuando esté listo. — *$biz*';
       case 'Pruebas':

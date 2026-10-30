@@ -439,6 +439,14 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     ('archivo', 'Archivo recibido (DXF, STEP, plano...)', 1, ''),
     ('norma', 'Norma o especificación (si aplica)', 1, ''),
   ];
+  // Croquis: con largo y ancho el PDF dibuja la pieza acotada (como plano)
+  static const _camposCroquis = [
+    ('croquis_largo', 'Largo (mm)', 1, ''),
+    ('croquis_ancho', 'Ancho (mm)', 1, ''),
+    ('croquis_espesor', 'Espesor (mm)', 1, ''),
+    ('croquis_barreno_d', 'Diámetro de barrenos (mm, opcional)', 1, ''),
+    ('croquis_barrenos', 'Número de barrenos (opcional)', 1, ''),
+  ];
   static const _camposFabricacion = [
     ('proceso', 'Proceso (ej. router CNC 3 ejes)', 1, ''),
     ('maquina', 'Máquina', 1, ''),
@@ -525,7 +533,26 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   double get _montoIva => _aplicaIva ? _baseIva * _ivaPct / 100 : 0;
   double get _total => _baseIva + _montoIva + _costoEnvio;
   bool get _puedeAccionar => _items.isNotEmpty && _cliente != null;
+  // La primera opción usa el % de anticipo configurado por el taller
+  // (Más → Costos del taller → Material y cobro); al editar una cotización
+  // vieja se conserva el texto que tenía.
   final _metodosPago = ['50% anticipo / 50% entrega', 'Pago total anticipado', 'Crédito 30 días', 'Transferencia bancaria'];
+  String _opcionAnticipo(double pct) {
+    final a = WhatsAppService.pctTexto(pct);
+    final r = WhatsAppService.pctTexto(100 - pct);
+    return '$a% anticipo / $r% entrega';
+  }
+  Future<void> _cargarAnticipo() async {
+    final pct = await WhatsAppService.anticipoPct();
+    if (!mounted) return;
+    final nueva = _opcionAnticipo(pct);
+    setState(() {
+      final vieja = _metodosPago.first;
+      _metodosPago[0] = nueva;
+      if (_metodoPago == vieja || (!_esEdicion && _metodoPago == '50% anticipo / 50% entrega')) _metodoPago = nueva;
+      if (!_metodosPago.contains(_metodoPago)) _metodosPago.add(_metodoPago);
+    });
+  }
   final _condiciones = ['LAB — En planta HETNA', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
   String _tiempoEntrega = '15 días';
@@ -551,6 +578,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   void initState() {
     super.initState();
     if (widget.cotizacionEditar == null) _cargarImpuestoDefault();
+    _cargarAnticipo();
     if (widget.itemInicial != null) {
       try {
         final item = widget.itemInicial!;
@@ -701,6 +729,20 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         _bloquePro(tr('Proyecto y resumen'), Icons.folder_outlined, _camposProyecto),
         _bloquePro(tr('Alcance'), Icons.checklist_outlined, _camposAlcance),
         _bloquePro(tr('Detalle técnico'), Icons.straighten_outlined, _camposTecnicos),
+        _bloque(tr('Croquis con medidas (opcional)'), Icons.architecture_outlined, Column(children: [
+          Padding(padding: const EdgeInsets.only(bottom: 8),
+            child: Text(tr('Con largo y ancho la cotización en PDF lleva un dibujo con las cotas, como en un plano.'),
+              style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
+          ..._camposCroquis.map((f) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TextField(
+              controller: _ctrlPro(f.$1, f.$4),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(fontSize: 13),
+              decoration: InputDecoration(
+                labelText: tr(f.$2), isDense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))))),
+        ])),
         _bloquePro(tr('Especificaciones de fabricación'), Icons.precision_manufacturing_outlined, _camposFabricacion),
         _bloquePro(tr('Calidad y cambios'), Icons.verified_outlined, _camposCondiciones),
       ],

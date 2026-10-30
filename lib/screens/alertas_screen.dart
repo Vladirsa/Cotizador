@@ -411,7 +411,7 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
       case 'post_entrega':
         return 'Hola *$nombre* ✅ Esperamos que estés disfrutando tu pedido. Tu opinión es importante para nosotros. ¡Gracias! — *HETNA CNC*';
       case 'pago_anticipo_pendiente':
-        return 'Hola *$nombre* 👋 Te recordamos que el anticipo del 50% del pedido *$folio* está pendiente. Para iniciar producción necesitamos confirmarlo. — *HETNA CNC*';
+        return 'Hola *$nombre* 👋 Te recordamos que el anticipo del pedido *$folio* está pendiente. Para iniciar producción necesitamos confirmarlo. — *HETNA CNC*';
       case 'pago_final_pendiente':
         return 'Hola *$nombre* ✅ Tu pedido *$folio* está listo. Para proceder con la entrega necesitamos el saldo restante. — *HETNA CNC*';
       case 'produccion_sin_avance':

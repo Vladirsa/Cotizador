@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
 import '../i18n/tr.dart';
+import '../services/whatsapp_service.dart';
 
 String get _negocioId => AuthService.negocioId ?? '';
 
@@ -27,6 +28,9 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
   // ── EMPRESA ──────────────────────────────────────
   final _nombreCtrl    = TextEditingController();
   final _margenMinCtrl = TextEditingController(text: '20');
+  final _mermaCtrl = TextEditingController(text: '15');
+  final _markupMatCtrl = TextEditingController(text: '20');
+  final _anticipoCtrl = TextEditingController(text: '50');
   final _margenRecCtrl = TextEditingController(text: '35');
   final _ivaCtrl       = TextEditingController(text: '16');
   final _horasDiaCtrl  = TextEditingController(text: '8');
@@ -109,6 +113,9 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         _ivaCtrl.text = (cfg['iva_pct'] ?? 16).toString();
         _horasDiaCtrl.text = (cfg['horas_dia'] ?? 8).toString();
         _diasSemCtrl.text = (cfg['dias_semana'] ?? 6).toString();
+        _mermaCtrl.text = (cfg['merma_pct'] ?? 15).toString();
+        _markupMatCtrl.text = (cfg['markup_material_pct'] ?? 20).toString();
+        _anticipoCtrl.text = (cfg['anticipo_pct'] ?? 50).toString();
         for (final key in _costosCtrls.keys) {
           _costosCtrls[key]!.text =
             ((cfg[key] as num?)?.toDouble() ?? 0).toStringAsFixed(2);
@@ -132,11 +139,15 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
       total += double.tryParse(c.text) ?? 0;
     }
     final horas = double.tryParse(_horasDiaCtrl.text) ?? 8;
+    final diasSem = double.tryParse(_diasSemCtrl.text) ?? 6;
+    // Los gastos fijos se reparten sólo entre los días y horas que de
+    // verdad se trabajan (no entre 30 días del mes)
+    final diasMes = diasSem * 4.33;
     setState(() {
       _costoFijoMensual = total;
-      _costoDiario = total / 30;
-      _costoHora = total / (30 * horas);
-      _costoMinuto = total / (30 * horas * 60);
+      _costoDiario = diasMes > 0 ? total / diasMes : 0;
+      _costoHora = diasMes > 0 && horas > 0 ? total / (diasMes * horas) : 0;
+      _costoMinuto = _costoHora / 60;
     });
   }
 
@@ -156,6 +167,15 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         datos[key] = double.tryParse(_costosCtrls[key]!.text) ?? 0;
       }
 
+      // Columnas nuevas (merma, ganancia del material, anticipo): se
+      // guardan aparte para que, si la base todavía no las tiene, no se
+      // pierda el resto de la configuración.
+      final datosNuevos = <String, dynamic>{
+        'merma_pct': double.tryParse(_mermaCtrl.text) ?? 15,
+        'markup_material_pct': double.tryParse(_markupMatCtrl.text) ?? 20,
+        'anticipo_pct': double.tryParse(_anticipoCtrl.text) ?? 50,
+      };
+
       // Buscar TODAS las filas existentes (por si hay duplicados de ejecuciones SQL previas)
       final existingRows = await _sb.from('empresa_config')
         .select('id').eq('negocio_id', _negocioId);
@@ -163,10 +183,16 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
 
       if (rows.isEmpty) {
         await _sb.from('empresa_config').insert(datos);
+        try {
+          await _sb.from('empresa_config').update(datosNuevos).eq('negocio_id', _negocioId);
+        } catch (_) {}
       } else {
         // Actualizar la primera fila y borrar duplicados si existieran
         final idPrincipal = rows.first['id'];
         await _sb.from('empresa_config').update(datos).eq('id', idPrincipal);
+        try {
+          await _sb.from('empresa_config').update(datosNuevos).eq('id', idPrincipal);
+        } catch (_) {}
         if (rows.length > 1) {
           for (int i = 1; i < rows.length; i++) {
             await _sb.from('empresa_config').delete().eq('id', rows[i]['id']);
@@ -174,6 +200,7 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         }
       }
 
+      WhatsAppService.olvidarAnticipo(); // para que los mensajes usen el % nuevo
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(tr('✅ Configuración guardada')),
         backgroundColor: AppColors.verde));
@@ -236,6 +263,20 @@ class _ConfigCostosScreenState extends State<ConfigCostosScreen>
         Expanded(child: _campoNum(_horasDiaCtrl, 'Horas/día')),
         const SizedBox(width: 10),
         Expanded(child: _campoNum(_diasSemCtrl, 'Días/semana')),
+      ]),
+    ]),
+    const SizedBox(height: 12),
+    _card(tr('Material y cobro'), [
+      Text(tr('Merma: % de material que se desperdicia en recortes y pruebas. Ganancia del material: % que le subes al material al incluirlo en el precio. Anticipo: % que pides para empezar (se usa en cotizaciones y mensajes de WhatsApp).'),
+        style: TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      const SizedBox(height: 12),
+      Row(children: [
+        Expanded(child: _campoNum(_mermaCtrl, tr('Merma %'), sufijo: '%')),
+        const SizedBox(width: 10),
+        Expanded(child: _campoNum(_markupMatCtrl, tr('Ganancia material %'), sufijo: '%')),
+        const SizedBox(width: 10),
+        Expanded(child: _campoNum(_anticipoCtrl, tr('Anticipo %'), sufijo: '%',
+          color: AppColors.naranja)),
       ]),
     ]),
     const SizedBox(height: 12),

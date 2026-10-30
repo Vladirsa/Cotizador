@@ -463,6 +463,12 @@ class PdfService {
       (_t('Notas'), _limpiarTexto(cotizacion.notas ?? '')),
     ];
 
+    double numPro(String k) => double.tryParse(v(k).replaceAll(',', '.')) ?? 0;
+    final croquis = _croquisPieza(
+      largo: numPro('croquis_largo'), ancho: numPro('croquis_ancho'),
+      espesor: numPro('croquis_espesor'), barrenoD: numPro('croquis_barreno_d'),
+      barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto);
+
     int n = 0;
     String sig() => '${++n}';
 
@@ -556,7 +562,11 @@ class PdfService {
         ],
 
         // ─── 3. DETALLE TÉCNICO ─────────────
-        if (hay(tecnicos)) ...[titulo(sig(), _t('DETALLE TÉCNICO')), datos(tecnicos)],
+        if (hay(tecnicos) || croquis != null) ...[
+          titulo(sig(), _t('DETALLE TÉCNICO')),
+          if (hay(tecnicos)) datos(tecnicos),
+          if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
+        ],
 
         // ─── 4. FABRICACIÓN ─────────────────
         if (hay(fabricacion)) ...[titulo(sig(), _t('ESPECIFICACIONES DE FABRICACIÓN')), datos(fabricacion)],
@@ -688,6 +698,138 @@ class PdfService {
         pw.SizedBox(width: 4),
         pw.Expanded(child: pw.Text(valor, style: pw.TextStyle(fontSize: 9, color: color))),
       ]));
+
+  // ── Croquis acotado de la pieza (vista superior + lateral) ──
+  // Dibuja un rectángulo de largo × ancho con sus cotas, barrenos opcionales
+  // y, si hay espesor, una vista lateral. Ilustrativo, no a escala real.
+  static pw.Widget? _croquisPieza({
+    required double largo, required double ancho, required double espesor,
+    required double barrenoD, required int barrenos,
+    required PdfColor azul, required PdfColor gris,
+  }) {
+    if (largo <= 0 || ancho <= 0) return null;
+    const double W = 480, H = 190;
+    // Caja disponible para la vista superior
+    const double boxW = 250, boxH = 120, ox = 50, oy = 40; // ox/oy: margen para cotas
+    final esc = (boxW / largo) < (boxH / ancho) ? boxW / largo : boxH / ancho;
+    final rw = largo * esc, rh = ancho * esc;
+    final rx = ox + (boxW - rw) / 2;
+    final ryTop = oy + (boxH - rh) / 2; // desde arriba (coordenadas de Stack)
+    // Vista lateral a la derecha
+    final tieneLado = espesor > 0;
+    final lx = ox + boxW + 60;
+    final lw = rw > 90 ? 90.0 : rw;
+    double lh = espesor * (lw / largo);
+    if (lh < 6) lh = 6;
+    if (lh > 60) lh = 60;
+    final lyTop = ryTop + (rh - lh) / 2;
+    String mm(double x) => x == x.roundToDouble() ? x.toStringAsFixed(0) : x.toStringAsFixed(1);
+    final estilo = pw.TextStyle(fontSize: 8, color: azul, fontWeight: pw.FontWeight.bold);
+    final estiloGris = pw.TextStyle(fontSize: 7, color: gris);
+
+    // Barrenos: hasta 4 en las esquinas (o 1 al centro)
+    final nB = barrenos.clamp(0, 4).toInt();
+    final holes = <(double, double)>[];
+    final rB = barrenoD > 0 ? (barrenoD * esc / 2).clamp(2.0, 12.0).toDouble() : 0.0;
+    if (barrenoD > 0 && nB > 0) {
+      final ins = rB + 6;
+      if (nB == 1) holes.add((rx + rw / 2, ryTop + rh / 2));
+      else {
+        final cands = [(rx + ins, ryTop + ins), (rx + rw - ins, ryTop + ins),
+          (rx + ins, ryTop + rh - ins), (rx + rw - ins, ryTop + rh - ins)];
+        holes.addAll(cands.take(nB));
+      }
+    }
+
+    return pw.Container(
+      decoration: pw.BoxDecoration(border: pw.Border.all(color: const PdfColor.fromInt(0xFFD1D5DB), width: 0.5),
+        borderRadius: pw.BorderRadius.circular(4)),
+      padding: const pw.EdgeInsets.all(6),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(_t('CROQUIS DE LA PIEZA'), style: pw.TextStyle(fontSize: 8, color: gris, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(
+          width: W, height: H,
+          child: pw.Stack(children: [
+            pw.Positioned(left: 0, top: 0, child: pw.CustomPaint(
+              size: const PdfPoint(W, H),
+              painter: (PdfGraphics c, PdfPoint size) {
+                // El lienzo del PDF tiene el origen abajo-izquierda
+                double Y(double top) => H - top;
+                void linea(double x1, double t1, double x2, double t2) {
+                  c.drawLine(x1, Y(t1), x2, Y(t2));
+                  c.strokePath();
+                }
+                void flecha(double x, double t, double dx, double dt) {
+                  // punta de flecha en (x,t) apuntando en dirección (dx,dt)
+                  const a = 4.0;
+                  if (dt == 0) { linea(x, t, x - dx * a, t - 2); linea(x, t, x - dx * a, t + 2); }
+                  else { linea(x, t, x - 2, t - dt * a); linea(x, t, x + 2, t - dt * a); }
+                }
+                void cotaH(double x1, double x2, double t) {
+                  linea(x1, t, x2, t); flecha(x1, t, -1, 0); flecha(x2, t, 1, 0);
+                }
+                void cotaV(double x, double t1, double t2) {
+                  linea(x, t1, x, t2); flecha(x, t1, 0, -1); flecha(x, t2, 0, 1);
+                }
+                // Pieza (vista superior)
+                c.setStrokeColor(azul);
+                c.setLineWidth(1.2);
+                c.drawRect(rx, Y(ryTop + rh), rw, rh);
+                c.strokePath();
+                // Barrenos
+                c.setLineWidth(0.8);
+                for (final h in holes) {
+                  c.drawEllipse(h.$1, Y(h.$2), rB, rB);
+                  c.strokePath();
+                  c.setLineWidth(0.3);
+                  linea(h.$1 - rB - 3, h.$2, h.$1 + rB + 3, h.$2);
+                  linea(h.$1, h.$2 - rB - 3, h.$1, h.$2 + rB + 3);
+                  c.setLineWidth(0.8);
+                }
+                // Cotas
+                c.setStrokeColor(gris);
+                c.setLineWidth(0.5);
+                // extensión y cota del largo (arriba)
+                linea(rx, ryTop - 4, rx, ryTop - 24);
+                linea(rx + rw, ryTop - 4, rx + rw, ryTop - 24);
+                cotaH(rx, rx + rw, ryTop - 18);
+                // extensión y cota del ancho (izquierda)
+                linea(rx - 4, ryTop, rx - 28, ryTop);
+                linea(rx - 4, ryTop + rh, rx - 28, ryTop + rh);
+                cotaV(rx - 22, ryTop, ryTop + rh);
+                // Vista lateral
+                if (tieneLado) {
+                  c.setStrokeColor(azul);
+                  c.setLineWidth(1.2);
+                  c.drawRect(lx, Y(lyTop + lh), lw, lh);
+                  c.strokePath();
+                  c.setStrokeColor(gris);
+                  c.setLineWidth(0.5);
+                  linea(lx + lw + 4, lyTop, lx + lw + 26, lyTop);
+                  linea(lx + lw + 4, lyTop + lh, lx + lw + 26, lyTop + lh);
+                  cotaV(lx + lw + 20, lyTop, lyTop + lh);
+                }
+              })),
+            // Etiquetas de las cotas
+            pw.Positioned(left: rx, top: ryTop - 31, child: pw.SizedBox(width: rw,
+              child: pw.Text(mm(largo), style: estilo, textAlign: pw.TextAlign.center))),
+            pw.Positioned(left: rx - 48, top: ryTop + rh / 2 - 5, child: pw.SizedBox(width: 22,
+              child: pw.Text(mm(ancho), style: estilo, textAlign: pw.TextAlign.right))),
+            pw.Positioned(left: rx, top: ryTop + rh + 6, child: pw.SizedBox(width: rw,
+              child: pw.Text(_t('Vista superior'), style: estiloGris, textAlign: pw.TextAlign.center))),
+            if (holes.isNotEmpty)
+              pw.Positioned(left: rx, top: ryTop + rh + 16, child: pw.SizedBox(width: rw,
+                child: pw.Text('${holes.length} x Ø${mm(barrenoD)}', style: estilo, textAlign: pw.TextAlign.center))),
+            if (tieneLado) ...[
+              pw.Positioned(left: lx + lw + 28, top: lyTop + lh / 2 - 5,
+                child: pw.Text(mm(espesor), style: estilo)),
+              pw.Positioned(left: lx, top: lyTop + lh + 6, child: pw.SizedBox(width: lw,
+                child: pw.Text(_t('Vista lateral'), style: estiloGris, textAlign: pw.TextAlign.center))),
+            ],
+          ])),
+        pw.Text(_t('Medidas en mm. Croquis ilustrativo, no a escala.'), style: estiloGris),
+      ]));
+  }
 
   // Fix 3: Limpiar caracteres especiales que aparecen como "tachas" en el PDF
   static String _limpiarTexto(String texto) {
