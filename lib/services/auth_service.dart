@@ -351,9 +351,23 @@ class AuthService {
         const SizedBox(width: 8),
         Expanded(child: Text(trf('Disponible en plan {0}', [nombre]), style: const TextStyle(fontSize: 16))),
       ]),
-      content: Text(tr(esTrialVencido
-        ? trf('Tu prueba gratuita terminó. Para seguir usando {0} activa el plan {1} (\${2} al mes).', [funcion, nombre, precio])
-        : trf('Para usar {0} necesitas el plan {1} (\${2} al mes).', [funcion, nombre, precio]))),
+      content: SingleChildScrollView(child: Column(
+        mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(tr(esTrialVencido
+          ? trf('Tu prueba gratuita terminó. Para seguir usando {0} activa el plan {1} (\${2} al mes).', [funcion, nombre, precio])
+          : trf('Para usar {0} necesitas el plan {1} (\${2} al mes).', [funcion, nombre, precio]))),
+        const SizedBox(height: 12),
+        Text(trf('Con el plan {0} también tienes:', [nombre]),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 6),
+        for (final b in (Planes.incluye[requerido] ?? const <String>[]).take(6))
+          Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Icon(Icons.check_circle, size: 16, color: Color(0xFF1D9E75)),
+            const SizedBox(width: 6),
+            Expanded(child: Text(tr(b), style: const TextStyle(fontSize: 13))),
+          ])),
+      ])),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cerrar'))),
         ElevatedButton(

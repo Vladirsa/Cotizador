@@ -37,7 +37,7 @@ const Map<String, String> textosEn = {
   '1-10 pzas': '1-10 pcs',
   '1. Se abrió tu tienda en el navegador': '1. Your store opened in the browser',
   '1. Ábrelo (si no aparece, revisa spam o promociones).\n2. Toca "Confirmar mi correo".\n3. Regresa aquí e inicia sesión con tu correo y contraseña.': '1. Open it (if you don\'t see it, check spam or promotions).\n2. Tap "Confirm my email".\n3. Come back here and sign in with your email and password.',
-  '10 cotizaciones sencillas al mes': '10 simple quotes per month',
+  '5 cotizaciones sencillas al mes': '5 simple quotes per month',
   '10 días': '10 days',
   '11-50 pzas': '11-50 pcs',
   '15 días': '15 days',
@@ -1953,4 +1953,12 @@ const Map<String, String> textosEn = {
   'Tus PDFs mostrarán Tax ID / EIN en lugar de RFC y "Sales tax" en lugar de IVA. La factura se emite como invoice (sin timbrado SAT).': 'Your PDFs will show Tax ID / EIN instead of RFC and "Sales tax" instead of IVA. The invoice is issued as a US invoice (no SAT stamping).',
   'Factura electrónica CFDI 4.0 con RFC, régimen fiscal y uso de CFDI, timbrada por tu proveedor.': 'CFDI 4.0 electronic invoice with RFC, tax regime and CFDI use, stamped by your provider.',
   '🚚 Envíos: por el momento solo dentro de México. Esta leyenda sale en tus cotizaciones.': '🚚 Shipping: for now only within Mexico. This notice appears on your quotes.',
+  // Planes: marca de agua y lo que incluye cada plan
+  'PDF con marca de agua HETNA CNC': 'PDF with HETNA CNC watermark',
+  'PDF con tu logo, sin marca de agua': 'PDF with your logo, no watermark',
+  'Cotización profesional (formato internacional)': 'Professional quote (international format)',
+  'Sube DXF, SVG, STL u OBJ: plano con medidas en la cotización': 'Upload DXF, SVG, STL or OBJ: dimensioned drawing in the quote',
+  'Simulador de costos con 3 precios y anticipo a tu medida': 'Cost simulator with 3 prices and custom deposit',
+  'Con el plan {0} también tienes:': 'With the {0} plan you also get:',
+  'Hecho con el Cotizador gratis de HETNA CNC · hetnacnc.com/cotizador': 'Made with the free HETNA CNC Quoter · hetnacnc.com/cotizador',
 };

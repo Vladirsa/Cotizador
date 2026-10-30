@@ -11,6 +11,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import 'archivo_cad_service.dart';
+import 'auth_service.dart';
 import '../main.dart';
 
 class PdfService {
@@ -30,6 +31,28 @@ class PdfService {
     return f.format(v);
   }
   static String _tf(String es, List<Object?> valores) => trfIdioma(es, _en, valores);
+
+  // Plan Gratis: las cotizaciones salen con "HETNA CNC" en diagonal, muy
+  // tenue, y una línea al pie. Con el plan Taller salen limpias, sólo con el
+  // logo del taller (Planes: 'pdf_sin_marca').
+  static pw.PageTheme _tema(pw.EdgeInsets margen) {
+    final marca = !AuthService.puede('pdf_sin_marca');
+    return pw.PageTheme(
+      pageFormat: PdfPageFormat.a4,
+      margin: margen,
+      buildForeground: !marca ? null : (ctx) => pw.FullPage(ignoreMargins: true,
+        child: pw.Stack(children: [
+          pw.Center(child: pw.Transform.rotate(angle: 0.55,
+            child: pw.Opacity(opacity: 0.07,
+              child: pw.Text('HETNA CNC', style: pw.TextStyle(
+                fontSize: 110, fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey800))))),
+          pw.Positioned(left: 0, right: 0, bottom: 10,
+            child: pw.Center(child: pw.Text(
+              _t('Hecho con el Cotizador gratis de HETNA CNC · hetnacnc.com/cotizador'),
+              style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey600)))),
+        ])),
+    );
+  }
   static DateFormat get _fmtFecha =>
       _en ? DateFormat('MM/dd/yyyy', 'en_US') : DateFormat('dd/MM/yyyy', 'es_MX');
 
@@ -211,8 +234,7 @@ class PdfService {
       (cotizacion.createdAt ?? DateTime.now()).add(Duration(days: vigenciaDias)));
 
     pdf.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(28),
+      pageTheme: _tema(const pw.EdgeInsets.all(28)),
       build: (ctx) => [
         // ─── ENCABEZADO ─────────────────────
         pw.Container(
@@ -507,8 +529,7 @@ class PdfService {
     String sig() => '${++n}';
 
     pdf.addPage(pw.MultiPage(
-      pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 36),
+      pageTheme: _tema(const pw.EdgeInsets.fromLTRB(28, 28, 28, 36)),
       footer: (ctx) => pw.Container(
         padding: const pw.EdgeInsets.only(top: 6),
         decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: grisLinea, width: 0.5))),

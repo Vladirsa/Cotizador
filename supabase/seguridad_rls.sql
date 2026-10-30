@@ -231,9 +231,9 @@ begin
   v_slug := lower(regexp_replace(p_nombre_taller, '[^a-zA-Z0-9]+', '-', 'g'))
             || '-' || substr(md5(random()::text), 1, 6);
 
-  -- Taller nuevo: plan "trial" con 1 mes completo desde hoy
+  -- Taller nuevo: plan "trial" con 14 días con todo abierto (igual que hetnacnc.com)
   insert into negocios (nombre, slug, telefono, correo, plan, trial_hasta, activo)
-  values (p_nombre_taller, v_slug, p_telefono, p_correo, 'trial', now() + interval '1 month', true)
+  values (p_nombre_taller, v_slug, p_telefono, p_correo, 'trial', now() + interval '14 days', true)
   returning id into v_negocio_id;
 
   insert into usuarios_negocio (user_id, negocio_id, rol, nombre, correo, activo)

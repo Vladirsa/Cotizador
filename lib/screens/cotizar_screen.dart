@@ -1253,7 +1253,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       numero: _cliente!.whatsappNumero, mensaje: msg);
   }
 
-  // Plan Gratis: 10 cotizaciones nuevas al mes (igual que en hetnacnc.com)
+  // Plan Gratis: 5 cotizaciones nuevas al mes (igual que en hetnacnc.com)
   Future<bool> _hayCupo() async {
     if (_esEdicion || AuthService.puede('cotizaciones_ilimitadas')) return true;
     final n = await SupabaseService.contarCotizacionesDelMes();
