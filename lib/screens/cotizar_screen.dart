@@ -9,6 +9,8 @@ import '../services/supabase_service.dart';
 import '../services/pdf_service.dart';
 import '../services/whatsapp_service.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
+import 'package:file_picker/file_picker.dart';
+import '../services/archivo_cad_service.dart';
 import 'simulador_screen.dart';
 import 'envios_screen.dart';
 import '../services/auth_service.dart';
@@ -461,6 +463,10 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       'Cambios de diseño o de cantidad después de aprobar pueden modificar precio y tiempo de entrega.'),
   ];
   final Map<String, TextEditingController> _pro = {};
+  // Archivo de la pieza (DXF/SVG/STL/OBJ) leído por ArchivoCadService
+  Map<String, dynamic>? _archivoInfo;
+  List<List<List<double>>> _archivoGeo = [];
+  bool _leyendoArchivo = false;
 
   TextEditingController _ctrlPro(String k, String inicial) =>
     _pro.putIfAbsent(k, () => TextEditingController(text: inicial));
@@ -470,7 +476,94 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     _pro.forEach((k, c) { if (c.text.trim().isNotEmpty) d[k] = c.text.trim(); });
     d['tiempo_entrega'] = _tiempoEntrega;
     if (_muestraGratis) d['muestra'] = true;
+    if (_archivoInfo != null) {
+      d['archivo_info'] = _archivoInfo;
+      d['archivo_geo'] = _archivoGeo.map((t) => t.map((q) => [
+        (q[0] * 100).round() / 100, (q[1] * 100).round() / 100]).toList()).toList();
+    }
     return d;
+  }
+
+  Future<void> _subirArchivoPieza() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ArchivoCadService.extensiones, withData: true);
+      if (result == null || result.files.isEmpty) return;
+      final f = result.files.first;
+      final bytes = f.bytes;
+      if (bytes == null) return;
+      setState(() => _leyendoArchivo = true);
+      final g = ArchivoCadService.leer(f.name, bytes);
+      String mm(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+      setState(() {
+        _archivoInfo = g.toInfo();
+        _archivoGeo = g.trazos;
+        _ctrlPro('croquis_largo', '').text = mm(g.largo);
+        _ctrlPro('croquis_ancho', '').text = mm(g.ancho);
+        if (g.es3D && g.alto > 0) _ctrlPro('croquis_espesor', '').text = mm(g.alto);
+        if (!g.es3D && g.barrenos > 0 && _ctrlPro('croquis_barrenos', '').text.isEmpty) {
+          _ctrlPro('croquis_barrenos', '').text = '${g.barrenos}';
+        }
+        final arch = _ctrlPro('archivo', '');
+        if (arch.text.trim().isEmpty) arch.text = '${g.nombre} (${g.tipo.toUpperCase()})';
+        final med = _ctrlPro('medidas', '');
+        if (med.text.trim().isEmpty) {
+          final esp = _ctrlPro('croquis_espesor', '').text.trim();
+          med.text = g.es3D
+            ? '${mm(g.largo)} × ${mm(g.ancho)} × ${mm(g.alto)} mm'
+            : '${mm(g.largo)} × ${mm(g.ancho)} mm${esp.isNotEmpty ? " · espesor $esp mm" : ""}';
+        }
+        _leyendoArchivo = false;
+      });
+    } catch (e) {
+      setState(() => _leyendoArchivo = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')])),
+        backgroundColor: AppColors.rojo));
+    }
+  }
+
+  Widget _resumenArchivo() {
+    final i = _archivoInfo!;
+    final es3D = i['tipo'] == 'stl' || i['tipo'] == 'obj';
+    String n(dynamic v, [int d = 1]) => ((v as num?) ?? 0).toStringAsFixed(d);
+    final filas = <(String, String)>[
+      (tr('Archivo'), '${i['nombre']} · ${(i['tipo'] as String).toUpperCase()} · ${i['unidades']}'),
+      (tr('Medidas'), es3D
+        ? '${n(i['largo'])} × ${n(i['ancho'])} × ${n(i['alto'])} mm'
+        : '${n(i['largo'])} × ${n(i['ancho'])} mm'),
+      if (!es3D) (tr('Longitud de corte'), '${n((i['longitud_corte'] as num? ?? 0) / 1000, 2)} m'),
+      if (!es3D) (tr('Contornos cerrados'), '${i['contornos']}'),
+      if (!es3D) (tr('Barrenos (círculos)'), '${i['barrenos']}'),
+      if (!es3D && ((i['area_pieza'] as num?) ?? 0) > 0) (tr('Área de la pieza'), '${n((i['area_pieza'] as num) / 100, 1)} cm²'),
+      if (es3D) (tr('Triángulos'), '${i['triangulos']}'),
+      if (es3D) (tr('Volumen'), '${n(i['volumen_cm3'], 2)} cm³'),
+      if (es3D) (tr('Área superficial'), '${n(i['area_superficial_cm2'], 1)} cm²'),
+    ];
+    final avisos = (i['avisos'] as List?)?.cast<String>() ?? const [];
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (_archivoGeo.isNotEmpty)
+          Container(height: 150, width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+            child: CustomPaint(painter: _PiezaPainter(_archivoGeo))),
+        ...filas.map((f) => Padding(padding: const EdgeInsets.only(bottom: 2),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(width: 130, child: Text(f.$1, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
+            Expanded(child: Text(f.$2, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+          ]))),
+        ...avisos.map((a) => Padding(padding: const EdgeInsets.only(top: 4),
+          child: Text('⚠️ $a', style: const TextStyle(fontSize: 11, color: AppColors.naranja)))),
+        Align(alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; }),
+            icon: const Icon(Icons.close, size: 16),
+            label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12)))),
+      ]));
   }
 
   bool get _eraProfesional => _esEdicion && _tipoOriginal == 'profesional';
@@ -622,6 +715,10 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _tipo = c.tipo;
       _tipoOriginal = c.tipo;
       _muestraGratis = c.datosPro['muestra'] == true;
+      if (c.datosPro['archivo_info'] is Map) {
+        _archivoInfo = Map<String, dynamic>.from(c.datosPro['archivo_info'] as Map);
+        _archivoGeo = GeoCad.geoDeJson(c.datosPro['archivo_geo']);
+      }
       c.datosPro.forEach((k, v) {
         if (k == 'tiempo_entrega') {
           if (_tiempos.contains(v)) _tiempoEntrega = v as String;
@@ -729,10 +826,23 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         _bloquePro(tr('Proyecto y resumen'), Icons.folder_outlined, _camposProyecto),
         _bloquePro(tr('Alcance'), Icons.checklist_outlined, _camposAlcance),
         _bloquePro(tr('Detalle técnico'), Icons.straighten_outlined, _camposTecnicos),
-        _bloque(tr('Croquis con medidas (opcional)'), Icons.architecture_outlined, Column(children: [
+        _bloque(tr('Archivo de la pieza y croquis con medidas'), Icons.architecture_outlined, Column(children: [
           Padding(padding: const EdgeInsets.only(bottom: 8),
-            child: Text(tr('Con largo y ancho la cotización en PDF lleva un dibujo con las cotas, como en un plano.'),
+            child: Text(tr('Sube el DXF, SVG, STL u OBJ: la app saca las medidas, la longitud de corte, contornos, barrenos o volumen, y el PDF lleva el dibujo real de la pieza con sus cotas y los datos técnicos. Si no tienes archivo, escribe largo y ancho y se dibuja un croquis.'),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
+          if (_archivoInfo == null)
+            Padding(padding: const EdgeInsets.only(bottom: 10),
+              child: SizedBox(width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _leyendoArchivo ? null : _subirArchivoPieza,
+                  icon: _leyendoArchivo
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.upload_file_outlined, size: 18),
+                  label: Text(tr('Subir archivo de la pieza (DXF, SVG, STL, OBJ)'), style: const TextStyle(fontSize: 13)),
+                  style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+                    side: const BorderSide(color: AppColors.azul),
+                    padding: const EdgeInsets.symmetric(vertical: 12)))))
+          else _resumenArchivo(),
           ..._camposCroquis.map((f) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: TextField(
@@ -1930,4 +2040,31 @@ class _ContactosPickerState extends State<_ContactosPicker> {
             })),
         ])));
   }
+}
+
+// Vista previa de la pieza (trazos en mm) para la cotización profesional
+class _PiezaPainter extends CustomPainter {
+  final List<List<List<double>>> trazos;
+  _PiezaPainter(this.trazos);
+  @override
+  void paint(Canvas canvas, Size size) {
+    double maxX = 0, maxY = 0;
+    for (final t in trazos) { for (final q in t) { if (q[0] > maxX) maxX = q[0]; if (q[1] > maxY) maxY = q[1]; } }
+    if (maxX <= 0 || maxY <= 0) return;
+    const m = 10.0;
+    final esc = ((size.width - 2 * m) / maxX < (size.height - 2 * m) / maxY)
+      ? (size.width - 2 * m) / maxX : (size.height - 2 * m) / maxY;
+    final ox = (size.width - maxX * esc) / 2, oy = (size.height - maxY * esc) / 2;
+    final p = Paint()..color = AppColors.azul..strokeWidth = 1..style = PaintingStyle.stroke;
+    for (final t in trazos) {
+      final path = Path();
+      for (int i = 0; i < t.length; i++) {
+        final x = ox + t[i][0] * esc, y = size.height - (oy + t[i][1] * esc);
+        if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+      }
+      canvas.drawPath(path, p);
+    }
+  }
+  @override
+  bool shouldRepaint(covariant _PiezaPainter old) => old.trazos != trazos;
 }

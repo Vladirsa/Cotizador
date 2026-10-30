@@ -10,6 +10,7 @@ import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
+import 'archivo_cad_service.dart';
 import '../main.dart';
 
 class PdfService {
@@ -19,6 +20,15 @@ class PdfService {
   // español o en inglés sin importar el idioma de la app (ver elegirIdioma).
   static bool _en = false;
   static String _t(String es) => trIdioma(es, _en);
+  // Etiquetas fiscales según el país de facturación del taller
+  static bool _esUS(Map<String, dynamic> e) => e['pais_factura'] == 'US';
+  static String _etqRfc(Map<String, dynamic> e) => _esUS(e) ? 'Tax ID' : 'RFC';
+  static String _etqIva(Map<String, dynamic> e) => _esUS(e) ? 'Sales tax' : 'IVA';
+  static String _leyendaEnvio() => _t('Envíos: por el momento solo dentro de México.');
+  static String _fmtN(double v, int dec) {
+    final f = NumberFormat(dec == 0 ? '#,##0' : '#,##0.${'0' * dec}', 'es_MX');
+    return f.format(v);
+  }
   static String _tf(String es, List<Object?> valores) => trfIdioma(es, _en, valores);
   static DateFormat get _fmtFecha =>
       _en ? DateFormat('MM/dd/yyyy', 'en_US') : DateFormat('dd/MM/yyyy', 'es_MX');
@@ -222,7 +232,7 @@ class PdfService {
                   pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
                 pw.SizedBox(height: 8),
                 if (rfcEmpresa.isNotEmpty)
-                  pw.Text(_tf('RFC: {0}', [rfcEmpresa]), style: pw.TextStyle(fontSize: 8, color: blanco70)),
+                  pw.Text('${_etqRfc(empresa)}: $rfcEmpresa', style: pw.TextStyle(fontSize: 8, color: blanco70)),
                 if (direccion.isNotEmpty)
                   pw.Text(direccion, style: pw.TextStyle(fontSize: 8, color: blanco70)),
                 pw.Text(_tf('Tel: {0}', ['$tel1${tel2.isNotEmpty ? " / $tel2" : ""}']), style: pw.TextStyle(fontSize: 8, color: blanco70)),
@@ -303,7 +313,7 @@ class PdfService {
           pw.Container(width: 220, child: pw.Column(children: [
             if (cotizacion.descuentoPct > 0) _tR(_t('Subtotal'), '\$${_fmt.format(cotizacion.subtotal)}', grisTexto),
             if (cotizacion.descuentoPct > 0) _tR(_tf('Descuento {0}%', [(cotizacion.descuentoPct.toInt())]), '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-            if (cotizacion.ivaPct > 0) _tR(_tf('IVA {0}%', [pctTexto(cotizacion.ivaPct)]), '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
+            if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
             if (cotizacion.costoEnvio > 0) _tR(_t('Envío'), '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
             pw.Divider(color: azul),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
@@ -323,6 +333,7 @@ class PdfService {
             if (cotizacion.metodoPago != null) _cond(_t('Pago:'), _t(cotizacion.metodoPago!), grisTexto),
             if (cotizacion.condicionEntrega != null) _cond(_t('Entrega:'), _limpiarTexto(_t(cotizacion.condicionEntrega!)), grisTexto),
             _cond(_t('Vigencia:'), _tf('{0} días hábiles', [vigenciaDias]), grisTexto),
+            _cond(_t('Envíos:'), _t('Por el momento solo dentro de México.'), grisTexto),
             if (cotizacion.notas != null && cotizacion.notas!.isNotEmpty) _cond(_t('Notas:'), cotizacion.notas!, grisTexto),
             if ((empresa['leyenda_pdf'] as String?)?.isNotEmpty == true)
               pw.Padding(padding: const pw.EdgeInsets.only(top: 6),
@@ -458,16 +469,39 @@ class PdfService {
       (_t('Lugar de entrega'), _limpiarTexto(_t(cotizacion.condicionEntrega ?? ''))),
       (_t('Vigencia de la oferta'), _tf('{0} días (hasta {1})', [vigenciaDias, fechaVigencia])),
       (_t('Moneda'), moneda),
-      (_t('Impuestos'), cotizacion.ivaPct > 0 ? _tf('IVA {0}% incluido en el total', [pctTexto(cotizacion.ivaPct)]) : _t('Precios sin IVA')),
+      (_t('Impuestos'), cotizacion.ivaPct > 0 ? _tf('{0} {1}% incluido en el total', [_etqIva(empresa), pctTexto(cotizacion.ivaPct)]) : _tf('Precios sin {0}', [_etqIva(empresa)])),
+      (_t('Envíos'), _leyendaEnvio()),
       (_t('Cambios y cancelaciones'), _t(v('cambios'))),
       (_t('Notas'), _limpiarTexto(cotizacion.notas ?? '')),
     ];
 
     double numPro(String k) => double.tryParse(v(k).replaceAll(',', '.')) ?? 0;
+    final infoArch = d['archivo_info'] is Map ? Map<String, dynamic>.from(d['archivo_info'] as Map) : null;
+    final trazosArch = GeoCad.geoDeJson(d['archivo_geo']);
     final croquis = _croquisPieza(
       largo: numPro('croquis_largo'), ancho: numPro('croquis_ancho'),
       espesor: numPro('croquis_espesor'), barrenoD: numPro('croquis_barreno_d'),
-      barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto);
+      barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto,
+      trazos: trazosArch, es3D: infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj'));
+    // Datos técnicos que salen del archivo (DXF/SVG/STL/OBJ)
+    if (infoArch != null) {
+      String nf(dynamic x, [int dec = 1]) => _fmtN(((x as num?) ?? 0).toDouble(), dec);
+      final es3D = infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj';
+      tecnicos.add((_t('Archivo analizado'), _limpiarTexto('${infoArch['nombre']} (${(infoArch['tipo'] as String).toUpperCase()}, ${infoArch['unidades']})')));
+      tecnicos.add((_t('Medidas totales'), es3D
+        ? '${nf(infoArch['largo'])} x ${nf(infoArch['ancho'])} x ${nf(infoArch['alto'])} mm'
+        : '${nf(infoArch['largo'])} x ${nf(infoArch['ancho'])} mm'));
+      if (!es3D) {
+        tecnicos.add((_t('Longitud de corte'), '${nf(((infoArch['longitud_corte'] as num?) ?? 0) / 1000, 2)} m'));
+        tecnicos.add((_t('Contornos cerrados'), '${infoArch['contornos']}'));
+        if (((infoArch['barrenos'] as num?) ?? 0) > 0) tecnicos.add((_t('Barrenos'), '${infoArch['barrenos']}'));
+        if (((infoArch['area_pieza'] as num?) ?? 0) > 0) tecnicos.add((_t('Área de la pieza'), '${nf(((infoArch['area_pieza'] as num?) ?? 0) / 100, 1)} cm2'));
+      } else {
+        tecnicos.add((_t('Volumen'), '${nf(infoArch['volumen_cm3'], 2)} cm3'));
+        tecnicos.add((_t('Área superficial'), '${nf(infoArch['area_superficial_cm2'], 1)} cm2'));
+        tecnicos.add((_t('Malla'), _tf('{0} triángulos', [infoArch['triangulos']])));
+      }
+    }
 
     int n = 0;
     String sig() => '${++n}';
@@ -497,7 +531,7 @@ class PdfService {
               pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: azul)),
             pw.SizedBox(height: 6),
             pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-            if (rfcEmpresa.isNotEmpty) pw.Text(_tf('RFC: {0}', [rfcEmpresa]), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+            if (rfcEmpresa.isNotEmpty) pw.Text('${_etqRfc(empresa)}: $rfcEmpresa', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
             if (direccion.isNotEmpty) pw.Text(direccion, style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
             pw.Text([if (tel1.isNotEmpty) _tf('Tel: {0}', [tel1]), if (correoEmpresa.isNotEmpty) correoEmpresa, web].join('  ·  '),
               style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
@@ -614,7 +648,7 @@ class PdfService {
             if (cotizacion.montoDescuento > 0)
               _tR(_tf('Descuento{0}', [(cotizacion.descuentoPct > 0 ? " ${cotizacion.descuentoPct.toInt()}%" : "")]),
                 '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-            if (cotizacion.ivaPct > 0) _tR(_tf('IVA {0}%', [pctTexto(cotizacion.ivaPct)]), '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
+            if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
             if (cotizacion.costoEnvio > 0) _tR(_t('Envío'), '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
             pw.Divider(color: azul),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
@@ -706,7 +740,15 @@ class PdfService {
     required double largo, required double ancho, required double espesor,
     required double barrenoD, required int barrenos,
     required PdfColor azul, required PdfColor gris,
+    List<List<List<double>>> trazos = const [], bool es3D = false,
   }) {
+    // Con archivo: el dibujo es la pieza real y las medidas salen de él
+    if (trazos.isNotEmpty) {
+      double mx = 0, my = 0;
+      for (final t in trazos) { for (final q in t) { if (q[0] > mx) mx = q[0]; if (q[1] > my) my = q[1]; } }
+      if (mx > 0 && my > 0) { largo = mx; ancho = my; }
+      barrenos = 0; // los barrenos ya vienen dibujados
+    }
     if (largo <= 0 || ancho <= 0) return null;
     const double W = 480, H = 190;
     // Caja disponible para la vista superior
@@ -771,11 +813,22 @@ class PdfService {
                 void cotaV(double x, double t1, double t2) {
                   linea(x, t1, x, t2); flecha(x, t1, 0, -1); flecha(x, t2, 0, 1);
                 }
-                // Pieza (vista superior)
+                // Pieza (vista superior): archivo real o rectángulo
                 c.setStrokeColor(azul);
-                c.setLineWidth(1.2);
-                c.drawRect(rx, Y(ryTop + rh), rw, rh);
-                c.strokePath();
+                if (trazos.isNotEmpty) {
+                  c.setLineWidth(es3D ? 0.25 : 0.9);
+                  for (final t in trazos) {
+                    for (int i = 0; i < t.length; i++) {
+                      final px = rx + t[i][0] * esc, py = Y(ryTop + rh - t[i][1] * esc);
+                      if (i == 0) c.moveTo(px, py); else c.lineTo(px, py);
+                    }
+                    c.strokePath();
+                  }
+                } else {
+                  c.setLineWidth(1.2);
+                  c.drawRect(rx, Y(ryTop + rh), rw, rh);
+                  c.strokePath();
+                }
                 // Barrenos
                 c.setLineWidth(0.8);
                 for (final h in holes) {
@@ -816,7 +869,7 @@ class PdfService {
             pw.Positioned(left: rx - 48, top: ryTop + rh / 2 - 5, child: pw.SizedBox(width: 22,
               child: pw.Text(mm(ancho), style: estilo, textAlign: pw.TextAlign.right))),
             pw.Positioned(left: rx, top: ryTop + rh + 6, child: pw.SizedBox(width: rw,
-              child: pw.Text(_t('Vista superior'), style: estiloGris, textAlign: pw.TextAlign.center))),
+              child: pw.Text(es3D ? _t('Vista superior (malla)') : _t('Vista superior'), style: estiloGris, textAlign: pw.TextAlign.center))),
             if (holes.isNotEmpty)
               pw.Positioned(left: rx, top: ryTop + rh + 16, child: pw.SizedBox(width: rw,
                 child: pw.Text('${holes.length} x Ø${mm(barrenoD)}', style: estilo, textAlign: pw.TextAlign.center))),
@@ -1144,7 +1197,7 @@ class PdfService {
               border: pw.Border.all(color: verde, width: 1)),
             child: pw.Column(children: [
               if (cotizacion.descuentoPct > 0) _tR(_t('Descuento'), '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-              if (cotizacion.ivaPct > 0) _tR(_tf('IVA {0}%', [pctTexto(cotizacion.ivaPct)]), '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
+              if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
               pw.Divider(color: verde),
               pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                 pw.Text(_t('TOTAL PAGADO'), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: verde)),

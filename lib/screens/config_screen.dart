@@ -56,6 +56,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _serieCtrl    = TextEditingController();
   bool _facturaActivo = false;
   String _proveedor   = 'Facturapi';
+  // 'MX' = factura CFDI (SAT) · 'US' = invoice con Tax ID / sales tax
+  String _paisFactura = 'MX';
   String _regimenFiscal = '612';
 
   final _proveedores = ['Facturapi', 'SAT Directo', 'Contpaqi', 'Aspel', 'Otro'];
@@ -101,6 +103,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _serieCtrl.text     = cfg['factura_serie'] ?? 'A';
       _facturaActivo      = cfg['factura_activo'] ?? false;
       _proveedor          = cfg['factura_proveedor'] ?? 'Facturapi';
+      _paisFactura        = cfg['pais_factura'] == 'US' ? 'US' : 'MX';
       // Moneda e impuesto (si la base aún no tiene las columnas, quedan MXN / 16%)
       final m = (cfg['moneda'] ?? 'MXN').toString().toUpperCase();
       _moneda = m == 'USD' ? 'USD' : 'MXN';
@@ -169,6 +172,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'moneda'      : _moneda,
         'impuesto_pct': double.tryParse(_impuestoCtrl.text.trim().replaceAll(',', '.')) ?? 16,
       });
+      // Columna nueva: aparte, por si la base todavía no la tiene
+      await SupabaseService.guardarConfiguracion({'pais_factura': _paisFactura});
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(tr('✅ Configuración guardada')),
         backgroundColor: AppColors.verde));
@@ -222,12 +227,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
               const SizedBox(height: 20),
 
-              // ── WOOCOMMERCE ──
-              _seccion(tr('🛍️ SINCRONIZAR CON TU TIENDA WOOCOMMERCE')),
-              const SizedBox(height: 8),
-              _CardWooCommerce(),
-
-              const SizedBox(height: 20),
+              // (La sincronización con WooCommerce se quitó: la tienda
+              // hetnacnc.com ya no usa WooCommerce.)
 
               // ── LOGO Y COLORES DE MARCA ──
               _seccion(tr('🎨 LOGO Y COLORES DE TUS PDFs')),
@@ -359,6 +360,33 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     value: _facturaActivo,
                     activeColor: AppColors.azul,
                     onChanged: (v) => setState(() => _facturaActivo = v)),
+                ])),
+
+              const SizedBox(height: 10),
+              // País: cambia etiquetas (RFC / Tax ID, IVA / sales tax) en PDFs
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white, borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(tr('¿Dónde facturas?'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: [
+                      ButtonSegment(value: 'MX', label: Text(tr('🇲🇽 México (CFDI)'))),
+                      ButtonSegment(value: 'US', label: Text(tr('🇺🇸 EE.UU. (Invoice)'))),
+                    ],
+                    selected: {_paisFactura},
+                    onSelectionChanged: (s) => setState(() => _paisFactura = s.first)),
+                  const SizedBox(height: 6),
+                  Text(_paisFactura == 'US'
+                      ? tr('Tus PDFs mostrarán Tax ID / EIN en lugar de RFC y "Sales tax" en lugar de IVA. La factura se emite como invoice (sin timbrado SAT).')
+                      : tr('Factura electrónica CFDI 4.0 con RFC, régimen fiscal y uso de CFDI, timbrada por tu proveedor.'),
+                    style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                  const SizedBox(height: 6),
+                  Text(tr('🚚 Envíos: por el momento solo dentro de México. Esta leyenda sale en tus cotizaciones.'),
+                    style: const TextStyle(fontSize: 11, color: AppColors.naranja, fontWeight: FontWeight.w600)),
                 ])),
 
               if (_facturaActivo) ...[
