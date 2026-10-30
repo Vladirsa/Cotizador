@@ -67,7 +67,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void initState() { super.initState(); _cargarAlertas(); }
+  void initState() { super.initState(); _cargarAlertas(); _abrirPlanesSiLoPide(); }
+
+  // Los correos de "elige tu plan" abren hetnacnc.com/cotizador/?planes=1: al
+  // entrar se abre la pantalla de planes (una vez por sesión). En Android/iOS
+  // Uri.base no trae parámetros, así que ahí no pasa nada.
+  static bool _planesMostrados = false;
+  void _abrirPlanesSiLoPide() {
+    if (_planesMostrados || Uri.base.queryParameters['planes'] != '1') return;
+    _planesMostrados = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => const PremiumScreen()));
+    });
+  }
 
   Future<void> _cargarAlertas() async {
     try {

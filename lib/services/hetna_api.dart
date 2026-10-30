@@ -136,6 +136,11 @@ class SuscripcionApi {
 
   /// Cancela la suscripción; el plan sigue hasta el fin del periodo pagado.
   static Future<Map<String, dynamic>> cancelar(String token) => _post('$_ruta/cancelar', token);
+
+  /// Vincula este taller con la cuenta de hetnacnc.com con el código de 6
+  /// dígitos que se saca en hetnacnc.com → Mi cuenta. Devuelve { ok, taller }.
+  static Future<Map<String, dynamic>> vincular(String token, String codigo) =>
+    _post('$_ruta/vincular', token, {'codigo': codigo});
 }
 
 class HetnaError implements Exception {

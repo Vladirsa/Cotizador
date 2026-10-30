@@ -7,6 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
+import '../services/auth_service.dart';
+import '../services/hetna_api.dart';
 import '../services/woocommerce_service.dart';
 import '../i18n/tr.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
@@ -58,6 +60,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
   String _proveedor   = 'Facturapi';
   // 'MX' = factura CFDI (SAT) · 'US' = invoice con Tax ID / sales tax
   String _paisFactura = 'MX';
+  final _codigoVinculo = TextEditingController();
+  bool _vinculando = false;
   String _regimenFiscal = '612';
 
   final _proveedores = ['Facturapi', 'SAT Directo', 'Contpaqi', 'Aspel', 'Otro'];
@@ -81,6 +85,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
     _direccionCtrl.dispose(); _rfcCtrl.dispose(); _leyendaCtrl.dispose();
     _apiKeyCtrl.dispose(); _apiUrlCtrl.dispose();
     _rfcEmisorCtrl.dispose(); _serieCtrl.dispose(); _impuestoCtrl.dispose();
+    _codigoVinculo.dispose();
     super.dispose();
   }
 
@@ -208,6 +213,13 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion(tr('🌎 IDIOMA, MONEDA E IMPUESTOS')),
               const SizedBox(height: 8),
               _seccionIdiomaMoneda(),
+
+              const SizedBox(height: 20),
+
+              // ── CUENTA DE HETNACNC.COM ──
+              _seccion(tr('🔗 CUENTA DE HETNACNC.COM')),
+              const SizedBox(height: 8),
+              _seccionVincular(),
 
               const SizedBox(height: 20),
 
@@ -556,6 +568,57 @@ class _ConfigScreenState extends State<ConfigScreen> {
             return null;
           }),
       ]));
+  }
+
+  // Una sola cuenta: con el código de hetnacnc.com → Mi cuenta, la tienda
+  // entra a esta app sin pedir la contraseña y el plan cuenta también allá.
+  Future<void> _vincular() async {
+    final codigo = _codigoVinculo.text.replaceAll(RegExp(r'\D'), '');
+    final token = AuthService.sesion?.accessToken;
+    if (codigo.length != 6 || token == null) {
+      _aviso(tr('Escribe los 6 dígitos del código.'));
+      return;
+    }
+    setState(() => _vinculando = true);
+    try {
+      final r = await SuscripcionApi.vincular(token, codigo);
+      _codigoVinculo.clear();
+      _aviso(trf('Listo: {0} quedó vinculado con tu cuenta de hetnacnc.com.', [r['taller'] ?? tr('tu taller')]));
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _vinculando = false);
+    }
+  }
+
+  void _aviso(String m) {
+    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  Widget _seccionVincular() {
+    if (!AuthService.esAdmin) {
+      return Text(tr('Solo el administrador del taller puede vincularlo con hetnacnc.com.'),
+        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario));
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(tr('Usa una sola cuenta: en hetnacnc.com entra a Mi cuenta → Cotizador para talleres → "Vincular mi taller" y escribe aquí el código. Después el botón Cotizador de la tienda entra sin contraseña y tu plan también cuenta en la tienda.'),
+        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: TextField(
+          controller: _codigoVinculo,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          decoration: InputDecoration(labelText: tr('Código de 6 dígitos'), counterText: '',
+            border: const OutlineInputBorder(), isDense: true))),
+        const SizedBox(width: 8),
+        ElevatedButton(
+          onPressed: _vinculando ? null : _vincular,
+          child: _vinculando
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+            : Text(tr('Vincular'))),
+      ]),
+    ]);
   }
 
   Widget _seccion(String titulo) => Padding(

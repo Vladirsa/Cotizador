@@ -1961,4 +1961,13 @@ const Map<String, String> textosEn = {
   'Simulador de costos con 3 precios y anticipo a tu medida': 'Cost simulator with 3 prices and custom deposit',
   'Con el plan {0} también tienes:': 'With the {0} plan you also get:',
   'Hecho con el Cotizador gratis de HETNA CNC · hetnacnc.com/cotizador': 'Made with the free HETNA CNC Quoter · hetnacnc.com/cotizador',
+  // Vincular con hetnacnc.com
+  '🔗 CUENTA DE HETNACNC.COM': '🔗 HETNACNC.COM ACCOUNT',
+  'Escribe los 6 dígitos del código.': 'Enter the 6-digit code.',
+  'Listo: {0} quedó vinculado con tu cuenta de hetnacnc.com.': 'Done: {0} is now linked to your hetnacnc.com account.',
+  'tu taller': 'your shop',
+  'Solo el administrador del taller puede vincularlo con hetnacnc.com.': 'Only the shop administrator can link it to hetnacnc.com.',
+  'Usa una sola cuenta: en hetnacnc.com entra a Mi cuenta → Cotizador para talleres → "Vincular mi taller" y escribe aquí el código. Después el botón Cotizador de la tienda entra sin contraseña y tu plan también cuenta en la tienda.': 'Use a single account: on hetnacnc.com go to My account → Quoting tool for shops → "Link my shop" and enter the code here. Then the store\'s Quoter button signs you in without a password and your plan also counts in the store.',
+  'Código de 6 dígitos': '6-digit code',
+  'Vincular': 'Link',
 };
