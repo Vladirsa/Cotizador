@@ -2,8 +2,10 @@
 // HETNA CNC — Pantalla de login con logo
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../l10n/app_localizations.dart';
 import '../services/auth_service.dart';
@@ -41,6 +43,11 @@ class _LoginScreenState extends State<LoginScreen> {
     // hetnacnc.com/app manda a /cotizador/?registro=1 para abrir directo el
     // registro del taller (en Android/iOS Uri.base no trae parámetros: no pasa nada)
     if (Uri.base.queryParameters['registro'] == '1') {
+      // En la web, una sola cuenta: el registro es el de la tienda
+      if (kIsWeb) {
+        _irATienda('/mx/register?volver=%2Fapi%2Fapp%2Fentrar-cotizador');
+        return;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         Navigator.push(context,
@@ -104,6 +111,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
               : Text(tr('Enviar enlace'), style: TextStyle(color: Colors.white))),
         ])));
+  }
+
+  // Abre una página de hetnacnc.com en la misma pestaña (solo web)
+  void _irATienda(String ruta) {
+    launchUrl(Uri.base.resolve(ruta), webOnlyWindowName: '_self');
   }
 
   Future<void> _login() async {
@@ -294,6 +306,35 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: const TextStyle(fontSize: 12,
                             color: AppColors.textoSecundario,
                             fontWeight: FontWeight.w600)))),
+
+                      // Una sola cuenta (en hetnacnc.com/cotizador/): entra con
+                      // la cuenta de la tienda, sin otra contraseña.
+                      if (kIsWeb) ...[
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          const Expanded(child: Divider()),
+                          Padding(padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(tr('o'), style: const TextStyle(
+                              fontSize: 12, color: AppColors.textoSecundario))),
+                          const Expanded(child: Divider()),
+                        ]),
+                        const SizedBox(height: 10),
+                        SizedBox(width: double.infinity, height: 46,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _irATienda('/api/app/entrar-cotizador'),
+                            icon: const Icon(Icons.storefront_outlined, size: 18),
+                            label: Text(tr('Entrar con mi cuenta de hetnacnc.com'),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.azul,
+                              side: const BorderSide(color: AppColors.azul),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10))))),
+                        const SizedBox(height: 4),
+                        Text(tr('La misma cuenta de la tienda: sin otra contraseña.'),
+                          style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario),
+                          textAlign: TextAlign.center),
+                      ],
                     ])),
 
                   const SizedBox(height: 28),
@@ -312,8 +353,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
                   SizedBox(width: double.infinity, height: 48,
                     child: ElevatedButton.icon(
-                      onPressed: () => Navigator.push(context,
-                        MaterialPageRoute(builder: (_) => const RegistroTallerScreen())),
+                      // En la web la cuenta nueva se crea en la tienda (una sola
+                      // cuenta para la tienda y el Cotizador); en Android/iOS,
+                      // el registro de siempre.
+                      onPressed: () {
+                        if (kIsWeb) {
+                          _irATienda('/mx/register?volver=%2Fapi%2Fapp%2Fentrar-cotizador');
+                        } else {
+                          Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => const RegistroTallerScreen()));
+                        }
+                      },
                       icon: const Icon(Icons.store_outlined, color: AppColors.azul, size: 20),
                       label: Text(AppLocalizations.of(context)!.loginRegistrarTaller,
                         style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,

@@ -1970,4 +1970,8 @@ const Map<String, String> textosEn = {
   'Usa una sola cuenta: en hetnacnc.com entra a Mi cuenta → Cotizador para talleres → "Vincular mi taller" y escribe aquí el código. Después el botón Cotizador de la tienda entra sin contraseña y tu plan también cuenta en la tienda.': 'Use a single account: on hetnacnc.com go to My account → Quoting tool for shops → "Link my shop" and enter the code here. Then the store\'s Quoter button signs you in without a password and your plan also counts in the store.',
   'Código de 6 dígitos': '6-digit code',
   'Vincular': 'Link',
+  // Una sola cuenta (login web)
+  'o': 'or',
+  'Entrar con mi cuenta de hetnacnc.com': 'Sign in with my hetnacnc.com account',
+  'La misma cuenta de la tienda: sin otra contraseña.': 'Same account as the store: no extra password.',
 };
