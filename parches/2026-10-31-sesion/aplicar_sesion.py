@@ -1,1 +1,15 @@
-PLACEHOLDER
+# Cotizador: (1) se ve el campo para vincular con hetnacnc.com (el boton rompia el renglon)
+# y (2) si el boton Cotizador de la tienda llega con otra cuenta, cierra la sesion anterior.
+# Uso: python3 aplicar_sesion.py   (dentro de la carpeta del repo Cotizador)
+import sys
+def cambia(p, viejo, nuevo):
+    s = open(p, encoding="utf-8").read()
+    if s.count(viejo) != 1: sys.exit("No encontre el texto a cambiar en " + p)
+    open(p, "w", encoding="utf-8").write(s.replace(viejo, nuevo))
+cambia('lib/main.dart', "import 'dart:async';\nimport 'package:flutter/foundation.dart' show kIsWeb;\n", "import 'dart:async';\nimport 'dart:convert' show utf8;\nimport 'package:crypto/crypto.dart' show sha256;\nimport 'package:flutter/foundation.dart' show kIsWeb;\n")
+cambia('lib/main.dart', '\nvoid main() async {\n', "\n// El botón Cotizador de hetnacnc.com, cuando la cuenta de la tienda NO está\n// vinculada, abre /cotizador/?cuenta=<huella> (16 letras del SHA-256 del correo\n// de la tienda, igual que huellaCorreo en packages/api/src/lib/cotizador-vinculo.ts\n// de hetnacnc) o /cotizador/?salir=1. Si en este navegador quedó abierta la\n// sesión de OTRO correo (otra persona que usó la misma computadora), se cierra:\n// así una cuenta nueva no entra al taller de alguien más.\nFuture<void> _cerrarSesionAjena() async {\n  if (!kIsWeb) return;\n  final q = Uri.base.queryParameters;\n  final salir = q['salir'] == '1';\n  final cuenta = q['cuenta'];\n  if (!salir && cuenta == null) return;\n  final sesion = Supabase.instance.client.auth.currentSession;\n  if (sesion == null) return;\n  if (!salir) {\n    final correo = (sesion.user.email ?? '').trim().toLowerCase();\n    final huella = sha256.convert(utf8.encode(correo)).toString().substring(0, 16);\n    if (huella == cuenta) return;\n  }\n  try {\n    await AuthService.logout();\n  } catch (e) {\n    print('No se pudo cerrar la sesión anterior: $e');\n  }\n}\n\nvoid main() async {\n")
+cambia('lib/main.dart', '  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);\n  // Inglés si el usuario lo eligió o si el teléfono/navegador está en inglés\n', '  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);\n  await _cerrarSesionAjena();\n  // Inglés si el usuario lo eligió o si el teléfono/navegador está en inglés\n')
+cambia('lib/screens/config_screen.dart', '        const SizedBox(width: 8),\n        ElevatedButton(\n', '        const SizedBox(width: 8),\n        // El tema pone a los botones ancho mínimo infinito (Size.fromHeight):\n        // dentro de un Row eso rompe el renglón y no se ve nada.\n        ElevatedButton(\n')
+cambia('lib/screens/config_screen.dart', '        ElevatedButton(\n          onPressed: _vinculando ? null : _vincular,\n', '        ElevatedButton(\n          style: ElevatedButton.styleFrom(minimumSize: const Size(110, 46)),\n          onPressed: _vinculando ? null : _vincular,\n')
+cambia('pubspec.yaml', '  supabase_flutter: 1.10.25\n\n', '  supabase_flutter: 1.10.25\n  crypto: ^3.0.3\n\n')
+print("Listo: campo de vincular y cierre de sesion ajena aplicados")
