@@ -4,6 +4,8 @@
 // ============================================
 
 import 'dart:async';
+import 'dart:convert' show utf8;
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,10 +37,37 @@ final ValueNotifier<bool> mostrarRecuperarPass = ValueNotifier(false);
 // El idioma de la app (idiomaActual, cambiarIdioma, tr) vive en i18n/tr.dart;
 // se re-exporta aquí para las pantallas que ya importan main.dart.
 
+// El botón Cotizador de hetnacnc.com, cuando la cuenta de la tienda NO está
+// vinculada, abre /cotizador/?cuenta=<huella> (16 letras del SHA-256 del correo
+// de la tienda, igual que huellaCorreo en packages/api/src/lib/cotizador-vinculo.ts
+// de hetnacnc) o /cotizador/?salir=1. Si en este navegador quedó abierta la
+// sesión de OTRO correo (otra persona que usó la misma computadora), se cierra:
+// así una cuenta nueva no entra al taller de alguien más.
+Future<void> _cerrarSesionAjena() async {
+  if (!kIsWeb) return;
+  final q = Uri.base.queryParameters;
+  final salir = q['salir'] == '1';
+  final cuenta = q['cuenta'];
+  if (!salir && cuenta == null) return;
+  final sesion = Supabase.instance.client.auth.currentSession;
+  if (sesion == null) return;
+  if (!salir) {
+    final correo = (sesion.user.email ?? '').trim().toLowerCase();
+    final huella = sha256.convert(utf8.encode(correo)).toString().substring(0, 16);
+    if (huella == cuenta) return;
+  }
+  try {
+    await AuthService.logout();
+  } catch (e) {
+    print('No se pudo cerrar la sesión anterior: $e');
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (kIsWeb) usePathUrlStrategy();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+  await _cerrarSesionAjena();
   // Inglés si el usuario lo eligió o si el teléfono/navegador está en inglés
   await cargarIdioma();
 

@@ -612,7 +612,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
           decoration: InputDecoration(labelText: tr('Código de 6 dígitos'), counterText: '',
             border: const OutlineInputBorder(), isDense: true))),
         const SizedBox(width: 8),
+        // El tema pone a los botones ancho mínimo infinito (Size.fromHeight):
+        // dentro de un Row eso rompe el renglón y no se ve nada.
         ElevatedButton(
+          style: ElevatedButton.styleFrom(minimumSize: const Size(110, 46)),
           onPressed: _vinculando ? null : _vincular,
           child: _vinculando
             ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
