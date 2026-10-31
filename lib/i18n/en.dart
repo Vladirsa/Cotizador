@@ -302,6 +302,7 @@ const Map<String, String> textosEn = {
   'Contador': 'Accountant',
   'Continuar': 'Continue',
   'Contrasena': 'Password',
+  'Contraseña': 'Password',
   'Contraseña *': 'Password *',
   'Contratar {0}': 'Get {0}',
   'Control de calidad': 'Quality control',
@@ -1971,7 +1972,8 @@ const Map<String, String> textosEn = {
   'Código de 6 dígitos': '6-digit code',
   'Vincular': 'Link',
   // Una sola cuenta (login web)
-  'o': 'or',
   'Entrar con mi cuenta de hetnacnc.com': 'Sign in with my hetnacnc.com account',
-  'La misma cuenta de la tienda: sin otra contraseña.': 'Same account as the store: no extra password.',
+  'Usa la misma cuenta de la tienda. Si todavía no tienes, ahí mismo la creas.': 'Use your store account. If you don\'t have one yet, you can create it there.',
+  '¿Te invitaron como empleado de un taller? Entra aquí': 'Invited as a shop employee? Sign in here',
+  '← Entrar con mi cuenta de hetnacnc.com': '← Sign in with my hetnacnc.com account',
 };
