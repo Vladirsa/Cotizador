@@ -920,7 +920,12 @@ class MotorCalculo {
 // PANTALLA PRINCIPAL
 // ══════════════════════════════════════════════════════
 class SimuladorScreen extends StatefulWidget {
-  const SimuladorScreen({super.key});
+  // geoInicial: pieza ya leída (desde la cotización profesional) para llenar
+  // medidas, largo de corte y volumen. seleccionar: en vez de carrito, al
+  // elegir un precio se regresa el ResultadoSimulador a quien abrió la pantalla.
+  final GeoCad? geoInicial;
+  final bool seleccionar;
+  const SimuladorScreen({super.key, this.geoInicial, this.seleccionar = false});
   @override
   State<SimuladorScreen> createState() => _SimuladorScreenState();
 }
@@ -1063,9 +1068,15 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
             fontWeight: FontWeight.w700, fontSize: 12)))),
     ]));
 
+  ResultadoSimulador? _seleccion;
   Widget _cardServicio(SimServicio s) => GestureDetector(
-    onTap: () => Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _PantallaServicio(servicio: s, onAgregar: _agregarAlCarrito))),
+    onTap: () async {
+      await Navigator.push(context, MaterialPageRoute(
+        builder: (_) => _PantallaServicio(servicio: s,
+          geoInicial: widget.geoInicial, seleccionar: widget.seleccionar,
+          onAgregar: widget.seleccionar ? (r) => _seleccion = r : _agregarAlCarrito)));
+      if (widget.seleccionar && _seleccion != null && mounted) Navigator.pop(context, _seleccion);
+    },
     onLongPress: () => _confirmarBorrarServicio(s),
     child: Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
@@ -1243,7 +1254,9 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
 class _PantallaServicio extends StatefulWidget {
   final SimServicio servicio;
   final void Function(ResultadoSimulador) onAgregar;
-  const _PantallaServicio({required this.servicio, required this.onAgregar});
+  final GeoCad? geoInicial;
+  final bool seleccionar;
+  const _PantallaServicio({required this.servicio, required this.onAgregar, this.geoInicial, this.seleccionar = false});
   @override
   State<_PantallaServicio> createState() => _PantallaServicioState();
 }
@@ -1379,6 +1392,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       if (mounted) setState(() {
         _config = cfg; _costosTaller = costos; _materialesInv = inv;
         _cargando = false;
+        if (widget.geoInicial != null) { _geoOriginal = widget.geoInicial; _aplicarGeo(widget.geoInicial!); }
         if (cfg.tipos.isNotEmpty) _tipoSel = cfg.tipos.first;
         if (cfg.acabados.isNotEmpty) _acabadoSel = cfg.acabados.first;
         for (final t in cfg.tarifas.values) {
@@ -1539,7 +1553,46 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       }
       setState(() => _leyendoArchivo = true);
       final g = ArchivoCadService.leer(f.name, f.bytes!);
-      final cm = 10.0; // el archivo mide en mm; el simulador en cm
+      _geoOriginal = g;
+      _escala = 1;
+      _aplicarGeo(g);
+    } catch (e) {
+      setState(() => _leyendoArchivo = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')]))));
+    }
+  }
+
+  GeoCad? _geoOriginal;
+  double _escala = 1;
+
+  Future<void> _escalarArchivo() async {
+    final g0 = _geoOriginal;
+    if (g0 == null || g0.largo <= 0) return;
+    final ctrl = TextEditingController(text: (g0.largo * _escala).toStringAsFixed(1));
+    final nuevo = await showDialog<double>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(tr('Escalar la pieza')),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(trf('El archivo mide {0} mm de largo. Escribe el largo que quieres y el resto se ajusta en proporción.', [g0.largo.toStringAsFixed(1)]),
+          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+        const SizedBox(height: 10),
+        TextField(controller: ctrl, autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: tr('Largo final (mm)'), isDense: true, border: const OutlineInputBorder())),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, g0.largo), child: Text(tr('Tamaño original'))),
+        ElevatedButton(onPressed: () => Navigator.pop(ctx, double.tryParse(ctrl.text.replaceAll(',', '.'))), child: Text(tr('Aplicar'))),
+      ]));
+    if (nuevo == null || nuevo <= 0) return;
+    _escala = nuevo / g0.largo;
+    _aplicarGeo(g0.escalado(_escala));
+  }
+
+  void _aplicarGeo(GeoCad g) {
+    try {
+      const cm = 10.0; // el archivo mide en mm; el simulador en cm
       setState(() {
         _geo = g;
         _largo = g.largo / cm; _ancho = g.ancho / cm;
@@ -1556,10 +1609,8 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         _leyendoArchivo = false;
         _resultado = null;
       });
-    } catch (e) {
+    } catch (_) {
       setState(() => _leyendoArchivo = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')]))));
     }
   }
 
@@ -1595,9 +1646,12 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
         const SizedBox(width: 8),
         if (_leyendoArchivo)
           const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-        else if (g != null)
+        else if (g != null) ...[
+          TextButton(onPressed: _escalarArchivo,
+            child: Text(_escala == 1 ? tr('Escalar') : '${(_escala * 100).round()}%', style: const TextStyle(fontSize: 12))),
           IconButton(tooltip: tr('Quitar archivo'), icon: const Icon(Icons.close, size: 18),
-            onPressed: () => setState(() { _geo = null; _resultado = null; }))
+            onPressed: () => setState(() { _geo = null; _geoOriginal = null; _escala = 1; _resultado = null; })),
+        ]
         else
           TextButton(onPressed: _subirArchivo, child: Text(tr('Subir archivo'))),
       ]),
@@ -3460,13 +3514,13 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             widget.onAgregar(rFinal);
             Navigator.pop(context);
           },
-          icon: const Icon(Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
-          label: Text(tr('Agregar al carrito'),
+          icon: Icon(widget.seleccionar ? Icons.check_circle_outline : Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
+          label: Text(widget.seleccionar ? tr('Usar este precio en la cotización') : tr('Agregar al carrito'),
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde,
             padding: const EdgeInsets.symmetric(vertical: 12)))),
       const SizedBox(height: 8),
-      SizedBox(width: double.infinity,
+      if (!widget.seleccionar) SizedBox(width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () {
             final rFinal = _resultadoConPrecio(r, precioSelIdx);
