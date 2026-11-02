@@ -412,7 +412,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       ]));
   }
 
-  // ── TAB 2: HOY ────────────────────────────────────────
+  // ── TAB 2: HOY ──────────────────────────────────────
   Widget _tabHoy() {
     final hoy = DateTime.now();
     final eventosHoy = _pendientes.where((e) {
@@ -519,7 +519,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       ]));
   }
 
-  // ── CARD EVENTO ─────────────────────────────────────────
+  // ── CARD EVENTO ─────────────────────────────────────
   Widget _cardEvento(AgendaEvento e) {
     final semaforo = e.semaforo;
     return Dismissible(
@@ -595,7 +595,7 @@ class _AgendaScreenState extends State<AgendaScreen>
             ])))));
   }
 
-  // ── DETALLE EVENTO ────────────────────────────────────────
+  // ── DETALLE EVENTO ──────────────────────────────────
   void _verDetalleEvento(AgendaEvento e) {
     showModalBottomSheet(
       context: context,
@@ -656,7 +656,7 @@ class _AgendaScreenState extends State<AgendaScreen>
         Expanded(child: Text(tr(valor), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
       ]));
 
-  // ── NUEVO EVENTO MANUAL ────────────────────────────────
+  // ── NUEVO EVENTO MANUAL ─────────────────────────────
   void _nuevoEvento() {
     final tituloCtrl = TextEditingController();
     final notasCtrl = TextEditingController();
@@ -757,7 +757,7 @@ class _AgendaScreenState extends State<AgendaScreen>
           ]))));
   }
 
-  // ── HELPERS ─────────────────────────────────────────────
+  // ── HELPERS ─────────────────────────────────────────
   Widget _kpiHoy(String label, String valor, Color color, IconData icon) =>
     Expanded(child: Container(
       padding: const EdgeInsets.all(12),
