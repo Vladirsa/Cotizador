@@ -463,7 +463,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // Archivo de la pieza (DXF/SVG/STL/OBJ) leído por ArchivoCadService
   Map<String, dynamic>? _archivoInfo;
   GeoCad? _geoOriginal; // tal como se leyó, para escalar sin perder precisión
-  double _escalaArchivo = 1;
+  double _escalaArchivo = 1; // largo
+  double _escalaY = 1, _escalaZ = 1; // ancho y alto (iguales a la del largo si es proporcional)
   List<List<List<double>>> _archivoGeo = [];
   bool _leyendoArchivo = false;
 
@@ -537,26 +538,45 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // en proporción (ancho, alto, largo de corte, área y volumen).
   Future<void> _escalarArchivo() async {
     final g0 = _geoOriginal;
-    if (g0 == null) return;
-    final ctrl = TextEditingController(text: (g0.largo * _escalaArchivo).toStringAsFixed(1));
-    final nuevo = await showDialog<double>(context: context, builder: (ctx) => AlertDialog(
-      title: Text(tr('Escalar la pieza')),
-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(trf('El archivo mide {0} mm de largo. Escribe el largo que quieres y el resto se ajusta en proporción.', [g0.largo.toStringAsFixed(1)]),
-          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
-        const SizedBox(height: 10),
-        TextField(controller: ctrl, autofocus: true,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(labelText: tr('Largo final (mm)'), isDense: true, border: const OutlineInputBorder())),
+    if (g0 == null || g0.largo <= 0) return;
+    final r = await mostrarDialogoEscala(context, g0, _escalaArchivo, _escalaY, _escalaZ);
+    if (r == null) return;
+    _escalaArchivo = r[0]; _escalaY = r[1]; _escalaZ = r[2];
+    _aplicarGeo(g0.escaladoXYZ(r[0], r[1], r[2]), sobrescribir: true);
+  }
+
+  // La pieza del archivo como partida de la cotización (nombre, cantidad y
+  // precio), sin pasar por el catálogo. Si quiere el precio calculado, usa
+  // "Calcular precio con el simulador".
+  Future<void> _agregarPiezaComoPartida() async {
+    final i = _archivoInfo;
+    if (i == null) return;
+    final n = TextEditingController(text: (i['nombre'] as String? ?? '').replaceFirst(RegExp(r'\.[^.]+$'), ''));
+    final c = TextEditingController(text: '1');
+    final p = TextEditingController();
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(tr('Agregar la pieza a la cotización')),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: n, decoration: InputDecoration(labelText: tr('Nombre de la pieza'), isDense: true, border: const OutlineInputBorder())),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: TextField(controller: c, keyboardType: TextInputType.number,
+            decoration: InputDecoration(labelText: tr('Cantidad'), isDense: true, border: const OutlineInputBorder()))),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: TextField(controller: p, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(labelText: tr('Precio por pieza'), prefixText: '\$', isDense: true, border: const OutlineInputBorder()))),
+        ]),
       ]),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
-        TextButton(onPressed: () => Navigator.pop(ctx, g0.largo), child: Text(tr('Tamaño original'))),
-        ElevatedButton(onPressed: () => Navigator.pop(ctx, double.tryParse(ctrl.text.replaceAll(',', '.'))), child: Text(tr('Aplicar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancelar'))),
+        ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Agregar a cotización'))),
       ]));
-    if (nuevo == null || nuevo <= 0 || g0.largo <= 0) return;
-    _escalaArchivo = nuevo / g0.largo;
-    _aplicarGeo(g0.escalado(_escalaArchivo), sobrescribir: true);
+    if (ok != true || n.text.trim().isEmpty) return;
+    setState(() => _items.add(CotizacionItem(
+      nombreProducto: n.text.trim(),
+      cantidad: int.tryParse(c.text) ?? 1,
+      precioUnitario: double.tryParse(p.text.replaceAll(',', '.')) ?? 0,
+      sku: null)));
   }
 
   // Abre el simulador con la pieza cargada; el precio elegido entra como partida
@@ -603,10 +623,12 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (_archivoGeo.isNotEmpty)
-          Container(height: 150, width: double.infinity,
+          Container(height: 230, width: double.infinity,
             margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-            child: CustomPaint(painter: _PiezaPainter(_archivoGeo))),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+            child: CustomPaint(painter: _PiezaPainter(_archivoGeo,
+              largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D))),
         ...filas.map((f) => Padding(padding: const EdgeInsets.only(bottom: 2),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             SizedBox(width: 130, child: Text(f.$1, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
@@ -617,6 +639,10 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         const SizedBox(height: 6),
         Wrap(spacing: 6, runSpacing: 4, alignment: WrapAlignment.end, children: [
           OutlinedButton.icon(
+            onPressed: _agregarPiezaComoPartida,
+            icon: const Icon(Icons.playlist_add, size: 15),
+            label: Text(tr('Agregar como partida'), style: const TextStyle(fontSize: 12))),
+          OutlinedButton.icon(
             onPressed: _escalarArchivo,
             icon: const Icon(Icons.open_in_full, size: 15),
             label: Text(_escalaArchivo == 1 ? tr('Escalar') : trf('Escala {0}%', [(_escalaArchivo * 100).round()]), style: const TextStyle(fontSize: 12))),
@@ -626,7 +652,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             label: Text(tr('Calcular precio con el simulador'), style: const TextStyle(fontSize: 12, color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.naranja)),
           TextButton.icon(
-            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; _geoOriginal = null; _escalaArchivo = 1; }),
+            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; _geoOriginal = null; _escalaArchivo = 1; _escalaY = 1; _escalaZ = 1; }),
             icon: const Icon(Icons.close, size: 16),
             label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12))),
         ]),
@@ -2275,26 +2301,116 @@ class _ContactosPickerState extends State<_ContactosPicker> {
 // Vista previa de la pieza (trazos en mm) para la cotización profesional
 class _PiezaPainter extends CustomPainter {
   final List<List<List<double>>> trazos;
-  _PiezaPainter(this.trazos);
+  final double largo, ancho;
+  final bool es3D;
+  _PiezaPainter(this.trazos, {this.largo = 0, this.ancho = 0, this.es3D = false});
   @override
   void paint(Canvas canvas, Size size) {
     double maxX = 0, maxY = 0;
     for (final t in trazos) { for (final q in t) { if (q[0] > maxX) maxX = q[0]; if (q[1] > maxY) maxY = q[1]; } }
     if (maxX <= 0 || maxY <= 0) return;
-    const m = 10.0;
-    final esc = ((size.width - 2 * m) / maxX < (size.height - 2 * m) / maxY)
-      ? (size.width - 2 * m) / maxX : (size.height - 2 * m) / maxY;
-    final ox = (size.width - maxX * esc) / 2, oy = (size.height - maxY * esc) / 2;
-    final p = Paint()..color = AppColors.azul..strokeWidth = 1..style = PaintingStyle.stroke;
+    // Margen para las cotas (abajo y a la derecha)
+    const m = 14.0, cota = 26.0;
+    final aw = size.width - 2 * m - cota, ah = size.height - 2 * m - cota;
+    final esc = (aw / maxX < ah / maxY) ? aw / maxX : ah / maxY;
+    final rw = maxX * esc, rh = maxY * esc;
+    final ox = m + (aw - rw) / 2, oyTop = m + (ah - rh) / 2;
+    double X(double x) => ox + x * esc;
+    double Y(double y) => oyTop + rh - y * esc;
+    // Papel cuadriculado tenue, como plano
+    final grid = Paint()..color = const Color(0xFFEDF1F7)..strokeWidth = 0.6;
+    for (double x = 0; x <= size.width; x += 12) canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    for (double y = 0; y <= size.height; y += 12) canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    // Relleno tenue de la pieza (contornos cerrados) y trazos
+    final relleno = Paint()..color = AppColors.azul.withOpacity(0.06)..style = PaintingStyle.fill;
+    final p = Paint()..color = AppColors.azul..strokeWidth = es3D ? 1.2 : 1.4
+      ..style = PaintingStyle.stroke..strokeJoin = StrokeJoin.round..strokeCap = StrokeCap.round..isAntiAlias = true;
     for (final t in trazos) {
       final path = Path();
       for (int i = 0; i < t.length; i++) {
-        final x = ox + t[i][0] * esc, y = size.height - (oy + t[i][1] * esc);
-        if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+        if (i == 0) path.moveTo(X(t[i][0]), Y(t[i][1])); else path.lineTo(X(t[i][0]), Y(t[i][1]));
+      }
+      if (!es3D && t.length > 3 && (t.first[0] - t.last[0]).abs() < 0.01 && (t.first[1] - t.last[1]).abs() < 0.01) {
+        canvas.drawPath(path, relleno);
       }
       canvas.drawPath(path, p);
     }
+    // Cotas: largo abajo, ancho a la derecha
+    final cp = Paint()..color = const Color(0xFF6B7280)..strokeWidth = 0.8;
+    String mm(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    final L = largo > 0 ? largo : maxX, A = ancho > 0 ? ancho : maxY;
+    final yC = oyTop + rh + 12, xC = ox + rw + 12;
+    canvas.drawLine(Offset(ox, yC), Offset(ox + rw, yC), cp);
+    canvas.drawLine(Offset(ox, yC - 4), Offset(ox, yC + 4), cp);
+    canvas.drawLine(Offset(ox + rw, yC - 4), Offset(ox + rw, yC + 4), cp);
+    canvas.drawLine(Offset(xC, oyTop), Offset(xC, oyTop + rh), cp);
+    canvas.drawLine(Offset(xC - 4, oyTop), Offset(xC + 4, oyTop), cp);
+    canvas.drawLine(Offset(xC - 4, oyTop + rh), Offset(xC + 4, oyTop + rh), cp);
+    void texto(String s, Offset o, {bool vertical = false}) {
+      final tp = TextPainter(text: TextSpan(text: s, style: const TextStyle(fontSize: 10, color: Color(0xFF374151), fontWeight: FontWeight.w600)),
+        textDirection: TextDirection.ltr)..layout();
+      canvas.save();
+      if (vertical) { canvas.translate(o.dx, o.dy); canvas.rotate(-1.5708); tp.paint(canvas, Offset(-tp.width / 2, 0)); }
+      else { tp.paint(canvas, Offset(o.dx - tp.width / 2, o.dy)); }
+      canvas.restore();
+    }
+    texto('${mm(L)} mm', Offset(ox + rw / 2, yC + 3));
+    texto('${mm(A)} mm', Offset(xC + 4, oyTop + rh / 2), vertical: true);
   }
   @override
-  bool shouldRepaint(covariant _PiezaPainter old) => old.trazos != trazos;
+  bool shouldRepaint(covariant _PiezaPainter old) => old.trazos != trazos || old.largo != largo || old.ancho != ancho;
+}
+
+/// Diálogo de escala: largo, ancho y alto en mm, proporcional o libre por eje.
+/// Devuelve [fx, fy, fz] o null si se canceló.
+Future<List<double>?> mostrarDialogoEscala(BuildContext context, GeoCad g0, double fx0, double fy0, double fz0) async {
+  final l = TextEditingController(text: (g0.largo * fx0).toStringAsFixed(1));
+  final a = TextEditingController(text: (g0.ancho * fy0).toStringAsFixed(1));
+  final h = TextEditingController(text: (g0.alto * fz0).toStringAsFixed(1));
+  bool proporcional = (fx0 - fy0).abs() < 1e-6 && (fx0 - fz0).abs() < 1e-6;
+  String f(double v) => v.toStringAsFixed(1);
+  return showDialog<List<double>>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) {
+    void ligar(TextEditingController origen, double base) {
+      if (!proporcional) return;
+      final v = double.tryParse(origen.text.replaceAll(',', '.'));
+      if (v == null || v <= 0 || base <= 0) return;
+      final k = v / base;
+      if (origen != l) l.text = f(g0.largo * k);
+      if (origen != a) a.text = f(g0.ancho * k);
+      if (origen != h && g0.es3D) h.text = f(g0.alto * k);
+    }
+    Widget campo(String etq, TextEditingController c, double base) => TextField(controller: c,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      onChanged: (_) => ligar(c, base),
+      decoration: InputDecoration(labelText: etq, suffixText: 'mm', isDense: true, border: const OutlineInputBorder()));
+    return AlertDialog(
+      title: Text(tr('Escalar la pieza')),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(trf('Original: {0} × {1}{2} mm. Escribe la medida que quieres; con "proporcional" las otras se ajustan solas.',
+          [f(g0.largo), f(g0.ancho), g0.es3D ? ' × ${f(g0.alto)}' : '']),
+          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+        const SizedBox(height: 10),
+        SwitchListTile(dense: true, contentPadding: EdgeInsets.zero,
+          title: Text(tr('Proporcional (misma escala en todos los ejes)'), style: const TextStyle(fontSize: 12)),
+          value: proporcional, onChanged: (v) => setS(() => proporcional = v)),
+        const SizedBox(height: 6),
+        campo(tr('Largo'), l, g0.largo),
+        const SizedBox(height: 8),
+        campo(tr('Ancho'), a, g0.ancho),
+        if (g0.es3D) ...[const SizedBox(height: 8), campo(tr('Alto'), h, g0.alto)],
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, [1.0, 1.0, 1.0]), child: Text(tr('Tamaño original'))),
+        ElevatedButton(onPressed: () {
+          final vl = double.tryParse(l.text.replaceAll(',', '.')) ?? g0.largo;
+          final va = double.tryParse(a.text.replaceAll(',', '.')) ?? g0.ancho;
+          final vh = double.tryParse(h.text.replaceAll(',', '.')) ?? g0.alto;
+          final fx = g0.largo > 0 ? vl / g0.largo : 1.0;
+          final fy = g0.ancho > 0 ? va / g0.ancho : fx;
+          final fz = g0.es3D && g0.alto > 0 ? vh / g0.alto : fx;
+          Navigator.pop(ctx, [fx, fy, fz]);
+        }, child: Text(tr('Aplicar'))),
+      ]);
+  }));
 }
