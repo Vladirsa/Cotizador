@@ -614,7 +614,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     });
   }
   String _metodoPago = '50% anticipo / 50% entrega';
-  String _condicionEntrega = 'LAB — En nuestro taller';
+  String _condicionEntrega = 'El cliente recoge en el taller';
   String _notas = '';
   bool _generando = false;
   bool _guardando = false;
@@ -646,7 +646,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (!_metodosPago.contains(_metodoPago)) _metodosPago.add(_metodoPago);
     });
   }
-  final _condiciones = ['LAB — En nuestro taller', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
+  // Forma de entrega: antes decía "LAB — En planta", jerga de comercio
+  // exterior que nadie entendía. Las cotizaciones viejas con ese texto se
+  // muestran como "El cliente recoge en el taller".
+  final _condiciones = ['El cliente recoge en el taller', 'Entrega a domicilio del cliente', 'Envío por paquetería (lo paga el cliente)', 'Envío por paquetería (incluido en el precio)'];
+  String _condicionNormal(String? c) {
+    if (c == null || c.trim().isEmpty || c.startsWith('LAB')) return _condiciones[0];
+    if (c == 'Entrega en domicilio cliente') return _condiciones[1];
+    if (c == 'Flete por cuenta del cliente') return _condiciones[2];
+    return c;
+  }
   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
   String _tiempoEntrega = '15 días';
   // Vigencia de la cotización: antes siempre 7 días aunque el taller quisiera otra
@@ -713,7 +722,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _aplicaIva = c.ivaPct > 0;
       _costoEnvio = c.costoEnvio;
       _metodoPago = c.metodoPago ?? '50% anticipo / 50% entrega';
-      _condicionEntrega = c.condicionEntrega ?? tr('LAB — En nuestro taller');
+      _condicionEntrega = _condicionNormal(c.condicionEntrega);
       _notas = c.notas ?? '';
       if (c.createdAt != null) _fechaCotizacion = c.createdAt!;
       _vigenciaDias = c.vigenciaDias;
@@ -920,6 +929,12 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             items: _metodosPago.map((m) => DropdownMenuItem(value: m, child: Text(tr(m), style: const TextStyle(fontSize: 11)))).toList(),
             onChanged: (v) => setState(() => _metodoPago = v!)))),
         ]),
+        const SizedBox(height: 8),
+        _campo(tr('Forma de entrega'), child: DropdownButtonFormField<String>(
+          value: _condiciones.contains(_condicionEntrega) ? _condicionEntrega : _condiciones[0],
+          decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+          items: _condiciones.map((c) => DropdownMenuItem(value: c, child: Text(tr(c), style: const TextStyle(fontSize: 12)))).toList(),
+          onChanged: (v) => setState(() => _condicionEntrega = v!))),
         const SizedBox(height: 8),
         _campo(tr('Notas'), child: TextFormField(
           key: ValueKey('notas_$_envioVer'),
