@@ -412,7 +412,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       ]));
   }
 
-  // ── TAB 2: HOY ──────────────────────────────────────
+  // ── TAB 2: HOY ────────────────────────────────────────
   Widget _tabHoy() {
     final hoy = DateTime.now();
     final eventosHoy = _pendientes.where((e) {
@@ -519,7 +519,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       ]));
   }
 
-  // ── CARD EVENTO ─────────────────────────────────────
+  // ── CARD EVENTO ─────────────────────────────────────────
   Widget _cardEvento(AgendaEvento e) {
     final semaforo = e.semaforo;
     return Dismissible(
@@ -595,7 +595,7 @@ class _AgendaScreenState extends State<AgendaScreen>
             ])))));
   }
 
-  // ── DETALLE EVENTO ──────────────────────────────────
+  // ── DETALLE EVENTO ────────────────────────────────────────
   void _verDetalleEvento(AgendaEvento e) {
     showModalBottomSheet(
       context: context,
@@ -656,7 +656,7 @@ class _AgendaScreenState extends State<AgendaScreen>
         Expanded(child: Text(tr(valor), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
       ]));
 
-  // ── NUEVO EVENTO MANUAL ─────────────────────────────
+  // ── NUEVO EVENTO MANUAL ────────────────────────────────
   void _nuevoEvento() {
     final tituloCtrl = TextEditingController();
     final notasCtrl = TextEditingController();
@@ -757,7 +757,7 @@ class _AgendaScreenState extends State<AgendaScreen>
           ]))));
   }
 
-  // ── HELPERS ─────────────────────────────────────────
+  // ── HELPERS ─────────────────────────────────────────────
   Widget _kpiHoy(String label, String valor, Color color, IconData icon) =>
     Expanded(child: Container(
       padding: const EdgeInsets.all(12),
@@ -1046,10 +1046,8 @@ class _AgendaBodyState extends State<AgendaBody>
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-          border: Border(left: BorderSide(color: e.completado ? AppColors.grisBorde : sem, width: 3),
-            top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-            right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-            bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5),
+          boxShadow: [BoxShadow(color: e.completado ? AppColors.grisBorde : sem, offset: const Offset(-3, 0))]),
         child: Padding(padding: const EdgeInsets.all(10),
           child: Row(children: [
             Text(tr(e.tipoEmoji), style: const TextStyle(fontSize: 18)),
