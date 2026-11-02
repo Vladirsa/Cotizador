@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../l10n/app_localizations.dart';
 import '../services/auth_service.dart';
+import '../services/entrar_tienda.dart';
 import 'home_screen.dart';
 import 'registro_taller_screen.dart';
 import 'unirse_equipo_screen.dart';
@@ -141,6 +142,15 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // Android/iOS: correo y contraseña de hetnacnc.com (services/entrar_tienda.dart)
+  Future<void> _entrarConTienda() async {
+    final ok = await entrarConCuentaTienda(context);
+    if (ok && mounted) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeScreen()));
+    }
+  }
+
   Future<void> _reenviarConfirmacion() async {
     final correo = _correoCtrl.text.trim();
     if (!correo.contains('@')) return;
@@ -234,6 +244,29 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
 
                       if (_conContrasena) ...[
+                      // En Android/iOS también se entra con la cuenta de la tienda
+                      if (!kIsWeb) ...[
+                        SizedBox(width: double.infinity, height: 48,
+                          child: ElevatedButton.icon(
+                            onPressed: _cargando ? null : _entrarConTienda,
+                            icon: const Icon(Icons.storefront_outlined, size: 20, color: Colors.white),
+                            label: Text(tr('Entrar con mi cuenta de hetnacnc.com'),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                                color: Colors.white)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.azul,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10))))),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          const Expanded(child: Divider()),
+                          Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Text(tr('o con tu usuario de la app'),
+                              style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
+                          const Expanded(child: Divider()),
+                        ]),
+                        const SizedBox(height: 12),
+                      ],
                       // Correo
                       TextFormField(
                         controller: _correoCtrl,
