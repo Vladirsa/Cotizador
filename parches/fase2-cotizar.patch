@@ -1,0 +1,160 @@
+diff --git a/lib/screens/cotizar_screen.dart b/lib/screens/cotizar_screen.dart
+index 9d5b842..5a80688 100644
+--- a/lib/screens/cotizar_screen.dart
++++ b/lib/screens/cotizar_screen.dart
+@@ -1,6 +1,7 @@
+ import 'package:shared_preferences/shared_preferences.dart';
+ import 'dart:typed_data';
+ import 'package:flutter/material.dart';
++import 'package:flutter/services.dart';
+ import 'package:url_launcher/url_launcher.dart';
+ import 'package:intl/intl.dart';
+ import '../main.dart';
+@@ -253,6 +254,7 @@ class _TarjetaCotizacion extends StatelessWidget {
+             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+               decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+               child: Text(tr(cotizacion.estado), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
++            _seguimientoLiga(cotizacion),
+           ])),
+           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+             Text(tr(monto > 0 ? fmt.format(monto) : tr('Sin monto')),
+@@ -322,6 +324,19 @@ class _TarjetaCotizacion extends StatelessWidget {
+               SizedBox(width: double.infinity,
+                 child: _BtnPdfWA(cotizacion: cotizacion)),
+             ],
++            if (cotizacion.ligaPublica != null && cotizacion.estado != 'Rechazada') ...[
++              const SizedBox(height: 6),
++              SizedBox(width: double.infinity,
++                child: OutlinedButton.icon(
++                  onPressed: () => mostrarLigaCliente(context, cotizacion),
++                  icon: const Icon(Icons.link, size: 15),
++                  label: Text(tr('Liga para el cliente (aceptar y pagar)'),
++                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
++                  style: OutlinedButton.styleFrom(
++                    foregroundColor: AppColors.azul,
++                    side: const BorderSide(color: AppColors.azul, width: 1),
++                    padding: const EdgeInsets.symmetric(vertical: 8)))),
++            ],
+           ])),
+       ]));
+   }
+@@ -1593,7 +1608,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+     descuentoPct: _descuentoPct, ivaPct: _aplicaIva ? _ivaPct : 0,
+     costoEnvio: _costoEnvio, metodoPago: _metodoPago,
+     condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion, vigenciaDias: _vigenciaDias,
++    anticipoMonto: _anticipoMontoFijo(),
+     tipo: _tipo, datosPro: _tipo == 'profesional' ? _datosPro() : {});
++
++  /// Monto fijo de anticipo que escribió el taller (null si es porcentaje:
++  /// ese lo saca el servidor del texto del método de pago).
++  double? _anticipoMontoFijo() {
++    if (!_anticipoEnMonto) return null;
++    final v = double.tryParse(_anticipoCtrl.text.replaceAll(',', '.')) ?? 0;
++    return v > 0 ? v : null;
++  }
+ }
+ 
+ // ═══════════════════════════════════════════
+@@ -2171,6 +2195,92 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
+ // ══════════════════════════════════════════════
+ // Botón PDF + compartir por WA
+ // ══════════════════════════════════════════════
++/// Renglón para el mensaje de WhatsApp con la liga pública (si ya existe).
++String _lineaLiga(Cotizacion cot) {
++  final liga = cot.ligaPublica;
++  if (liga == null) return '';
++  return trf('\n\nPuedes verla, aceptarla y pagar el anticipo aquí:\n{0}', [liga]);
++}
++
++/// Liga pública: copiar, mandar por WhatsApp o abrir. Fase 2 del Cotizador 2.0.
++Future<void> mostrarLigaCliente(BuildContext context, Cotizacion cot) async {
++  final liga = cot.ligaPublica;
++  if (liga == null) {
++    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
++      tr('Guarda la cotización primero; la liga se crea al guardarla. Si ya está guardada, vuelve a abrir la lista.'))));
++    return;
++  }
++  final nombreCliente = cot.cliente?.nombre ?? cot.cliente?.empresa ?? '';
++  final msg = trf('¡Hola *{0}*! 😊\n\nAquí está tu cotización *{1}* de *{2}*. Puedes verla, aceptarla y pagar el anticipo desde esta liga:\n{3}\n\n¡Quedamos a tus órdenes! 💙',
++    [nombreCliente, cot.folio ?? '', AuthService.marcaTaller, liga]);
++  await showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(
++      borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
++    builder: (ctx) => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
++      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
++        Text(tr('Liga para el cliente'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
++        const SizedBox(height: 4),
++        Text(tr('El cliente abre la liga, ve la cotización, la acepta con su nombre y paga el anticipo con Mercado Pago. Aquí verás cuando la abra, la acepte y pague.'),
++          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
++        const SizedBox(height: 12),
++        Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
++          decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(10),
++            border: Border.all(color: AppColors.grisBorde, width: 0.5)),
++          child: Row(children: [
++            Expanded(child: SelectableText(liga, style: const TextStyle(fontSize: 12))),
++            IconButton(icon: const Icon(Icons.copy, size: 18), tooltip: tr('Copiar'),
++              onPressed: () async {
++                await Clipboard.setData(ClipboardData(text: liga));
++                if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(tr('Liga copiada'))));
++              }),
++          ])),
++        const SizedBox(height: 12),
++        Row(children: [
++          Expanded(child: ElevatedButton.icon(
++            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), minimumSize: const Size(0, 44)),
++            icon: const Icon(Icons.chat, size: 16, color: Colors.white),
++            label: Text(tr('Mandar por WhatsApp'), style: const TextStyle(fontSize: 12, color: Colors.white)),
++            onPressed: () async {
++              Navigator.pop(ctx);
++              final num = cot.cliente?.whatsappNumero ?? '';
++              final url = num.isNotEmpty
++                ? 'https://wa.me/${WhatsAppService.normalizarNumero(num)}?text=${Uri.encodeComponent(msg)}'
++                : 'https://wa.me/?text=${Uri.encodeComponent(msg)}';
++              await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
++            })),
++          const SizedBox(width: 8),
++          Expanded(child: OutlinedButton.icon(
++            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
++            icon: const Icon(Icons.open_in_new, size: 16),
++            label: Text(tr('Abrir'), style: const TextStyle(fontSize: 12)),
++            onPressed: () => launchUrl(Uri.parse(liga), mode: LaunchMode.externalApplication))),
++        ]),
++      ]))));
++}
++
++/// Seguimiento de la liga: la abrió / la aceptó / pagó el anticipo.
++Widget _seguimientoLiga(Cotizacion cot) {
++  final fmt = NumberFormat('\$#,##0', 'es_MX');
++  final chips = <Widget>[];
++  Widget chip(String t, Color c, IconData i) => Container(
++    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
++    decoration: BoxDecoration(color: c.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
++    child: Row(mainAxisSize: MainAxisSize.min, children: [
++      Icon(i, size: 11, color: c), const SizedBox(width: 4),
++      Text(t, style: TextStyle(fontSize: 10, color: c, fontWeight: FontWeight.w600))]));
++  if (cot.anticipoPagadoCompleto) {
++    chips.add(chip(trf('Anticipo pagado {0}', [fmt.format(cot.anticipoPagado)]), const Color(0xFF1d9e75), Icons.paid_outlined));
++  } else if (cot.anticipoPagado > 0) {
++    chips.add(chip(trf('Pagó {0} del anticipo', [fmt.format(cot.anticipoPagado)]), const Color(0xFF185fa5), Icons.paid_outlined));
++  }
++  if (cot.aceptadaEn != null) {
++    chips.add(chip(trf('Aceptó {0}', [cot.aceptadaPor ?? '']).trim(), const Color(0xFF1d9e75), Icons.check_circle_outline));
++  } else if (cot.ligaVistaEn != null) {
++    chips.add(chip(trf('Vista {0}', [DateFormat(enIngles ? 'MM/dd' : 'dd/MM').format(cot.ligaVistaEn!)]), const Color(0xFF185fa5), Icons.visibility_outlined));
++  }
++  if (chips.isEmpty) return const SizedBox.shrink();
++  return Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 6, runSpacing: 4, children: chips));
++}
++
+ class _BtnPdfWA extends StatefulWidget {
+   final Cotizacion cotizacion;
+   const _BtnPdfWA({required this.cotizacion});
+@@ -2196,7 +2306,8 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
+       final nombreCliente = cot.cliente?.nombre ?? cot.cliente?.empresa ?? '';
+       if (mounted) await PdfService.mostrarOpcionesEnvio(context, bytes, '$folio.pdf',
+         whatsapp: cot.cliente?.whatsappNumero,
+-        mensaje: trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! 💙', [nombreCliente, folio, AuthService.marcaTaller]));
++        mensaje: trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.{3}\n\n¡Quedamos a tus órdenes! 💙',
++          [nombreCliente, folio, AuthService.marcaTaller, _lineaLiga(cot)]));
+     } catch (e) {
+       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+         SnackBar(content: Text(trf('Error al generar PDF: {0}', [e])), backgroundColor: AppColors.rojo));
