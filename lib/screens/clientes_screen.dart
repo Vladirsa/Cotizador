@@ -303,10 +303,8 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border(left: BorderSide(color: color, width: 3),
-          top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5),
+        boxShadow: [BoxShadow(color: color, offset: const Offset(-3, 0))]),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(children: [
