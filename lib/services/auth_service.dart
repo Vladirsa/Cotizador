@@ -16,7 +16,7 @@ class AuthService {
   static bool  get estaLogueado  => usuarioActual != null;
   static Session? get sesion     => _sb.auth.currentSession;
 
-  // ── Datos del negocio/rol en memoria ─────────────────────────────────────
+  // ── Datos del negocio/rol en memoria ──────────────────
   static String? _negocioId;
   static String? _rol;
   static String? _plan;
@@ -104,7 +104,7 @@ class AuthService {
   static bool get esContador   => _rol == 'contador' || esAdmin;
   static bool get esSuperAdmin => _rol == 'super_admin';
 
-  // ── Login ───────────────────────────────────────────────────
+  // ── Login ──────────────────────────────────────────────
   static Future<AuthResult> login({
     required String correo,
     required String password,
@@ -132,7 +132,7 @@ class AuthService {
     }
   }
 
-  // ── Reenviar el correo de confirmación ─────────────────────
+  // ── Reenviar el correo de confirmación ─────────────────
   // Devuelve null si se envió, o el mensaje de error.
   static Future<String?> reenviarConfirmacion(String correo) async {
     try {
@@ -271,7 +271,7 @@ class AuthService {
     }
   }
 
-  // ── Logout ────────────────────────────────────────────────────
+  // ── Logout ─────────────────────────────────────────────
   static Future<void> logout() async {
     _negocioId     = null;
     _rol           = null;
@@ -399,7 +399,7 @@ class AuthService {
     return false;
   }
 
-  // ── Cambiar contraseña ───────────────────────────────────────────
+  // ── Cambiar contraseña ─────────────────────────────────
   static Future<String?> cambiarPassword({
     required String passwordActual,
     required String passwordNuevo,
@@ -598,7 +598,7 @@ class AuthService {
     }
   }
 
-  // ── Desactivar usuario ────────────────────────────────────────
+  // ── Desactivar usuario ────────────────────────────────
   static Future<void> desactivarUsuario(String id) async {
     await _sb.from('usuarios_negocio').update({'activo': false}).eq('id', id);
   }
@@ -614,7 +614,7 @@ class AuthService {
   }
 }
 
-// ── Resultado de operaciones Auth ────────────────────────────────────────
+// ── Resultado de operaciones Auth ─────────────────────────
 class AuthResult {
   final bool exito;
   final String? error;
