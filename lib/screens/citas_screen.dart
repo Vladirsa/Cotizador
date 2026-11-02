@@ -5,6 +5,7 @@ import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
 import '../models/models.dart';
 import '../i18n/tr.dart';
+import '../services/auth_service.dart';
 
 class CitasScreen extends StatefulWidget {
   const CitasScreen({super.key});
@@ -239,9 +240,9 @@ class _CitasScreenState extends State<CitasScreen> {
     if (wa.isEmpty) return;
     final nombre = (cita['clientes'] as Map?)?['nombre'] as String? ?? tr('Cliente');
     final fecha = DateTime.tryParse(cita['fecha_hora'] as String? ?? '');
-    final lugar = cita['lugar'] as String? ?? tr('Taller HETNA CNC');
+    final lugar = cita['lugar'] as String? ?? AuthService.marcaTaller;
     final titulo = cita['titulo'] as String? ?? '';
-    final msg = trf('Hola *{0}* 📅 Te confirmamos tu cita en *HETNA CNC*:\n\n📋 *{1}*\n📅 *{2}*\n📍 *{3}*\n\nSi necesitas reprogramar avísanos con anticipación. ¡Te esperamos! 😊', [nombre, titulo, (fecha != null ? DateFormat(enIngles ? "EEEE, MMMM d 'at' h:mm a" : "EEEE dd 'de' MMMM 'a las' HH:mm", localeFormato).format(fecha) : ""), lugar]);
+    final msg = trf('Hola *{0}* 📅 Te confirmamos tu cita en *{4}*:\n\n📋 *{1}*\n📅 *{2}*\n📍 *{3}*\n\nSi necesitas reprogramar avísanos con anticipación. ¡Te esperamos! 😊', [nombre, titulo, (fecha != null ? DateFormat(enIngles ? "EEEE, MMMM d 'at' h:mm a" : "EEEE dd 'de' MMMM 'a las' HH:mm", localeFormato).format(fecha) : ""), lugar, AuthService.marcaTaller]);
     await WhatsAppService.abrirChat(numero: wa, mensaje: msg);
     await SupabaseService.actualizarCita(cita['id'] as String, {'wa_enviado': true});
     await _cargar();
