@@ -649,6 +649,9 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   final _condiciones = ['LAB — En nuestro taller', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
   String _tiempoEntrega = '15 días';
+  // Vigencia de la cotización: antes siempre 7 días aunque el taller quisiera otra
+  int _vigenciaDias = 7;
+  static const _vigencias = [3, 7, 15, 30, 45];
 
   // Impuesto por defecto del taller (Configuración → Idioma, moneda e impuestos)
   Future<void> _cargarImpuestoDefault() async {
@@ -672,6 +675,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     super.initState();
     if (widget.cotizacionEditar == null) _cargarImpuestoDefault();
     _cargarAnticipo();
+    _cargarCupo();
     if (widget.itemInicial != null) {
       try {
         final item = widget.itemInicial!;
@@ -712,6 +716,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _condicionEntrega = c.condicionEntrega ?? tr('LAB — En nuestro taller');
       _notas = c.notas ?? '';
       if (c.createdAt != null) _fechaCotizacion = c.createdAt!;
+      _vigenciaDias = c.vigenciaDias;
       _tipo = c.tipo;
       _tipoOriginal = c.tipo;
       _muestraGratis = c.datosPro['muestra'] == true;
@@ -735,9 +740,46 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   }
 
   @override
+  // Cupo del mes (plan Gratis): aviso cuando quedan pocas y botón para subir
+  // de plan. Viene del servidor (supabase/cupo_servidor.sql).
+  Map<String, dynamic>? _cupo;
+  Future<void> _cargarCupo() async {
+    if (AuthService.puede('cotizaciones_ilimitadas')) return;
+    final c = await SupabaseService.cupoCotizaciones();
+    if (mounted && c != null) setState(() => _cupo = c);
+  }
+
+  Widget? _avisoCupo() {
+    final c = _cupo;
+    if (c == null || c['limite'] == null || _esEdicion) return null;
+    final limite = (c['limite'] as num).toInt();
+    final quedan = (c['quedan'] as num?)?.toInt() ?? 0;
+    if (quedan > 1) return null; // sólo cuando queda una o ninguna
+    final agotado = quedan == 0;
+    final color = agotado ? AppColors.rojo : AppColors.ambar;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(8)),
+      child: Row(children: [
+        Icon(agotado ? Icons.lock_outline : Icons.hourglass_bottom, size: 18, color: color),
+        const SizedBox(width: 8),
+        Expanded(child: Text(
+          agotado
+            ? trf('Ya usaste tus {0} cotizaciones gratis de este mes. Se renuevan el día 1.', [limite])
+            : trf('Te queda {0} cotización gratis este mes (de {1}).', [quedan, limite]),
+          style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600))),
+        TextButton(
+          onPressed: () => AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
+            funcion: trf('más de {0} cotizaciones al mes', [limite])),
+          child: Text(tr('Ver planes'), style: TextStyle(color: color, fontWeight: FontWeight.w800))),
+      ]));
+  }
+
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0.00', 'es_MX');
+    final avisoCupo = _avisoCupo();
     return ListView(padding: const EdgeInsets.all(14), children: [
+      if (avisoCupo != null) avisoCupo,
       if (_esEdicion)
         Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8)),
@@ -864,6 +906,14 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             items: _tiempos.map((t) => DropdownMenuItem(value: t, child: Text(tr(t), style: const TextStyle(fontSize: 13)))).toList(),
             onChanged: (v) => setState(() => _tiempoEntrega = v!)))),
           const SizedBox(width: 8),
+          Expanded(child: _campo(tr('Vigencia'), child: DropdownButtonFormField<int>(
+            value: _vigencias.contains(_vigenciaDias) ? _vigenciaDias : 7,
+            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+            items: _vigencias.map((d) => DropdownMenuItem(value: d, child: Text(trf('{0} días', [d]), style: const TextStyle(fontSize: 13)))).toList(),
+            onChanged: (v) => setState(() => _vigenciaDias = v!)))),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
           Expanded(child: _campo(tr('Método de pago'), child: DropdownButtonFormField<String>(
             value: _metodosPago.contains(_metodoPago) ? _metodoPago : _metodosPago.first,
             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
@@ -1309,6 +1359,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             content: Text(tr('✅ Borrador guardado')), backgroundColor: AppColors.azul));
           widget.onGuardada?.call();
           setState(() { _items = []; _cliente = null; _guardadaEnSesion = null; });
+          _cargarCupo();
         }
       }
     } catch (e) {
@@ -1340,6 +1391,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       final creada = await SupabaseService.crearCotizacion(_buildCotizacion(estado: 'Borrador'), _items);
       _guardadaEnSesion = creada;
       widget.onGuardada?.call();
+      _cargarCupo();
       return _buildCotizacion(id: creada.id, folio: creada.folio);
     } catch (e) {
       if (!mounted) return null;
@@ -1396,7 +1448,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     items: _items, estado: estado ?? 'Borrador',
     descuentoPct: _descuentoPct, ivaPct: _aplicaIva ? _ivaPct : 0,
     costoEnvio: _costoEnvio, metodoPago: _metodoPago,
-    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion,
+    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion, vigenciaDias: _vigenciaDias,
     tipo: _tipo, datosPro: _tipo == 'profesional' ? _datosPro() : {});
 }
 
