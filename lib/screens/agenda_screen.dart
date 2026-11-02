@@ -653,7 +653,7 @@ class _AgendaScreenState extends State<AgendaScreen>
         Expanded(child: Text(tr(valor), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
       ]));
 
-  // ── NUEVO EVENTO MANUAL ───────────────────────────────
+  // ── NUEVO EVENTO MANUAL ─────────────────────────────
   void _nuevoEvento() {
     final tituloCtrl = TextEditingController();
     final notasCtrl = TextEditingController();
@@ -754,7 +754,7 @@ class _AgendaScreenState extends State<AgendaScreen>
           ]))));
   }
 
-  // ── HELPERS ───────────────────────────────────────────────────
+  // ── HELPERS ─────────────────────────────────────────
   Widget _kpiHoy(String label, String valor, Color color, IconData icon) =>
     Expanded(child: Container(
       padding: const EdgeInsets.all(12),
