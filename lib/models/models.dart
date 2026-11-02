@@ -244,7 +244,7 @@ class CotizacionItem {
       };
 }
 
-// ─── COTIZACIÓN ────────────────────────────
+// ─── COTIZACIÓN ──────────────────────────────
 class Cotizacion {
   final String? id;
   final String? folio;
@@ -655,7 +655,7 @@ class Gasto {
   };
 }
 
-// ─── HISTORIAL DE CLIENTE ─────────────────
+// ─── HISTORIAL DE CLIENTE ─────────────────────
 class HistorialCliente {
   final List<Cotizacion> cotizaciones;
   final List<Pedido> pedidos;
