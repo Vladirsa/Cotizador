@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
+import 'whatsapp_service.dart';
 import '../models/models.dart';
 import '../i18n/tr.dart';
 
@@ -40,6 +41,8 @@ class SupabaseService {
   // mismo con el teléfono vacío. Sólo al leer: no se toca lo guardado.
   static Map<String, dynamic> _conDatosDelTaller(Map<String, dynamic> cfg) {
     final r = Map<String, dynamic>.from(cfg);
+    // Lada por defecto de WhatsApp según el país del taller
+    WhatsAppService.paisTaller = r['pais_factura'] == 'US' ? 'US' : 'MX';
     final propio = (AuthService.nombreNegocio ?? '').trim();
     final actual = (r['nombre_comercial'] ?? '').toString().trim();
     final esDeHetna = actual.toUpperCase() == 'HETNA CNC' && !propio.toUpperCase().contains('HETNA');
@@ -233,6 +236,8 @@ class SupabaseService {
     final folio = await generarFolio();
     final resCot = await _db.from('cotizaciones').insert({
       'folio': folio,
+      // La fecha que eligió el taller en el formulario (antes se ignoraba)
+      if (cotizacion.createdAt != null) 'created_at': cotizacion.createdAt!.toIso8601String(),
       'cliente_id': cotizacion.clienteId ?? cotizacion.cliente?.id,
       'estado': cotizacion.estado,
       'subtotal': cotizacion.subtotal,
