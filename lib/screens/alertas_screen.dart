@@ -461,11 +461,8 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border(
-            left: BorderSide(color: vencida ? AppColors.rojo : color, width: 3),
-            top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-            right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-            bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5),
+          boxShadow: [BoxShadow(color: vencida ? AppColors.rojo : color, offset: const Offset(-3, 0))]),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
