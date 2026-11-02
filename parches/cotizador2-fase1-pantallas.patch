@@ -1,0 +1,342 @@
+diff --git a/lib/screens/cotizar_screen.dart b/lib/screens/cotizar_screen.dart
+index 719aca4..bedca56 100644
+--- a/lib/screens/cotizar_screen.dart
++++ b/lib/screens/cotizar_screen.dart
+@@ -649,6 +649,9 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+   final _condiciones = ['LAB — En nuestro taller', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
+   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
+   String _tiempoEntrega = '15 días';
++  // Vigencia de la cotización: antes siempre 7 días aunque el taller quisiera otra
++  int _vigenciaDias = 7;
++  static const _vigencias = [3, 7, 15, 30, 45];
+ 
+   // Impuesto por defecto del taller (Configuración → Idioma, moneda e impuestos)
+   Future<void> _cargarImpuestoDefault() async {
+@@ -672,6 +675,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+     super.initState();
+     if (widget.cotizacionEditar == null) _cargarImpuestoDefault();
+     _cargarAnticipo();
++    _cargarCupo();
+     if (widget.itemInicial != null) {
+       try {
+         final item = widget.itemInicial!;
+@@ -712,6 +716,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+       _condicionEntrega = c.condicionEntrega ?? tr('LAB — En nuestro taller');
+       _notas = c.notas ?? '';
+       if (c.createdAt != null) _fechaCotizacion = c.createdAt!;
++      _vigenciaDias = c.vigenciaDias;
+       _tipo = c.tipo;
+       _tipoOriginal = c.tipo;
+       _muestraGratis = c.datosPro['muestra'] == true;
+@@ -735,9 +740,46 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+   }
+ 
+   @override
++  // Cupo del mes (plan Gratis): aviso cuando quedan pocas y botón para subir
++  // de plan. Viene del servidor (supabase/cupo_servidor.sql).
++  Map<String, dynamic>? _cupo;
++  Future<void> _cargarCupo() async {
++    if (AuthService.puede('cotizaciones_ilimitadas')) return;
++    final c = await SupabaseService.cupoCotizaciones();
++    if (mounted && c != null) setState(() => _cupo = c);
++  }
++
++  Widget? _avisoCupo() {
++    final c = _cupo;
++    if (c == null || c['limite'] == null || _esEdicion) return null;
++    final limite = (c['limite'] as num).toInt();
++    final quedan = (c['quedan'] as num?)?.toInt() ?? 0;
++    if (quedan > 1) return null; // sólo cuando queda una o ninguna
++    final agotado = quedan == 0;
++    final color = agotado ? AppColors.rojo : AppColors.ambar;
++    return Container(
++      margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(10),
++      decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(8)),
++      child: Row(children: [
++        Icon(agotado ? Icons.lock_outline : Icons.hourglass_bottom, size: 18, color: color),
++        const SizedBox(width: 8),
++        Expanded(child: Text(
++          agotado
++            ? trf('Ya usaste tus {0} cotizaciones gratis de este mes. Se renuevan el día 1.', [limite])
++            : trf('Te queda {0} cotización gratis este mes (de {1}).', [quedan, limite]),
++          style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600))),
++        TextButton(
++          onPressed: () => AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
++            funcion: trf('más de {0} cotizaciones al mes', [limite])),
++          child: Text(tr('Ver planes'), style: TextStyle(color: color, fontWeight: FontWeight.w800))),
++      ]));
++  }
++
+   Widget build(BuildContext context) {
+     final fmt = NumberFormat('\$#,##0.00', 'es_MX');
++    final avisoCupo = _avisoCupo();
+     return ListView(padding: const EdgeInsets.all(14), children: [
++      if (avisoCupo != null) avisoCupo,
+       if (_esEdicion)
+         Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(10),
+           decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8)),
+@@ -864,6 +906,14 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+             items: _tiempos.map((t) => DropdownMenuItem(value: t, child: Text(tr(t), style: const TextStyle(fontSize: 13)))).toList(),
+             onChanged: (v) => setState(() => _tiempoEntrega = v!)))),
+           const SizedBox(width: 8),
++          Expanded(child: _campo(tr('Vigencia'), child: DropdownButtonFormField<int>(
++            value: _vigencias.contains(_vigenciaDias) ? _vigenciaDias : 7,
++            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
++            items: _vigencias.map((d) => DropdownMenuItem(value: d, child: Text(trf('{0} días', [d]), style: const TextStyle(fontSize: 13)))).toList(),
++            onChanged: (v) => setState(() => _vigenciaDias = v!)))),
++        ]),
++        const SizedBox(height: 8),
++        Row(children: [
+           Expanded(child: _campo(tr('Método de pago'), child: DropdownButtonFormField<String>(
+             value: _metodosPago.contains(_metodoPago) ? _metodoPago : _metodosPago.first,
+             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+@@ -1309,6 +1359,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+             content: Text(tr('✅ Borrador guardado')), backgroundColor: AppColors.azul));
+           widget.onGuardada?.call();
+           setState(() { _items = []; _cliente = null; _guardadaEnSesion = null; });
++          _cargarCupo();
+         }
+       }
+     } catch (e) {
+@@ -1340,6 +1391,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+       final creada = await SupabaseService.crearCotizacion(_buildCotizacion(estado: 'Borrador'), _items);
+       _guardadaEnSesion = creada;
+       widget.onGuardada?.call();
++      _cargarCupo();
+       return _buildCotizacion(id: creada.id, folio: creada.folio);
+     } catch (e) {
+       if (!mounted) return null;
+@@ -1396,7 +1448,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
+     items: _items, estado: estado ?? 'Borrador',
+     descuentoPct: _descuentoPct, ivaPct: _aplicaIva ? _ivaPct : 0,
+     costoEnvio: _costoEnvio, metodoPago: _metodoPago,
+-    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion,
++    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion, vigenciaDias: _vigenciaDias,
+     tipo: _tipo, datosPro: _tipo == 'profesional' ? _datosPro() : {});
+ }
+ 
+diff --git a/lib/screens/simulador_screen.dart b/lib/screens/simulador_screen.dart
+index 34c7c31..c9b8303 100644
+--- a/lib/screens/simulador_screen.dart
++++ b/lib/screens/simulador_screen.dart
+@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
+ import 'package:supabase_flutter/supabase_flutter.dart';
+ import '../main.dart';
+ import 'cotizar_screen.dart';
++import 'package:file_picker/file_picker.dart';
++import '../services/archivo_cad_service.dart';
+ import '../services/auth_service.dart';
+ import '../i18n/tr.dart';
+ 
+@@ -401,6 +403,11 @@ class MotorCalculo {
+     // Impresión 3D
+     String materialImpresion = 'pla',
+     String calidadImpresion = 'normal',
++    // Medidas leídas del archivo (DXF/SVG/STL/OBJ). 0 = no se subió archivo y
++    // se usan las medidas capturadas a mano, como antes.
++    double longitudCorteMm = 0,
++    int perforaciones = 0,
++    double volumenRealCm3 = 0,
+   }) {
+     final fmt = NumberFormat(r'$#,##0.00', 'es_MX');
+     final formula = tipo.formula;
+@@ -473,7 +480,9 @@ class MotorCalculo {
+           final td = cfg.getTarifa('costo_diseno') > 0 ? cfg.getTarifa('costo_diseno') : 300;
+           desglose['diseno_adicional'] = td.toDouble();
+         }
+-        tiempoHoras = areaM2 * 0.5 * cantidad; break;
++        // El tiempo ya se calculó arriba con los minutos por m² del taller;
++        // antes aquí se reemplazaba por "área × 0.5 h" y el costo salía mal.
++        break;
+ 
+       // ── ROUTER 3D / IMPRESIÓN 3D / CARPINTERÍA ─────────
+       case 'por_volumen':
+@@ -486,7 +495,11 @@ class MotorCalculo {
+ 
+         if (esImpresion) {
+           final relleno = cfg.getTarifa('relleno_pct') > 0 ? cfg.getTarifa('relleno_pct') / 100 : 0.20;
+-          final volEfectivo = volumen * relleno;
++          // Con STL/OBJ se usa el volumen real de la pieza; las paredes y tapas
++          // van sólidas (~30% del volumen) y el resto lleva el % de relleno.
++          final volEfectivo = volumenRealCm3 > 0
++            ? volumenRealCm3 * (0.30 + 0.70 * relleno)
++            : volumen * relleno;
+           // Densidad según material
+           final densidades = {'pla': 1.24, 'abs': 1.04, 'petg': 1.27, 'tpu': 1.20};
+           final densidad = densidades[materialImpresion] ?? 1.24;
+@@ -503,7 +516,7 @@ class MotorCalculo {
+           tiempoHoras = minutos3D / 60 * cantidad;
+           final tarifaHr3D = cfg.getTarifa('tarifa_hora') > 0 ? cfg.getTarifa('tarifa_hora') : 80;
+           precioMaquila = tiempoHoras * tarifaHr3D;
+-          desglose['volumen_cm3'] = volumen.toDouble();
++          desglose['volumen_cm3'] = (volumenRealCm3 > 0 ? volumenRealCm3 : volumen).toDouble();
+           desglose['gramos_estimados'] = gramos.toDouble();
+           desglose['tiempo_min'] = minutos3D.toDouble();
+           // Mínimo
+@@ -627,8 +640,13 @@ class MotorCalculo {
+             : densidadLaser == 'denso'
+               ? (cfg.getTarifa('intervalo_denso') > 0 ? cfg.getTarifa('intervalo_denso') : 0.1)
+               : (cfg.getTarifa('intervalo_normal') > 0 ? cfg.getTarifa('intervalo_normal') : 0.15);
+-          final perimetro = 2 * (largo + ancho) * 10;
+-          final minCorte = perimetro / velCorte / 60;
++          // Con archivo: el largo real de corte; sin archivo, el perímetro
++          // del rectángulo (estimado). Cada perforación suma su tiempo.
++          final perimetro = longitudCorteMm > 0 ? longitudCorteMm : 2 * (largo + ancho) * 10;
++          final segPerf = cfg.getTarifa('seg_perforacion') > 0 ? cfg.getTarifa('seg_perforacion') : 0.5;
++          final minCorte = perimetro / velCorte / 60 + perforaciones * segPerf / 60;
++          if (longitudCorteMm > 0) desglose['corte_mm_archivo'] = longitudCorteMm;
++          if (perforaciones > 0) desglose['perforaciones'] = perforaciones.toDouble();
+           final areaGrab = largo * ancho;
+           final minGrabado = (areaGrab * 100) / (intervalo * velGrab * 60);
+           switch (tipoLaser) {
+@@ -683,7 +701,13 @@ class MotorCalculo {
+         // antes se asumían 6 min por metro, 5 veces más de lo real
+         final velM = cfg.getTarifa('vel_corte_m_min') > 0 ? cfg.getTarifa('vel_corte_m_min') : 1.2;
+         final setupM = cfg.getTarifa('min_setup') > 0 ? cfg.getTarifa('min_setup') : 10.0;
+-        tiempoHoras = (metros * cantidad / velM + setupM) / 60;
++        final segPerfM = cfg.getTarifa('seg_perforacion') > 0 ? cfg.getTarifa('seg_perforacion') : 2.0;
++        tiempoHoras = (metros * cantidad / velM + perforaciones * cantidad * segPerfM / 60 + setupM) / 60;
++        final costoPerf = cfg.getTarifa('costo_perforacion');
++        if (perforaciones > 0 && costoPerf > 0) {
++          desglose['perforaciones'] = perforaciones.toDouble();
++          precioMaquila += perforaciones * costoPerf * cantidad;
++        }
+         desglose['metros'] = metros;
+         desglose['tarifa_metro'] = tarifaMt;
+         break;
+@@ -1231,6 +1255,11 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
+   ResultadoSimulador? _resultado;
+   bool _mostrarTarifas = false;
+ 
++  // Archivo de la pieza (DXF/SVG/STL/OBJ): llena las medidas y le da al motor
++  // el largo real de corte, las perforaciones y el volumen real.
++  GeoCad? _geo;
++  bool _leyendoArchivo = false;
++
+   // Inputs Diseño Digital
+   bool _clienteTraeArchivo = false;
+   bool _archivoEsVector = false;
+@@ -1381,6 +1410,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
+       descParts.add('Acabado: ${_acabadoSel!.nombre}');
+     }
+     if (_cantidad > 1) descParts.add(trf('Cantidad: {0} piezas', [_cantidad]));
++    if (_geo != null) descParts.add(trf('Archivo: {0}', [_geo!.nombre]));
+     final desc = _descripcionEditable.isNotEmpty
+       ? _descripcionEditable : descParts.join('\n');
+ 
+@@ -1421,7 +1451,10 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
+       llevaPlantilla: _llevaPlantilla,
+       llevaRotativo: _llevaRotativo,
+       materialImpresion: _materialImpresion,
+-      calidadImpresion: _calidadImpresion);
++      calidadImpresion: _calidadImpresion,
++      longitudCorteMm: _geo?.longitudCorte ?? 0,
++      perforaciones: _geo?.contornos ?? 0,
++      volumenRealCm3: (_geo?.es3D ?? false) ? _geo!.volumenCm3 : 0);
+ 
+     setState(() { _resultado = r; _descripcionEditable = desc; });
+   }
+@@ -1475,6 +1508,103 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
+     SingleChildScrollView(padding: const EdgeInsets.all(14), child: child);
+ 
+   Widget _buildBodyServicio(SimConfig cfg) {
++    final cuerpo = _cuerpoServicio(cfg);
++    final esDisenoDig = cfg.getTarifa('tarifa_hora_2d') > 0 ||
++                        cfg.getTarifa('tarifa_setup') > 0 ||
++                        cfg.getTarifa('cargo_urgente') > 0;
++    if (esDisenoDig) return cuerpo;
++    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
++      _tarjetaArchivo(),
++      const SizedBox(height: 10),
++      cuerpo,
++    ]);
++  }
++
++  String _num1(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
++
++  void _ponerMedida(String etiqueta, double v) {
++    final ctrl = _medidaCtrls.putIfAbsent(etiqueta, () => TextEditingController());
++    ctrl.text = v > 0 ? _num1(v) : '';
++  }
++
++  Future<void> _subirArchivo() async {
++    try {
++      final res = await FilePicker.platform.pickFiles(
++        type: FileType.custom, allowedExtensions: ArchivoCadService.extensiones, withData: true);
++      if (res == null || res.files.isEmpty || res.files.first.bytes == null) return;
++      final f = res.files.first;
++      if (f.size > ArchivoCadService.maxBytes) {
++        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('El archivo pesa más de 40 MB.'))));
++        return;
++      }
++      setState(() => _leyendoArchivo = true);
++      final g = ArchivoCadService.leer(f.name, f.bytes!);
++      final cm = 10.0; // el archivo mide en mm; el simulador en cm
++      setState(() {
++        _geo = g;
++        _largo = g.largo / cm; _ancho = g.ancho / cm;
++        _ponerMedida(tr('Largo (cm)'), _largo);
++        _ponerMedida(tr('Ancho (cm)'), _ancho);
++        if (g.es3D) {
++          _alto = g.alto / cm;
++          _ponerMedida(tr('Alto (cm)'), _alto);
++          _ponerMedida(tr('Alto / Profundidad (cm)'), _alto);
++        } else if (g.longitudCorte > 0) {
++          _metros = g.longitudCorte / 1000;
++          _ponerMedida(tr('Metros lineales'), _metros);
++        }
++        _leyendoArchivo = false;
++        _resultado = null;
++      });
++    } catch (e) {
++      setState(() => _leyendoArchivo = false);
++      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
++        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')]))));
++    }
++  }
++
++  Widget _tarjetaArchivo() {
++    final g = _geo;
++    final datos = <String>[];
++    if (g != null) {
++      datos.add(g.es3D
++        ? '${_num1(g.largo / 10)} × ${_num1(g.ancho / 10)} × ${_num1(g.alto / 10)} cm'
++        : '${_num1(g.largo / 10)} × ${_num1(g.ancho / 10)} cm');
++      if (!g.es3D && g.longitudCorte > 0) datos.add(trf('{0} m de corte', [(g.longitudCorte / 1000).toStringAsFixed(2)]));
++      if (!g.es3D && g.contornos > 0) datos.add(trf('{0} perforaciones', [g.contornos]));
++      if (g.es3D && g.volumenCm3 > 0) datos.add(trf('{0} cm³ de pieza', [g.volumenCm3.toStringAsFixed(1)]));
++    }
++    return Container(
++      padding: const EdgeInsets.all(12),
++      decoration: BoxDecoration(
++        color: g == null ? Colors.white : const Color(0xFFEFF7F1),
++        borderRadius: BorderRadius.circular(12),
++        border: Border.all(color: g == null ? const Color(0xFFE2E0D8) : const Color(0xFF1E7B3A))),
++      child: Row(children: [
++        Icon(g == null ? Icons.upload_file : Icons.check_circle,
++          color: g == null ? AppColors.azul : const Color(0xFF1E7B3A)),
++        const SizedBox(width: 10),
++        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
++          Text(g == null ? tr('Calcular desde el archivo') : g.nombre,
++            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
++          Text(g == null ? tr('Sube DXF, SVG, STL u OBJ y se llenan las medidas, el largo de corte y las perforaciones.') : datos.join(' · '),
++            style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
++          if (g != null && g.avisos.isNotEmpty)
++            Text(g.avisos.first, style: const TextStyle(fontSize: 11, color: Color(0xFFB54708))),
++        ])),
++        const SizedBox(width: 8),
++        if (_leyendoArchivo)
++          const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
++        else if (g != null)
++          IconButton(tooltip: tr('Quitar archivo'), icon: const Icon(Icons.close, size: 18),
++            onPressed: () => setState(() { _geo = null; _resultado = null; }))
++        else
++          TextButton(onPressed: _subirArchivo, child: Text(tr('Subir archivo'))),
++      ]),
++    );
++  }
++
++  Widget _cuerpoServicio(SimConfig cfg) {
+     final esPlasma = cfg.getTarifa('tarifa_m2_delgado') > 0;
+     final esFibra  = cfg.getTarifa('precio_1_10') > 0;
+     final esLaser  = cfg.getTarifa('vel_mdf_fino') > 0 && !esFibra;
