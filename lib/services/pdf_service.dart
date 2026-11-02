@@ -879,7 +879,7 @@ class PdfService {
                 // Pieza (vista superior): archivo real o rectángulo
                 c.setStrokeColor(azul);
                 if (trazos.isNotEmpty) {
-                  c.setLineWidth(es3D ? 0.25 : 0.9);
+                  c.setLineWidth(es3D ? 0.5 : 0.9);
                   for (final t in trazos) {
                     for (int i = 0; i < t.length; i++) {
                       final px = rx + t[i][0] * esc, py = Y(ryTop + rh - t[i][1] * esc);
