@@ -50,4 +50,10 @@ const Map<String, String> textosEnExtra = {
   'Monto fijo': 'Fixed amount',
   '{0}% de anticipo / {1}% a la entrega': '{0}% deposit / {1}% on delivery',
   'Anticipo de {0}, el resto a la entrega': 'Deposit of {0}, balance on delivery',
+  'Agregar como partida': 'Add as line item',
+  'Agregar la pieza a la cotización': 'Add the part to the quote',
+  'Nombre de la pieza': 'Part name',
+  'Precio por pieza': 'Price per part',
+  'Original: {0} × {1}{2} mm. Escribe la medida que quieres; con "proporcional" las otras se ajustan solas.': 'Original: {0} × {1}{2} mm. Enter the size you want; with "proportional" the others follow.',
+  'Proporcional (misma escala en todos los ejes)': 'Proportional (same scale on all axes)',
 };

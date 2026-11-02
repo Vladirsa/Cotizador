@@ -41,17 +41,27 @@ class GeoCad {
   /// Copia escalada por un factor (p. ej. 1.5 = 150%). Medidas y largo de
   /// corte ×f, áreas ×f², volumen ×f³. Sirve cuando el cliente quiere la
   /// pieza más grande o más chica que el archivo.
-  GeoCad escalado(double f) {
-    if (f <= 0 || f == 1) return this;
+  GeoCad escalado(double f) => escaladoXYZ(f, f, f);
+
+  /// Escala distinta por eje (largo, ancho, alto). Con factores iguales es la
+  /// escala proporcional. Largo de corte y área superficial se aproximan.
+  GeoCad escaladoXYZ(double fx, double fy, double fz) {
+    if (fx <= 0 || fy <= 0 || fz <= 0) return this;
+    if (fx == 1 && fy == 1 && fz == 1) return this;
+    final fxy = (fx + fy) / 2;
+    final uniforme = (fx - fy).abs() < 1e-6 && (fx - fz).abs() < 1e-6;
+    final nota = uniforme
+      ? 'Escalado al ${(fx * 100).round()}% del archivo original'
+      : 'Escalado por eje: largo ${(fx * 100).round()}%, ancho ${(fy * 100).round()}%, alto ${(fz * 100).round()}%';
     return GeoCad(
       nombre: nombre, tipo: tipo, unidades: unidades,
-      largo: largo * f, ancho: ancho * f, alto: alto * f,
-      longitudCorte: longitudCorte * f, contornos: contornos, barrenos: barrenos,
-      areaPieza: areaPieza * f * f,
-      triangulos: triangulos, volumenCm3: volumenCm3 * f * f * f,
-      areaSuperficialCm2: areaSuperficialCm2 * f * f,
-      trazos: trazos.map((p) => p.map((q) => [q[0] * f, q[1] * f]).toList()).toList(),
-      avisos: [...avisos, if (f != 1) 'Escalado al ${(f * 100).round()}% del archivo original'],
+      largo: largo * fx, ancho: ancho * fy, alto: alto * fz,
+      longitudCorte: longitudCorte * fxy, contornos: contornos, barrenos: barrenos,
+      areaPieza: areaPieza * fx * fy,
+      triangulos: triangulos, volumenCm3: volumenCm3 * fx * fy * fz,
+      areaSuperficialCm2: areaSuperficialCm2 * (fx * fy + fx * fz + fy * fz) / 3,
+      trazos: trazos.map((p) => p.map((q) => [q[0] * fx, q[1] * fy]).toList()).toList(),
+      avisos: [...avisos.where((a) => !a.startsWith('Escalado')), nota],
     );
   }
 
