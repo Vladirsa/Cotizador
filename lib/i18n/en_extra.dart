@@ -25,4 +25,9 @@ const Map<String, String> textosEnExtra = {
   'Te queda {0} cotización gratis este mes (de {1}).': 'You have {0} free quote left this month (of {1}).',
   'Vigencia': 'Valid for',
   '{0} días': '{0} days',
+  'El cliente recoge en el taller': 'Customer picks up at the shop',
+  'Entrega a domicilio del cliente': 'Delivery to the customer\'s address',
+  'Envío por paquetería (lo paga el cliente)': 'Shipping by carrier (paid by the customer)',
+  'Envío por paquetería (incluido en el precio)': 'Shipping by carrier (included in the price)',
+  'Forma de entrega': 'Delivery',
 };

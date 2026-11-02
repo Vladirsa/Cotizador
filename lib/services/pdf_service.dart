@@ -64,7 +64,11 @@ class PdfService {
 
   /// Pregunta en qué idioma sale el PDF. Devuelve null si el usuario cierra
   /// el diálogo sin elegir.
-  static Future<bool?> elegirIdioma(BuildContext context) {
+  // El PDF sale en el idioma de la app (Configuración → Idioma); ya no se
+  // pregunta cada vez. Para forzar otro idioma, generarCotizacion(ingles: …).
+  static Future<bool?> elegirIdioma(BuildContext context) async => enIngles;
+
+  static Future<bool?> elegirIdiomaDialogo(BuildContext context) {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -244,10 +248,9 @@ class PdfService {
             children: [
               pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                 if (logoImage != null)
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(4)),
-                    child: pw.Image(logoImage, width: 100, height: 28, fit: pw.BoxFit.contain))
+                  // Sin caja blanca: el logo va directo sobre el encabezado
+                  // (si el PNG tiene fondo transparente, se ve limpio)
+                  pw.Image(logoImage, width: 110, height: 32, fit: pw.BoxFit.contain)
                 else
                   pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
                 pw.SizedBox(height: 8),
@@ -966,11 +969,7 @@ class PdfService {
           child: pw.Row(children: [
             logoImage != null
               ? pw.Container(
-                  width: 50, height: 50,
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.white,
-                    borderRadius: pw.BorderRadius.circular(8)),
-                  padding: const pw.EdgeInsets.all(4),
+                  width: 56, height: 50,
                   margin: const pw.EdgeInsets.only(right: 12),
                   child: pw.Image(logoImage, fit: pw.BoxFit.contain))
               : pw.SizedBox(width: 0),
@@ -1113,12 +1112,7 @@ class PdfService {
             // IZQUIERDA: logo + datos empresa
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               if (logoImage != null)
-                pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.white,
-                    borderRadius: pw.BorderRadius.circular(4)),
-                  child: pw.Image(logoImage, width: 100, height: 28, fit: pw.BoxFit.contain))
+                pw.Image(logoImage, width: 110, height: 32, fit: pw.BoxFit.contain)
               else
                 pw.Text(nombreEmpresa,
                   style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
