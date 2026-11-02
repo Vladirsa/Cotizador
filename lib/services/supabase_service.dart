@@ -207,9 +207,26 @@ class SupabaseService {
       final res = await _db.rpc('generar_folio_cotizacion');
       return res as String;
     } catch (_) {
+      // Folio provisional: el trigger del servidor lo reemplaza por el del
+      // taller al guardar (supabase/cupo_servidor.sql).
       return 'COT-${DateTime.now().millisecondsSinceEpoch}';
     }
   }
+
+  /// Cupo de cotizaciones del mes según el servidor (supabase/cupo_servidor.sql):
+  /// { limite (null = sin límite), usadas, quedan }. null si la función aún no
+  /// está instalada en la base: entonces la app usa su conteo de siempre.
+  static Future<Map<String, dynamic>?> cupoCotizaciones() async {
+    try {
+      final res = await _db.rpc('cupo_cotizaciones');
+      if (res is Map) return Map<String, dynamic>.from(res);
+      return null;
+    } catch (_) { return null; }
+  }
+
+  /// true si el error que devolvió Supabase es el rechazo del servidor por
+  /// cupo agotado (trigger cotizaciones_consumir_cupo).
+  static bool esErrorSinCupo(Object e) => e.toString().contains('SIN_CUPO');
 
   static Future<Cotizacion> crearCotizacion(
       Cotizacion cotizacion, List<CotizacionItem> items) async {
