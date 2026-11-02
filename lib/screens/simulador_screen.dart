@@ -1534,7 +1534,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       if (res == null || res.files.isEmpty || res.files.first.bytes == null) return;
       final f = res.files.first;
       if (f.size > ArchivoCadService.maxBytes) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('El archivo pesa más de 40 MB.'))));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('El archivo pesa más de 120 MB.'))));
         return;
       }
       setState(() => _leyendoArchivo = true);
