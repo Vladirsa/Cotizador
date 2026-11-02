@@ -15,9 +15,21 @@ import '../i18n/tr.dart';
 class WhatsAppService {
 
   // ── Normalizar número del CLIENTE ───────────────────
+  // País del taller para la lada por defecto: 'MX' (52) o 'US' (1). Lo pone
+  // AuthService/Configuración (pais_factura). Un número con '+' o con lada ya
+  // escrita se respeta tal cual.
+  static String paisTaller = 'MX';
+
   static String normalizarNumero(String numero) {
+    final conMas = numero.trim().startsWith('+');
     var n = numero.replaceAll(RegExp(r'[^0-9]'), '');
     if (n.isEmpty) return '';
+    if (conMas) return n; // ya trae lada internacional
+    if (paisTaller == 'US') {
+      if (n.length == 10) return '1$n';
+      return n; // 11 dígitos con 1 al frente u otra lada: tal cual
+    }
+    // México: WhatsApp usa 52 + 1 + 10 dígitos
     if (n.length == 10) return '521$n';
     if (n.length == 11 && n.startsWith('1')) return '52$n';
     if (n.length == 12 && n.startsWith('52')) return '521${n.substring(2)}';
