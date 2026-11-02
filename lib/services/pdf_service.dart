@@ -647,6 +647,7 @@ class PdfService {
           titulo(sig(), _t('RESUMEN')),
           pw.Text(v('resumen'), style: const pw.TextStyle(fontSize: 9, lineSpacing: 2)),
         ],
+
         // ─── 2. ALCANCE ─────────────────────
         if (incluye.isNotEmpty || noIncluye.isNotEmpty) ...[
           titulo(sig(), _t('ALCANCE DEL TRABAJO')),
