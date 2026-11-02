@@ -47,15 +47,15 @@ class Planes {
     ],
     Plan.taller: [
       'Cotizaciones ilimitadas', 'PDF con tu logo, sin marca de agua', 'Cotización profesional (formato internacional)',
-      'Sube DXF, SVG, STL u OBJ: plano con medidas en la cotización', 'Simulador de costos con 3 precios y anticipo a tu medida',
+      'Sube DXF, SVG, STL u OBJ: medidas, plano y precio desde el archivo', 'Simulador de costos con 3 precios y anticipo a tu medida',
       'Costos de tu taller', 'Gastos y compras', 'Avisos de avance por WhatsApp', 'Fotos en productos', '2 usuarios',
     ],
     Plan.pro: [
-      'Todo lo de Taller', 'Inventario de bodega', 'Marketing: cupones y plantillas de WhatsApp', 'Reportes Excel',
+      'Todo lo de Taller', 'Inventario de bodega', 'Marketing: segmentos de clientes y plantillas de WhatsApp', 'Reportes Excel',
       'Dashboard de utilidad, gastos y conversión', 'Equipo con roles: 5 usuarios',
     ],
     Plan.industrial: [
-      'Todo lo de Pro', 'Facturación electrónica (CFDI)', 'API para conectar tu sistema', 'Usuarios ilimitados',
+      'Todo lo de Pro', 'Factura electrónica CFDI (próximamente)', 'API para conectar tu sistema (próximamente)', 'Usuarios ilimitados',
     ],
   };
 
