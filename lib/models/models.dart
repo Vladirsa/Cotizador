@@ -244,7 +244,7 @@ class CotizacionItem {
       };
 }
 
-// ─── COTIZACIÓN ──────────────────────────────
+// ─── COTIZACIÓN ────────────────────────────
 class Cotizacion {
   final String? id;
   final String? folio;
@@ -265,6 +265,15 @@ class Cotizacion {
   String? pdfUrl;
   final DateTime? createdAt;
   final double? totalBd; // total guardado en BD
+  // Liga pública (Fase 2): hetnacnc.com/c/<tokenPublico>. La pone el servidor.
+  final String? tokenPublico;
+  final DateTime? ligaVistaEn;
+  final DateTime? aceptadaEn;
+  final String? aceptadaPor;
+  // Anticipo pedido (monto fijo; si es null se calcula del % del método de pago)
+  double? anticipoMonto;
+  final double anticipoPagado;
+  final String anticipoEstado; // pendiente | pagado | sin_anticipo
   // 'sencilla' (la de siempre) o 'profesional' (formato internacional).
   String tipo;
   // Datos técnicos de la cotización profesional (proyecto, alcance,
@@ -272,6 +281,11 @@ class Cotizacion {
   Map<String, dynamic> datosPro;
 
   bool get esProfesional => tipo == 'profesional';
+
+  /// Liga que se manda al cliente para ver, aceptar y pagar el anticipo.
+  String? get ligaPublica =>
+    (tokenPublico == null || tokenPublico!.isEmpty) ? null : 'https://hetnacnc.com/c/$tokenPublico';
+  bool get anticipoPagadoCompleto => anticipoEstado == 'pagado';
 
   Cotizacion({
     this.id,
@@ -293,6 +307,13 @@ class Cotizacion {
     this.pdfUrl,
     this.createdAt,
     this.totalBd,
+    this.tokenPublico,
+    this.ligaVistaEn,
+    this.aceptadaEn,
+    this.aceptadaPor,
+    this.anticipoMonto,
+    this.anticipoPagado = 0,
+    this.anticipoEstado = 'pendiente',
     this.tipo = 'sencilla',
     Map<String, dynamic>? datosPro,
   }) : datosPro = datosPro ?? {};
@@ -307,6 +328,8 @@ class Cotizacion {
     fechaEntrega: fechaEntrega, diasHabiles: diasHabiles,
     vigenciaDias: vigenciaDias, notas: notas,
     pdfUrl: pdfUrl, createdAt: createdAt, totalBd: totalBd,
+    tokenPublico: tokenPublico, ligaVistaEn: ligaVistaEn, aceptadaEn: aceptadaEn, aceptadaPor: aceptadaPor,
+    anticipoMonto: anticipoMonto, anticipoPagado: anticipoPagado, anticipoEstado: anticipoEstado,
     tipo: tipo, datosPro: datosPro);
 
   double get subtotal => items.fold(0, (s, i) => s + i.subtotal);
@@ -360,6 +383,13 @@ class Cotizacion {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) : null,
       totalBd: (json['total'] as num?)?.toDouble(),
+      tokenPublico: json['token_publico'] as String?,
+      ligaVistaEn: json['liga_vista_en'] != null ? DateTime.tryParse(json['liga_vista_en']) : null,
+      aceptadaEn: json['aceptada_en'] != null ? DateTime.tryParse(json['aceptada_en']) : null,
+      aceptadaPor: json['aceptada_por'] as String?,
+      anticipoMonto: (json['anticipo_monto'] as num?)?.toDouble(),
+      anticipoPagado: (json['anticipo_pagado'] as num?)?.toDouble() ?? 0,
+      anticipoEstado: (json['anticipo_estado'] as String?) ?? 'pendiente',
       tipo: (json['tipo'] as String?) ?? 'sencilla',
       datosPro: json['datos_pro'] is Map
           ? Map<String, dynamic>.from(json['datos_pro'] as Map) : null,
@@ -625,7 +655,7 @@ class Gasto {
   };
 }
 
-// ─── HISTORIAL DE CLIENTE ─────────────────────
+// ─── HISTORIAL DE CLIENTE ─────────────────
 class HistorialCliente {
   final List<Cotizacion> cotizaciones;
   final List<Pedido> pedidos;

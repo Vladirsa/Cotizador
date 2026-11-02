@@ -90,6 +90,50 @@ class HetnaApi {
     '$base/$_region/servicios/envios-hetna/solicitar?c=${Uri.encodeComponent(cotizacionId)}&t=${Uri.encodeComponent(tarifaId)}';
 }
 
+// ═══════════════ Cobros en línea: Mercado Pago del taller ═══════════════
+// El taller conecta SU cuenta de Mercado Pago una sola vez. Después, cuando
+// su cliente paga el anticipo desde la liga de la cotización
+// (hetnacnc.com/c/<token>), el dinero entra directo a la cuenta del taller y
+// la comisión HETNA (por plan) se descuenta sola. Ver
+// packages/api/src/lib/cotizacion-liga.ts en hetnacnc.
+class MercadoPagoApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-mp';
+
+  static Map<String, String> _cab(String token) =>
+    {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
+
+  static Map<String, dynamic> _leer(http.Response r) {
+    Map<String, dynamic> d = {};
+    try {
+      final j = jsonDecode(utf8.decode(r.bodyBytes));
+      if (j is Map<String, dynamic>) d = j;
+    } catch (_) {}
+    if (r.statusCode != 200) {
+      throw HetnaError((d['error'] ?? d['message'] ?? tr('No se pudo completar. Intenta de nuevo.')).toString());
+    }
+    return d;
+  }
+
+  /// { disponible, conectado, mp_user_id, conectado_en, comision_pct, comision_tope }
+  static Future<Map<String, dynamic>> estado(String token) async {
+    final r = await http.get(Uri.parse('$_ruta/estado'), headers: _cab(token)).timeout(const Duration(seconds: 20));
+    return _leer(r);
+  }
+
+  /// Liga para que el taller autorice su cuenta de Mercado Pago.
+  static Future<String> conectar(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/conectar'), headers: _cab(token), body: '{}').timeout(const Duration(seconds: 30));
+    final url = _leer(r)['url'] as String?;
+    if (url == null || url.isEmpty) throw HetnaError(tr('Mercado Pago no devolvió la liga.'));
+    return url;
+  }
+
+  static Future<void> desconectar(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/desconectar'), headers: _cab(token), body: '{}').timeout(const Duration(seconds: 30));
+    _leer(r);
+  }
+}
+
 // ═══════════════ Suscripción con Mercado Pago o PayPal ═══════════════
 // El backend de hetnacnc.com crea la suscripción y, cuando Mercado Pago o
 // PayPal confirman el pago, cambia el plan del taller. La app sólo abre el enlace.
