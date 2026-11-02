@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -99,8 +98,9 @@ class PdfService {
     }
   }
 
-  // Descarga el logo configurado por el taller (logo_url). Si no hay
-  // logo propio o falla la descarga, usa el logo genérico por defecto.
+  // Descarga el logo configurado por el taller (logo_url). Si no hay logo
+  // propio o falla la descarga, no se pone ninguno: el encabezado muestra el
+  // nombre del taller (nunca el logo de HETNA en documentos de otro taller).
   static Future<Uint8List> _obtenerLogoBytes(Map<String, dynamic> empresa) async {
     final logoUrl = empresa['logo_url'] as String?;
     if (logoUrl != null && logoUrl.trim().isNotEmpty) {
@@ -112,14 +112,12 @@ class PdfService {
         }
       } catch (_) {}
     }
-    return _logoBytes;
+    return Uint8List(0);
   }
 
-  static const String _logoB64 = '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';
+  static bool _vacio(dynamic v) => v == null || v.toString().trim().isEmpty;
 
-  static Uint8List get _logoBytes {
-    try { return base64Decode(_logoB64); } catch (_) { return Uint8List(0); }
-  }
+
 
   static Future<void> verPdf(Uint8List bytes) async {
     await Printing.layoutPdf(onLayout: (_) async => bytes);
@@ -219,13 +217,13 @@ class PdfService {
     const verde = PdfColor.fromInt(0xFF1d9e75);
     const blanco70 = PdfColor.fromInt(0xB3FFFFFF);
 
-    final nombreEmpresa = empresa['nombre_comercial'] ?? _t('HETNA CNC');
+    final nombreEmpresa = (_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']);
     final rfcEmpresa = empresa['rfc'] ?? '';
     final direccion = empresa['direccion'] ?? '';
     final tel1 = empresa['telefono1'] ?? '';
     final tel2 = empresa['telefono2'] ?? '';
     final correoEmpresa = empresa['correo'] ?? '';
-    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final web = empresa['sitio_web'] ?? '';
     final cliente = cotizacion.cliente;
     final folio = cotizacion.folio ?? 'COT-${DateTime.now().millisecondsSinceEpoch}';
     final fecha = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
@@ -417,12 +415,12 @@ class PdfService {
       .map((l) => l.trim().replaceFirst(RegExp(r'^[-*]\s*'), ''))
       .where((l) => l.isNotEmpty).toList();
 
-    final nombreEmpresa = _limpiarTexto(empresa['nombre_comercial'] ?? _t('HETNA CNC'));
+    final nombreEmpresa = _limpiarTexto((_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']));
     final rfcEmpresa = empresa['rfc'] ?? '';
     final direccion = _limpiarTexto(empresa['direccion'] ?? '');
     final tel1 = empresa['telefono1'] ?? '';
     final correoEmpresa = empresa['correo'] ?? '';
-    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final web = empresa['sitio_web'] ?? '';
     final cliente = cotizacion.cliente;
     final folio = cotizacion.folio ?? 'COT-${DateTime.now().millisecondsSinceEpoch}';
     final revision = v('revision').isEmpty ? 'A' : v('revision');
@@ -554,7 +552,7 @@ class PdfService {
             pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
             if (rfcEmpresa.isNotEmpty) pw.Text('${_etqRfc(empresa)}: $rfcEmpresa', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
             if (direccion.isNotEmpty) pw.Text(direccion, style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
-            pw.Text([if (tel1.isNotEmpty) _tf('Tel: {0}', [tel1]), if (correoEmpresa.isNotEmpty) correoEmpresa, web].join('  ·  '),
+            pw.Text([if (tel1.isNotEmpty) _tf('Tel: {0}', [tel1]), if (correoEmpresa.isNotEmpty) correoEmpresa, if (web.toString().isNotEmpty) web].join('  ·  '),
               style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
           ])),
           pw.Container(
@@ -952,10 +950,10 @@ class PdfService {
     const grisTexto = PdfColor.fromInt(0xFF6B7280);
     const verde = PdfColor.fromInt(0xFF1d9e75);
 
-    final nombreEmpresa = empresa['nombre_comercial'] ?? _t('HETNA CNC');
+    final nombreEmpresa = (_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']);
     final tel = empresa['telefono'] ?? '';
     final correo = empresa['correo'] ?? '';
-    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final web = empresa['sitio_web'] ?? '';
     final fecha = _fmtFecha.format(DateTime.now());
 
     pdf.addPage(pw.MultiPage(
@@ -1090,11 +1088,11 @@ class PdfService {
     const verde      = PdfColor.fromInt(0xFF1d9e75);
     const verdeClaro = PdfColor.fromInt(0xFFe6f7f0);
 
-    final nombreEmpresa    = empresa['nombre_comercial'] ?? _t('HETNA CNC');
+    final nombreEmpresa    = (_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']);
     final telEmpresa       = empresa['telefono'] ?? empresa['telefono2'] ?? '';
     final direccionEmpresa = empresa['direccion'] ?? '';
     final correo           = empresa['correo']   ?? '';
-    final web              = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final web              = empresa['sitio_web'] ?? '';
     final fecha            = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
     final clienteNombre    = _limpiarTexto(cotizacion.cliente?.nombreCompleto ?? cotizacion.cliente?.nombre ?? _t('Cliente'));
     final folio            = folioPedido ?? cotizacion.folio ?? 'N/A';
