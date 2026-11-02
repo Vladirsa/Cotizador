@@ -239,11 +239,8 @@ class _TarjetaCotizacion extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(color: color, width: 4),
-          top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5),
+        boxShadow: [BoxShadow(color: color, offset: const Offset(-4, 0))]),
       child: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2064,7 +2061,10 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
       final cfg = await SupabaseService.getConfiguracion();
       final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg, ingles: ingles);
       final folio = cot.folio ?? 'cotizacion';
-      if (mounted) await PdfService.mostrarOpcionesEnvio(context, bytes, '$folio.pdf');
+      final nombreCliente = cot.cliente?.nombre ?? cot.cliente?.empresa ?? '';
+      if (mounted) await PdfService.mostrarOpcionesEnvio(context, bytes, '$folio.pdf',
+        whatsapp: cot.cliente?.whatsappNumero,
+        mensaje: trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! 💙', [nombreCliente, folio, AuthService.marcaTaller]));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(trf('Error al generar PDF: {0}', [e])), backgroundColor: AppColors.rojo));
