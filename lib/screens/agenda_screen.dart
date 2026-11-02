@@ -285,7 +285,7 @@ class _AgendaScreenState extends State<AgendaScreen>
     );
   }
 
-  // ── TAB 1: CALENDARIO ─────────────────────────────────
+  // ── TAB 1: CALENDARIO ───────────────────────────────
   Widget _tabCalendario() {
     return Column(children: [
       // Navegación de mes
@@ -412,7 +412,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       ]));
   }
 
-  // ── TAB 2: HOY ────────────────────────────────────────────────
+  // ── TAB 2: HOY ────────────────────────────────────────
   Widget _tabHoy() {
     final hoy = DateTime.now();
     final eventosHoy = _pendientes.where((e) {
@@ -475,7 +475,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       ]));
   }
 
-  // ── TAB 3: PENDIENTES ─────────────────────────────────
+  // ── TAB 3: PENDIENTES ───────────────────────────────
   Widget _tabPendientes() {
     final grupos = <String, List<AgendaEvento>>{
       'entrega_cotizacion': [],
@@ -519,7 +519,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       ]));
   }
 
-  // ── CARD EVENTO ───────────────────────────────────────
+  // ── CARD EVENTO ─────────────────────────────────────
   Widget _cardEvento(AgendaEvento e) {
     final semaforo = e.semaforo;
     return Dismissible(
@@ -592,7 +592,7 @@ class _AgendaScreenState extends State<AgendaScreen>
             ])))));
   }
 
-  // ── DETALLE EVENTO ────────────────────────────────────
+  // ── DETALLE EVENTO ──────────────────────────────────
   void _verDetalleEvento(AgendaEvento e) {
     showModalBottomSheet(
       context: context,
