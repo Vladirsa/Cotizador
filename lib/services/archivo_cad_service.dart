@@ -38,6 +38,23 @@ class GeoCad {
 
   bool get es3D => tipo == 'stl' || tipo == 'obj';
 
+  /// Copia escalada por un factor (p. ej. 1.5 = 150%). Medidas y largo de
+  /// corte ×f, áreas ×f², volumen ×f³. Sirve cuando el cliente quiere la
+  /// pieza más grande o más chica que el archivo.
+  GeoCad escalado(double f) {
+    if (f <= 0 || f == 1) return this;
+    return GeoCad(
+      nombre: nombre, tipo: tipo, unidades: unidades,
+      largo: largo * f, ancho: ancho * f, alto: alto * f,
+      longitudCorte: longitudCorte * f, contornos: contornos, barrenos: barrenos,
+      areaPieza: areaPieza * f * f,
+      triangulos: triangulos, volumenCm3: volumenCm3 * f * f * f,
+      areaSuperficialCm2: areaSuperficialCm2 * f * f,
+      trazos: trazos.map((p) => p.map((q) => [q[0] * f, q[1] * f]).toList()).toList(),
+      avisos: [...avisos, if (f != 1) 'Escalado al ${(f * 100).round()}% del archivo original'],
+    );
+  }
+
   // Lo que se guarda en datos_pro['archivo_info'] (jsonb)
   Map<String, dynamic> toInfo() => {
     'nombre': nombre, 'tipo': tipo, 'unidades': unidades,
