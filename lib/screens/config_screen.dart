@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
+import '../services/whatsapp_service.dart';
 import '../services/auth_service.dart';
 import '../services/hetna_api.dart';
 import '../services/woocommerce_service.dart';
@@ -179,6 +180,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       });
       // Columna nueva: aparte, por si la base todavía no la tiene
       await SupabaseService.guardarConfiguracion({'pais_factura': _paisFactura});
+      WhatsAppService.paisTaller = _paisFactura;
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(tr('✅ Configuración guardada')),
         backgroundColor: AppColors.verde));
