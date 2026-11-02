@@ -303,8 +303,8 @@ class WhatsAppService {
         msg = msg.replaceAll('*FOLIO*', folio ?? '');
         msg = msg.replaceAll('*MONTO*', monto != null
           ? '\$${monto.toStringAsFixed(2)}' : '');
-        msg = msg.replaceAll('*EMPRESA*', empresa ?? 'HETNA CNC');
-        msg = msg.replaceAll('*TELEFONO*', telefono ?? '2461217072');
+        msg = msg.replaceAll('*EMPRESA*', empresa ?? AuthService.marcaTaller);
+        msg = msg.replaceAll('*TELEFONO*', telefono ?? AuthService.telefonoNegocio ?? '');
         msg = msg.replaceAll('*FECHA*',
           DateTime.now().toString().substring(0, 10));
         return msg;
@@ -325,7 +325,7 @@ class WhatsAppService {
   static Future<String> getNumeroTaller() async {
     try {
       final negocioId = AuthService.negocioId;
-      if (negocioId == null) return '2461217072';
+      if (negocioId == null) return AuthService.telefonoNegocio ?? '';
 
       final rows = await Supabase.instance.client
         .from('configuracion_empresa')
@@ -338,7 +338,7 @@ class WhatsAppService {
         return list.first['whatsapp_numero'] as String;
       }
     } catch (_) {}
-    return '2461217072'; // default HETNA CNC
+    return AuthService.telefonoNegocio ?? ''; // el del taller, nunca el de HETNA
   }
 
   static Future<String> getModoEnvio() async {
@@ -424,7 +424,7 @@ class WhatsAppService {
           msg = msg.replaceAll('*ANTICIPO*', total > 0 ? '\$${anticipo.toStringAsFixed(2)}' : '');
           msg = msg.replaceAll('*PCT_ANTICIPO*', '${pctTexto(pctAnt)}%');
           msg = msg.replaceAll('*RESTANTE*', total > 0 ? '\$${restante.toStringAsFixed(2)}' : '');
-          msg = msg.replaceAll('*EMPRESA*', empresa ?? 'HETNA CNC');
+          msg = msg.replaceAll('*EMPRESA*', empresa ?? AuthService.marcaTaller);
           msg = msg.replaceAll('*FECHA*', DateTime.now().toString().substring(0, 10));
           msgFinal = msg;
         } else {
@@ -453,8 +453,8 @@ class WhatsAppService {
     String? empresa,    // nombre del negocio (configurable)
     String? telefono,   // teléfono del negocio
   }) {
-    final biz = empresa ?? tr('HETNA CNC');
-    final tel = telefono ?? '2461217072';
+    final biz = empresa ?? AuthService.marcaTaller;
+    final tel = telefono ?? AuthService.telefonoNegocio ?? '';
     final folioTexto = folio != null && folio.isNotEmpty
       ? trf('cotización *{0}*', [folio]) : tr('tu cotización');
 
@@ -576,7 +576,7 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     String? empresa,
     double anticipoPct = 50,
   }) {
-    final biz = empresa ?? tr('HETNA CNC');
+    final biz = empresa ?? AuthService.marcaTaller;
     final montoTotal = total ?? 0;
     final anticipo = montoTotal * anticipoPct / 100;
     final restante = montoTotal - anticipo;
@@ -610,7 +610,7 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     required String empresa,
   }) async {
     final folio = cotizacion?.folio ?? '';
-    final msg = trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *HETNA CNC*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! 💙\n📱 2461217072', [nombreCliente, folio]);
+    final msg = trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! 💙', [nombreCliente, folio, empresa.trim().isNotEmpty ? empresa : AuthService.marcaTaller]);
     await abrirChat(numero: whatsapp, mensaje: msg);
   }
 
