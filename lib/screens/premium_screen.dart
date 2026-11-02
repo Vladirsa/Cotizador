@@ -286,7 +286,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
             onPressed: _ocupado ? null : () => _contratar(p),
             style: ElevatedButton.styleFrom(backgroundColor: destacado ? AppColors.naranja : AppColors.azul,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-            child: Text(trf('Contratar {0}', [(Planes.nombres[p])])),
+            child: Text(trf('Contratar {0}', [(Planes.nombres[p])]),
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
       ]));
   }
