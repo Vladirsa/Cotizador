@@ -1231,10 +1231,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   Future<void> _generarPDF() async {
     final ingles = await PdfService.elegirIdioma(context);
     if (ingles == null) return;
+    final cot = await _asegurarGuardada();
+    if (cot == null) return;
     setState(() => _generando = true);
     try {
       final cfg = await SupabaseService.getConfiguracion();
-      final cot = _buildCotizacion();
       final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg, ingles: ingles);
       await PdfService.verPdf(bytes);
     } catch (e) {
@@ -1246,6 +1247,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _enviarWA() async {
     if (_cliente == null) return;
+    if (await _asegurarGuardada() == null) return;
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final itemsTexto = _items.map((i) => trf('• {0} x{1} = {2}', [(i.nombreProducto), (i.cantidad), (fmt.format(i.subtotal))])).join('\n');
     final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *{7}*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *{7}*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? trf('\nIVA {0}%: {1}', [pctTexto(_ivaPct), (fmt.format(_montoIva))]) : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago, AuthService.marcaTaller]);
@@ -1256,8 +1258,18 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // Plan Gratis: 5 cotizaciones nuevas al mes (igual que en hetnacnc.com)
   Future<bool> _hayCupo() async {
     if (_esEdicion || AuthService.puede('cotizaciones_ilimitadas')) return true;
-    final n = await SupabaseService.contarCotizacionesDelMes();
-    if (n < Planes.limiteCotizacionesGratis) return true;
+    // El servidor lleva la cuenta (supabase/cupo_servidor.sql): no baja al
+    // borrar y cuenta también los PDF y WhatsApp. Si aún no está instalado,
+    // se usa el conteo local de siempre.
+    final cupo = await SupabaseService.cupoCotizaciones();
+    if (cupo != null) {
+      if (cupo['limite'] == null) return true;
+      final quedan = (cupo['quedan'] as num?)?.toInt() ?? 0;
+      if (quedan > 0) return true;
+    } else {
+      final n = await SupabaseService.contarCotizacionesDelMes();
+      if (n < Planes.limiteCotizacionesGratis) return true;
+    }
     if (!mounted) return false;
     await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
       funcion: trf('más de {0} cotizaciones al mes', [(Planes.limiteCotizacionesGratis)]));
@@ -1279,6 +1291,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             content: Text(tr('✅ Cotización actualizada')), backgroundColor: AppColors.verde));
           widget.onGuardada?.call();
         }
+      } else if (_guardadaEnSesion != null) {
+        // Ya se guardó al sacar el PDF o mandar el WhatsApp: se actualiza, no se duplica
+        final cot = _buildCotizacion(id: _guardadaEnSesion!.id, folio: _guardadaEnSesion!.folio, estado: 'Borrador');
+        await SupabaseService.actualizarCotizacion(cot, _items, incluirTipo: _tipo == 'profesional');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('✅ Borrador guardado')), backgroundColor: AppColors.azul));
+          widget.onGuardada?.call();
+          setState(() { _items = []; _cliente = null; _guardadaEnSesion = null; });
+        }
       } else {
         final cot = _buildCotizacion(estado: 'Borrador');
         await SupabaseService.crearCotizacion(cot, _items);
@@ -1286,13 +1308,48 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(tr('✅ Borrador guardado')), backgroundColor: AppColors.azul));
           widget.onGuardada?.call();
-          setState(() { _items = []; _cliente = null; });
+          setState(() { _items = []; _cliente = null; _guardadaEnSesion = null; });
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (!mounted) return;
+      if (SupabaseService.esErrorSinCupo(e)) {
+        await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
+          funcion: trf('más de {0} cotizaciones al mes', [(Planes.limiteCotizacionesGratis)]));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _guardando = false);
+    }
+  }
+
+  // Una cotización nueva se guarda ANTES de sacar el PDF o mandarla por
+  // WhatsApp: así cuenta para el cupo del mes igual que guardar, y el PDF sale
+  // con el folio real del taller. Si ya se guardó en esta sesión, se reutiliza.
+  Cotizacion? _guardadaEnSesion;
+  Future<Cotizacion?> _asegurarGuardada() async {
+    if (_esEdicion) return _buildCotizacion(id: widget.cotizacionEditar!.id, folio: widget.cotizacionEditar!.folio);
+    if (_guardadaEnSesion != null) {
+      return _buildCotizacion(id: _guardadaEnSesion!.id, folio: _guardadaEnSesion!.folio);
+    }
+    if (_cliente == null || _items.isEmpty) return null;
+    if (!await _hayCupo()) return null;
+    if (_tipo == 'profesional' && !await _permiteProfesional()) return null;
+    try {
+      final creada = await SupabaseService.crearCotizacion(_buildCotizacion(estado: 'Borrador'), _items);
+      _guardadaEnSesion = creada;
+      widget.onGuardada?.call();
+      return _buildCotizacion(id: creada.id, folio: creada.folio);
+    } catch (e) {
+      if (!mounted) return null;
+      if (SupabaseService.esErrorSinCupo(e)) {
+        await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
+          funcion: trf('más de {0} cotizaciones al mes', [(Planes.limiteCotizacionesGratis)]));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+      return null;
     }
   }
 
