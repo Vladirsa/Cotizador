@@ -19,18 +19,35 @@ class SupabaseService {
       final list = res as List;
       if (list.isEmpty) {
         await _db.from('configuracion_empresa').insert({
-          'nombre_comercial': 'HETNA CNC',
+          'nombre_comercial': AuthService.nombreNegocio ?? '',
+          if (AuthService.telefonoNegocio != null) 'telefono1': AuthService.telefonoNegocio,
           if (negId != null) 'negocio_id': negId,
         });
         var query2 = _db.from('configuracion_empresa').select();
         if (negId != null) query2 = query2.eq('negocio_id', negId);
         final res2 = await query2.limit(1);
-        return (res2 as List).first as Map<String, dynamic>;
+        return _conDatosDelTaller((res2 as List).first as Map<String, dynamic>);
       }
-      return list.first as Map<String, dynamic>;
+      return _conDatosDelTaller(list.first as Map<String, dynamic>);
     } catch (e) {
-      return {'nombre_comercial': 'HETNA CNC'};
+      return _conDatosDelTaller({});
     }
+  }
+
+  // Antes la configuración nueva nacía con nombre "HETNA CNC" y los talleres
+  // que no lo cambiaron mandaban cotizaciones con ese nombre. Si el nombre está
+  // vacío o es el de HETNA (y el taller no es HETNA), se usa el del taller; lo
+  // mismo con el teléfono vacío. Sólo al leer: no se toca lo guardado.
+  static Map<String, dynamic> _conDatosDelTaller(Map<String, dynamic> cfg) {
+    final r = Map<String, dynamic>.from(cfg);
+    final propio = (AuthService.nombreNegocio ?? '').trim();
+    final actual = (r['nombre_comercial'] ?? '').toString().trim();
+    final esDeHetna = actual.toUpperCase() == 'HETNA CNC' && !propio.toUpperCase().contains('HETNA');
+    if (propio.isNotEmpty && (actual.isEmpty || esDeHetna)) r['nombre_comercial'] = propio;
+    if (esDeHetna && propio.isEmpty) r['nombre_comercial'] = '';
+    final tel = (r['telefono1'] ?? '').toString().trim();
+    if (tel.isEmpty && (AuthService.telefonoNegocio ?? '').trim().isNotEmpty) r['telefono1'] = AuthService.telefonoNegocio;
+    return r;
   }
 
   static Future<void> guardarConfiguracion(Map<String, dynamic> datos) async {
