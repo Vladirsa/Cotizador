@@ -343,7 +343,7 @@ class _TarjetaMensaje extends StatelessWidget {
         const SizedBox(height: 10),
         Container(padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
-            border: const Border(left: BorderSide(color: Color(0xFF25D366), width: 3))),
+            boxShadow: const [BoxShadow(color: Color(0xFF25D366), offset: Offset(-3, 0))]),
           child: Text(tr(mensaje), style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.azul))),
         const SizedBox(height: 10),
         Row(children: [
@@ -1121,7 +1121,7 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                         Container(padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(color: AppColors.gris,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border(left: BorderSide(color: color, width: 3))),
+                            boxShadow: [BoxShadow(color: color, offset: const Offset(-3, 0))]),
                           child: Text(tr(p['cuerpo'] as String? ?? ''),
                             style: const TextStyle(fontSize: 11, height: 1.5, color: AppColors.azul))),
                       ])));
