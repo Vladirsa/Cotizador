@@ -253,6 +253,8 @@ class SupabaseService {
       'dias_habiles': cotizacion.diasHabiles,
       'vigencia_dias': cotizacion.vigenciaDias,
       'notas': cotizacion.notas,
+      // Anticipo en monto fijo (Fase 2; la columna la crea supabase/liga_cotizacion.sql)
+      if (cotizacion.anticipoMonto != null) 'anticipo_monto': cotizacion.anticipoMonto,
       // Las columnas tipo/datos_pro solo se mandan en la profesional: así la
       // cotización sencilla se sigue guardando aunque la base aún no las tenga.
       if (cotizacion.esProfesional) 'tipo': 'profesional',
@@ -364,6 +366,7 @@ class SupabaseService {
       'metodo_pago': cotizacion.metodoPago,
       'condicion_entrega': cotizacion.condicionEntrega,
       'notas': cotizacion.notas,
+      if (cotizacion.anticipoMonto != null) 'anticipo_monto': cotizacion.anticipoMonto,
       if (incluirTipo || cotizacion.esProfesional) 'tipo': cotizacion.tipo,
       if (incluirTipo || cotizacion.esProfesional) 'datos_pro': cotizacion.datosPro,
       'updated_at': DateTime.now().toIso8601String(),
@@ -1165,7 +1168,7 @@ class SupabaseService {
     await _db.from('gastos').update(datos).eq('id', id);
   }
 
-  // ── Historial por cliente ─────────────────────────
+  // ── Historial por cliente ───────────────────────────
   static Future<List<Cotizacion>> getCotizacionesByCliente(String clienteId) async {
     final res = await _db.from('cotizaciones')
       .select('*, clientes(nombre, empresa, whatsapp), cotizacion_items(*)')
