@@ -1168,7 +1168,7 @@ class SupabaseService {
     await _db.from('gastos').update(datos).eq('id', id);
   }
 
-  // ── Historial por cliente ─────────────────────────────
+  // ── Historial por cliente ─────────────────────────
   static Future<List<Cotizacion>> getCotizacionesByCliente(String clienteId) async {
     final res = await _db.from('cotizaciones')
       .select('*, clientes(nombre, empresa, whatsapp), cotizacion_items(*)')
