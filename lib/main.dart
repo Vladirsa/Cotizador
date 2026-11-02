@@ -22,7 +22,6 @@ import 'screens/nueva_password_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/pedido_publico_screen.dart';
 import 'services/auth_service.dart';
-import 'services/billing_service.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'i18n/tr.dart';
 export 'i18n/tr.dart';
@@ -71,13 +70,8 @@ void main() async {
   // Inglés si el usuario lo eligió o si el teléfono/navegador está en inglés
   await cargarIdioma();
 
-  // Google Play Billing — no bloquea el arranque si falla
-  // (ej. no está disponible en Web, o no hay Play Console configurado aún)
-  try {
-    await BillingService.inicializar();
-  } catch (e) {
-    print('BillingService no disponible: $e');
-  }
+  // Los planes se cobran sólo por hetnacnc.com (Mercado Pago y PayPal). El pago
+  // por Google Play se retiró: ponía siempre el plan Pro y la base lo rechazaba.
   await initializeDateFormatting('es_MX', null);
   await initializeDateFormatting('en_US', null);
 

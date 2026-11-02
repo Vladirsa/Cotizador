@@ -21,4 +21,8 @@ const Map<String, String> textosEnExtra = {
   'Marketing: segmentos de clientes y plantillas de WhatsApp': 'Marketing: customer segments and WhatsApp templates',
   'Factura electrónica CFDI (próximamente)': 'E-invoicing CFDI (coming soon)',
   'API para conectar tu sistema (próximamente)': 'API to connect your system (coming soon)',
+  'Ya usaste tus {0} cotizaciones gratis de este mes. Se renuevan el día 1.': 'You have used your {0} free quotes this month. They reset on the 1st.',
+  'Te queda {0} cotización gratis este mes (de {1}).': 'You have {0} free quote left this month (of {1}).',
+  'Vigencia': 'Valid for',
+  '{0} días': '{0} days',
 };
