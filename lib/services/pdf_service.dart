@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -11,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import 'archivo_cad_service.dart';
 import 'auth_service.dart';
+import 'whatsapp_service.dart';
 import '../main.dart';
 
 class PdfService {
@@ -156,7 +158,46 @@ class PdfService {
   // u "Otra app" (el menú normal de Android, para cualquier otra cosa
   // — correo, Drive, la otra app de WhatsApp, etc.)
   static Future<void> mostrarOpcionesEnvio(
-      BuildContext context, Uint8List bytes, String nombre) async {
+      BuildContext context, Uint8List bytes, String nombre,
+      {String? whatsapp, String? mensaje}) async {
+    // En la web (computadora) no hay apps de Android: se descarga el PDF y, si
+    // hay número, se abre WhatsApp Web con el mensaje para adjuntar el archivo.
+    if (kIsWeb) {
+      await showModalBottomSheet(context: context, backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(tr('¿Cómo quieres enviarlo?'),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(tr('Descarga el PDF y adjúntalo en WhatsApp Web; el mensaje ya va listo.'),
+              style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            SizedBox(width: double.infinity, child: ElevatedButton.icon(
+              onPressed: () async { Navigator.pop(ctx); await compartirPdf(bytes, nombre); },
+              icon: const Icon(Icons.download_outlined, color: Colors.white),
+              label: Text(tr('Descargar PDF'), style: const TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+                padding: const EdgeInsets.symmetric(vertical: 12)))),
+            if (whatsapp != null && whatsapp.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SizedBox(width: double.infinity, child: ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await compartirPdf(bytes, nombre);
+                  await WhatsAppService.abrirChat(numero: whatsapp, mensaje: mensaje ?? '');
+                },
+                icon: const Icon(Icons.chat, color: Colors.white),
+                label: Text(tr('Descargar y abrir WhatsApp Web'), style: const TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
+                  padding: const EdgeInsets.symmetric(vertical: 12)))),
+            ],
+            const SizedBox(height: 8),
+          ])));
+      return;
+    }
     await showModalBottomSheet(context: context, backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         padding: const EdgeInsets.all(20),
@@ -606,7 +647,6 @@ class PdfService {
           titulo(sig(), _t('RESUMEN')),
           pw.Text(v('resumen'), style: const pw.TextStyle(fontSize: 9, lineSpacing: 2)),
         ],
-
         // ─── 2. ALCANCE ─────────────────────
         if (incluye.isNotEmpty || noIncluye.isNotEmpty) ...[
           titulo(sig(), _t('ALCANCE DEL TRABAJO')),
