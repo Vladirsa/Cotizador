@@ -30,4 +30,8 @@ const Map<String, String> textosEnExtra = {
   'Envío por paquetería (lo paga el cliente)': 'Shipping by carrier (paid by the customer)',
   'Envío por paquetería (incluido en el precio)': 'Shipping by carrier (included in the price)',
   'Forma de entrega': 'Delivery',
+  'Descarga el PDF y adjúntalo en WhatsApp Web; el mensaje ya va listo.': 'Download the PDF and attach it in WhatsApp Web; the message is ready.',
+  'Descargar PDF': 'Download PDF',
+  'Descargar y abrir WhatsApp Web': 'Download and open WhatsApp Web',
+  'El archivo pesa más de 120 MB.': 'The file is larger than 120 MB.',
 };

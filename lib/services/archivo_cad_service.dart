@@ -77,12 +77,12 @@ class GeoCad {
 
 class ArchivoCadService {
   static const extensiones = ['dxf', 'svg', 'stl', 'obj'];
-  static const int maxBytes = 40 * 1024 * 1024;
+  static const int maxBytes = 120 * 1024 * 1024;
   static const int maxPuntosDibujo = 4000;
 
   static GeoCad leer(String nombre, Uint8List bytes) {
     final ext = nombre.contains('.') ? nombre.split('.').last.toLowerCase() : '';
-    if (bytes.length > maxBytes) throw Exception('El archivo pesa más de 40 MB');
+    if (bytes.length > maxBytes) throw Exception('El archivo pesa más de 120 MB');
     switch (ext) {
       case 'dxf': return _leerDxf(nombre, _texto(bytes));
       case 'svg': return _leerSvg(nombre, _texto(bytes));
