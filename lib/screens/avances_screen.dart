@@ -234,6 +234,13 @@ class _TarjetaPedido extends StatefulWidget {
 }
 
 class _TarjetaPedidoState extends State<_TarjetaPedido> {
+  // % de anticipo del taller (Costos del taller); antes el "Resta" era siempre la mitad
+  double _anticipoPct = 50;
+  @override
+  void initState() {
+    super.initState();
+    WhatsAppService.anticipoPct().then((p) { if (mounted) setState(() => _anticipoPct = p); });
+  }
   bool _enviandoWA = false;
   bool _cambiando = false;
   bool _generandoPdf = false;
@@ -278,7 +285,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             if (widget.pedido.total != null && widget.pedido.total! > 0 &&
                 (widget.pedido.estado == 'Pago50' || widget.pedido.estado == 'Produccion' ||
                  widget.pedido.estado == 'Pruebas'))
-              Text('Resta: ${fmt.format(widget.pedido.total! / 2)}',
+              Text('Resta: ${fmt.format(widget.pedido.total! * (1 - _anticipoPct / 100))}',
                 style: const TextStyle(fontSize: 10, color: Color(0xFFD97706), fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
