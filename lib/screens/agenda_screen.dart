@@ -412,7 +412,7 @@ class _AgendaScreenState extends State<AgendaScreen>
       ]));
   }
 
-  // ── TAB 2: HOY ────────────────────────────────────────
+  // ── TAB 2: HOY ───────────────────────────────────────
   Widget _tabHoy() {
     final hoy = DateTime.now();
     final eventosHoy = _pendientes.where((e) {
