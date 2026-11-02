@@ -462,6 +462,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   final Map<String, TextEditingController> _pro = {};
   // Archivo de la pieza (DXF/SVG/STL/OBJ) leído por ArchivoCadService
   Map<String, dynamic>? _archivoInfo;
+  GeoCad? _geoOriginal; // tal como se leyó, para escalar sin perder precisión
+  double _escalaArchivo = 1;
   List<List<List<double>>> _archivoGeo = [];
   bool _leyendoArchivo = false;
 
@@ -491,7 +493,21 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (bytes == null) return;
       setState(() => _leyendoArchivo = true);
       final g = ArchivoCadService.leer(f.name, bytes);
-      String mm(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+      _geoOriginal = g;
+      _escalaArchivo = 1;
+      _aplicarGeo(g);
+    } catch (e) {
+      setState(() => _leyendoArchivo = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')])),
+        backgroundColor: AppColors.rojo));
+    }
+  }
+
+  // Llena la ficha con las medidas del archivo (o del archivo escalado)
+  void _aplicarGeo(GeoCad g, {bool sobrescribir = false}) {
+    String mm(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    try {
       setState(() {
         _archivoInfo = g.toInfo();
         _archivoGeo = g.trazos;
@@ -504,7 +520,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         final arch = _ctrlPro('archivo', '');
         if (arch.text.trim().isEmpty) arch.text = '${g.nombre} (${g.tipo.toUpperCase()})';
         final med = _ctrlPro('medidas', '');
-        if (med.text.trim().isEmpty) {
+        if (med.text.trim().isEmpty || sobrescribir) {
           final esp = _ctrlPro('croquis_espesor', '').text.trim();
           med.text = g.es3D
             ? '${mm(g.largo)} × ${mm(g.ancho)} × ${mm(g.alto)} mm'
@@ -512,12 +528,55 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         }
         _leyendoArchivo = false;
       });
-    } catch (e) {
+    } catch (_) {
       setState(() => _leyendoArchivo = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')])),
-        backgroundColor: AppColors.rojo));
     }
+  }
+
+  // Escalar la pieza: el usuario escribe el largo que quiere y todo se ajusta
+  // en proporción (ancho, alto, largo de corte, área y volumen).
+  Future<void> _escalarArchivo() async {
+    final g0 = _geoOriginal;
+    if (g0 == null) return;
+    final ctrl = TextEditingController(text: (g0.largo * _escalaArchivo).toStringAsFixed(1));
+    final nuevo = await showDialog<double>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(tr('Escalar la pieza')),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(trf('El archivo mide {0} mm de largo. Escribe el largo que quieres y el resto se ajusta en proporción.', [g0.largo.toStringAsFixed(1)]),
+          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+        const SizedBox(height: 10),
+        TextField(controller: ctrl, autofocus: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: tr('Largo final (mm)'), isDense: true, border: const OutlineInputBorder())),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, g0.largo), child: Text(tr('Tamaño original'))),
+        ElevatedButton(onPressed: () => Navigator.pop(ctx, double.tryParse(ctrl.text.replaceAll(',', '.'))), child: Text(tr('Aplicar'))),
+      ]));
+    if (nuevo == null || nuevo <= 0 || g0.largo <= 0) return;
+    _escalaArchivo = nuevo / g0.largo;
+    _aplicarGeo(g0.escalado(_escalaArchivo), sobrescribir: true);
+  }
+
+  // Abre el simulador con la pieza cargada; el precio elegido entra como partida
+  Future<void> _calcularConSimulador() async {
+    final g = _geoOriginal?.escalado(_escalaArchivo);
+    final r = await Navigator.push<ResultadoSimulador>(context, MaterialPageRoute(
+      builder: (_) => SimuladorScreen(geoInicial: g, seleccionar: true)));
+    if (r == null || !mounted) return;
+    final desc = r.descripcion;
+    setState(() {
+      _items.add(CotizacionItem(
+        nombreProducto: '${r.emoji} ${r.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
+        cantidad: 1, precioUnitario: r.total, sku: null));
+      if (_ctrlPro('proceso', '').text.trim().isEmpty) _ctrlPro('proceso', '').text = r.servicio;
+      if (r.tiempoHoras > 0 && _ctrlPro('operaciones', '').text.trim().isEmpty) {
+        _ctrlPro('operaciones', '').text = trf('Tiempo de máquina estimado: {0} h', [r.tiempoHoras.toStringAsFixed(1)]);
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(trf('✅ Partida agregada: {0}', [NumberFormat('\$#,##0', 'es_MX').format(r.total)])), backgroundColor: AppColors.verde));
   }
 
   Widget _resumenArchivo() {
@@ -555,11 +614,22 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           ]))),
         ...avisos.map((a) => Padding(padding: const EdgeInsets.only(top: 4),
           child: Text('⚠️ $a', style: const TextStyle(fontSize: 11, color: AppColors.naranja)))),
-        Align(alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; }),
+        const SizedBox(height: 6),
+        Wrap(spacing: 6, runSpacing: 4, alignment: WrapAlignment.end, children: [
+          OutlinedButton.icon(
+            onPressed: _escalarArchivo,
+            icon: const Icon(Icons.open_in_full, size: 15),
+            label: Text(_escalaArchivo == 1 ? tr('Escalar') : trf('Escala {0}%', [(_escalaArchivo * 100).round()]), style: const TextStyle(fontSize: 12))),
+          ElevatedButton.icon(
+            onPressed: _calcularConSimulador,
+            icon: const Icon(Icons.calculate_outlined, size: 15, color: Colors.white),
+            label: Text(tr('Calcular precio con el simulador'), style: const TextStyle(fontSize: 12, color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.naranja)),
+          TextButton.icon(
+            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; _geoOriginal = null; _escalaArchivo = 1; }),
             icon: const Icon(Icons.close, size: 16),
-            label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12)))),
+            label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12))),
+        ]),
       ]));
   }
 
@@ -627,6 +697,22 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // (Más → Costos del taller → Material y cobro); al editar una cotización
   // vieja se conserva el texto que tenía.
   final _metodosPago = ['50% anticipo / 50% entrega', 'Pago total anticipado', 'Crédito 30 días', 'Transferencia bancaria'];
+  // Anticipo a la medida: porcentaje o monto fijo. Reemplaza el texto del
+  // método de pago (antes siempre era el % configurado del taller).
+  bool _anticipoEnMonto = false;
+  final _anticipoCtrl = TextEditingController();
+  void _aplicarAnticipo() {
+    final v = double.tryParse(_anticipoCtrl.text.replaceAll(',', '.')) ?? 0;
+    if (v <= 0) return;
+    final fmt = NumberFormat('\$#,##0', 'es_MX');
+    final txt = _anticipoEnMonto
+      ? trf('Anticipo de {0}, el resto a la entrega', [fmt.format(v)])
+      : trf('{0}% de anticipo / {1}% a la entrega', [pctTexto(v.clamp(1, 100)), pctTexto(100 - v.clamp(1, 100))]);
+    setState(() {
+      if (!_metodosPago.contains(txt)) _metodosPago.insert(0, txt);
+      _metodoPago = txt;
+    });
+  }
   String _opcionAnticipo(double pct) {
     final a = WhatsAppService.pctTexto(pct);
     final r = WhatsAppService.pctTexto(100 - pct);
@@ -926,6 +1012,26 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             items: _metodosPago.map((m) => DropdownMenuItem(value: m, child: Text(tr(m), style: const TextStyle(fontSize: 11)))).toList(),
             onChanged: (v) => setState(() => _metodoPago = v!)))),
         ]),
+        const SizedBox(height: 8),
+        _campo(tr('Anticipo'), child: Row(children: [
+          SegmentedButton<bool>(
+            segments: [ButtonSegment(value: false, label: Text('%', style: const TextStyle(fontSize: 12))),
+                       ButtonSegment(value: true, label: Text('\$', style: const TextStyle(fontSize: 12)))],
+            selected: {_anticipoEnMonto},
+            showSelectedIcon: false,
+            style: ButtonStyle(visualDensity: VisualDensity.compact),
+            onSelectionChanged: (s) => setState(() => _anticipoEnMonto = s.first)),
+          const SizedBox(width: 8),
+          Expanded(child: TextField(
+            controller: _anticipoCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(isDense: true, hintText: _anticipoEnMonto ? tr('Monto fijo') : tr('Porcentaje'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+            onSubmitted: (_) => _aplicarAnticipo())),
+          const SizedBox(width: 6),
+          OutlinedButton(onPressed: _aplicarAnticipo, child: Text(tr('Aplicar'), style: const TextStyle(fontSize: 12))),
+        ])),
         const SizedBox(height: 8),
         _campo(tr('Forma de entrega'), child: DropdownButtonFormField<String>(
           value: _condiciones.contains(_condicionEntrega) ? _condicionEntrega : _condiciones[0],
