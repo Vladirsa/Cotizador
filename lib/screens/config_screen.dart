@@ -4,6 +4,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
@@ -63,6 +64,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
   String _paisFactura = 'MX';
   final _codigoVinculo = TextEditingController();
   bool _vinculando = false;
+  // Cobros en línea (Fase 2): estado de la cuenta de Mercado Pago del taller
+  Map<String, dynamic>? _mp;
+  bool _mpCargando = false;
+  bool _mpTrabajando = false;
   String _regimenFiscal = '612';
 
   final _proveedores = ['Facturapi', 'SAT Directo', 'Contpaqi', 'Aspel', 'Otro'];
@@ -78,6 +83,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   void initState() {
     super.initState();
     _cargar();
+    _cargarMp();
   }
 
   @override
@@ -222,6 +228,13 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion(tr('🔗 CUENTA DE HETNACNC.COM')),
               const SizedBox(height: 8),
               _seccionVincular(),
+
+              const SizedBox(height: 20),
+
+              // ── COBROS EN LÍNEA ──
+              _seccion(tr('💳 COBROS EN LÍNEA · MERCADO PAGO')),
+              const SizedBox(height: 8),
+              _seccionMercadoPago(),
 
               const SizedBox(height: 20),
 
@@ -595,6 +608,104 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   void _aviso(String m) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  // ── Mercado Pago del taller ──────────────────────────────────────────
+  Future<void> _cargarMp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null || !AuthService.esAdmin) return;
+    setState(() => _mpCargando = true);
+    try {
+      final e = await MercadoPagoApi.estado(token);
+      if (mounted) setState(() => _mp = e);
+    } catch (_) {
+      // sin red: se deja la sección con el botón para reintentar
+    } finally {
+      if (mounted) setState(() => _mpCargando = false);
+    }
+  }
+
+  Future<void> _conectarMp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null) return;
+    setState(() => _mpTrabajando = true);
+    try {
+      final url = await MercadoPagoApi.conectar(token);
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+      await showDialog(context: context, builder: (ctx) => AlertDialog(
+        title: Text(tr('Autoriza en Mercado Pago')),
+        content: Text(tr('Se abrió Mercado Pago. Entra con la cuenta de tu taller y presiona "Autorizar". Cuando termines, regresa aquí y toca "Ya autoricé".')),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Ya autoricé')))]));
+      await _cargarMp();
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _mpTrabajando = false);
+    }
+  }
+
+  Future<void> _desconectarMp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null) return;
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(tr('¿Desconectar Mercado Pago?')),
+      content: Text(tr('Tus clientes ya no podrán pagar el anticipo desde la liga de la cotización hasta que vuelvas a conectarla.')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancelar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Desconectar'))),
+      ]));
+    if (ok != true) return;
+    setState(() => _mpTrabajando = true);
+    try {
+      await MercadoPagoApi.desconectar(token);
+      await _cargarMp();
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _mpTrabajando = false);
+    }
+  }
+
+  Widget _seccionMercadoPago() {
+    if (!AuthService.esAdmin) {
+      return Text(tr('Solo el administrador del taller puede conectar la cuenta de Mercado Pago.'),
+        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario));
+    }
+    final conectado = _mp?['conectado'] == true;
+    final disponible = _mp == null || _mp?['disponible'] != false;
+    final pct = _mp?['comision_pct'];
+    final tope = _mp?['comision_tope'];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(tr('Conecta la cuenta de Mercado Pago de tu taller y tus clientes podrán pagar el anticipo desde la liga de la cotización (tarjeta, transferencia, efectivo o saldo). El dinero entra directo a tu cuenta.'),
+        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      if (pct != null) ...[
+        const SizedBox(height: 6),
+        Text(trf('Comisión HETNA con tu plan: {0}% por cobro (máximo \${1}). La comisión de Mercado Pago la cobra Mercado Pago. Con un plan más alto la comisión baja.', [pct, tope ?? 150]),
+          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      ],
+      const SizedBox(height: 10),
+      if (_mpCargando)
+        const Center(child: Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))))
+      else if (conectado)
+        Row(children: [
+          const Icon(Icons.check_circle, color: AppColors.verde, size: 20),
+          const SizedBox(width: 8),
+          Expanded(child: Text(trf('Conectado (cuenta {0})', [_mp?['mp_user_id'] ?? '']),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+          TextButton(onPressed: _mpTrabajando ? null : _desconectarMp,
+            child: Text(tr('Desconectar'), style: const TextStyle(fontSize: 12, color: AppColors.rojo))),
+        ])
+      else
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF009EE3), minimumSize: const Size(0, 46)),
+          onPressed: (_mpTrabajando || !disponible) ? null : _conectarMp,
+          icon: _mpTrabajando
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
+          label: Text(disponible ? tr('Conectar mi Mercado Pago') : tr('Próximamente'),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+    ]);
   }
 
   Widget _seccionVincular() {
