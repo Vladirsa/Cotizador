@@ -614,7 +614,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     });
   }
   String _metodoPago = '50% anticipo / 50% entrega';
-  String _condicionEntrega = 'LAB — En planta HETNA';
+  String _condicionEntrega = 'LAB — En nuestro taller';
   String _notas = '';
   bool _generando = false;
   bool _guardando = false;
@@ -646,7 +646,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (!_metodosPago.contains(_metodoPago)) _metodosPago.add(_metodoPago);
     });
   }
-  final _condiciones = ['LAB — En planta HETNA', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
+  final _condiciones = ['LAB — En nuestro taller', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
   String _tiempoEntrega = '15 días';
 
@@ -709,7 +709,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _aplicaIva = c.ivaPct > 0;
       _costoEnvio = c.costoEnvio;
       _metodoPago = c.metodoPago ?? '50% anticipo / 50% entrega';
-      _condicionEntrega = c.condicionEntrega ?? tr('LAB — En planta HETNA');
+      _condicionEntrega = c.condicionEntrega ?? tr('LAB — En nuestro taller');
       _notas = c.notas ?? '';
       if (c.createdAt != null) _fechaCotizacion = c.createdAt!;
       _tipo = c.tipo;
@@ -1248,7 +1248,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     if (_cliente == null) return;
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final itemsTexto = _items.map((i) => trf('• {0} x{1} = {2}', [(i.nombreProducto), (i.cantidad), (fmt.format(i.subtotal))])).join('\n');
-    final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *HETNA CNC*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? trf('\nIVA {0}%: {1}', [pctTexto(_ivaPct), (fmt.format(_montoIva))]) : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago]);
+    final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *{7}*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *{7}*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? trf('\nIVA {0}%: {1}', [pctTexto(_ivaPct), (fmt.format(_montoIva))]) : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago, AuthService.marcaTaller]);
     if (mounted) await WhatsAppService.abrirChatConSelector(context,
       numero: _cliente!.whatsappNumero, mensaje: msg);
   }
