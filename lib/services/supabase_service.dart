@@ -1015,6 +1015,58 @@ class SupabaseService {
     } catch (_) { return 0; }
   }
 
+  // ═══════════════════════════════════════════
+  // COTIZADOR EN LÍNEA (Fase 3)
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getSolicitudesEnLinea() async {
+    try {
+      final res = await _db.from('solicitudes_en_linea').select()
+        .order('creado', ascending: false).limit(40);
+      return (res as List).cast<Map<String, dynamic>>();
+    } catch (_) { return []; }
+  }
+
+  /// Liga temporal (1 hora) para abrir el archivo que subió el cliente.
+  static Future<String?> urlArchivoSolicitud(String ruta) async {
+    try {
+      return await _db.storage.from('solicitudes').createSignedUrl(ruta, 3600);
+    } catch (_) { return null; }
+  }
+
+  /// Convierte en cotización una solicitud que llegó sin cupo (o sin cotización).
+  static Future<Cotizacion> cotizacionDesdeSolicitud(Map<String, dynamic> s) async {
+    final medidas = Map<String, dynamic>.from((s['medidas'] as Map?) ?? {});
+    final partes = <String>[];
+    final largo = (medidas['largo'] as num?)?.toDouble() ?? 0;
+    final ancho = (medidas['ancho'] as num?)?.toDouble() ?? 0;
+    final alto = (medidas['alto'] as num?)?.toDouble() ?? 0;
+    if (largo > 0 && ancho > 0) partes.add('${largo.round()} × ${ancho.round()}${alto > 0 ? ' × ${alto.round()}' : ''} mm');
+    final corte = (medidas['corte_mm'] as num?)?.toDouble() ?? 0;
+    if (corte > 0) partes.add('corte ${(corte / 1000).toStringAsFixed(2)} m');
+    if ((s['archivo_nombre'] as String?)?.isNotEmpty == true) partes.add('Archivo: ${s['archivo_nombre']}');
+    if ((s['mensaje'] as String?)?.isNotEmpty == true) partes.add(s['mensaje'] as String);
+    final cantidad = (s['cantidad'] as num?)?.toInt() ?? 1;
+    final estimado = (s['estimado'] as num?)?.toDouble() ?? 0;
+    final item = CotizacionItem(
+      nombreProducto: (s['servicio'] as String?)?.isNotEmpty == true ? '${s['servicio']} — ${s['tipo'] ?? ''}' : 'Solicitud en línea',
+      descripcion: partes.join('\n'),
+      cantidad: cantidad,
+      precioUnitario: cantidad > 0 ? estimado / cantidad : estimado);
+    final cot = await crearCotizacion(Cotizacion(
+      clienteId: s['cliente_id'] as String?,
+      items: [item],
+      notas: '🌐 Solicitud desde tu cotizador en línea.'), [item]);
+    try {
+      await _db.from('cotizaciones').update({
+        'origen': 'en_linea',
+        if (s['archivo_ruta'] != null) 'archivo_ruta': s['archivo_ruta'],
+        if (s['archivo_nombre'] != null) 'archivo_nombre': s['archivo_nombre'],
+      }).eq('id', cot.id!);
+    } catch (_) {}
+    await _db.from('solicitudes_en_linea').update({'cotizacion_id': cot.id, 'estado': 'cotizada'}).eq('id', s['id']);
+    return cot;
+  }
+
   /// Marketing automático: resultados de los últimos 30 días por receta
   /// { receta: { enviados, correos, whatsapps, ganadas } }
   static Future<Map<String, dynamic>> marketingResultados() async {
