@@ -189,6 +189,27 @@ class MarketingApi {
   }
 }
 
+// ═══════════════ Cotizador en línea del taller (Fase 3) ═══════════════
+// Página pública hetnacnc.com/t/<liga>: el cliente sube su archivo, ve un
+// precio estimado y manda su solicitud. Ver
+// packages/api/src/lib/cotizador-en-linea.ts en hetnacnc.
+class PaginaApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-pagina';
+
+  /// { tabla_lista, slug, url, pagina: {activa, titulo, descripcion, ciudad,
+  ///   servicios, mostrar_precio, en_directorio}, servicios: [{id, nombre, emoji}] }
+  static Future<Map<String, dynamic>> leer(String token) async {
+    final r = await http.get(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token)).timeout(const Duration(seconds: 20));
+    return MercadoPagoApi._leer(r);
+  }
+
+  static Future<Map<String, dynamic>> guardar(String token, Map<String, dynamic> cambios) async {
+    final r = await http.post(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token), body: jsonEncode(cambios))
+      .timeout(const Duration(seconds: 20));
+    return MercadoPagoApi._leer(r);
+  }
+}
+
 // ═══════════════ Suscripción con Mercado Pago o PayPal ═══════════════
 // El backend de hetnacnc.com crea la suscripción y, cuando Mercado Pago o
 // PayPal confirman el pago, cambia el plan del taller. La app sólo abre el enlace.
