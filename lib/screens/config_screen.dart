@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'pagina_en_linea_screen.dart';
 import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
@@ -242,6 +243,21 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccionMercadoPago(),
               const SizedBox(height: 14),
               _seccionPayPal(),
+
+              const SizedBox(height: 20),
+
+              // ── COTIZADOR EN LÍNEA (Fase 3) ──
+              _seccion(tr('🌐 TU COTIZADOR EN LÍNEA')),
+              const SizedBox(height: 8),
+              Material(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                    side: const BorderSide(color: AppColors.grisBorde, width: 0.5)),
+                  leading: const Icon(Icons.public, color: AppColors.azul),
+                  title: Text(tr('Tu página para que te lleguen clientes'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  subtitle: Text(tr('El cliente sube su archivo y ve el precio; te llega como cotización.'), style: const TextStyle(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaginaEnLineaScreen())))),
 
               const SizedBox(height: 20),
 
