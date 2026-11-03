@@ -1,5 +1,5 @@
 // lib/screens/reportes_screen.dart
-// HETNA CNC — Reportes Excel + Fiscal SAT
+// HETNA CNC — Rentabilidad real + Reportes Excel + Fiscal SAT
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -11,6 +11,7 @@ import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../i18n/tr.dart';
+import 'rentabilidad_tab.dart';
 
 class ReportesScreen extends StatefulWidget {
   const ReportesScreen({super.key});
@@ -25,7 +26,7 @@ class _ReportesScreenState extends State<ReportesScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -46,10 +47,12 @@ class _ReportesScreenState extends State<ReportesScreen>
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           tabs: [
+            Tab(icon: Icon(Icons.trending_up, size: 16), text: tr('Rentabilidad')),
             Tab(icon: Icon(Icons.table_chart_outlined, size: 16), text: tr('Excel')),
             Tab(icon: Icon(Icons.receipt_outlined, size: 16), text: tr('Fiscal SAT')),
           ])),
       body: TabBarView(controller: _tabCtrl, children: [
+        const RentabilidadTab(),
         const _TabExcel(),
         const _TabFiscal(),
       ]));
