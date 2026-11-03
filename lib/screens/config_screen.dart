@@ -68,6 +68,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
   Map<String, dynamic>? _mp;
   bool _mpCargando = false;
   bool _mpTrabajando = false;
+  // PayPal del taller
+  Map<String, dynamic>? _pp;
+  Map<String, dynamic> _comisiones = {};
+  bool _ppTrabajando = false;
   String _regimenFiscal = '612';
 
   final _proveedores = ['Facturapi', 'SAT Directo', 'Contpaqi', 'Aspel', 'Otro'];
@@ -84,6 +88,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
     super.initState();
     _cargar();
     _cargarMp();
+    _cargarPp();
   }
 
   @override
@@ -232,9 +237,11 @@ class _ConfigScreenState extends State<ConfigScreen> {
               const SizedBox(height: 20),
 
               // ── COBROS EN LÍNEA ──
-              _seccion(tr('💳 COBROS EN LÍNEA · MERCADO PAGO')),
+              _seccion(tr('💳 COBROS EN LÍNEA · MERCADO PAGO Y PAYPAL')),
               const SizedBox(height: 8),
               _seccionMercadoPago(),
+              const SizedBox(height: 14),
+              _seccionPayPal(),
 
               const SizedBox(height: 20),
 
@@ -665,6 +672,107 @@ class _ConfigScreenState extends State<ConfigScreen> {
     } finally {
       if (mounted) setState(() => _mpTrabajando = false);
     }
+  }
+
+  // ── PayPal del taller ────────────────────────────────────────────────
+  Future<void> _cargarPp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null || !AuthService.esAdmin) return;
+    try {
+      final r = await Future.wait([PayPalTallerApi.estado(token), SupabaseService.comisionesPendientes()]);
+      if (mounted) setState(() { _pp = r[0]; _comisiones = r[1]; });
+    } catch (_) {}
+  }
+
+  Future<void> _conectarPp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null) return;
+    setState(() => _ppTrabajando = true);
+    try {
+      final url = await PayPalTallerApi.conectar(token);
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+      await showDialog(context: context, builder: (ctx) => AlertDialog(
+        title: Text(tr('Vincula tu PayPal')),
+        content: Text(tr('Se abrió PayPal. Entra con la cuenta de tu taller y acepta. Cuando termines, regresa aquí y toca "Ya lo vinculé".')),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Ya lo vinculé')))]));
+      await _cargarPp();
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _ppTrabajando = false);
+    }
+  }
+
+  Future<void> _desconectarPp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null) return;
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(tr('¿Desvincular PayPal?')),
+      content: Text(tr('Tus clientes ya no verán el botón de PayPal en la liga de la cotización.')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancelar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Desvincular'))),
+      ]));
+    if (ok != true) return;
+    setState(() => _ppTrabajando = true);
+    try {
+      await PayPalTallerApi.desconectar(token);
+      await _cargarPp();
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _ppTrabajando = false);
+    }
+  }
+
+  Widget _seccionPayPal() {
+    if (!AuthService.esAdmin) return const SizedBox.shrink();
+    final conectado = _pp?['conectado'] == true;
+    final disponible = _pp == null || _pp?['disponible'] != false;
+    final pendiente = ((_comisiones['pendiente'] as num?) ?? (_pp?['comision_pendiente'] as num?) ?? 0).toDouble();
+    final enCobro = ((_comisiones['en_cobro'] as num?) ?? 0).toDouble();
+    final liga = _comisiones['liga'] as String?;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(tr('También puedes vincular tu PayPal: el cliente paga con su cuenta PayPal o tarjeta y el dinero te llega completo. La comisión HETNA de esos cobros (la misma de tu plan) se junta y se cobra el día 1 de cada mes.'),
+        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      const SizedBox(height: 10),
+      if (conectado)
+        Row(children: [
+          const Icon(Icons.check_circle, color: AppColors.verde, size: 20),
+          const SizedBox(width: 8),
+          Expanded(child: Text(trf('PayPal vinculado ({0})', [_pp?['email'] ?? '']),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+          TextButton(onPressed: _ppTrabajando ? null : _desconectarPp,
+            child: Text(tr('Desvincular'), style: const TextStyle(fontSize: 12, color: AppColors.rojo))),
+        ])
+      else
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFC439), minimumSize: const Size(0, 46)),
+          onPressed: (_ppTrabajando || !disponible) ? null : _conectarPp,
+          icon: _ppTrabajando
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+            : const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Color(0xFF111111)),
+          label: Text(disponible ? tr('Vincular mi PayPal') : tr('Próximamente'),
+            style: const TextStyle(color: Color(0xFF111111), fontWeight: FontWeight.w700))),
+      if (pendiente > 0 || enCobro > 0) ...[
+        const SizedBox(height: 10),
+        Container(width: double.infinity, padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(10)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (pendiente > 0)
+              Text(trf('Comisión HETNA acumulada este mes: \${0}. Se cobra el día 1.', [pendiente.toStringAsFixed(2)]),
+                style: const TextStyle(fontSize: 12)),
+            if (enCobro > 0) ...[
+              Text(trf('Comisión por pagar: \${0}', [enCobro.toStringAsFixed(2)]),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              if (liga != null && liga.isNotEmpty)
+                TextButton(onPressed: () => launchUrl(Uri.parse(liga), mode: LaunchMode.externalApplication),
+                  child: Text(tr('Pagar comisión'))),
+            ],
+          ])),
+      ],
+    ]);
   }
 
   Widget _seccionMercadoPago() {
