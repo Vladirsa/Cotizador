@@ -134,6 +134,61 @@ class MercadoPagoApi {
   }
 }
 
+// ═══════════════ Cobros en línea: PayPal del taller ═══════════════
+// El taller vincula su PayPal ("Iniciar sesión con PayPal"). Su cliente paga
+// el anticipo desde la liga y el dinero le llega completo a su PayPal; la
+// comisión HETNA de esos cobros se junta y se cobra el día 1 de cada mes.
+class PayPalTallerApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-paypal';
+
+  /// { disponible, conectado, email, comision_pct, comision_tope, comision_tope_usd, comision_pendiente }
+  static Future<Map<String, dynamic>> estado(String token) async {
+    final r = await http.get(Uri.parse('$_ruta/estado'), headers: MercadoPagoApi._cab(token)).timeout(const Duration(seconds: 20));
+    return MercadoPagoApi._leer(r);
+  }
+
+  static Future<String> conectar(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/conectar'), headers: MercadoPagoApi._cab(token), body: '{}').timeout(const Duration(seconds: 30));
+    final url = MercadoPagoApi._leer(r)['url'] as String?;
+    if (url == null || url.isEmpty) throw HetnaError(tr('PayPal no devolvió la liga.'));
+    return url;
+  }
+
+  static Future<void> desconectar(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/desconectar'), headers: MercadoPagoApi._cab(token), body: '{}').timeout(const Duration(seconds: 30));
+    MercadoPagoApi._leer(r);
+  }
+}
+
+// ═══════════════ Marketing en piloto automático ═══════════════
+// Las "recetas" (seguimiento, último aviso, anticipo pendiente, gracias +
+// reseña, reactivación) las corre el servidor cada mañana: el correo sale solo
+// y el WhatsApp queda en Marketing → Cola de hoy. Ver
+// packages/api/src/lib/cotizador-marketing.ts en hetnacnc.
+class MarketingApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-marketing';
+
+  /// { permitido, tabla_lista, recetas: [{clave, titulo, descripcion, recomendada,
+  ///   mensaje_sugerido, campos, activa, mensaje, correo, whatsapp, config}] }
+  static Future<Map<String, dynamic>> recetas(String token) async {
+    final r = await http.get(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token)).timeout(const Duration(seconds: 20));
+    return MercadoPagoApi._leer(r);
+  }
+
+  static Future<void> guardar(String token, Map<String, dynamic> cambios) async {
+    final r = await http.post(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token), body: jsonEncode(cambios))
+      .timeout(const Duration(seconds: 20));
+    MercadoPagoApi._leer(r);
+  }
+
+  /// Revisa ahora (sin esperar a mañana). { whatsapp, correos }
+  static Future<Map<String, dynamic>> correr(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/correr'), headers: MercadoPagoApi._cab(token), body: '{}')
+      .timeout(const Duration(seconds: 90));
+    return MercadoPagoApi._leer(r);
+  }
+}
+
 // ═══════════════ Suscripción con Mercado Pago o PayPal ═══════════════
 // El backend de hetnacnc.com crea la suscripción y, cuando Mercado Pago o
 // PayPal confirman el pago, cambia el plan del taller. La app sólo abre el enlace.
