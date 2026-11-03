@@ -970,11 +970,14 @@ class SupabaseService {
   // ═══════════════════════════════════════════
   static Future<List<Map<String, dynamic>>> getColaMensajesHoy() async {
     try {
+      // Los de hoy y los que quedaron pendientes de días anteriores (antes
+      // desaparecían al día siguiente sin mandarse)
       final hoy = DateTime.now().toIso8601String().split('T')[0];
       final res = await _db.from('cola_mensajes_wa')
           .select('*, clientes(nombre, whatsapp, telefono)')
           .eq('estado', 'pendiente')
-          .eq('fecha_programada', hoy)
+          .lte('fecha_programada', hoy)
+          .order('fecha_programada')
           .order('created_at');
       return (res as List).map((j) => j as Map<String, dynamic>).toList();
     } catch (_) { return []; }
@@ -1004,11 +1007,29 @@ class SupabaseService {
 
   static Future<int> countMensajesEnviadosHoy() async {
     try {
-      final hoy = DateTime.now().toIso8601String().split('T')[0];
+      final ahora = DateTime.now();
+      final inicio = DateTime(ahora.year, ahora.month, ahora.day).toUtc().toIso8601String();
       final res = await _db.from('cola_mensajes_wa')
-          .select().eq('estado', 'enviado').eq('fecha_programada', hoy);
+          .select('id').eq('estado', 'enviado').gte('enviado_at', inicio);
       return (res as List).length;
     } catch (_) { return 0; }
+  }
+
+  /// Marketing automático: resultados de los últimos 30 días por receta
+  /// { receta: { enviados, correos, whatsapps, ganadas } }
+  static Future<Map<String, dynamic>> marketingResultados() async {
+    try {
+      final r = await _db.rpc('marketing_resultados');
+      return r is Map ? Map<String, dynamic>.from(r) : {};
+    } catch (_) { return {}; }
+  }
+
+  /// Comisiones HETNA de cobros con PayPal: { pendiente, en_cobro, liga }
+  static Future<Map<String, dynamic>> comisionesPendientes() async {
+    try {
+      final r = await _db.rpc('comisiones_pendientes');
+      return r is Map ? Map<String, dynamic>.from(r) : {};
+    } catch (_) { return {}; }
   }
 
   static Future<void> agregarAColaMarketing({
