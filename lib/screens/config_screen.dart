@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'pagina_en_linea_screen.dart';
+import 'facturacion_config_screen.dart';
 import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
@@ -176,13 +177,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'color_primario'        : _colorPrimario,
         'color_secundario'      : _colorSecundario,
         if (_logoUrl != null) 'logo_url': _logoUrl,
-        'factura_api_key'       : _apiKeyCtrl.text.trim(),
-        'factura_api_url'       : _apiUrlCtrl.text.trim(),
-        'factura_rfc_emisor'    : _rfcEmisorCtrl.text.trim().toUpperCase(),
-        'factura_serie'         : _serieCtrl.text.trim().toUpperCase(),
-        'factura_activo'        : _facturaActivo,
-        'factura_proveedor'     : _proveedor,
-        'factura_regimen_fiscal': _regimenFiscal,
+        // La llave de facturación ya no vive en la app (la maneja el servidor
+        // de HETNA): se borra la que se haya capturado antes.
+        'factura_api_key'       : '',
+        'factura_api_url'       : '',
       });
       // Aparte, para que si la base todavía no tiene estas columnas no se
       // pierda el resto de la configuración.
@@ -391,26 +389,22 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion(tr('🧾 FACTURACIÓN ELECTRÓNICA')),
               const SizedBox(height: 8),
 
-              // Toggle activar facturación
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-                child: Row(children: [
-                  const Icon(Icons.receipt_long_outlined, size: 20, color: AppColors.azul),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(tr('Activar facturación'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    Text(tr('Habilita el botón de facturar en pedidos'),
-                      style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                  ])),
-                  Switch(
-                    value: _facturaActivo,
-                    activeColor: AppColors.azul,
-                    onChanged: (v) => setState(() => _facturaActivo = v)),
-                ])),
+              // Factura electrónica real (Fase 4): datos fiscales y CSD en su pantalla
+              Material(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                    side: const BorderSide(color: AppColors.grisBorde, width: 0.5)),
+                  leading: const Icon(Icons.receipt_long_outlined, color: AppColors.azul),
+                  title: Text(tr('Factura electrónica CFDI 4.0'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  subtitle: Text(tr('Tus datos fiscales y tu CSD para timbrar desde cada pedido.'), style: const TextStyle(fontSize: 11)),
+                  trailing: Icon(AuthService.puede('facturacion') ? Icons.chevron_right : Icons.lock_outline),
+                  onTap: () async {
+                    if (!AuthService.puede('facturacion')) {
+                      await AuthService.exigirModulo(context, 'facturacion', funcion: tr('Facturación (CFDI)'));
+                      return;
+                    }
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturacionConfigScreen()));
+                  })),
 
               const SizedBox(height: 10),
               // País: cambia etiquetas (RFC / Tax ID, IVA / sales tax) en PDFs
@@ -438,113 +432,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   Text(tr('🚚 Envíos: por el momento solo dentro de México. Esta leyenda sale en tus cotizaciones.'),
                     style: const TextStyle(fontSize: 11, color: AppColors.naranja, fontWeight: FontWeight.w600)),
                 ])),
-
-              if (_facturaActivo) ...[
-                const SizedBox(height: 10),
-
-                // Proveedor
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white, borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-                  child: DropdownButtonFormField<String>(
-                    value: _proveedor,
-                    decoration: InputDecoration(
-                      labelText: tr('Proveedor de facturación'),
-                      border: InputBorder.none,
-                      prefixIcon: Icon(Icons.cloud_outlined, size: 18, color: AppColors.azul)),
-                    items: _proveedores.map((p) => DropdownMenuItem(value: p, child: Text(tr(p)))).toList(),
-                    onChanged: (v) => setState(() => _proveedor = v!))),
-
-                const SizedBox(height: 8),
-
-                // Info box
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.azul.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.azul.withOpacity(0.2))),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      const Icon(Icons.info_outline, size: 14, color: AppColors.azul),
-                      const SizedBox(width: 6),
-                      Text(trf('Configuración de {0}', [_proveedor]),
-                        style: const TextStyle(fontSize: 12, color: AppColors.azul, fontWeight: FontWeight.w600)),
-                    ]),
-                    const SizedBox(height: 6),
-                    Text(
-                      tr('Obtén tu API Key desde el panel de tu proveedor y pégala aquí. Cuando estés listo, la conexión se activa automáticamente.'),
-                      style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                  ])),
-
-                const SizedBox(height: 8),
-
-                // API Key
-                _campoPassword(_apiKeyCtrl, tr('API Key'), Icons.key_outlined,
-                  hint: 'sk_live_xxxxxxxxxxxxxxxxxxxx'),
-
-                // API URL
-                _campo(_apiUrlCtrl, tr('URL del API'), Icons.link_outlined,
-                  tipo: TextInputType.url,
-                  hint: 'https://api.facturapi.io/v2'),
-
-                // RFC emisor
-                _campo(_rfcEmisorCtrl, tr('RFC del emisor (tu empresa)'), Icons.badge_outlined,
-                  mayusculas: true, hint: 'XAXX010101000'),
-
-                // Régimen fiscal
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white, borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-                  child: DropdownButtonFormField<String>(
-                    value: _regimenFiscal,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: tr('Régimen fiscal'),
-                      border: InputBorder.none,
-                      prefixIcon: Icon(Icons.account_balance_outlined, size: 18, color: AppColors.azul)),
-                    items: _regimenesFiscales.entries.map((e) =>
-                      DropdownMenuItem(value: e.key,
-                        child: Text(tr(e.value), style: const TextStyle(fontSize: 12)))).toList(),
-                    onChanged: (v) => setState(() => _regimenFiscal = v!))),
-
-                // Serie
-                _campo(_serieCtrl, tr('Serie de comprobante'), Icons.tag_outlined,
-                  hint: 'A', mayusculas: true),
-
-                const SizedBox(height: 8),
-
-                // Estado de conexión
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _apiKeyCtrl.text.isNotEmpty
-                      ? AppColors.verde.withOpacity(0.05)
-                      : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _apiKeyCtrl.text.isNotEmpty
-                        ? AppColors.verde.withOpacity(0.3)
-                        : AppColors.grisBorde)),
-                  child: Row(children: [
-                    Icon(
-                      _apiKeyCtrl.text.isNotEmpty ? Icons.check_circle_outline : Icons.radio_button_unchecked,
-                      size: 16,
-                      color: _apiKeyCtrl.text.isNotEmpty ? AppColors.verde : AppColors.textoSecundario),
-                    const SizedBox(width: 8),
-                    Text(
-                      tr(_apiKeyCtrl.text.isNotEmpty
-                        ? tr('API Key configurada — lista para conectar')
-                        : tr('Pendiente configurar API Key')),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _apiKeyCtrl.text.isNotEmpty ? AppColors.verde : AppColors.textoSecundario)),
-                  ])),
-              ],
 
               const SizedBox(height: 32),
             ])));
