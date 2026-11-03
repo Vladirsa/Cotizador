@@ -15,6 +15,8 @@ import 'avances_screen.dart';
 import 'clientes_screen.dart';
 import 'productos_screen.dart';
 import 'inventario_screen.dart';
+import 'mantenimiento_screen.dart';
+import 'facturacion_config_screen.dart';
 import 'gastos_screen.dart';
 import 'marketing_screen.dart';
 import 'config_screen.dart';
@@ -62,6 +64,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 12: return const ConfigScreen();
       case 13: return const ConfigSimuladorScreen();
       case 14: return const ConfigCostosScreen();
+      case 15: return const MantenimientoScreen();
+      case 16: return const FacturacionConfigScreen();
       default: return const InicioScreen();
     }
   }
@@ -195,7 +199,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _dItem(Icons.campaign_outlined,      tr('Marketing'),           9, plan: 'marketing', modulo: 'marketing'),
       _dItem(Icons.group_outlined,         tr('Mi equipo'),          10, plan: 'equipo', modulo: 'equipo'),
       const Divider(height: 1),
-      _dItem(Icons.bar_chart_outlined,     tr('Reportes Excel'),     11, plan: 'reportes', modulo: 'reportes'),
+      _dItem(Icons.bar_chart_outlined,     tr('Reportes y rentabilidad'), 11, plan: 'reportes', modulo: 'reportes'),
+      _dItem(Icons.build_circle_outlined,  tr('Mantenimiento'),      15, plan: 'mantenimiento'),
+      _dItem(Icons.request_quote_outlined, tr('Factura electrónica'), 16, plan: 'facturacion'),
       _dItem(Icons.settings_outlined,      tr('Configuración'),      12, modulo: 'config'),
       _dItem(Icons.tune_outlined,          tr('Config Simulador'),   13, plan: 'config_simulador'),
       _dItem(Icons.calculate_outlined,     tr('Costos del taller'),  14, plan: 'costos_taller'),
