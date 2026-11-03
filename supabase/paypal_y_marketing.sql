@@ -1,4 +1,4 @@
--- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════
 -- Cotizador 2.0 — PayPal del taller + Marketing en piloto automático
 --
 -- PayPal:
@@ -18,7 +18,7 @@
 --
 -- Pegar una sola vez en Supabase > SQL Editor del proyecto de la app.
 -- Idempotente: se puede volver a correr.
--- ════════════════════════════════════════════════════════════════════════════
+-- ════════════════════════════════════════════════════════════════════
 
 -- 1) PayPal del taller ───────────────────────────────────────────────
 create table if not exists negocios_paypal (
