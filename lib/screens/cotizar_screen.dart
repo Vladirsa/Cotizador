@@ -254,6 +254,11 @@ class _TarjetaCotizacion extends StatelessWidget {
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
               child: Text(tr(cotizacion.estado), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+            if (cotizacion.esEnLinea)
+              Padding(padding: const EdgeInsets.only(top: 4), child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: const Color(0xFFFFF4EA), borderRadius: BorderRadius.circular(20)),
+                child: Text(tr('🌐 Llegó por tu página'), style: const TextStyle(fontSize: 10, color: Color(0xFFC2560A), fontWeight: FontWeight.w700)))),
             _seguimientoLiga(cotizacion),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
@@ -323,6 +328,26 @@ class _TarjetaCotizacion extends StatelessWidget {
               const SizedBox(height: 6),
               SizedBox(width: double.infinity,
                 child: _BtnPdfWA(cotizacion: cotizacion)),
+            ],
+            if (cotizacion.archivoRuta != null) ...[
+              const SizedBox(height: 6),
+              SizedBox(width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final url = await SupabaseService.urlArchivoSolicitud(cotizacion.archivoRuta!);
+                    if (url == null) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('No se pudo abrir el archivo.'))));
+                      return;
+                    }
+                    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                  },
+                  icon: const Icon(Icons.attach_file, size: 15),
+                  label: Text(trf('Archivo del cliente: {0}', [cotizacion.archivoNombre ?? '']),
+                    overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFC2560A),
+                    side: const BorderSide(color: Color(0xFFF3D9C2)),
+                    padding: const EdgeInsets.symmetric(vertical: 8)))),
             ],
             if (cotizacion.ligaPublica != null && cotizacion.estado != 'Rechazada') ...[
               const SizedBox(height: 6),
