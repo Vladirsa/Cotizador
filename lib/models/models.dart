@@ -412,6 +412,10 @@ class Pedido {
   bool redesEnviadas;
   bool cuponSeguidorEnviado;
   final DateTime? createdAt;
+  // Guía de envío (Fase 2): el cliente la ve y la rastrea en su liga
+  String? paqueteria;
+  String? guia;
+  String? rastreoUrl;
 
   Pedido({
     this.id,
@@ -427,6 +431,9 @@ class Pedido {
     this.redesEnviadas = false,
     this.cuponSeguidorEnviado = false,
     this.createdAt,
+    this.paqueteria,
+    this.guia,
+    this.rastreoUrl,
   });
 
   int get porcentajeAvance {
@@ -464,6 +471,9 @@ class Pedido {
       cuponSeguidorEnviado: json['cupon_seguidor_enviado'] ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) : null,
+      paqueteria: json['paqueteria'] as String?,
+      guia: json['guia'] as String?,
+      rastreoUrl: json['rastreo_url'] as String?,
     );
   }
 }
