@@ -434,6 +434,27 @@ class SupabaseService {
     });
   }
 
+  // Guía de envío del pedido (columnas de supabase/avisos_y_seguimiento.sql)
+  static Future<void> guardarGuiaPedido(String pedidoId,
+      {String? paqueteria, String? guia, String? rastreoUrl}) async {
+    await _db.from('pedidos').update({
+      'paqueteria': (paqueteria ?? '').trim().isEmpty ? null : paqueteria!.trim(),
+      'guia': (guia ?? '').trim().isEmpty ? null : guia!.trim(),
+      'rastreo_url': (rastreoUrl ?? '').trim().isEmpty ? null : rastreoUrl!.trim(),
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', pedidoId);
+  }
+
+  /// Liga pública de la cotización del pedido: ahí el cliente ve también el
+  /// avance, las fotos y la guía (hetnacnc.com/c/<token>).
+  static Future<String?> ligaSeguimiento(String cotizacionId) async {
+    try {
+      final r = await _db.from('cotizaciones').select('token_publico').eq('id', cotizacionId).maybeSingle();
+      final t = (r as Map<String, dynamic>?)?['token_publico'] as String?;
+      return (t == null || t.isEmpty) ? null : 'https://hetnacnc.com/c/$t';
+    } catch (_) { return null; }
+  }
+
   // ═══════════════════════════════════════════
   // ESTADO PÚBLICO DEL PEDIDO (el cliente lo ve sin cuenta)
   // ═══════════════════════════════════════════
