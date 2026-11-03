@@ -160,4 +160,4 @@ select m.id as maquina_id, m.negocio_id,
        coalesce(m.horas_base, 0) + coalesce(sum(c.cantidad), 0) as horas
   from maquinaria m
   left join pedido_costos c on c.maquina_id = m.id and c.tipo = 'maquina'
- framework group by m.id, m.negocio_id, m.horas_base;
+ group by m.id, m.negocio_id, m.horas_base;

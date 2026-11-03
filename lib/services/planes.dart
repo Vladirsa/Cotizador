@@ -48,14 +48,14 @@ class Planes {
     Plan.taller: [
       'Cotizaciones ilimitadas', 'PDF con tu logo, sin marca de agua', 'Cotización profesional (formato internacional)',
       'Sube DXF, SVG, STL u OBJ: medidas, plano y precio desde el archivo', 'Simulador de costos con 3 precios y anticipo a tu medida',
-      'Costos de tu taller', 'Gastos y compras', 'Avisos de avance por WhatsApp', 'Fotos en productos', '2 usuarios',
+      'Costos de tu taller', 'Costo real y utilidad de cada pedido', 'Factura electrónica CFDI: 30 al mes', 'Mantenimiento de máquinas con avisos', 'Gastos y compras', 'Avisos de avance por WhatsApp', 'Fotos en productos', '2 usuarios',
     ],
     Plan.pro: [
       'Todo lo de Taller', 'Inventario de bodega', 'Marketing: segmentos de clientes y plantillas de WhatsApp', 'Reportes Excel',
-      'Dashboard de utilidad, gastos y conversión', 'Equipo con roles: 5 usuarios',
+      'Dashboard de utilidad, gastos y conversión', 'Rentabilidad por máquina y por cliente', 'Factura electrónica CFDI: 150 al mes', 'Equipo con roles: 5 usuarios',
     ],
     Plan.industrial: [
-      'Todo lo de Pro', 'Factura electrónica CFDI (próximamente)', 'API para conectar tu sistema (próximamente)', 'Usuarios ilimitados',
+      'Todo lo de Pro', 'Factura electrónica CFDI sin límite', 'API para conectar tu sistema (próximamente)', 'Usuarios ilimitados',
     ],
   };
 
@@ -80,13 +80,16 @@ class Planes {
     'config_simulador': Plan.taller,
     'gastos': Plan.taller,
     'equipo': Plan.taller,          // Usuarios: Taller 2, Pro 5, Industrial sin límite
+    'facturacion': Plan.taller,     // CFDI: Taller 30/mes, Pro 150, Industrial sin límite (el servidor cuenta)
+    'costo_real': Plan.taller,      // Costo real y utilidad de cada pedido
+    'mantenimiento': Plan.taller,   // Mantenimiento de máquinas con avisos
     // ── Pro ($599) ──
     'inventario': Plan.pro,
     'marketing': Plan.pro,          // incluye cupones y plantillas de WhatsApp
     'reportes': Plan.pro,           // Reportes Excel
     'dashboard_avanzado': Plan.pro, // Gráficas de utilidad, gastos y conversión
+    'rentabilidad': Plan.pro,       // Rentabilidad por máquina y por cliente
     // ── Industrial ($1,199) ──
-    'facturacion': Plan.industrial, // CFDI
     'api': Plan.industrial,         // Llave de API para conectar su sistema
   };
 
