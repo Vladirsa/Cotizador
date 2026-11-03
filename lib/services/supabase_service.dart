@@ -787,7 +787,7 @@ class SupabaseService {
   static Future<Map<String, dynamic>> getDatosFiscalesCliente(String clienteId) async {
     try {
       final res = await _db.from('clientes')
-        .select('rfc_fiscal, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal')
+        .select('rfc_fiscal, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal, correo')
         .eq('id', clienteId).single();
       return res as Map<String, dynamic>;
     } catch (_) { return {}; }
@@ -806,6 +806,16 @@ class SupabaseService {
       'estado': 'pendiente',
       'created_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  /// Facturas timbradas (CFDI) del taller; las crea sólo el servidor.
+  static Future<List<Map<String, dynamic>>> getCfdiEmitidos({String? pedidoId, int limite = 50}) async {
+    try {
+      var q = _db.from('cfdi_emitidos').select();
+      if (pedidoId != null) q = q.eq('pedido_id', pedidoId);
+      final res = await q.order('creado', ascending: false).limit(limite);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
   }
 
   static Future<List<Map<String, dynamic>>> getFacturasPedido(String pedidoId) async {
