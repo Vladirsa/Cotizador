@@ -7,6 +7,7 @@ import '../services/whatsapp_service.dart';
 import '../services/pdf_service.dart';
 import '../services/auth_service.dart';
 import 'factura_screen.dart';
+import 'costo_real_screen.dart';
 import 'envios_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -415,6 +416,21 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
           ]),
         ],
         const SizedBox(height: 6),
+        // Costo real y utilidad del pedido (Fase 4)
+        if (!_cancelado && widget.pedido.id != null)
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () async {
+              if (!AuthService.puede('costo_real')) {
+                await AuthService.exigirModulo(context, 'costo_real', funcion: tr('Costo real y utilidad'));
+                return;
+              }
+              Navigator.push(context, MaterialPageRoute(builder: (_) => CostoRealScreen(pedido: widget.pedido)));
+            },
+            icon: Icon(AuthService.puede('costo_real') ? Icons.calculate_outlined : Icons.lock_outline, size: 14),
+            label: Text(tr('Costo real y utilidad'), style: const TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+              side: const BorderSide(color: AppColors.grisBorde), padding: const EdgeInsets.symmetric(vertical: 7)))),
+        const SizedBox(height: 6),
         // Botón Facturar — visible cuando ya pagaron
         if (widget.pedido.estado == 'PagoCompleto' ||
             widget.pedido.estado == 'Entrega' ||
@@ -553,7 +569,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     }
   }
 
-  // ── Guía de envío ────────────────────────────────────────────────
+  // ── Guía de envío ──────────────────────────────────────────────
   static const _paqueterias = ['DHL', 'Estafeta', 'FedEx', 'Paquetexpress', 'UPS', '99 Minutos', 'J&T Express', 'Redpack', 'Castores', 'Tres Guerras', 'Otra'];
 
   Future<void> _editarGuia() async {
