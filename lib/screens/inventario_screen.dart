@@ -4,6 +4,9 @@ import '../main.dart';
 import '../services/supabase_service.dart';
 import '../services/barcode_service.dart';
 import '../i18n/tr.dart';
+import '../services/hetna_api.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class InventarioScreen extends StatefulWidget {
   const InventarioScreen({super.key});
@@ -32,6 +35,64 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
 
   double get _valorTotal => _filtrados.fold(0.0, (s, m) =>
     s + ((m['stock_actual'] as int? ?? 0) * ((m['costo_unitario'] as num?)?.toDouble() ?? 0)));
+
+  // ── Lista de compra (Fase 4): lo que está en mínimo, con cantidad sugerida
+  // para volver al doble del mínimo. Se comparte por WhatsApp o se busca en
+  // la tienda HETNA.
+  int _sugerido(Map<String, dynamic> m) {
+    final actual = m['stock_actual'] as int? ?? 0;
+    final minimo = m['stock_minimo'] as int? ?? 1;
+    final meta = minimo * 2 < minimo + 1 ? minimo + 1 : minimo * 2;
+    return (meta - actual).clamp(1, 99999);
+  }
+
+  void _listaDeCompra() {
+    final bajos = _materiales.where((m) =>
+      (m['stock_actual'] as int? ?? 0) <= (m['stock_minimo'] as int? ?? 1)).toList();
+    if (bajos.isEmpty) return;
+    final total = bajos.fold<double>(0, (s, m) => s + _sugerido(m) * ((m['costo_unitario'] as num?)?.toDouble() ?? 0));
+    String texto() => [
+      tr('🛒 Lista de compra'),
+      '',
+      ...bajos.map((m) => '• ${_sugerido(m)} ${m['unidad'] ?? ''} · ${m['nombre']}'),
+      '',
+      trf('Aprox. {0}', [_fmt.format(total)]),
+    ].join('\n');
+    showModalBottomSheet(context: context, isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => DraggableScrollableSheet(expand: false, initialChildSize: 0.6, maxChildSize: 0.9,
+        builder: (ctx, scroll) => Column(children: [
+          Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 4), child: Row(children: [
+            Expanded(child: Text(tr('Lista de compra'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700))),
+            Text(trf('Aprox. {0}', [_fmt.format(total)]), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.azul)),
+          ])),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(tr('Para volver al doble de tu stock mínimo.'), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
+          Expanded(child: ListView(controller: scroll, children: bajos.map((m) => ListTile(
+            dense: true,
+            title: Text('${m['nombre']}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: Text(trf('Tienes {0}, mínimo {1}', [m['stock_actual'] ?? 0, m['stock_minimo'] ?? 1]), style: const TextStyle(fontSize: 11)),
+            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text('${_sugerido(m)} ${m['unidad'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              IconButton(tooltip: tr('Buscar en la tienda HETNA'),
+                icon: const Icon(Icons.storefront_outlined, size: 18, color: AppColors.azul),
+                onPressed: () => launchUrl(Uri.parse('${HetnaApi.base}/mx/categories?query=${Uri.encodeComponent('${m['nombre']}')}'),
+                  mode: LaunchMode.externalApplication)),
+            ]))).toList())),
+          SafeArea(child: Padding(padding: const EdgeInsets.all(12), child: Row(children: [
+            Expanded(child: OutlinedButton.icon(
+              onPressed: () => Share.share(texto()),
+              icon: const Icon(Icons.share_outlined, size: 16), label: Text(tr('Compartir')))),
+            const SizedBox(width: 8),
+            Expanded(child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.whatsapp),
+              onPressed: () => launchUrl(Uri.parse('https://wa.me/?text=${Uri.encodeComponent(texto())}'),
+                mode: LaunchMode.externalApplication),
+              icon: const Icon(Icons.chat, size: 16, color: Colors.white),
+              label: Text(tr('WhatsApp'), style: const TextStyle(color: Colors.white)))),
+          ]))),
+        ])));
+  }
 
   @override
   void initState() {
@@ -123,6 +184,11 @@ class _InventarioScreenState extends State<InventarioScreen> with SingleTickerPr
             const SizedBox(width: 6),
             Expanded(child: Text(trf('{0} material{1} con stock bajo', [(_bajos.length), (_bajos.length > 1 ? "es" : "")]),
               style: const TextStyle(fontSize: 11, color: AppColors.rojo, fontWeight: FontWeight.w600))),
+            TextButton.icon(
+              onPressed: _listaDeCompra,
+              style: TextButton.styleFrom(foregroundColor: AppColors.rojo, visualDensity: VisualDensity.compact),
+              icon: const Icon(Icons.shopping_cart_outlined, size: 14),
+              label: Text(tr('Lista de compra'), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700))),
           ])),
 
       // Lista

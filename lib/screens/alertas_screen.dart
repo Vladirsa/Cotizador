@@ -37,6 +37,7 @@ class _AlertasScreenState extends State<AlertasScreen> {
     'anticipo_pagado':         {'label': '💰 Pagó',            'color': Color(0xFF059669)},
     'solicitud_en_linea':      {'label': '🌐 Solicitud',       'color': Color(0xFFC2560A)},
     'comision_hetna':          {'label': '🧾 Comisión',        'color': Color(0xFF6b7280)},
+    'mantenimiento':           {'label': '🔧 Mantenimiento',   'color': Color(0xFF1a3a5c)},
   };
 
   List<Alerta> get _filtradas => _filtro == 'todos'
@@ -645,6 +646,7 @@ class _AlertasBodyState extends State<AlertasBody> {
     'anticipo_pagado':         {'label': 'Pagó',           'color': Color(0xFF059669)},
     'solicitud_en_linea':      {'label': 'Solicitud',      'color': Color(0xFFC2560A)},
     'comision_hetna':          {'label': 'Comisión',       'color': Color(0xFF6b7280)},
+    'mantenimiento':           {'label': 'Mantenimiento',  'color': Color(0xFF1a3a5c)},
   };
 
   List<Alerta> get _filtradas => _filtro == 'todos'
