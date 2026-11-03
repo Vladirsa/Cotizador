@@ -27,6 +27,8 @@ dependencies:
   file_picker: ^8.0.0
   share_plus: ^9.0.0
   url_launcher: ^6.2.0
+  # Código QR de la página del cotizador en línea
+  qr_flutter: ^4.1.0
   http: ^1.2.0
   flutter_local_notifications: ^17.0.0
   shared_preferences: ^2.2.3
