@@ -274,6 +274,10 @@ class Cotizacion {
   double? anticipoMonto;
   final double anticipoPagado;
   final String anticipoEstado; // pendiente | pagado | sin_anticipo
+  // Fase 3: 'en_linea' si llegó por la página del taller (hetnacnc.com/t/...)
+  final String? origen;
+  final String? archivoRuta;   // en el bucket privado "solicitudes"
+  final String? archivoNombre;
   // 'sencilla' (la de siempre) o 'profesional' (formato internacional).
   String tipo;
   // Datos técnicos de la cotización profesional (proyecto, alcance,
@@ -286,6 +290,7 @@ class Cotizacion {
   String? get ligaPublica =>
     (tokenPublico == null || tokenPublico!.isEmpty) ? null : 'https://hetnacnc.com/c/$tokenPublico';
   bool get anticipoPagadoCompleto => anticipoEstado == 'pagado';
+  bool get esEnLinea => origen == 'en_linea';
 
   Cotizacion({
     this.id,
@@ -314,6 +319,9 @@ class Cotizacion {
     this.anticipoMonto,
     this.anticipoPagado = 0,
     this.anticipoEstado = 'pendiente',
+    this.origen,
+    this.archivoRuta,
+    this.archivoNombre,
     this.tipo = 'sencilla',
     Map<String, dynamic>? datosPro,
   }) : datosPro = datosPro ?? {};
@@ -330,6 +338,7 @@ class Cotizacion {
     pdfUrl: pdfUrl, createdAt: createdAt, totalBd: totalBd,
     tokenPublico: tokenPublico, ligaVistaEn: ligaVistaEn, aceptadaEn: aceptadaEn, aceptadaPor: aceptadaPor,
     anticipoMonto: anticipoMonto, anticipoPagado: anticipoPagado, anticipoEstado: anticipoEstado,
+    origen: origen, archivoRuta: archivoRuta, archivoNombre: archivoNombre,
     tipo: tipo, datosPro: datosPro);
 
   double get subtotal => items.fold(0, (s, i) => s + i.subtotal);
@@ -390,6 +399,9 @@ class Cotizacion {
       anticipoMonto: (json['anticipo_monto'] as num?)?.toDouble(),
       anticipoPagado: (json['anticipo_pagado'] as num?)?.toDouble() ?? 0,
       anticipoEstado: (json['anticipo_estado'] as String?) ?? 'pendiente',
+      origen: json['origen'] as String?,
+      archivoRuta: json['archivo_ruta'] as String?,
+      archivoNombre: json['archivo_nombre'] as String?,
       tipo: (json['tipo'] as String?) ?? 'sencilla',
       datosPro: json['datos_pro'] is Map
           ? Map<String, dynamic>.from(json['datos_pro'] as Map) : null,
