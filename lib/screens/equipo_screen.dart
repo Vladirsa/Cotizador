@@ -243,7 +243,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
       ]));
   }
 
-  // ── Mi perfil ──────────────────────────────────────────
+  // ── Mi perfil ──────────────────────────────────────
   Widget _cardMiPerfil() {
     final nombre = AuthService.nombreUsuario ?? tr('Usuario');
     final rol = AuthService.rol ?? '';
@@ -281,7 +281,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
       ]));
   }
 
-  // ── Card usuario ─────────────────────────────────────────────
+  // ── Card usuario ──────────────────────────────────────
   Widget _cardUsuario(UsuarioNegocio u, bool esAdmin) {
     final esMismoUsuario = u.userId == AuthService.usuarioActual?.id;
     final color = u.rolColor(context);
@@ -375,7 +375,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         label: Text(tr('Invitar primer usuario'))),
     ]));
 
-  // ── Roles info ────────────────────────────────────────────
+  // ── Roles info ────────────────────────────────────────
   Widget _cardRolesInfo() {
     final roles = ['administrador', 'vendedor', 'operador_cnc', 'almacenista', 'contador'];
     return Container(
@@ -539,7 +539,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
   }
 
   // ── EDITAR PERFIL
-  // ── EDITAR PERFIL ───────────────────────────────────────────
+  // ── EDITAR PERFIL ──────────────────────────────────────
   void _editarPerfil(String nombreActual) {
     final ctrl = TextEditingController(text: nombreActual);
     showDialog(
@@ -571,7 +571,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         ]));
   }
 
-  // ── ACCIONES SOBRE USUARIO ──────────────────────────────
+  // ── ACCIONES SOBRE USUARIO ──────────────────────────
   void _accionUsuario(String accion, UsuarioNegocio u) async {
     if (accion == 'cambiar_rol') {
       _cambiarRol(u);
@@ -607,7 +607,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
     } catch (_) {}
   }
 
-  // ── CAMBIAR ROL ───────────────────────────────────────────────
+  // ── CAMBIAR ROL ───────────────────────────────────────
   void _cambiarRol(UsuarioNegocio u) {
     String rolSel = u.rol;
     showModalBottomSheet(
@@ -673,7 +673,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
           ]))));
   }
 
-  // ── HELPERS ────────────────────────────────────────────────────
+  // ── HELPERS ───────────────────────────────────────────────
   Widget _avatar(String nombre, Color color, {double size = 40}) {
     final inicial = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
     return Container(
