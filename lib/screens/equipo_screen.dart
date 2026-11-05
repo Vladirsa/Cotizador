@@ -673,7 +673,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
           ]))));
   }
 
-  // ── HELPERS ──────────────────────────────────────────
+  // ── HELPERS ─────────────────────────────────────────
   Widget _avatar(String nombre, Color color, {double size = 40}) {
     final inicial = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
     return Container(

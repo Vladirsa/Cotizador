@@ -588,7 +588,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     }
   }
 
-  // ── Guía de envío ──────────────────────────────────────────────────
+  // ── Guía de envío ────────────────────────────────────────────────
   static const _paqueterias = ['DHL', 'Estafeta', 'FedEx', 'Paquetexpress', 'UPS', '99 Minutos', 'J&T Express', 'Redpack', 'Castores', 'Tres Guerras', 'Otra'];
 
   Future<void> _editarGuia() async {
