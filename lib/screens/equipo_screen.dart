@@ -539,7 +539,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
   }
 
   // ── EDITAR PERFIL
-  // ── EDITAR PERFIL ──────────────────────────────────────
+  // ── EDITAR PERFIL ───────────────────────────────────
   void _editarPerfil(String nombreActual) {
     final ctrl = TextEditingController(text: nombreActual);
     showDialog(
@@ -607,7 +607,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
     } catch (_) {}
   }
 
-  // ── CAMBIAR ROL ───────────────────────────────────────
+  // ── CAMBIAR ROL ─────────────────────────────────────
   void _cambiarRol(UsuarioNegocio u) {
     String rolSel = u.rol;
     showModalBottomSheet(
@@ -673,7 +673,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
           ]))));
   }
 
-  // ── HELPERS ───────────────────────────────────────────────
+  // ── HELPERS ───────────────────────────────────────────
   Widget _avatar(String nombre, Color color, {double size = 40}) {
     final inicial = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
     return Container(
