@@ -281,7 +281,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
       ]));
   }
 
-  // ── Card usuario ──────────────────────────────────────
+  // ── Card usuario ────────────────────────────────────
   Widget _cardUsuario(UsuarioNegocio u, bool esAdmin) {
     final esMismoUsuario = u.userId == AuthService.usuarioActual?.id;
     final color = u.rolColor(context);
@@ -375,7 +375,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         label: Text(tr('Invitar primer usuario'))),
     ]));
 
-  // ── Roles info ────────────────────────────────────────
+  // ── Roles info ──────────────────────────────────────
   Widget _cardRolesInfo() {
     final roles = ['administrador', 'vendedor', 'operador_cnc', 'almacenista', 'contador'];
     return Container(
@@ -673,7 +673,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
           ]))));
   }
 
-  // ── HELPERS ───────────────────────────────────────────
+  // ── HELPERS ──────────────────────────────────────────
   Widget _avatar(String nombre, Color color, {double size = 40}) {
     final inicial = nombre.isNotEmpty ? nombre[0].toUpperCase() : '?';
     return Container(
