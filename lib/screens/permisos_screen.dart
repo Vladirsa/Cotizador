@@ -20,7 +20,7 @@ class _PermisosScreenState extends State<PermisosScreen> {
   final _etiquetasRol = {
     'vendedor': '💼 Vendedor',
     'operador_cnc': '⚙️ Operador CNC',
-    'almacenista': '📦 Almacenista',
+    'almacenista': '📦 Almacén y envíos',
     'contador': '🧮 Contador',
   };
 

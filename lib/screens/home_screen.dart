@@ -28,6 +28,7 @@ import 'reportes_screen.dart';
 import 'premium_screen.dart';
 import 'calculadora_cnc_screen.dart';
 import 'envios_screen.dart';
+import 'orden_qr_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/hetna_api.dart';
 import '../i18n/tr.dart';
@@ -192,6 +193,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.w700))),
           ],
         ])),
+      _dPush(Icons.qr_code_scanner, tr('Escanear orden'), const LectorOrdenScreen()),
+      const Divider(height: 1),
       _dItem(Icons.people_outline,         tr('CRM Clientes'),        5, modulo: 'clientes'),
       _dItem(Icons.inventory_2_outlined,   tr('Productos y Catálogo'),6, modulo: 'productos'),
       _dItem(Icons.warehouse_outlined,     tr('Inventario Bodega'),   7, plan: 'inventario', modulo: 'inventario'),

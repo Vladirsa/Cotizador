@@ -21,6 +21,7 @@ import 'screens/home_screen.dart';
 import 'screens/nueva_password_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/pedido_publico_screen.dart';
+import 'screens/orden_qr_screen.dart';
 import 'services/auth_service.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'i18n/tr.dart';
@@ -121,6 +122,12 @@ class HetnaCncApp extends StatelessWidget {
         if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'pedido') {
           final slug = uri.pathSegments[1];
           return MaterialPageRoute(builder: (_) => PedidoPublicoScreen(slug: slug));
+        }
+        // QR de la hoja de orden leído con la cámara del teléfono:
+        // /orden/{id-del-pedido} abre la orden (pide entrar si no hay sesión)
+        if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'orden') {
+          final id = uri.pathSegments[1];
+          return MaterialPageRoute(builder: (_) => OrdenScreen(pedidoId: id));
         }
         return null;
       },
