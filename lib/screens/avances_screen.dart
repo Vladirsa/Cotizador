@@ -9,6 +9,7 @@ import '../services/auth_service.dart';
 import 'factura_screen.dart';
 import 'costo_real_screen.dart';
 import 'envios_screen.dart';
+import 'orden_qr_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../i18n/tr.dart';
@@ -111,7 +112,14 @@ class _AvancesScreenState extends State<AvancesScreen> {
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(title: Text(tr('Avances de pedidos')),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)]),
+        actions: [
+          IconButton(tooltip: tr('Escanear orden'), icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const LectorOrdenScreen()));
+              _cargar();
+            }),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar),
+        ]),
       body: Column(children: [
         // Búsqueda por nombre/folio + filtro de fechas
         Container(color: Colors.white,
@@ -415,6 +423,17 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             ],
           ]),
         ],
+        // Orden de trabajo con QR: se imprime y viaja con la pieza
+        if (!_cancelado && widget.pedido.id != null) ...[
+          const SizedBox(height: 6),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => QrOrdenScreen(pedidoId: widget.pedido.id!, folio: widget.pedido.folio))),
+            icon: const Icon(Icons.qr_code_2, size: 14),
+            label: Text(tr('QR y hoja de orden'), style: const TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+              side: const BorderSide(color: AppColors.grisBorde), padding: const EdgeInsets.symmetric(vertical: 7)))),
+        ],
         const SizedBox(height: 6),
         // Costo real y utilidad del pedido (Fase 4)
         if (!_cancelado && widget.pedido.id != null)
@@ -569,7 +588,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     }
   }
 
-  // ── Guía de envío ────────────────────────────────────────────────
+  // ── Guía de envío ──────────────────────────────────────────────────
   static const _paqueterias = ['DHL', 'Estafeta', 'FedEx', 'Paquetexpress', 'UPS', '99 Minutos', 'J&T Express', 'Redpack', 'Castores', 'Tres Guerras', 'Otra'];
 
   Future<void> _editarGuia() async {
