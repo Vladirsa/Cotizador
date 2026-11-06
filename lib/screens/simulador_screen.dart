@@ -202,6 +202,9 @@ class ResultadoSimulador {
   final Map<String, double> costosDesglose;
   final bool incluyeIva;
   final String? materialNombre;
+  // Material de la bodega (para descontarlo al maquinar) y unidades usadas
+  final String? materialId;
+  final double materialUnidades;
   // Para compatibilidad con cotizacion
   final double maquila, extras, acabado, costoMaterial;
 
@@ -215,7 +218,7 @@ class ResultadoSimulador {
     required this.cm, required this.cmo, required this.cmaq,
     required this.cc, required this.ca, required this.ci,
     required this.costosDesglose, this.incluyeIva = false,
-    this.materialNombre, this.maquila = 0, this.extras = 0,
+    this.materialNombre, this.materialId, this.materialUnidades = 0, this.maquila = 0, this.extras = 0,
     this.acabado = 0, this.costoMaterial = 0,
     this.precioTarifa = 0, this.precioCosto = 0});
 }
@@ -911,6 +914,8 @@ class MotorCalculo {
       },
       incluyeIva: aplicarIva,
       materialNombre: materialNombre,
+      materialId: usarInventario && materialInv != null ? materialInv['id'] as String? : null,
+      materialUnidades: usarInventario && materialInv != null ? cantidad.toDouble() : 0,
       maquila: baseRec, costoMaterial: cm, acabado: ca, extras: extrasTotal,
       precioTarifa: precioTarifa, precioCosto: precioCosto);
   }
@@ -1390,7 +1395,9 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       final inv = await SimuladorDataService.getMaterialesInventario();
       final costos = await SimuladorDataService.getCostosTaller();
       if (mounted) setState(() {
-        _config = cfg; _costosTaller = costos; _materialesInv = inv;
+        _config = cfg; _costosTaller = costos;
+        // Retazos primero: lo que ya se pagó se usa antes que una hoja nueva
+        _materialesInv = [...inv.where((m) => m['es_retazo'] == true), ...inv.where((m) => m['es_retazo'] != true)];
         _cargando = false;
         if (widget.geoInicial != null) { _geoOriginal = widget.geoInicial; _aplicarGeo(widget.geoInicial!); }
         if (cfg.tipos.isNotEmpty) _tipoSel = cfg.tipos.first;
@@ -3212,6 +3219,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
               ..._materialesInv.map((m) => DropdownMenuItem<String>(
                 value: m['id'] as String,
                 child: Row(children: [
+                  if (m['es_retazo'] == true) const Padding(padding: EdgeInsets.only(right: 4), child: Icon(Icons.content_cut, size: 12, color: AppColors.ambar)),
                   Expanded(child: Text(tr(m['nombre'] ?? ''), style: const TextStyle(fontSize: 13),
                     overflow: TextOverflow.ellipsis)),
                   Text('\$${((m['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}',
@@ -3538,7 +3546,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       tiempoHoras: r.tiempoHoras,
       cm: r.cm, cmo: r.cmo, cmaq: r.cmaq, cc: r.cc, ca: r.ca, ci: r.ci,
       costosDesglose: r.costosDesglose, incluyeIva: r.incluyeIva,
-      materialNombre: r.materialNombre, maquila: precio,
+      materialNombre: r.materialNombre, materialId: r.materialId, materialUnidades: r.materialUnidades, maquila: precio,
       costoMaterial: r.cm, acabado: r.ca, extras: r.extras);
   }
 
