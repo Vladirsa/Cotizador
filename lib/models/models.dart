@@ -18,6 +18,10 @@ class Cliente {
   final String tipoCliente;
   final String? notas;
   final DateTime? createdAt;
+  // CRM con seguimiento (supabase/crm_seguimiento.sql)
+  final String? proximoPaso;
+  final DateTime? proximoPasoFecha;
+  final DateTime? ultimoContacto;
 
   Cliente({
     this.id,
@@ -34,6 +38,9 @@ class Cliente {
     this.tipoCliente = 'Cliente potencial',
     this.notas,
     this.createdAt,
+    this.proximoPaso,
+    this.proximoPasoFecha,
+    this.ultimoContacto,
   });
 
   factory Cliente.fromJson(Map<String, dynamic> json) => Cliente(
@@ -51,6 +58,9 @@ class Cliente {
         tipoCliente: json['tipo_cliente'] ?? 'Cliente potencial',
         notas: json['notas'],
         createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
+        proximoPaso: json['proximo_paso'] as String?,
+        proximoPasoFecha: json['proximo_paso_fecha'] != null ? DateTime.tryParse(json['proximo_paso_fecha'].toString()) : null,
+        ultimoContacto: json['ultimo_contacto'] != null ? DateTime.tryParse(json['ultimo_contacto'].toString())?.toLocal() : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -278,6 +288,8 @@ class Cotizacion {
   final String? origen;
   final String? archivoRuta;   // en el bucket privado "solicitudes"
   final String? archivoNombre;
+  final DateTime? updatedAt;
+  final String? motivoPerdida; // CRM: por qué se perdió (Rechazada/Vencida)
   // 'sencilla' (la de siempre) o 'profesional' (formato internacional).
   String tipo;
   // Datos técnicos de la cotización profesional (proyecto, alcance,
@@ -322,6 +334,8 @@ class Cotizacion {
     this.origen,
     this.archivoRuta,
     this.archivoNombre,
+    this.updatedAt,
+    this.motivoPerdida,
     this.tipo = 'sencilla',
     Map<String, dynamic>? datosPro,
   }) : datosPro = datosPro ?? {};
@@ -402,6 +416,8 @@ class Cotizacion {
       origen: json['origen'] as String?,
       archivoRuta: json['archivo_ruta'] as String?,
       archivoNombre: json['archivo_nombre'] as String?,
+      updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
+      motivoPerdida: json['motivo_perdida'] as String?,
       tipo: (json['tipo'] as String?) ?? 'sencilla',
       datosPro: json['datos_pro'] is Map
           ? Map<String, dynamic>.from(json['datos_pro'] as Map) : null,
