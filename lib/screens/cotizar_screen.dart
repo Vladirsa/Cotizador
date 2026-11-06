@@ -14,6 +14,8 @@ import 'package:file_picker/file_picker.dart';
 import '../services/archivo_cad_service.dart';
 import 'simulador_screen.dart';
 import 'envios_screen.dart';
+import 'crm_seguimiento_screen.dart';
+import '../services/crm_service.dart';
 import '../services/auth_service.dart';
 import '../i18n/tr.dart';
 
@@ -253,7 +255,9 @@ class _TarjetaCotizacion extends StatelessWidget {
             const SizedBox(height: 4),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(tr(cotizacion.estado), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+              child: Text(cotizacion.motivoPerdida != null
+                  ? '${tr(cotizacion.estado)} · ${tr(CrmService.motivosPerdida[cotizacion.motivoPerdida!] ?? cotizacion.motivoPerdida!)}'
+                  : tr(cotizacion.estado), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
             if (cotizacion.esEnLinea)
               Padding(padding: const EdgeInsets.only(top: 4), child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -295,13 +299,23 @@ class _TarjetaCotizacion extends StatelessWidget {
                     backgroundColor: const Color(0xFF185fa5),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                   child: Text(tr('→ Enviada'), style: TextStyle(fontSize: 11, color: Colors.white))),
-              if (cotizacion.estado == 'Enviada')
+              if (cotizacion.estado == 'Enviada') ...[
                 Expanded(child: ElevatedButton(
                   onPressed: () => _cambiarEstado(context, 'Aprobada'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1d9e75),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                   child: Text(tr('→ Aprobada'), style: TextStyle(fontSize: 11, color: Colors.white)))),
+                const SizedBox(width: 6),
+                // CRM: se perdió, con motivo (alimenta el embudo)
+                OutlinedButton(
+                  onPressed: () async {
+                    if (await dialogoPerdida(context, cotizacion)) onActualizar();
+                  },
+                  style: OutlinedButton.styleFrom(foregroundColor: AppColors.rojo, side: const BorderSide(color: AppColors.rojo),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                  child: Text(tr('Se perdió'), style: const TextStyle(fontSize: 11))),
+              ],
               if (cotizacion.estado == 'Aprobada')
                 Expanded(child: ElevatedButton(
                   onPressed: () => _convertirPedido(context),
@@ -856,6 +870,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             cantidad: 1,
             precioUnitario: sv.total,
             sku: sv.servicio,
+            materialId: sv.materialId as String?,
+            materialCantidad: (sv.materialUnidades as num?)?.toDouble(),
           ));
         } catch (e) {
           print('Error simulador: $e');
