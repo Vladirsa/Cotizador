@@ -198,6 +198,10 @@ class Producto {
 class CotizacionItem {
   final String? id;
   final String? productoId;
+  // Inventario conectado: material de la bodega que usa esta partida y
+  // cuántas unidades (hojas, kg). Lo llena el simulador.
+  final String? materialId;
+  final double? materialCantidad;
   String nombreProducto;
   String? descripcion;
   final String? sku;
@@ -208,6 +212,8 @@ class CotizacionItem {
   CotizacionItem({
     this.id,
     this.productoId,
+    this.materialId,
+    this.materialCantidad,
     required this.nombreProducto,
     this.descripcion,
     this.sku,
@@ -232,6 +238,8 @@ class CotizacionItem {
   factory CotizacionItem.fromJson(Map<String, dynamic> json) => CotizacionItem(
         id: json['id'],
         productoId: json['producto_id'],
+        materialId: json['material_id'],
+        materialCantidad: (json['material_cantidad'] as num?)?.toDouble(),
         nombreProducto: json['nombre_producto'] ?? '',
         descripcion: json['descripcion'],
         sku: json['sku'],
@@ -244,6 +252,8 @@ class CotizacionItem {
         if (id != null) 'id': id,
         'cotizacion_id': cotizacionId,
         'producto_id': productoId,
+        if (materialId != null) 'material_id': materialId,
+        if (materialId != null) 'material_cantidad': materialCantidad,
         'nombre_producto': nombreProducto,
         'descripcion': descripcion,
         'sku': sku,
