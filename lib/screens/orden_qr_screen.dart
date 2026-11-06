@@ -19,6 +19,7 @@ import '../services/orden_service.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
 import '../i18n/tr.dart';
+import 'descontar_material_sheet.dart';
 
 const _ordenEtapas = ['Pedido', 'Pago50', 'Produccion', 'Pruebas', 'PagoCompleto', 'Entrega', 'Entregado'];
 const _colores = {
@@ -334,6 +335,9 @@ class _OrdenScreenState extends State<OrdenScreen> {
     try {
       if (a.etapa != null) {
         await OrdenService.mover(p.id!, a.etapa!, nota: nota);
+        // Inventario conectado a la orden
+        if (a.etapa == 'Produccion' && mounted) await descontarMaterialSheet(context, pedidoId: p.id!, folio: p.folio);
+        if (a.etapa == 'Pruebas' && mounted) await retazoSheet(context, folio: p.folio);
       } else if (a.pideGuia) {
         await OrdenService.registrar(p.id!, p.estado, tr('Guía de envío actualizada'));
       }

@@ -10,6 +10,7 @@ import 'factura_screen.dart';
 import 'costo_real_screen.dart';
 import 'envios_screen.dart';
 import 'orden_qr_screen.dart';
+import 'descontar_material_sheet.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../i18n/tr.dart';
@@ -578,6 +579,10 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     setState(() => _cambiando = true);
     try {
       await SupabaseService.actualizarEtapaPedido(widget.pedido.id!, nueva);
+      // Inventario conectado: al entrar a producción sale el material; al
+      // terminar (control de calidad) se puede guardar el retazo
+      if (nueva == 'Produccion' && mounted) await descontarMaterialSheet(context, pedidoId: widget.pedido.id!, folio: widget.pedido.folio);
+      if (nueva == 'Pruebas' && mounted) await retazoSheet(context, folio: widget.pedido.folio);
       widget.onActualizar();
       // Sin notificación automática por ahora — usa el botón manual
       // "Notificar WA" cuando quieras avisarle al cliente.
@@ -588,7 +593,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     }
   }
 
-  // ── Guía de envío ────────────────────────────────────────────────
+  // ── Guía de envío ─────────────────────────────────────────────────
   static const _paqueterias = ['DHL', 'Estafeta', 'FedEx', 'Paquetexpress', 'UPS', '99 Minutos', 'J&T Express', 'Redpack', 'Castores', 'Tres Guerras', 'Otra'];
 
   Future<void> _editarGuia() async {
@@ -660,7 +665,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     }
   }
 
-  // ── Liga de seguimiento ─────────────────────────────────────────
+  // ── Liga de seguimiento ───────────────────────────────────────────────
   Future<void> _compartirSeguimiento() async {
     final liga = await SupabaseService.ligaSeguimiento(widget.pedido.cotizacionId!);
     if (!mounted) return;
