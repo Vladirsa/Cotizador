@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'crm_seguimiento_screen.dart';
 import '../services/supabase_service.dart';
 import '../main.dart';
 import '../models/models.dart';
@@ -27,7 +28,7 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
     _cargar();
   }
 
@@ -62,15 +63,23 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
       backgroundColor: AppColors.gris,
       appBar: AppBar(
         title: Text(tr('CRM Clientes')),
+        actions: [
+          IconButton(tooltip: tr('Importar de Excel o CSV'), icon: const Icon(Icons.upload_file_outlined),
+            onPressed: () async {
+              final r = await Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportarClientesScreen()));
+              if (r == true) _cargar();
+            }),
+        ],
         bottom: TabBar(
           controller: _tabs,
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
-          tabs: [Tab(text: tr('Clientes')), Tab(text: tr('Nuevo cliente'))],
+          tabs: [Tab(text: tr('Hoy')), Tab(text: tr('Clientes')), Tab(text: tr('Nuevo cliente'))],
         ),
       ),
       body: TabBarView(controller: _tabs, children: [
+        const SeguimientoBody(),
         _listaClientes(),
         _formNuevoCliente(),
       ]),
@@ -120,7 +129,7 @@ class _ClientesScreenState extends State<ClientesScreen> with SingleTickerProvid
   Widget _formNuevoCliente() => _FormCliente(
     onGuardado: () {
       _cargar();
-      _tabs.animateTo(0);
+      _tabs.animateTo(1);
     },
   );
 
@@ -256,6 +265,9 @@ class _HistorialClienteScreenState extends State<HistorialClienteScreen>
       body: _cargando
         ? const Center(child: CircularProgressIndicator())
         : Column(children: [
+            // Seguimiento: último contacto, próximo paso y bitácora
+            if (widget.cliente.id != null) TarjetaCrmCliente(cliente: widget.cliente),
+            const Divider(height: 1),
             // KPIs del cliente
             Container(
               color: Colors.white,
