@@ -13,6 +13,8 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/archivo_cad_service.dart';
 import 'simulador_screen.dart';
+import '../simulador2/simulador2_screen.dart';
+import '../simulador2/simulador2_data.dart';
 import 'envios_screen.dart';
 import 'crm_seguimiento_screen.dart';
 import '../services/crm_service.dart';
@@ -636,14 +638,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // Abre el simulador con la pieza cargada; el precio elegido entra como partida
   Future<void> _calcularConSimulador() async {
     final g = _geoOriginal?.escalado(_escalaArchivo);
-    final r = await Navigator.push<ResultadoSimulador>(context, MaterialPageRoute(
-      builder: (_) => SimuladorScreen(geoInicial: g, seleccionar: true)));
+    final r = await Navigator.push<Partida2>(context, MaterialPageRoute(
+      builder: (_) => Simulador2Screen(geoInicial: g, seleccionar: true)));
     if (r == null || !mounted) return;
     final desc = r.descripcion;
     setState(() {
       _items.add(CotizacionItem(
         nombreProducto: '${r.emoji} ${r.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
-        cantidad: 1, precioUnitario: r.total, sku: null));
+        cantidad: r.cantidad, precioUnitario: r.precioUnitario, sku: null,
+        materialId: r.materialId, materialCantidad: r.materialUnidades > 0 ? r.materialUnidades : null,
+        tiempoMin: r.tiempoMin, maquinaId: r.maquinaId, tipoMaterial: r.tipoMaterial, espesorMm: r.espesorMm));
       if (_ctrlPro('proceso', '').text.trim().isEmpty) _ctrlPro('proceso', '').text = r.servicio;
       if (r.tiempoHoras > 0 && _ctrlPro('operaciones', '').text.trim().isEmpty) {
         _ctrlPro('operaciones', '').text = trf('Tiempo de máquina estimado: {0} h', [r.tiempoHoras.toStringAsFixed(1)]);
@@ -861,6 +865,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     }
     if (widget.carritoSimulador != null) {
       for (final sv in widget.carritoSimulador!) {
+        if (sv is Partida2) {
+          final desc = sv.descripcion;
+          _items.add(CotizacionItem(
+            nombreProducto: '${sv.emoji} ${sv.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
+            cantidad: sv.cantidad, precioUnitario: sv.precioUnitario, sku: sv.servicio,
+            materialId: sv.materialId, materialCantidad: sv.materialUnidades > 0 ? sv.materialUnidades : null,
+            tiempoMin: sv.tiempoMin, maquinaId: sv.maquinaId, tipoMaterial: sv.tipoMaterial, espesorMm: sv.espesorMm));
+          continue;
+        }
         try {
           final desc = sv.descripcion ?? '';
           final nombre = '${sv.emoji} ${sv.servicio}'
