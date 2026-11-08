@@ -27,6 +27,9 @@ class GeoCad {
   // Dibujo: polilíneas en mm, origen en (0,0), Y hacia arriba
   List<List<List<double>>> trazos;
   List<String> avisos;
+  // 3D: muestra de la malla para el visor (≤ 40,000 triángulos, 9 números
+  // cada uno, centrada en el origen). null en archivos 2D.
+  Float32List? malla;
 
   GeoCad({
     required this.nombre, required this.tipo, this.unidades = 'mm',
@@ -62,7 +65,14 @@ class GeoCad {
       areaSuperficialCm2: areaSuperficialCm2 * (fx * fy + fx * fz + fy * fz) / 3,
       trazos: trazos.map((p) => p.map((q) => [q[0] * fx, q[1] * fy]).toList()).toList(),
       avisos: [...avisos.where((a) => !a.startsWith('Escalado')), nota],
-    );
+    )..malla = _escalarMalla(malla, fx, fy, fz);
+  }
+
+  static Float32List? _escalarMalla(Float32List? m, double fx, double fy, double fz) {
+    if (m == null) return null;
+    final o = Float32List(m.length);
+    for (int i = 0; i + 2 < m.length; i += 3) { o[i] = m[i] * fx; o[i + 1] = m[i + 1] * fy; o[i + 2] = m[i + 2] * fz; }
+    return o;
   }
 
   // Lo que se guarda en datos_pro['archivo_info'] (jsonb)
@@ -748,6 +758,26 @@ class ArchivoCadService {
     // y varias curvas de nivel (como un plano topográfico): la pieza se
     // reconoce aunque tenga millones de triángulos.
     g.trazos = _curvasDeNivel(tris, minX, minY, minZ, maxX, maxY, maxZ);
+    g.malla = _muestraMalla(tris, (minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+  }
+
+  // Muestra uniforme de la malla, centrada, para dibujarla girando en el
+  // visor sin que un STL de 2 millones de triángulos trabe la pantalla.
+  static Float32List _muestraMalla(List<List<double>> tris, double cx, double cy, double cz) {
+    const maxTris = 40000;
+    final paso = tris.length <= maxTris ? 1 : (tris.length / maxTris).ceil();
+    final n = (tris.length / paso).ceil();
+    final out = Float32List(n * 9);
+    int k = 0;
+    for (int i = 0; i < tris.length && k + 9 <= out.length; i += paso) {
+      final t = tris[i];
+      for (int v = 0; v < 3; v++) {
+        out[k++] = t[v * 3] - cx;
+        out[k++] = t[v * 3 + 1] - cy;
+        out[k++] = t[v * 3 + 2] - cz;
+      }
+    }
+    return k == out.length ? out : Float32List.sublistView(out, 0, k);
   }
 
   // Mapa de alturas (Z máxima por celda) de la vista superior y curvas de
