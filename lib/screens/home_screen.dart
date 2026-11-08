@@ -21,6 +21,7 @@ import 'gastos_screen.dart';
 import 'marketing_screen.dart';
 import 'config_screen.dart';
 import 'simulador_screen.dart';
+import '../simulador2/simulador2_screen.dart';
 import 'agenda_screen.dart';
 import 'equipo_screen.dart';
 import 'permisos_screen.dart';
@@ -50,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _AlertasAgendaScreen(),
     CotizarScreen(),
     AvancesScreen(),
-    SimuladorScreen(),
+    Simulador2Screen(),
   ];
 
   Widget _pantallaExtra(int tab) {

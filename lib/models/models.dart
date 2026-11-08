@@ -202,6 +202,12 @@ class CotizacionItem {
   // cuántas unidades (hojas, kg). Lo llena el simulador.
   final String? materialId;
   final double? materialCantidad;
+  // Simulador 2.0: tiempo de máquina estimado por pieza (min), con qué
+  // máquina y material, para comparar con el tiempo real al maquinar
+  final double? tiempoMin;
+  final String? maquinaId;
+  final String? tipoMaterial;
+  final double? espesorMm;
   String nombreProducto;
   String? descripcion;
   final String? sku;
@@ -214,6 +220,10 @@ class CotizacionItem {
     this.productoId,
     this.materialId,
     this.materialCantidad,
+    this.tiempoMin,
+    this.maquinaId,
+    this.tipoMaterial,
+    this.espesorMm,
     required this.nombreProducto,
     this.descripcion,
     this.sku,
@@ -240,6 +250,10 @@ class CotizacionItem {
         productoId: json['producto_id'],
         materialId: json['material_id'],
         materialCantidad: (json['material_cantidad'] as num?)?.toDouble(),
+        tiempoMin: (json['tiempo_min'] as num?)?.toDouble(),
+        maquinaId: json['maquina_id'],
+        tipoMaterial: json['tipo_material'],
+        espesorMm: (json['espesor_mm'] as num?)?.toDouble(),
         nombreProducto: json['nombre_producto'] ?? '',
         descripcion: json['descripcion'],
         sku: json['sku'],
@@ -254,6 +268,10 @@ class CotizacionItem {
         'producto_id': productoId,
         if (materialId != null) 'material_id': materialId,
         if (materialId != null) 'material_cantidad': materialCantidad,
+        if (tiempoMin != null) 'tiempo_min': tiempoMin,
+        if (maquinaId != null) 'maquina_id': maquinaId,
+        if (tipoMaterial != null) 'tipo_material': tipoMaterial,
+        if (espesorMm != null) 'espesor_mm': espesorMm,
         'nombre_producto': nombreProducto,
         'descripcion': descripcion,
         'sku': sku,
