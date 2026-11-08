@@ -403,6 +403,12 @@ class SupabaseService {
       'total': cotizacion.total,
       'fecha_entrega_estimada': cotizacion.fechaEntrega?.toIso8601String().split('T')[0],
     }).select().single();
+    // Simulador 2.0: horas de máquina estimadas, para la fecha de entrega
+    // calculada y para compararlas con el tiempo real al maquinar
+    final minEst = cotizacion.items.fold(0.0, (s, i) => s + (i.tiempoMin ?? 0) * i.cantidad);
+    if (minEst > 0) {
+      try { await _db.from('pedidos').update({'tiempo_estimado_min': minEst}).eq('id', res['id']); } catch (_) {}
+    }
     return Pedido.fromJson(res as Map<String, dynamic>);
   }
 
