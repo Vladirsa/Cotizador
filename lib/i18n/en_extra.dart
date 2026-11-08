@@ -786,4 +786,10 @@ const Map<String, String> textosEnExtra = {
   'Sencillo (sólo contorno)': 'Simple (outline only)',
   'Normal': 'Normal',
   'Calado o celosía': 'Fretwork or lattice',
+  'Entrega: {0} (hay {1} h por delante en {2})': 'Delivery: {0} ({1} h ahead on {2})',
+  'Entrega: {0} (la máquina está libre)': 'Delivery: {0} (the machine is free)',
+  'Comparar máquinas': 'Compare machines',
+  'Sólo una de tus máquinas puede hacer este trabajo con este material.': 'Only one of your machines can do this job with this material.',
+  'ganas': 'you earn',
+  'Toca una máquina para cotizar con ella.': 'Tap a machine to quote with it.',
 };
