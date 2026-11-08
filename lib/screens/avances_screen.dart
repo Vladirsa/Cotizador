@@ -11,6 +11,7 @@ import 'costo_real_screen.dart';
 import 'envios_screen.dart';
 import 'orden_qr_screen.dart';
 import 'descontar_material_sheet.dart';
+import '../simulador2/aprender_tiempo_sheet.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../i18n/tr.dart';
@@ -582,6 +583,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
       // Inventario conectado: al entrar a producción sale el material; al
       // terminar (control de calidad) se puede guardar el retazo
       if (nueva == 'Produccion' && mounted) await descontarMaterialSheet(context, pedidoId: widget.pedido.id!, folio: widget.pedido.folio);
+      if (nueva == 'Pruebas' && mounted) await aprenderTiempoSheet(context, pedidoId: widget.pedido.id!, folio: widget.pedido.folio);
       if (nueva == 'Pruebas' && mounted) await retazoSheet(context, folio: widget.pedido.folio);
       widget.onActualizar();
       // Sin notificación automática por ahora — usa el botón manual
