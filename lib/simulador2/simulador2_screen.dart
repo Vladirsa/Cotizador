@@ -18,6 +18,7 @@ import 'simulador2_data.dart';
 import 'velocidades_hetna.dart';
 import 'visor_pieza.dart';
 import 'config_maquina_sheet.dart';
+import 'capacidad.dart';
 
 class Simulador2Screen extends StatefulWidget {
   // geoInicial: pieza ya leída (desde la cotización). seleccionar: al pasar a
@@ -58,8 +59,9 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   double? _margen; // null = el del taller
   double? _tiempoManual;
   Resultado2? _r;
-  bool _verDesglose = false, _verVolumen = false, _verHoja = false;
+  bool _verDesglose = false, _verVolumen = false, _verHoja = false, _verComparar = false;
   List<Map<String, dynamic>> _parecidos = [];
+  Entrega? _entrega;
 
   @override
   void initState() {
@@ -154,6 +156,14 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
       cantidad: _cantidad, margenPct: _margen, acabados: acs, rellenoPct: _relleno, tiempoMinManual: _tiempoManual);
     setState(() => _r = r);
     _buscarParecidos();
+    _calcularEntrega(r);
+  }
+
+  int _entregaSeq = 0;
+  Future<void> _calcularEntrega(Resultado2 r) async {
+    final seq = ++_entregaSeq;
+    final e = await Capacidad.fechaEntrega(horasEste: r.tiempoTotalMin / 60, maquinaId: _maq?.id);
+    if (mounted && seq == _entregaSeq) setState(() => _entrega = e);
   }
 
   Future<void> _buscarParecidos() async {
@@ -514,6 +524,14 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
           const Icon(Icons.schedule, size: 14, color: AppColors.textoSecundario), const SizedBox(width: 3),
           Text(h > 0 ? '$h h ${m.toString().padLeft(2, '0')} min' : '$m min', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
         ]),
+        if (_entrega != null) Padding(padding: const EdgeInsets.only(top: 4), child: Row(children: [
+          const Icon(Icons.event_available, size: 14, color: AppColors.textoSecundario), const SizedBox(width: 4),
+          Expanded(child: Text(
+            _entrega!.horasAdelante > 0.5
+              ? trf('Entrega: {0} (hay {1} h por delante en {2})', [_fechaLarga(_entrega!.fecha), _entrega!.horasAdelante.toStringAsFixed(0), _maq?.nombre ?? ''])
+              : trf('Entrega: {0} (la máquina está libre)', [_fechaLarga(_entrega!.fecha)]),
+            style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario))),
+        ])),
         if (bajoMin) Padding(padding: const EdgeInsets.only(top: 4), child: Text(trf('Abajo de tu margen mínimo ({0} %)', [_taller.margenMinPct.round()]), style: const TextStyle(fontSize: 11.5, color: AppColors.rojo, fontWeight: FontWeight.w600))),
         if (r.mercadoTotal > 0) Padding(padding: const EdgeInsets.only(top: 4), child: Row(children: [
           const Icon(Icons.storefront_outlined, size: 14, color: AppColors.textoSecundario), const SizedBox(width: 4),
@@ -603,6 +621,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
         const SizedBox(height: 4),
         Text(trf('Usas {0} hojas; compras {1}. Sobra un retazo de {2}×{3} mm que puedes guardar en la bodega al terminar el trabajo.', [an.hojasUsadas.toStringAsFixed(2), an.hojasCompra, an.retazoLargo.round(), an.retazoAncho.round()]), style: const TextStyle(fontSize: 11.5, color: AppColors.textoSecundario)),
       ])),
+      if (_maquinas.length > 1) _plegable(tr('Comparar máquinas'), _verComparar, () => setState(() => _verComparar = !_verComparar), _tablaComparar()),
       _plegable(tr('Precio por volumen'), _verVolumen, () => setState(() => _verVolumen = !_verVolumen), _tablaVolumen()),
       if (_parecidos.isNotEmpty) _plegable(trf('Ya cotizaste algo parecido ({0})', [_parecidos.length]), true, null, Column(children: [
         for (final p in _parecidos) Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [
@@ -616,6 +635,8 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     ];
   }
 
+  String _fechaLarga(DateTime d) { try { return DateFormat('EEE d MMM', localeFormato).format(d); } catch (_) { return '${d.day}/${d.month}'; } }
+
   String _fecha(dynamic iso) { try { return DateFormat('d MMM yy', localeFormato).format(DateTime.parse(iso.toString()).toLocal()); } catch (_) { return ''; } }
 
   String _comoMaterial(Resultado2 r) {
@@ -625,6 +646,38 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     if (m.porPeso) return '${r.unidadesMaterial.toStringAsFixed(2)} ${m.unidad} × ${_fmt.format(m.precio)} × $merma';
     if (m.esHoja) return '${r.unidadesMaterial.toStringAsFixed(2)} ${tr('hojas')} × ${_fmt.format(m.precio)} × $merma ${tr('merma')}';
     return '${r.unidadesMaterial.toStringAsFixed(0)} × ${_fmt.format(m.precio)}';
+  }
+
+  /// La misma pieza y material en cada máquina del taller que pueda hacerla.
+  Widget _tablaComparar() {
+    if (_pieza == null || _mat == null) return const SizedBox.shrink();
+    final acs = _acabados.where((a) => _acabSel.contains(a.id)).toList();
+    final filas = <(Maquina2, Servicio2, Resultado2)>[];
+    for (final m in _maquinas) {
+      final svs = serviciosDeMaquina(m.tipo);
+      final s = svs.contains(_servicio) ? _servicio : (svs.first);
+      // Sólo tiene sentido comparar el mismo tipo de trabajo
+      if (s != _servicio && !(_servicio == Servicio2.corte2D && s == Servicio2.corte2D)) continue;
+      final vel = Simulador2Data.velocidad(m, _mat!);
+      final r = calcular(servicio: s, pieza: _pieza!, maquina: m, material: _mat!, vel: vel, taller: _taller,
+        cantidad: _cantidad, margenPct: _margen, acabados: acs, rellenoPct: _relleno);
+      filas.add((m, s, r));
+    }
+    if (filas.length < 2) return Text(tr('Sólo una de tus máquinas puede hacer este trabajo con este material.'), style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario));
+    filas.sort((a, b) => a.$3.precioTotal.compareTo(b.$3.precioTotal));
+    return Column(children: [
+      for (final f in filas) InkWell(onTap: () { setState(() { _elegirMaquina(f.$1); _servicio = f.$2; }); _recalcular(); },
+        child: Padding(padding: const EdgeInsets.symmetric(vertical: 5), child: Row(children: [
+          Text(f.$1.emoji, style: const TextStyle(fontSize: 16)), const SizedBox(width: 6),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(f.$1.nombre, style: TextStyle(fontSize: 12.5, fontWeight: f.$1.id == _maq?.id ? FontWeight.w800 : FontWeight.w600)),
+            Text(f.$3.faltantes.isNotEmpty ? '${tr('Falta')}: ${f.$3.faltantes.first}' : '${(f.$3.tiempoTotalMin / 60).toStringAsFixed(1)} h · ${tr('ganas')} ${_fmt.format(f.$3.utilidad)}',
+              style: TextStyle(fontSize: 10.5, color: f.$3.faltantes.isNotEmpty ? AppColors.naranja : AppColors.textoSecundario)),
+          ])),
+          Text(f.$3.faltantes.isNotEmpty ? '—' : _fmt.format(f.$3.precioTotal), style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: f.$1.id == _maq?.id ? AppColors.azul : AppColors.textoPrincipal)),
+        ]))),
+      Text(tr('Toca una máquina para cotizar con ella.'), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+    ]);
   }
 
   Widget _tablaVolumen() {
