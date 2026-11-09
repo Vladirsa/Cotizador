@@ -47,8 +47,21 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   bool _aMano = false;
   final _largoC = TextEditingController(), _anchoC = TextEditingController(), _altoC = TextEditingController();
   String _complejidad = 'normal';
+  String _tipo = 'router'; // tipo de máquina/servicio elegido (chips)
   Maquina2? _maq;
   Servicio2 _servicio = Servicio2.corte2D;
+
+  // Si el taller no tiene máquina de ese tipo, se cotiza con una de referencia
+  // HETNA ($/h típico en México) para que todos los servicios estén siempre.
+  static const _costoRef = {'router': 350.0, 'laser_co2': 320.0, 'plasma': 480.0, 'laser_fibra': 950.0, 'router_3d': 350.0, 'impresora_3d': 60.0, 'torno': 450.0, 'otro': 350.0};
+  static bool esReferencia(Maquina2 m) => m.id.startsWith('ref_');
+  Maquina2 _referencia(String tipo) => Maquina2(id: 'ref_$tipo', nombre: tr('Máquina de referencia HETNA'), tipo: tipo,
+    emoji: emojiTipoMaquina[tipo] ?? '⚙️', costoHora: _costoRef[tipo] ?? 350, preparacionMin: tipo == 'impresora_3d' ? 5 : tipo.startsWith('laser') ? 8 : 15,
+    perforacionSeg: tipo == 'router' ? 2 : tipo.startsWith('laser') ? 0.5 : 1.5, remocionCm3Min: 15, impresionCm3H: 12);
+  List<Maquina2> _maquinasDeTipo(String tipo) {
+    final l = _maquinas.where((m) => m.tipo == tipo).toList();
+    return l.isEmpty ? [_referencia(tipo)] : l;
+  }
   Material2? _mat;
   int _cantidad = 1;
   final _cantC = TextEditingController(text: '1');
@@ -88,7 +101,8 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
       _materiales = res[1] as List<Material2>;
       _acabados = res[2] as List<Acabado2>;
       _margen ??= t.margenPct;
-      if (_maq == null && _maquinas.isNotEmpty) _elegirMaquina(_maquinas.first);
+      if (_maq == null) { if (_maquinas.isNotEmpty) _tipo = _maquinas.first.tipo; _elegirMaquina(_maquinasDeTipo(_tipo).first); }
+      else if (!esReferencia(_maq!)) { final id = _maq!.id; _maq = _maquinas.firstWhere((m) => m.id == id, orElse: () => _maq!); }
       _cargando = false;
     });
     _recalcular();
@@ -96,6 +110,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
 
   void _elegirMaquina(Maquina2 m) {
     _maq = m;
+    _tipo = m.tipo;
     final svs = serviciosDeMaquina(m.tipo);
     if (!svs.contains(_servicio)) _servicio = svs.first;
     if (_pieza?.es3D == true && svs.contains(Servicio2.relieve3D) && m.tipo != 'impresora_3d') _servicio = Servicio2.relieve3D;
@@ -162,7 +177,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   int _entregaSeq = 0;
   Future<void> _calcularEntrega(Resultado2 r) async {
     final seq = ++_entregaSeq;
-    final e = await Capacidad.fechaEntrega(horasEste: r.tiempoTotalMin / 60, maquinaId: _maq?.id);
+    final e = await Capacidad.fechaEntrega(horasEste: r.tiempoTotalMin / 60, maquinaId: _maq == null || esReferencia(_maq!) ? null : _maq!.id);
     if (mounted && seq == _entregaSeq) setState(() => _entrega = e);
   }
 
@@ -182,7 +197,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
       emoji: _maq!.emoji, servicio: '${nombreServicio2(_servicio)} · ${_maq!.nombre}',
       descripcion: '${_pieza!.nombre} · ${_mat!.nombre}${_acabSel.isNotEmpty ? ' · ${_acabados.where((a) => _acabSel.contains(a.id)).map((a) => a.nombre).join(', ')}' : ''}',
       cantidad: r.cantidad, precioUnitario: r.precioPieza, total: r.precioTotal, costoTotal: r.costoTotal,
-      tiempoMin: r.tiempoMaquinaMinPieza, materialId: _mat!.id, maquinaId: _maq!.id, tipoMaterial: _mat!.tipo,
+      tiempoMin: r.tiempoMaquinaMinPieza, materialId: _mat!.id, maquinaId: esReferencia(_maq!) ? null : _maq!.id, tipoMaterial: _mat!.tipo,
       materialUnidades: r.unidadesMaterial, espesorMm: _mat!.espesorMm);
     Simulador2Data.guardarHistorial(r: r, pieza: _pieza!, maq: _maq!, mat: _mat!);
     if (widget.seleccionar) { Navigator.pop(context, partida); return; }
@@ -294,23 +309,36 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     decoration: InputDecoration(labelText: label, suffixText: suf, isDense: true, border: const OutlineInputBorder()),
     onChanged: (_) => _recalcular());
 
-  // ── 2. Máquina ──
+  // ── 2. Servicio y máquina ──
   Widget _campoMaquina() {
-    if (_maquinas.isEmpty) return Text(tr('Sin máquinas registradas.'), style: const TextStyle(fontSize: 12.5, color: AppColors.textoSecundario));
     final svs = _maq == null ? <Servicio2>[] : serviciosDeMaquina(_maq!.tipo);
+    final deTipo = _maquinasDeTipo(_tipo);
+    final virtual = _maq != null && esReferencia(_maq!);
+    const tipos = ['router', 'laser_co2', 'plasma', 'laser_fibra', 'router_3d', 'impresora_3d', 'torno'];
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Wrap(spacing: 6, runSpacing: 4, children: [
+        for (final t in tipos) ChoiceChip(
+          label: Text('${emojiTipoMaquina[t]} ${tr(nombresTipoMaquina[t]!)}', style: const TextStyle(fontSize: 12)),
+          selected: _tipo == t,
+          onSelected: (_) { setState(() { _tipo = t; _elegirMaquina(_maquinasDeTipo(t).first); _tiempoManual = null; if (_aMano) _piezaAMano(); }); _recalcular(); }),
+      ]),
+      const SizedBox(height: 8),
       Row(children: [
         Expanded(child: DropdownButtonFormField<String>(
           value: _maq?.id, isExpanded: true,
           decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-          items: _maquinas.map((m) => DropdownMenuItem(value: m.id, child: Text('${m.emoji} ${m.nombre} · ${_fmt.format(m.costoHora)}/h', style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: (id) { setState(() => _elegirMaquina(_maquinas.firstWhere((m) => m.id == id))); _recalcular(); })),
-        IconButton(tooltip: tr('Mesa, preparación y velocidades'), icon: const Icon(Icons.settings_outlined, color: AppColors.azul),
-          onPressed: _maq == null ? null : () async {
+          items: deTipo.map((m) => DropdownMenuItem(value: m.id, child: Text('${m.emoji} ${m.nombre} · ${_fmt.format(m.costoHora)}/h', style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis))).toList(),
+          onChanged: (id) { setState(() => _elegirMaquina(deTipo.firstWhere((m) => m.id == id))); _recalcular(); })),
+        IconButton(tooltip: virtual ? tr('Registra tu máquina en Costos del taller') : tr('Mesa, preparación y velocidades'),
+          icon: Icon(Icons.settings_outlined, color: virtual ? AppColors.textoSecundario : AppColors.azul),
+          onPressed: _maq == null ? null : virtual ? _configTaller : () async {
             await configMaquinaSheet(context, maquina: _maq!, materiales: _materiales);
             await _cargar();
           }),
       ]),
+      if (virtual) Padding(padding: const EdgeInsets.only(top: 4), child: Text(
+        tr('No tienes una máquina de este tipo registrada: se usa un costo por hora de referencia. Regístrala en Costos del taller para cotizar con tu costo real.'),
+        style: const TextStyle(fontSize: 11, color: AppColors.naranja))),
       if (svs.length > 1) Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 6, children: [
         for (final s in svs) ChoiceChip(label: Text(tr(nombreServicio2(s)), style: const TextStyle(fontSize: 12)), selected: _servicio == s,
           onSelected: (_) { setState(() { _servicio = s; _tiempoManual = null; if (_aMano) _piezaAMano(); }); _recalcular(); }),
@@ -371,6 +399,10 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
 
   Future<void> _editarVelocidad() async {
     if (_maq == null || _mat == null) return;
+    if (esReferencia(_maq!)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Para guardar velocidades primero registra tu máquina en Costos del taller.')), backgroundColor: AppColors.naranja));
+      return;
+    }
     final v = await editarVelocidadSheet(context, maquina: _maq!, material: _mat!, servicio: _servicio, actual: _vel);
     if (v == true) { await Simulador2Data.cargarVelocidades(); _recalcular(); }
   }
@@ -578,7 +610,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     if (min == null || min <= 0) return;
     // Si se guarda, la velocidad se recalcula para que dé ese tiempo y el
     // ajuste manual ya no hace falta
-    if (guardar && _servicio == Servicio2.corte2D && _pieza != null) {
+    if (guardar && _servicio == Servicio2.corte2D && _pieza != null && !esReferencia(_maq!)) {
       final perf = _pieza!.perforaciones * _maq!.perforacionSeg / 60;
       final corteMin = min - perf;
       if (corteMin > 0 && _pieza!.metrosCorte > 0) {
