@@ -1,8 +1,10 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
@@ -12,7 +14,11 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/archivo_cad_service.dart';
 import 'simulador_screen.dart';
+import '../simulador2/simulador2_screen.dart';
+import '../simulador2/simulador2_data.dart';
 import 'envios_screen.dart';
+import 'crm_seguimiento_screen.dart';
+import '../services/crm_service.dart';
 import '../services/auth_service.dart';
 import '../i18n/tr.dart';
 
@@ -239,11 +245,8 @@ class _TarjetaCotizacion extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(color: color, width: 4),
-          top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5),
+        boxShadow: [BoxShadow(color: color, offset: const Offset(-4, 0))]),
       child: Column(children: [
         Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), child: Row(children: [
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -255,7 +258,15 @@ class _TarjetaCotizacion extends StatelessWidget {
             const SizedBox(height: 4),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-              child: Text(tr(cotizacion.estado), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+              child: Text(cotizacion.motivoPerdida != null
+                  ? '${tr(cotizacion.estado)} · ${tr(CrmService.motivosPerdida[cotizacion.motivoPerdida!] ?? cotizacion.motivoPerdida!)}'
+                  : tr(cotizacion.estado), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600))),
+            if (cotizacion.esEnLinea)
+              Padding(padding: const EdgeInsets.only(top: 4), child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: const Color(0xFFFFF4EA), borderRadius: BorderRadius.circular(20)),
+                child: Text(tr('🌐 Llegó por tu página'), style: const TextStyle(fontSize: 10, color: Color(0xFFC2560A), fontWeight: FontWeight.w700)))),
+            _seguimientoLiga(cotizacion),
           ])),
           Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
             Text(tr(monto > 0 ? fmt.format(monto) : tr('Sin monto')),
@@ -291,13 +302,23 @@ class _TarjetaCotizacion extends StatelessWidget {
                     backgroundColor: const Color(0xFF185fa5),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                   child: Text(tr('→ Enviada'), style: TextStyle(fontSize: 11, color: Colors.white))),
-              if (cotizacion.estado == 'Enviada')
+              if (cotizacion.estado == 'Enviada') ...[
                 Expanded(child: ElevatedButton(
                   onPressed: () => _cambiarEstado(context, 'Aprobada'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF1d9e75),
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
                   child: Text(tr('→ Aprobada'), style: TextStyle(fontSize: 11, color: Colors.white)))),
+                const SizedBox(width: 6),
+                // CRM: se perdió, con motivo (alimenta el embudo)
+                OutlinedButton(
+                  onPressed: () async {
+                    if (await dialogoPerdida(context, cotizacion)) onActualizar();
+                  },
+                  style: OutlinedButton.styleFrom(foregroundColor: AppColors.rojo, side: const BorderSide(color: AppColors.rojo),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                  child: Text(tr('Se perdió'), style: const TextStyle(fontSize: 11))),
+              ],
               if (cotizacion.estado == 'Aprobada')
                 Expanded(child: ElevatedButton(
                   onPressed: () => _convertirPedido(context),
@@ -324,6 +345,39 @@ class _TarjetaCotizacion extends StatelessWidget {
               const SizedBox(height: 6),
               SizedBox(width: double.infinity,
                 child: _BtnPdfWA(cotizacion: cotizacion)),
+            ],
+            if (cotizacion.archivoRuta != null) ...[
+              const SizedBox(height: 6),
+              SizedBox(width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final url = await SupabaseService.urlArchivoSolicitud(cotizacion.archivoRuta!);
+                    if (url == null) {
+                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('No se pudo abrir el archivo.'))));
+                      return;
+                    }
+                    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                  },
+                  icon: const Icon(Icons.attach_file, size: 15),
+                  label: Text(trf('Archivo del cliente: {0}', [cotizacion.archivoNombre ?? '']),
+                    overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFC2560A),
+                    side: const BorderSide(color: Color(0xFFF3D9C2)),
+                    padding: const EdgeInsets.symmetric(vertical: 8)))),
+            ],
+            if (cotizacion.ligaPublica != null && cotizacion.estado != 'Rechazada') ...[
+              const SizedBox(height: 6),
+              SizedBox(width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => mostrarLigaCliente(context, cotizacion),
+                  icon: const Icon(Icons.link, size: 15),
+                  label: Text(tr('Liga para el cliente (aceptar y pagar)'),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.azul,
+                    side: const BorderSide(color: AppColors.azul, width: 1),
+                    padding: const EdgeInsets.symmetric(vertical: 8)))),
             ],
           ])),
       ]));
@@ -465,7 +519,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   final Map<String, TextEditingController> _pro = {};
   // Archivo de la pieza (DXF/SVG/STL/OBJ) leído por ArchivoCadService
   Map<String, dynamic>? _archivoInfo;
+  GeoCad? _geoOriginal; // tal como se leyó, para escalar sin perder precisión
+  double _escalaArchivo = 1; // largo
+  double _escalaY = 1, _escalaZ = 1; // ancho y alto (iguales a la del largo si es proporcional)
   List<List<List<double>>> _archivoGeo = [];
+  Uint8List? _archivoPng; // dibujo de la pieza (del Simulador 2.0) para el PDF
   bool _leyendoArchivo = false;
 
   TextEditingController _ctrlPro(String k, String inicial) =>
@@ -480,6 +538,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       d['archivo_info'] = _archivoInfo;
       d['archivo_geo'] = _archivoGeo.map((t) => t.map((q) => [
         (q[0] * 100).round() / 100, (q[1] * 100).round() / 100]).toList()).toList();
+      if (_archivoPng != null) d['archivo_png'] = base64Encode(_archivoPng!);
     }
     return d;
   }
@@ -494,7 +553,21 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (bytes == null) return;
       setState(() => _leyendoArchivo = true);
       final g = ArchivoCadService.leer(f.name, bytes);
-      String mm(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+      _geoOriginal = g;
+      _escalaArchivo = 1;
+      _aplicarGeo(g);
+    } catch (e) {
+      setState(() => _leyendoArchivo = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')])),
+        backgroundColor: AppColors.rojo));
+    }
+  }
+
+  // Llena la ficha con las medidas del archivo (o del archivo escalado)
+  void _aplicarGeo(GeoCad g, {bool sobrescribir = false}) {
+    String mm(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    try {
       setState(() {
         _archivoInfo = g.toInfo();
         _archivoGeo = g.trazos;
@@ -507,7 +580,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         final arch = _ctrlPro('archivo', '');
         if (arch.text.trim().isEmpty) arch.text = '${g.nombre} (${g.tipo.toUpperCase()})';
         final med = _ctrlPro('medidas', '');
-        if (med.text.trim().isEmpty) {
+        if (med.text.trim().isEmpty || sobrescribir) {
           final esp = _ctrlPro('croquis_espesor', '').text.trim();
           med.text = g.es3D
             ? '${mm(g.largo)} × ${mm(g.ancho)} × ${mm(g.alto)} mm'
@@ -515,12 +588,85 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         }
         _leyendoArchivo = false;
       });
-    } catch (e) {
+    } catch (_) {
       setState(() => _leyendoArchivo = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')])),
-        backgroundColor: AppColors.rojo));
     }
+  }
+
+  // Escalar la pieza: el usuario escribe el largo que quiere y todo se ajusta
+  // en proporción (ancho, alto, largo de corte, área y volumen).
+  Future<void> _escalarArchivo() async {
+    final g0 = _geoOriginal;
+    if (g0 == null || g0.largo <= 0) return;
+    final r = await mostrarDialogoEscala(context, g0, _escalaArchivo, _escalaY, _escalaZ);
+    if (r == null) return;
+    _escalaArchivo = r[0]; _escalaY = r[1]; _escalaZ = r[2];
+    _aplicarGeo(g0.escaladoXYZ(r[0], r[1], r[2]), sobrescribir: true);
+  }
+
+  // La pieza del archivo como partida de la cotización (nombre, cantidad y
+  // precio), sin pasar por el catálogo. Si quiere el precio calculado, usa
+  // "Calcular precio con el simulador".
+  Future<void> _agregarPiezaComoPartida() async {
+    final i = _archivoInfo;
+    if (i == null) return;
+    final n = TextEditingController(text: (i['nombre'] as String? ?? '').replaceFirst(RegExp(r'\.[^.]+$'), ''));
+    final c = TextEditingController(text: '1');
+    final p = TextEditingController();
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(tr('Agregar la pieza a la cotización')),
+      content: Column(mainAxisSize: MainAxisSize.min, children: [
+        TextField(controller: n, decoration: InputDecoration(labelText: tr('Nombre de la pieza'), isDense: true, border: const OutlineInputBorder())),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: TextField(controller: c, keyboardType: TextInputType.number,
+            decoration: InputDecoration(labelText: tr('Cantidad'), isDense: true, border: const OutlineInputBorder()))),
+          const SizedBox(width: 8),
+          Expanded(flex: 2, child: TextField(controller: p, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(labelText: tr('Precio por pieza'), prefixText: '\$', isDense: true, border: const OutlineInputBorder()))),
+        ]),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancelar'))),
+        ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Agregar a cotización'))),
+      ]));
+    if (ok != true || n.text.trim().isEmpty) return;
+    setState(() => _items.add(CotizacionItem(
+      nombreProducto: n.text.trim(),
+      cantidad: int.tryParse(c.text) ?? 1,
+      precioUnitario: double.tryParse(p.text.replaceAll(',', '.')) ?? 0,
+      sku: null)));
+  }
+
+  // Abre el simulador con la pieza cargada; el precio elegido entra como partida
+  Future<void> _calcularConSimulador() async {
+    final g = _geoOriginal?.escalado(_escalaArchivo);
+    final res = await Navigator.push<dynamic>(context, MaterialPageRoute(
+      builder: (_) => Simulador2Screen(geoInicial: g, seleccionar: true)));
+    if (res == null || !mounted) return;
+    // Una partida o un juego de piezas
+    final lista = res is Partida2 ? [res] : res is List ? res.whereType<Partida2>().toList() : <Partida2>[];
+    if (lista.isEmpty) return;
+    final r = lista.first;
+    if (r.geo != null && _archivoInfo == null) _aplicarGeo(r.geo!);
+    if (r.imagenPng != null) _archivoPng = r.imagenPng;
+    setState(() {
+      for (final r in lista) {
+      final desc = r.descripcion;
+      _items.add(CotizacionItem(
+        nombreProducto: '${r.emoji} ${r.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
+        cantidad: r.cantidad, precioUnitario: r.precioUnitario, sku: null,
+        materialId: r.materialId, materialCantidad: r.materialUnidades > 0 ? r.materialUnidades : null,
+        tiempoMin: r.tiempoMin, maquinaId: r.maquinaId, tipoMaterial: r.tipoMaterial, espesorMm: r.espesorMm,
+        imagenPng: r.imagenPng != null ? base64Encode(r.imagenPng!) : null, medidas: r.medidas.isNotEmpty ? r.medidas : null));
+      }
+      if (_ctrlPro('proceso', '').text.trim().isEmpty) _ctrlPro('proceso', '').text = r.servicio;
+      if (r.tiempoHoras > 0 && _ctrlPro('operaciones', '').text.trim().isEmpty) {
+        _ctrlPro('operaciones', '').text = trf('Tiempo de máquina estimado: {0} h', [r.tiempoHoras.toStringAsFixed(1)]);
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(trf('✅ Partida agregada: {0}', [NumberFormat('\$#,##0', 'es_MX').format(r.total)])), backgroundColor: AppColors.verde));
   }
 
   Widget _resumenArchivo() {
@@ -547,10 +693,12 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (_archivoGeo.isNotEmpty)
-          Container(height: 150, width: double.infinity,
+          Container(height: 230, width: double.infinity,
             margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-            child: CustomPaint(painter: _PiezaPainter(_archivoGeo))),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+            child: CustomPaint(painter: _PiezaPainter(_archivoGeo,
+              largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D))),
         ...filas.map((f) => Padding(padding: const EdgeInsets.only(bottom: 2),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             SizedBox(width: 130, child: Text(f.$1, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
@@ -558,11 +706,26 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           ]))),
         ...avisos.map((a) => Padding(padding: const EdgeInsets.only(top: 4),
           child: Text('⚠️ $a', style: const TextStyle(fontSize: 11, color: AppColors.naranja)))),
-        Align(alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; }),
+        const SizedBox(height: 6),
+        Wrap(spacing: 6, runSpacing: 4, alignment: WrapAlignment.end, children: [
+          OutlinedButton.icon(
+            onPressed: _agregarPiezaComoPartida,
+            icon: const Icon(Icons.playlist_add, size: 15),
+            label: Text(tr('Agregar como partida'), style: const TextStyle(fontSize: 12))),
+          OutlinedButton.icon(
+            onPressed: _escalarArchivo,
+            icon: const Icon(Icons.open_in_full, size: 15),
+            label: Text(_escalaArchivo == 1 ? tr('Escalar') : trf('Escala {0}%', [(_escalaArchivo * 100).round()]), style: const TextStyle(fontSize: 12))),
+          ElevatedButton.icon(
+            onPressed: _calcularConSimulador,
+            icon: const Icon(Icons.calculate_outlined, size: 15, color: Colors.white),
+            label: Text(tr('Calcular precio con el simulador'), style: const TextStyle(fontSize: 12, color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.naranja)),
+          TextButton.icon(
+            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; _archivoPng = null; _geoOriginal = null; _escalaArchivo = 1; _escalaY = 1; _escalaZ = 1; }),
             icon: const Icon(Icons.close, size: 16),
-            label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12)))),
+            label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12))),
+        ]),
       ]));
   }
 
@@ -614,7 +777,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     });
   }
   String _metodoPago = '50% anticipo / 50% entrega';
-  String _condicionEntrega = 'LAB — En planta HETNA';
+  String _condicionEntrega = 'El cliente recoge en el taller';
   String _notas = '';
   bool _generando = false;
   bool _guardando = false;
@@ -630,6 +793,22 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // (Más → Costos del taller → Material y cobro); al editar una cotización
   // vieja se conserva el texto que tenía.
   final _metodosPago = ['50% anticipo / 50% entrega', 'Pago total anticipado', 'Crédito 30 días', 'Transferencia bancaria'];
+  // Anticipo a la medida: porcentaje o monto fijo. Reemplaza el texto del
+  // método de pago (antes siempre era el % configurado del taller).
+  bool _anticipoEnMonto = false;
+  final _anticipoCtrl = TextEditingController();
+  void _aplicarAnticipo() {
+    final v = double.tryParse(_anticipoCtrl.text.replaceAll(',', '.')) ?? 0;
+    if (v <= 0) return;
+    final fmt = NumberFormat('\$#,##0', 'es_MX');
+    final txt = _anticipoEnMonto
+      ? trf('Anticipo de {0}, el resto a la entrega', [fmt.format(v)])
+      : trf('{0}% de anticipo / {1}% a la entrega', [pctTexto(v.clamp(1, 100)), pctTexto(100 - v.clamp(1, 100))]);
+    setState(() {
+      if (!_metodosPago.contains(txt)) _metodosPago.insert(0, txt);
+      _metodoPago = txt;
+    });
+  }
   String _opcionAnticipo(double pct) {
     final a = WhatsAppService.pctTexto(pct);
     final r = WhatsAppService.pctTexto(100 - pct);
@@ -646,9 +825,21 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (!_metodosPago.contains(_metodoPago)) _metodosPago.add(_metodoPago);
     });
   }
-  final _condiciones = ['LAB — En planta HETNA', 'Entrega en domicilio cliente', 'Flete por cuenta del cliente'];
+  // Forma de entrega: antes decía "LAB — En planta", jerga de comercio
+  // exterior que nadie entendía. Las cotizaciones viejas con ese texto se
+  // muestran como "El cliente recoge en el taller".
+  final _condiciones = ['El cliente recoge en el taller', 'Entrega a domicilio del cliente', 'Envío por paquetería (lo paga el cliente)', 'Envío por paquetería (incluido en el precio)'];
+  String _condicionNormal(String? c) {
+    if (c == null || c.trim().isEmpty || c.startsWith('LAB')) return _condiciones[0];
+    if (c == 'Entrega en domicilio cliente') return _condiciones[1];
+    if (c == 'Flete por cuenta del cliente') return _condiciones[2];
+    return c;
+  }
   final _tiempos = ['3 días', '5 días', '7 días', '10 días', '15 días', '20 días', '30 días'];
   String _tiempoEntrega = '15 días';
+  // Vigencia de la cotización: antes siempre 7 días aunque el taller quisiera otra
+  int _vigenciaDias = 7;
+  static const _vigencias = [3, 7, 15, 30, 45];
 
   // Impuesto por defecto del taller (Configuración → Idioma, moneda e impuestos)
   Future<void> _cargarImpuestoDefault() async {
@@ -672,6 +863,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     super.initState();
     if (widget.cotizacionEditar == null) _cargarImpuestoDefault();
     _cargarAnticipo();
+    _cargarCupo();
     if (widget.itemInicial != null) {
       try {
         final item = widget.itemInicial!;
@@ -685,6 +877,22 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     }
     if (widget.carritoSimulador != null) {
       for (final sv in widget.carritoSimulador!) {
+        if (sv is Partida2) {
+          final desc = sv.descripcion;
+          _items.add(CotizacionItem(
+            nombreProducto: '${sv.emoji} ${sv.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
+            cantidad: sv.cantidad, precioUnitario: sv.precioUnitario, sku: sv.servicio,
+            materialId: sv.materialId, materialCantidad: sv.materialUnidades > 0 ? sv.materialUnidades : null,
+            tiempoMin: sv.tiempoMin, maquinaId: sv.maquinaId, tipoMaterial: sv.tipoMaterial, espesorMm: sv.espesorMm,
+            imagenPng: sv.imagenPng != null ? base64Encode(sv.imagenPng!) : null, medidas: sv.medidas.isNotEmpty ? sv.medidas : null));
+          // El dibujo y las medidas de la pieza van a la cotización profesional
+          if (sv.geo != null && _archivoInfo == null) {
+            final g = sv.geo!;
+            _archivoPng = sv.imagenPng;
+            WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _aplicarGeo(g); });
+          }
+          continue;
+        }
         try {
           final desc = sv.descripcion ?? '';
           final nombre = '${sv.emoji} ${sv.servicio}'
@@ -694,6 +902,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             cantidad: 1,
             precioUnitario: sv.total,
             sku: sv.servicio,
+            materialId: sv.materialId as String?,
+            materialCantidad: (sv.materialUnidades as num?)?.toDouble(),
           ));
         } catch (e) {
           print('Error simulador: $e');
@@ -709,12 +919,16 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _aplicaIva = c.ivaPct > 0;
       _costoEnvio = c.costoEnvio;
       _metodoPago = c.metodoPago ?? '50% anticipo / 50% entrega';
-      _condicionEntrega = c.condicionEntrega ?? tr('LAB — En planta HETNA');
+      _condicionEntrega = _condicionNormal(c.condicionEntrega);
       _notas = c.notas ?? '';
       if (c.createdAt != null) _fechaCotizacion = c.createdAt!;
+      _vigenciaDias = c.vigenciaDias;
       _tipo = c.tipo;
       _tipoOriginal = c.tipo;
       _muestraGratis = c.datosPro['muestra'] == true;
+      if (c.datosPro['archivo_png'] is String) {
+        try { _archivoPng = base64Decode(c.datosPro['archivo_png'] as String); } catch (_) {}
+      }
       if (c.datosPro['archivo_info'] is Map) {
         _archivoInfo = Map<String, dynamic>.from(c.datosPro['archivo_info'] as Map);
         _archivoGeo = GeoCad.geoDeJson(c.datosPro['archivo_geo']);
@@ -735,9 +949,46 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   }
 
   @override
+  // Cupo del mes (plan Gratis): aviso cuando quedan pocas y botón para subir
+  // de plan. Viene del servidor (supabase/cupo_servidor.sql).
+  Map<String, dynamic>? _cupo;
+  Future<void> _cargarCupo() async {
+    if (AuthService.puede('cotizaciones_ilimitadas')) return;
+    final c = await SupabaseService.cupoCotizaciones();
+    if (mounted && c != null) setState(() => _cupo = c);
+  }
+
+  Widget? _avisoCupo() {
+    final c = _cupo;
+    if (c == null || c['limite'] == null || _esEdicion) return null;
+    final limite = (c['limite'] as num).toInt();
+    final quedan = (c['quedan'] as num?)?.toInt() ?? 0;
+    if (quedan > 1) return null; // sólo cuando queda una o ninguna
+    final agotado = quedan == 0;
+    final color = agotado ? AppColors.rojo : AppColors.ambar;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(8)),
+      child: Row(children: [
+        Icon(agotado ? Icons.lock_outline : Icons.hourglass_bottom, size: 18, color: color),
+        const SizedBox(width: 8),
+        Expanded(child: Text(
+          agotado
+            ? trf('Ya usaste tus {0} cotizaciones gratis de este mes. Se renuevan el día 1.', [limite])
+            : trf('Te queda {0} cotización gratis este mes (de {1}).', [quedan, limite]),
+          style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600))),
+        TextButton(
+          onPressed: () => AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
+            funcion: trf('más de {0} cotizaciones al mes', [limite])),
+          child: Text(tr('Ver planes'), style: TextStyle(color: color, fontWeight: FontWeight.w800))),
+      ]));
+  }
+
   Widget build(BuildContext context) {
     final fmt = NumberFormat('\$#,##0.00', 'es_MX');
+    final avisoCupo = _avisoCupo();
     return ListView(padding: const EdgeInsets.all(14), children: [
+      if (avisoCupo != null) avisoCupo,
       if (_esEdicion)
         Container(margin: const EdgeInsets.only(bottom: 10), padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(8)),
@@ -864,12 +1115,46 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             items: _tiempos.map((t) => DropdownMenuItem(value: t, child: Text(tr(t), style: const TextStyle(fontSize: 13)))).toList(),
             onChanged: (v) => setState(() => _tiempoEntrega = v!)))),
           const SizedBox(width: 8),
+          Expanded(child: _campo(tr('Vigencia'), child: DropdownButtonFormField<int>(
+            value: _vigencias.contains(_vigenciaDias) ? _vigenciaDias : 7,
+            decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+            items: _vigencias.map((d) => DropdownMenuItem(value: d, child: Text(trf('{0} días', [d]), style: const TextStyle(fontSize: 13)))).toList(),
+            onChanged: (v) => setState(() => _vigenciaDias = v!)))),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
           Expanded(child: _campo(tr('Método de pago'), child: DropdownButtonFormField<String>(
             value: _metodosPago.contains(_metodoPago) ? _metodoPago : _metodosPago.first,
             decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
             items: _metodosPago.map((m) => DropdownMenuItem(value: m, child: Text(tr(m), style: const TextStyle(fontSize: 11)))).toList(),
             onChanged: (v) => setState(() => _metodoPago = v!)))),
         ]),
+        const SizedBox(height: 8),
+        _campo(tr('Anticipo'), child: Row(children: [
+          SegmentedButton<bool>(
+            segments: [ButtonSegment(value: false, label: Text('%', style: const TextStyle(fontSize: 12))),
+                       ButtonSegment(value: true, label: Text('\$', style: const TextStyle(fontSize: 12)))],
+            selected: {_anticipoEnMonto},
+            showSelectedIcon: false,
+            style: ButtonStyle(visualDensity: VisualDensity.compact),
+            onSelectionChanged: (s) => setState(() => _anticipoEnMonto = s.first)),
+          const SizedBox(width: 8),
+          Expanded(child: TextField(
+            controller: _anticipoCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(isDense: true, hintText: _anticipoEnMonto ? tr('Monto fijo') : tr('Porcentaje'),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+            onSubmitted: (_) => _aplicarAnticipo())),
+          const SizedBox(width: 6),
+          OutlinedButton(onPressed: _aplicarAnticipo, child: Text(tr('Aplicar'), style: const TextStyle(fontSize: 12))),
+        ])),
+        const SizedBox(height: 8),
+        _campo(tr('Forma de entrega'), child: DropdownButtonFormField<String>(
+          value: _condiciones.contains(_condicionEntrega) ? _condicionEntrega : _condiciones[0],
+          decoration: const InputDecoration(contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+          items: _condiciones.map((c) => DropdownMenuItem(value: c, child: Text(tr(c), style: const TextStyle(fontSize: 12)))).toList(),
+          onChanged: (v) => setState(() => _condicionEntrega = v!))),
         const SizedBox(height: 8),
         _campo(tr('Notas'), child: TextFormField(
           key: ValueKey('notas_$_envioVer'),
@@ -1231,10 +1516,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   Future<void> _generarPDF() async {
     final ingles = await PdfService.elegirIdioma(context);
     if (ingles == null) return;
+    final cot = await _asegurarGuardada();
+    if (cot == null) return;
     setState(() => _generando = true);
     try {
       final cfg = await SupabaseService.getConfiguracion();
-      final cot = _buildCotizacion();
       final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg, ingles: ingles);
       await PdfService.verPdf(bytes);
     } catch (e) {
@@ -1246,9 +1532,10 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _enviarWA() async {
     if (_cliente == null) return;
+    if (await _asegurarGuardada() == null) return;
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final itemsTexto = _items.map((i) => trf('• {0} x{1} = {2}', [(i.nombreProducto), (i.cantidad), (fmt.format(i.subtotal))])).join('\n');
-    final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *HETNA CNC*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *HETNA CNC*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? trf('\nIVA {0}%: {1}', [pctTexto(_ivaPct), (fmt.format(_montoIva))]) : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago]);
+    final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *{7}*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *{7}*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? trf('\nIVA {0}%: {1}', [pctTexto(_ivaPct), (fmt.format(_montoIva))]) : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago, AuthService.marcaTaller]);
     if (mounted) await WhatsAppService.abrirChatConSelector(context,
       numero: _cliente!.whatsappNumero, mensaje: msg);
   }
@@ -1256,12 +1543,33 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // Plan Gratis: 5 cotizaciones nuevas al mes (igual que en hetnacnc.com)
   Future<bool> _hayCupo() async {
     if (_esEdicion || AuthService.puede('cotizaciones_ilimitadas')) return true;
-    final n = await SupabaseService.contarCotizacionesDelMes();
-    if (n < Planes.limiteCotizacionesGratis) return true;
+    // El servidor lleva la cuenta (supabase/cupo_servidor.sql): no baja al
+    // borrar y cuenta también los PDF y WhatsApp. Si aún no está instalado,
+    // se usa el conteo local de siempre.
+    final cupo = await SupabaseService.cupoCotizaciones();
+    if (cupo != null) {
+      if (cupo['limite'] == null) return true;
+      final quedan = (cupo['quedan'] as num?)?.toInt() ?? 0;
+      if (quedan > 0) return true;
+    } else {
+      final n = await SupabaseService.contarCotizacionesDelMes();
+      if (n < Planes.limiteCotizacionesGratis) return true;
+    }
     if (!mounted) return false;
     await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
       funcion: trf('más de {0} cotizaciones al mes', [(Planes.limiteCotizacionesGratis)]));
     return false;
+  }
+
+  // "Ya lo hiciste antes": liga lo que simuló con la cotización y el cliente
+  void _ligarHistorial(String? cotId) {
+    if (cotId == null) return;
+    final nombreCli = _cliente?.empresa?.isNotEmpty == true ? _cliente!.empresa! : _cliente?.nombre;
+    for (final it in _items) {
+      if (it.tiempoMin == null) continue; // sólo partidas del simulador
+      final archivo = it.nombreProducto.contains(' — ') ? it.nombreProducto.split(' — ').last.split(' · ').first.trim() : null;
+      if (archivo != null && archivo.isNotEmpty) Simulador2Data.ligarHistorial(archivo: archivo, cotizacionId: cotId, clienteNombre: nombreCli);
+    }
   }
 
   Future<void> _guardar() async {
@@ -1279,20 +1587,69 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             content: Text(tr('✅ Cotización actualizada')), backgroundColor: AppColors.verde));
           widget.onGuardada?.call();
         }
-      } else {
-        final cot = _buildCotizacion(estado: 'Borrador');
-        await SupabaseService.crearCotizacion(cot, _items);
+      } else if (_guardadaEnSesion != null) {
+        // Ya se guardó al sacar el PDF o mandar el WhatsApp: se actualiza, no se duplica
+        final cot = _buildCotizacion(id: _guardadaEnSesion!.id, folio: _guardadaEnSesion!.folio, estado: 'Borrador');
+        await SupabaseService.actualizarCotizacion(cot, _items, incluirTipo: _tipo == 'profesional');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(tr('✅ Borrador guardado')), backgroundColor: AppColors.azul));
           widget.onGuardada?.call();
-          setState(() { _items = []; _cliente = null; });
+          setState(() { _items = []; _cliente = null; _guardadaEnSesion = null; });
+        }
+      } else {
+        final cot = _buildCotizacion(estado: 'Borrador');
+        final creada = await SupabaseService.crearCotizacion(cot, _items);
+        _ligarHistorial(creada.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('✅ Borrador guardado')), backgroundColor: AppColors.azul));
+          widget.onGuardada?.call();
+          setState(() { _items = []; _cliente = null; _guardadaEnSesion = null; });
+          _cargarCupo();
         }
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      if (!mounted) return;
+      if (SupabaseService.esErrorSinCupo(e)) {
+        await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
+          funcion: trf('más de {0} cotizaciones al mes', [(Planes.limiteCotizacionesGratis)]));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
     } finally {
       if (mounted) setState(() => _guardando = false);
+    }
+  }
+
+  // Una cotización nueva se guarda ANTES de sacar el PDF o mandarla por
+  // WhatsApp: así cuenta para el cupo del mes igual que guardar, y el PDF sale
+  // con el folio real del taller. Si ya se guardó en esta sesión, se reutiliza.
+  Cotizacion? _guardadaEnSesion;
+  Future<Cotizacion?> _asegurarGuardada() async {
+    if (_esEdicion) return _buildCotizacion(id: widget.cotizacionEditar!.id, folio: widget.cotizacionEditar!.folio);
+    if (_guardadaEnSesion != null) {
+      return _buildCotizacion(id: _guardadaEnSesion!.id, folio: _guardadaEnSesion!.folio);
+    }
+    if (_cliente == null || _items.isEmpty) return null;
+    if (!await _hayCupo()) return null;
+    if (_tipo == 'profesional' && !await _permiteProfesional()) return null;
+    try {
+      final creada = await SupabaseService.crearCotizacion(_buildCotizacion(estado: 'Borrador'), _items);
+      _ligarHistorial(creada.id);
+      _guardadaEnSesion = creada;
+      widget.onGuardada?.call();
+      _cargarCupo();
+      return _buildCotizacion(id: creada.id, folio: creada.folio);
+    } catch (e) {
+      if (!mounted) return null;
+      if (SupabaseService.esErrorSinCupo(e)) {
+        await AuthService.exigirModulo(context, 'cotizaciones_ilimitadas',
+          funcion: trf('más de {0} cotizaciones al mes', [(Planes.limiteCotizacionesGratis)]));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+      return null;
     }
   }
 
@@ -1339,8 +1696,17 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     items: _items, estado: estado ?? 'Borrador',
     descuentoPct: _descuentoPct, ivaPct: _aplicaIva ? _ivaPct : 0,
     costoEnvio: _costoEnvio, metodoPago: _metodoPago,
-    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion,
+    condicionEntrega: _condicionEntrega, notas: _notas, createdAt: _fechaCotizacion, vigenciaDias: _vigenciaDias,
+    anticipoMonto: _anticipoMontoFijo(),
     tipo: _tipo, datosPro: _tipo == 'profesional' ? _datosPro() : {});
+
+  /// Monto fijo de anticipo que escribió el taller (null si es porcentaje:
+  /// ese lo saca el servidor del texto del método de pago).
+  double? _anticipoMontoFijo() {
+    if (!_anticipoEnMonto) return null;
+    final v = double.tryParse(_anticipoCtrl.text.replaceAll(',', '.')) ?? 0;
+    return v > 0 ? v : null;
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -1918,6 +2284,92 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
 // ══════════════════════════════════════════════
 // Botón PDF + compartir por WA
 // ══════════════════════════════════════════════
+/// Renglón para el mensaje de WhatsApp con la liga pública (si ya existe).
+String _lineaLiga(Cotizacion cot) {
+  final liga = cot.ligaPublica;
+  if (liga == null) return '';
+  return trf('\n\nPuedes verla, aceptarla y pagar el anticipo aquí:\n{0}', [liga]);
+}
+
+/// Liga pública: copiar, mandar por WhatsApp o abrir. Fase 2 del Cotizador 2.0.
+Future<void> mostrarLigaCliente(BuildContext context, Cotizacion cot) async {
+  final liga = cot.ligaPublica;
+  if (liga == null) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+      tr('Guarda la cotización primero; la liga se crea al guardarla. Si ya está guardada, vuelve a abrir la lista.'))));
+    return;
+  }
+  final nombreCliente = cot.cliente?.nombre ?? cot.cliente?.empresa ?? '';
+  final msg = trf('¡Hola *{0}*! 😊\n\nAquí está tu cotización *{1}* de *{2}*. Puedes verla, aceptarla y pagar el anticipo desde esta liga:\n{3}\n\n¡Quedamos a tus órdenes! 💙',
+    [nombreCliente, cot.folio ?? '', AuthService.marcaTaller, liga]);
+  await showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+    builder: (ctx) => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(tr('Liga para el cliente'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(tr('El cliente abre la liga, ve la cotización, la acepta con su nombre y paga el anticipo con Mercado Pago. Aquí verás cuando la abra, la acepte y pague.'),
+          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+        const SizedBox(height: 12),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+          child: Row(children: [
+            Expanded(child: SelectableText(liga, style: const TextStyle(fontSize: 12))),
+            IconButton(icon: const Icon(Icons.copy, size: 18), tooltip: tr('Copiar'),
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: liga));
+                if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(tr('Liga copiada'))));
+              }),
+          ])),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), minimumSize: const Size(0, 44)),
+            icon: const Icon(Icons.chat, size: 16, color: Colors.white),
+            label: Text(tr('Mandar por WhatsApp'), style: const TextStyle(fontSize: 12, color: Colors.white)),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final num = cot.cliente?.whatsappNumero ?? '';
+              final url = num.isNotEmpty
+                ? 'https://wa.me/${WhatsAppService.normalizarNumero(num)}?text=${Uri.encodeComponent(msg)}'
+                : 'https://wa.me/?text=${Uri.encodeComponent(msg)}';
+              await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+            })),
+          const SizedBox(width: 8),
+          Expanded(child: OutlinedButton.icon(
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: Text(tr('Abrir'), style: const TextStyle(fontSize: 12)),
+            onPressed: () => launchUrl(Uri.parse(liga), mode: LaunchMode.externalApplication))),
+        ]),
+      ]))));
+}
+
+/// Seguimiento de la liga: la abrió / la aceptó / pagó el anticipo.
+Widget _seguimientoLiga(Cotizacion cot) {
+  final fmt = NumberFormat('\$#,##0', 'es_MX');
+  final chips = <Widget>[];
+  Widget chip(String t, Color c, IconData i) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(color: c.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(i, size: 11, color: c), const SizedBox(width: 4),
+      Text(t, style: TextStyle(fontSize: 10, color: c, fontWeight: FontWeight.w600))]));
+  if (cot.anticipoPagadoCompleto) {
+    chips.add(chip(trf('Anticipo pagado {0}', [fmt.format(cot.anticipoPagado)]), const Color(0xFF1d9e75), Icons.paid_outlined));
+  } else if (cot.anticipoPagado > 0) {
+    chips.add(chip(trf('Pagó {0} del anticipo', [fmt.format(cot.anticipoPagado)]), const Color(0xFF185fa5), Icons.paid_outlined));
+  }
+  if (cot.aceptadaEn != null) {
+    chips.add(chip(trf('Aceptó {0}', [cot.aceptadaPor ?? '']).trim(), const Color(0xFF1d9e75), Icons.check_circle_outline));
+  } else if (cot.ligaVistaEn != null) {
+    chips.add(chip(trf('Vista {0}', [DateFormat(enIngles ? 'MM/dd' : 'dd/MM').format(cot.ligaVistaEn!)]), const Color(0xFF185fa5), Icons.visibility_outlined));
+  }
+  if (chips.isEmpty) return const SizedBox.shrink();
+  return Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 6, runSpacing: 4, children: chips));
+}
+
 class _BtnPdfWA extends StatefulWidget {
   final Cotizacion cotizacion;
   const _BtnPdfWA({required this.cotizacion});
@@ -1940,7 +2392,11 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
       final cfg = await SupabaseService.getConfiguracion();
       final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg, ingles: ingles);
       final folio = cot.folio ?? 'cotizacion';
-      if (mounted) await PdfService.mostrarOpcionesEnvio(context, bytes, '$folio.pdf');
+      final nombreCliente = cot.cliente?.nombre ?? cot.cliente?.empresa ?? '';
+      if (mounted) await PdfService.mostrarOpcionesEnvio(context, bytes, '$folio.pdf',
+        whatsapp: cot.cliente?.whatsappNumero,
+        mensaje: trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.{3}\n\n¡Quedamos a tus órdenes! 💙',
+          [nombreCliente, folio, AuthService.marcaTaller, _lineaLiga(cot)]));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(trf('Error al generar PDF: {0}', [e])), backgroundColor: AppColors.rojo));
@@ -2045,26 +2501,116 @@ class _ContactosPickerState extends State<_ContactosPicker> {
 // Vista previa de la pieza (trazos en mm) para la cotización profesional
 class _PiezaPainter extends CustomPainter {
   final List<List<List<double>>> trazos;
-  _PiezaPainter(this.trazos);
+  final double largo, ancho;
+  final bool es3D;
+  _PiezaPainter(this.trazos, {this.largo = 0, this.ancho = 0, this.es3D = false});
   @override
   void paint(Canvas canvas, Size size) {
     double maxX = 0, maxY = 0;
     for (final t in trazos) { for (final q in t) { if (q[0] > maxX) maxX = q[0]; if (q[1] > maxY) maxY = q[1]; } }
     if (maxX <= 0 || maxY <= 0) return;
-    const m = 10.0;
-    final esc = ((size.width - 2 * m) / maxX < (size.height - 2 * m) / maxY)
-      ? (size.width - 2 * m) / maxX : (size.height - 2 * m) / maxY;
-    final ox = (size.width - maxX * esc) / 2, oy = (size.height - maxY * esc) / 2;
-    final p = Paint()..color = AppColors.azul..strokeWidth = 1..style = PaintingStyle.stroke;
+    // Margen para las cotas (abajo y a la derecha)
+    const m = 14.0, cota = 26.0;
+    final aw = size.width - 2 * m - cota, ah = size.height - 2 * m - cota;
+    final esc = (aw / maxX < ah / maxY) ? aw / maxX : ah / maxY;
+    final rw = maxX * esc, rh = maxY * esc;
+    final ox = m + (aw - rw) / 2, oyTop = m + (ah - rh) / 2;
+    double X(double x) => ox + x * esc;
+    double Y(double y) => oyTop + rh - y * esc;
+    // Papel cuadriculado tenue, como plano
+    final grid = Paint()..color = const Color(0xFFEDF1F7)..strokeWidth = 0.6;
+    for (double x = 0; x <= size.width; x += 12) canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+    for (double y = 0; y <= size.height; y += 12) canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    // Relleno tenue de la pieza (contornos cerrados) y trazos
+    final relleno = Paint()..color = AppColors.azul.withOpacity(0.06)..style = PaintingStyle.fill;
+    final p = Paint()..color = AppColors.azul..strokeWidth = es3D ? 1.2 : 1.4
+      ..style = PaintingStyle.stroke..strokeJoin = StrokeJoin.round..strokeCap = StrokeCap.round..isAntiAlias = true;
     for (final t in trazos) {
       final path = Path();
       for (int i = 0; i < t.length; i++) {
-        final x = ox + t[i][0] * esc, y = size.height - (oy + t[i][1] * esc);
-        if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+        if (i == 0) path.moveTo(X(t[i][0]), Y(t[i][1])); else path.lineTo(X(t[i][0]), Y(t[i][1]));
+      }
+      if (!es3D && t.length > 3 && (t.first[0] - t.last[0]).abs() < 0.01 && (t.first[1] - t.last[1]).abs() < 0.01) {
+        canvas.drawPath(path, relleno);
       }
       canvas.drawPath(path, p);
     }
+    // Cotas: largo abajo, ancho a la derecha
+    final cp = Paint()..color = const Color(0xFF6B7280)..strokeWidth = 0.8;
+    String mm(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    final L = largo > 0 ? largo : maxX, A = ancho > 0 ? ancho : maxY;
+    final yC = oyTop + rh + 12, xC = ox + rw + 12;
+    canvas.drawLine(Offset(ox, yC), Offset(ox + rw, yC), cp);
+    canvas.drawLine(Offset(ox, yC - 4), Offset(ox, yC + 4), cp);
+    canvas.drawLine(Offset(ox + rw, yC - 4), Offset(ox + rw, yC + 4), cp);
+    canvas.drawLine(Offset(xC, oyTop), Offset(xC, oyTop + rh), cp);
+    canvas.drawLine(Offset(xC - 4, oyTop), Offset(xC + 4, oyTop), cp);
+    canvas.drawLine(Offset(xC - 4, oyTop + rh), Offset(xC + 4, oyTop + rh), cp);
+    void texto(String s, Offset o, {bool vertical = false}) {
+      final tp = TextPainter(text: TextSpan(text: s, style: const TextStyle(fontSize: 10, color: Color(0xFF374151), fontWeight: FontWeight.w600)),
+        textDirection: TextDirection.ltr)..layout();
+      canvas.save();
+      if (vertical) { canvas.translate(o.dx, o.dy); canvas.rotate(-1.5708); tp.paint(canvas, Offset(-tp.width / 2, 0)); }
+      else { tp.paint(canvas, Offset(o.dx - tp.width / 2, o.dy)); }
+      canvas.restore();
+    }
+    texto('${mm(L)} mm', Offset(ox + rw / 2, yC + 3));
+    texto('${mm(A)} mm', Offset(xC + 4, oyTop + rh / 2), vertical: true);
   }
   @override
-  bool shouldRepaint(covariant _PiezaPainter old) => old.trazos != trazos;
+  bool shouldRepaint(covariant _PiezaPainter old) => old.trazos != trazos || old.largo != largo || old.ancho != ancho;
+}
+
+/// Diálogo de escala: largo, ancho y alto en mm, proporcional o libre por eje.
+/// Devuelve [fx, fy, fz] o null si se canceló.
+Future<List<double>?> mostrarDialogoEscala(BuildContext context, GeoCad g0, double fx0, double fy0, double fz0) async {
+  final l = TextEditingController(text: (g0.largo * fx0).toStringAsFixed(1));
+  final a = TextEditingController(text: (g0.ancho * fy0).toStringAsFixed(1));
+  final h = TextEditingController(text: (g0.alto * fz0).toStringAsFixed(1));
+  bool proporcional = (fx0 - fy0).abs() < 1e-6 && (fx0 - fz0).abs() < 1e-6;
+  String f(double v) => v.toStringAsFixed(1);
+  return showDialog<List<double>>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) {
+    void ligar(TextEditingController origen, double base) {
+      if (!proporcional) return;
+      final v = double.tryParse(origen.text.replaceAll(',', '.'));
+      if (v == null || v <= 0 || base <= 0) return;
+      final k = v / base;
+      if (origen != l) l.text = f(g0.largo * k);
+      if (origen != a) a.text = f(g0.ancho * k);
+      if (origen != h && g0.es3D) h.text = f(g0.alto * k);
+    }
+    Widget campo(String etq, TextEditingController c, double base) => TextField(controller: c,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      onChanged: (_) => ligar(c, base),
+      decoration: InputDecoration(labelText: etq, suffixText: 'mm', isDense: true, border: const OutlineInputBorder()));
+    return AlertDialog(
+      title: Text(tr('Escalar la pieza')),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(trf('Original: {0} × {1}{2} mm. Escribe la medida que quieres; con "proporcional" las otras se ajustan solas.',
+          [f(g0.largo), f(g0.ancho), g0.es3D ? ' × ${f(g0.alto)}' : '']),
+          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+        const SizedBox(height: 10),
+        SwitchListTile(dense: true, contentPadding: EdgeInsets.zero,
+          title: Text(tr('Proporcional (misma escala en todos los ejes)'), style: const TextStyle(fontSize: 12)),
+          value: proporcional, onChanged: (v) => setS(() => proporcional = v)),
+        const SizedBox(height: 6),
+        campo(tr('Largo'), l, g0.largo),
+        const SizedBox(height: 8),
+        campo(tr('Ancho'), a, g0.ancho),
+        if (g0.es3D) ...[const SizedBox(height: 8), campo(tr('Alto'), h, g0.alto)],
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, [1.0, 1.0, 1.0]), child: Text(tr('Tamaño original'))),
+        ElevatedButton(onPressed: () {
+          final vl = double.tryParse(l.text.replaceAll(',', '.')) ?? g0.largo;
+          final va = double.tryParse(a.text.replaceAll(',', '.')) ?? g0.ancho;
+          final vh = double.tryParse(h.text.replaceAll(',', '.')) ?? g0.alto;
+          final fx = g0.largo > 0 ? vl / g0.largo : 1.0;
+          final fy = g0.ancho > 0 ? va / g0.ancho : fx;
+          final fz = g0.es3D && g0.alto > 0 ? vh / g0.alto : fx;
+          Navigator.pop(ctx, [fx, fy, fz]);
+        }, child: Text(tr('Aplicar'))),
+      ]);
+  }));
 }

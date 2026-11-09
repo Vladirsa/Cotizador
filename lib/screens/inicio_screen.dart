@@ -1197,10 +1197,10 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     final nombre = c.cliente?.nombre ?? c.cliente?.empresa ?? tr('Sin cliente');
     return Container(margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-        border: Border(left: BorderSide(color: color, width: 4),
-          top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-          bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+        border: Border.all(color: AppColors.grisBorde, width: 0.5),
+        // franja de color a la izquierda (un borde de colores distintos no
+        // admite esquinas redondeadas)
+        boxShadow: [BoxShadow(color: color, offset: const Offset(-4, 0))]),
       padding: const EdgeInsets.all(12),
       child: Row(children: [
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

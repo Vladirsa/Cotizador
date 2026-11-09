@@ -15,10 +15,13 @@ import 'avances_screen.dart';
 import 'clientes_screen.dart';
 import 'productos_screen.dart';
 import 'inventario_screen.dart';
+import 'mantenimiento_screen.dart';
+import 'facturacion_config_screen.dart';
 import 'gastos_screen.dart';
 import 'marketing_screen.dart';
 import 'config_screen.dart';
 import 'simulador_screen.dart';
+import '../simulador2/simulador2_screen.dart';
 import 'agenda_screen.dart';
 import 'equipo_screen.dart';
 import 'permisos_screen.dart';
@@ -26,6 +29,7 @@ import 'reportes_screen.dart';
 import 'premium_screen.dart';
 import 'calculadora_cnc_screen.dart';
 import 'envios_screen.dart';
+import 'orden_qr_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/hetna_api.dart';
 import '../i18n/tr.dart';
@@ -47,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _AlertasAgendaScreen(),
     CotizarScreen(),
     AvancesScreen(),
-    SimuladorScreen(),
+    Simulador2Screen(),
   ];
 
   Widget _pantallaExtra(int tab) {
@@ -62,6 +66,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 12: return const ConfigScreen();
       case 13: return const ConfigSimuladorScreen();
       case 14: return const ConfigCostosScreen();
+      case 15: return const MantenimientoScreen();
+      case 16: return const FacturacionConfigScreen();
       default: return const InicioScreen();
     }
   }
@@ -188,6 +194,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: TextStyle(color: Colors.black87, fontSize: 10, fontWeight: FontWeight.w700))),
           ],
         ])),
+      _dPush(Icons.qr_code_scanner, tr('Escanear orden'), const LectorOrdenScreen()),
+      const Divider(height: 1),
       _dItem(Icons.people_outline,         tr('CRM Clientes'),        5, modulo: 'clientes'),
       _dItem(Icons.inventory_2_outlined,   tr('Productos y Catálogo'),6, modulo: 'productos'),
       _dItem(Icons.warehouse_outlined,     tr('Inventario Bodega'),   7, plan: 'inventario', modulo: 'inventario'),
@@ -195,7 +203,9 @@ class _HomeScreenState extends State<HomeScreen> {
       _dItem(Icons.campaign_outlined,      tr('Marketing'),           9, plan: 'marketing', modulo: 'marketing'),
       _dItem(Icons.group_outlined,         tr('Mi equipo'),          10, plan: 'equipo', modulo: 'equipo'),
       const Divider(height: 1),
-      _dItem(Icons.bar_chart_outlined,     tr('Reportes Excel'),     11, plan: 'reportes', modulo: 'reportes'),
+      _dItem(Icons.bar_chart_outlined,     tr('Reportes y rentabilidad'), 11, plan: 'reportes', modulo: 'reportes'),
+      _dItem(Icons.build_circle_outlined,  tr('Mantenimiento'),      15, plan: 'mantenimiento'),
+      _dItem(Icons.request_quote_outlined, tr('Factura electrónica'), 16, plan: 'facturacion'),
       _dItem(Icons.settings_outlined,      tr('Configuración'),      12, modulo: 'config'),
       _dItem(Icons.tune_outlined,          tr('Config Simulador'),   13, plan: 'config_simulador'),
       _dItem(Icons.calculate_outlined,     tr('Costos del taller'),  14, plan: 'costos_taller'),

@@ -15,7 +15,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
-import '../services/billing_service.dart';
 import '../services/auth_service.dart';
 import '../services/hetna_api.dart';
 import '../i18n/tr.dart';
@@ -42,21 +41,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
     SuscripcionApi.precios().then((d) {
       if (mounted) setState(() => _precios = d);
     }).catchError((_) {});
-    BillingService.onError = (msg) {
-      if (!mounted) return;
-      setState(() => _ocupado = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr(msg)), backgroundColor: AppColors.rojo));
-    };
-    BillingService.onCompraExitosa = () {
-      if (!mounted) return;
-      setState(() => _ocupado = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(tr('✅ ¡Listo! Tu plan quedó activo')), backgroundColor: AppColors.verde));
-      Navigator.pop(context);
-    };
   }
-
-  bool get _hayGooglePlay => BillingService.disponible && BillingService.productoPremium != null;
 
   void _aviso(String texto, {bool error = false}) {
     if (!mounted) return;
@@ -71,11 +56,6 @@ class _PremiumScreenState extends State<PremiumScreen> {
   }
 
   Future<void> _contratar(Plan p) async {
-    if (_hayGooglePlay) {
-      setState(() => _ocupado = true);
-      await BillingService.comprarPremium();
-      return;
-    }
     if (!AuthService.esAdmin) {
       _aviso(tr('Sólo el administrador del taller puede contratar el plan.'), error: true);
       return;
@@ -160,7 +140,6 @@ class _PremiumScreenState extends State<PremiumScreen> {
 
   Future<void> _actualizar() async {
     setState(() => _ocupado = true);
-    if (_hayGooglePlay) await BillingService.restaurarCompras();
     final token = AuthService.sesion?.accessToken;
     if (token != null && AuthService.esAdmin) {
       try { await SuscripcionApi.verificar(token); } catch (_) {}
@@ -307,7 +286,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
             onPressed: _ocupado ? null : () => _contratar(p),
             style: ElevatedButton.styleFrom(backgroundColor: destacado ? AppColors.naranja : AppColors.azul,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-            child: Text(tr(_hayGooglePlay ? tr('Suscribirme') : trf('Contratar {0}', [(Planes.nombres[p])])),
+            child: Text(trf('Contratar {0}', [(Planes.nombres[p])]),
               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
       ]));
   }

@@ -5,6 +5,7 @@
 // - Envíos HETNA: cotización con todas las paqueterías, margen incluido (/api/app/envios)
 // - Enlaces del ecosistema: tienda, foro, laboratorio CAM, licitaciones
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../i18n/tr.dart';
 
@@ -88,6 +89,192 @@ class HetnaApi {
   // cotización ya hecha.
   static String urlSolicitarEnvio(String cotizacionId, String tarifaId) =>
     '$base/$_region/servicios/envios-hetna/solicitar?c=${Uri.encodeComponent(cotizacionId)}&t=${Uri.encodeComponent(tarifaId)}';
+}
+
+// ═══════════════ Cobros en línea: Mercado Pago del taller ═══════════════
+// El taller conecta SU cuenta de Mercado Pago una sola vez. Después, cuando
+// su cliente paga el anticipo desde la liga de la cotización
+// (hetnacnc.com/c/<token>), el dinero entra directo a la cuenta del taller y
+// la comisión HETNA (por plan) se descuenta sola. Ver
+// packages/api/src/lib/cotizacion-liga.ts en hetnacnc.
+class MercadoPagoApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-mp';
+
+  static Map<String, String> _cab(String token) =>
+    {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
+
+  static Map<String, dynamic> _leer(http.Response r) {
+    Map<String, dynamic> d = {};
+    try {
+      final j = jsonDecode(utf8.decode(r.bodyBytes));
+      if (j is Map<String, dynamic>) d = j;
+    } catch (_) {}
+    if (r.statusCode != 200) {
+      throw HetnaError((d['error'] ?? d['message'] ?? tr('No se pudo completar. Intenta de nuevo.')).toString());
+    }
+    return d;
+  }
+
+  /// { disponible, conectado, mp_user_id, conectado_en, comision_pct, comision_tope }
+  static Future<Map<String, dynamic>> estado(String token) async {
+    final r = await http.get(Uri.parse('$_ruta/estado'), headers: _cab(token)).timeout(const Duration(seconds: 20));
+    return _leer(r);
+  }
+
+  /// Liga para que el taller autorice su cuenta de Mercado Pago.
+  static Future<String> conectar(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/conectar'), headers: _cab(token), body: '{}').timeout(const Duration(seconds: 30));
+    final url = _leer(r)['url'] as String?;
+    if (url == null || url.isEmpty) throw HetnaError(tr('Mercado Pago no devolvió la liga.'));
+    return url;
+  }
+
+  static Future<void> desconectar(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/desconectar'), headers: _cab(token), body: '{}').timeout(const Duration(seconds: 30));
+    _leer(r);
+  }
+}
+
+// ═══════════════ Cobros en línea: PayPal del taller ═══════════════
+// El taller vincula su PayPal ("Iniciar sesión con PayPal"). Su cliente paga
+// el anticipo desde la liga y el dinero le llega completo a su PayPal; la
+// comisión HETNA de esos cobros se junta y se cobra el día 1 de cada mes.
+class PayPalTallerApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-paypal';
+
+  /// { disponible, conectado, email, comision_pct, comision_tope, comision_tope_usd, comision_pendiente }
+  static Future<Map<String, dynamic>> estado(String token) async {
+    final r = await http.get(Uri.parse('$_ruta/estado'), headers: MercadoPagoApi._cab(token)).timeout(const Duration(seconds: 20));
+    return MercadoPagoApi._leer(r);
+  }
+
+  static Future<String> conectar(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/conectar'), headers: MercadoPagoApi._cab(token), body: '{}').timeout(const Duration(seconds: 30));
+    final url = MercadoPagoApi._leer(r)['url'] as String?;
+    if (url == null || url.isEmpty) throw HetnaError(tr('PayPal no devolvió la liga.'));
+    return url;
+  }
+
+  static Future<void> desconectar(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/desconectar'), headers: MercadoPagoApi._cab(token), body: '{}').timeout(const Duration(seconds: 30));
+    MercadoPagoApi._leer(r);
+  }
+}
+
+// ═══════════════ Marketing en piloto automático ═══════════════
+// Las "recetas" (seguimiento, último aviso, anticipo pendiente, gracias +
+// reseña, reactivación) las corre el servidor cada mañana: el correo sale solo
+// y el WhatsApp queda en Marketing → Cola de hoy. Ver
+// packages/api/src/lib/cotizador-marketing.ts en hetnacnc.
+class MarketingApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-marketing';
+
+  /// { permitido, tabla_lista, recetas: [{clave, titulo, descripcion, recomendada,
+  ///   mensaje_sugerido, campos, activa, mensaje, correo, whatsapp, config}] }
+  static Future<Map<String, dynamic>> recetas(String token) async {
+    final r = await http.get(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token)).timeout(const Duration(seconds: 20));
+    return MercadoPagoApi._leer(r);
+  }
+
+  static Future<void> guardar(String token, Map<String, dynamic> cambios) async {
+    final r = await http.post(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token), body: jsonEncode(cambios))
+      .timeout(const Duration(seconds: 20));
+    MercadoPagoApi._leer(r);
+  }
+
+  /// Revisa ahora (sin esperar a mañana). { whatsapp, correos }
+  static Future<Map<String, dynamic>> correr(String token) async {
+    final r = await http.post(Uri.parse('$_ruta/correr'), headers: MercadoPagoApi._cab(token), body: '{}')
+      .timeout(const Duration(seconds: 90));
+    return MercadoPagoApi._leer(r);
+  }
+}
+
+// ═══════════════ Cotizador en línea del taller (Fase 3) ═══════════════
+// Página pública hetnacnc.com/t/<liga>: el cliente sube su archivo, ve un
+// precio estimado y manda su solicitud. Ver
+// packages/api/src/lib/cotizador-en-linea.ts en hetnacnc.
+class PaginaApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-pagina';
+
+  /// { tabla_lista, slug, url, pagina: {activa, titulo, descripcion, ciudad,
+  ///   servicios, mostrar_precio, en_directorio}, servicios: [{id, nombre, emoji}] }
+  static Future<Map<String, dynamic>> leer(String token) async {
+    final r = await http.get(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token)).timeout(const Duration(seconds: 20));
+    return MercadoPagoApi._leer(r);
+  }
+
+  static Future<Map<String, dynamic>> guardar(String token, Map<String, dynamic> cambios) async {
+    final r = await http.post(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token), body: jsonEncode(cambios))
+      .timeout(const Duration(seconds: 20));
+    return MercadoPagoApi._leer(r);
+  }
+}
+
+// ═══════════════ Factura electrónica CFDI 4.0 (Fase 4) ═══════════════
+// HETNA timbra con Facturapi: cada taller es una "organización" con su RFC y
+// su CSD. La app nunca ve llaves: todo pasa por hetnacnc.com. Ver
+// packages/api/src/lib/cotizador-cfdi.ts en hetnacnc.
+class FacturaApi {
+  static const _ruta = '${HetnaApi.base}/api/cotizador-cfdi';
+
+  /// { disponible, modo (prueba|real), plan_permite, configurado, listo,
+  ///   pendientes: [..], cupo: {incluidas (null = sin límite), usadas, precio_extra},
+  ///   regimenes: {clave: nombre}, datos: {razon_social, rfc, regimen, cp,
+  ///   csd_vence, clave_producto, clave_unidad, serie} }
+  static Future<Map<String, dynamic>> estado(String token) async {
+    final r = await http.get(Uri.parse(_ruta), headers: MercadoPagoApi._cab(token)).timeout(const Duration(seconds: 25));
+    return MercadoPagoApi._leer(r);
+  }
+
+  static Future<Map<String, dynamic>> guardarDatos(String token, Map<String, dynamic> datos) async {
+    final r = await http.post(Uri.parse('$_ruta/datos'), headers: MercadoPagoApi._cab(token), body: jsonEncode(datos))
+      .timeout(const Duration(seconds: 40));
+    return MercadoPagoApi._leer(r);
+  }
+
+  /// Sube el CSD (Certificado de Sello Digital): .cer, .key y su contraseña.
+  static Future<Map<String, dynamic>> subirCsd(String token, {
+    required List<int> cer, required String nombreCer,
+    required List<int> key, required String nombreKey,
+    required String password,
+  }) async {
+    final req = http.MultipartRequest('POST', Uri.parse('$_ruta/certificado'))
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['password'] = password
+      ..files.add(http.MultipartFile.fromBytes('cer', cer, filename: nombreCer))
+      ..files.add(http.MultipartFile.fromBytes('key', key, filename: nombreKey));
+    final r = await http.Response.fromStream(await req.send().timeout(const Duration(seconds: 60)));
+    return MercadoPagoApi._leer(r);
+  }
+
+  /// Timbra la factura de un pedido. { id, uuid, serie, folio, total, modo, extra, precio_extra, enviada_a }
+  static Future<Map<String, dynamic>> emitir(String token, Map<String, dynamic> datos) async {
+    final r = await http.post(Uri.parse('$_ruta/emitir'), headers: MercadoPagoApi._cab(token), body: jsonEncode(datos))
+      .timeout(const Duration(seconds: 60));
+    return MercadoPagoApi._leer(r);
+  }
+
+  /// PDF o XML de una factura (id de cfdi_emitidos).
+  static Future<Uint8List> archivo(String token, String id, String tipo) async {
+    final r = await http.get(Uri.parse('$_ruta/$id/$tipo'), headers: {'Authorization': 'Bearer $token'})
+      .timeout(const Duration(seconds: 40));
+    if (r.statusCode != 200) MercadoPagoApi._leer(r);
+    return r.bodyBytes;
+  }
+
+  static Future<String?> enviar(String token, String id, String correo) async {
+    final r = await http.post(Uri.parse('$_ruta/$id/enviar'), headers: MercadoPagoApi._cab(token), body: jsonEncode({'correo': correo}))
+      .timeout(const Duration(seconds: 30));
+    return MercadoPagoApi._leer(r)['enviada_a'] as String?;
+  }
+
+  /// motivo: 02 = con errores sin relación, 03 = no se llevó a cabo la operación.
+  static Future<String> cancelar(String token, String id, String motivo) async {
+    final r = await http.post(Uri.parse('$_ruta/$id/cancelar'), headers: MercadoPagoApi._cab(token), body: jsonEncode({'motivo': motivo}))
+      .timeout(const Duration(seconds: 40));
+    return (MercadoPagoApi._leer(r)['estado'] ?? 'cancelada').toString();
+  }
 }
 
 // ═══════════════ Suscripción con Mercado Pago o PayPal ═══════════════

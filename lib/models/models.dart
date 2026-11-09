@@ -18,6 +18,10 @@ class Cliente {
   final String tipoCliente;
   final String? notas;
   final DateTime? createdAt;
+  // CRM con seguimiento (supabase/crm_seguimiento.sql)
+  final String? proximoPaso;
+  final DateTime? proximoPasoFecha;
+  final DateTime? ultimoContacto;
 
   Cliente({
     this.id,
@@ -34,6 +38,9 @@ class Cliente {
     this.tipoCliente = 'Cliente potencial',
     this.notas,
     this.createdAt,
+    this.proximoPaso,
+    this.proximoPasoFecha,
+    this.ultimoContacto,
   });
 
   factory Cliente.fromJson(Map<String, dynamic> json) => Cliente(
@@ -51,6 +58,9 @@ class Cliente {
         tipoCliente: json['tipo_cliente'] ?? 'Cliente potencial',
         notas: json['notas'],
         createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at']) : null,
+        proximoPaso: json['proximo_paso'] as String?,
+        proximoPasoFecha: json['proximo_paso_fecha'] != null ? DateTime.tryParse(json['proximo_paso_fecha'].toString()) : null,
+        ultimoContacto: json['ultimo_contacto'] != null ? DateTime.tryParse(json['ultimo_contacto'].toString())?.toLocal() : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -188,6 +198,19 @@ class Producto {
 class CotizacionItem {
   final String? id;
   final String? productoId;
+  // Inventario conectado: material de la bodega que usa esta partida y
+  // cuántas unidades (hojas, kg). Lo llena el simulador.
+  final String? materialId;
+  final double? materialCantidad;
+  // Simulador 2.0: tiempo de máquina estimado por pieza (min), con qué
+  // máquina y material, para comparar con el tiempo real al maquinar
+  final double? tiempoMin;
+  final String? maquinaId;
+  final String? tipoMaterial;
+  final double? espesorMm;
+  // Dibujo (PNG base64) y medidas de la pieza, para que salgan en el PDF
+  final String? imagenPng;
+  final String? medidas;
   String nombreProducto;
   String? descripcion;
   final String? sku;
@@ -198,6 +221,14 @@ class CotizacionItem {
   CotizacionItem({
     this.id,
     this.productoId,
+    this.materialId,
+    this.materialCantidad,
+    this.tiempoMin,
+    this.maquinaId,
+    this.tipoMaterial,
+    this.espesorMm,
+    this.imagenPng,
+    this.medidas,
     required this.nombreProducto,
     this.descripcion,
     this.sku,
@@ -222,6 +253,14 @@ class CotizacionItem {
   factory CotizacionItem.fromJson(Map<String, dynamic> json) => CotizacionItem(
         id: json['id'],
         productoId: json['producto_id'],
+        materialId: json['material_id'],
+        materialCantidad: (json['material_cantidad'] as num?)?.toDouble(),
+        tiempoMin: (json['tiempo_min'] as num?)?.toDouble(),
+        maquinaId: json['maquina_id'],
+        tipoMaterial: json['tipo_material'],
+        espesorMm: (json['espesor_mm'] as num?)?.toDouble(),
+        imagenPng: json['imagen_png'],
+        medidas: json['medidas'],
         nombreProducto: json['nombre_producto'] ?? '',
         descripcion: json['descripcion'],
         sku: json['sku'],
@@ -234,6 +273,14 @@ class CotizacionItem {
         if (id != null) 'id': id,
         'cotizacion_id': cotizacionId,
         'producto_id': productoId,
+        if (materialId != null) 'material_id': materialId,
+        if (materialId != null) 'material_cantidad': materialCantidad,
+        if (tiempoMin != null) 'tiempo_min': tiempoMin,
+        if (maquinaId != null) 'maquina_id': maquinaId,
+        if (tipoMaterial != null) 'tipo_material': tipoMaterial,
+        if (espesorMm != null) 'espesor_mm': espesorMm,
+        if (imagenPng != null) 'imagen_png': imagenPng,
+        if (medidas != null) 'medidas': medidas,
         'nombre_producto': nombreProducto,
         'descripcion': descripcion,
         'sku': sku,
@@ -265,6 +312,21 @@ class Cotizacion {
   String? pdfUrl;
   final DateTime? createdAt;
   final double? totalBd; // total guardado en BD
+  // Liga pública (Fase 2): hetnacnc.com/c/<tokenPublico>. La pone el servidor.
+  final String? tokenPublico;
+  final DateTime? ligaVistaEn;
+  final DateTime? aceptadaEn;
+  final String? aceptadaPor;
+  // Anticipo pedido (monto fijo; si es null se calcula del % del método de pago)
+  double? anticipoMonto;
+  final double anticipoPagado;
+  final String anticipoEstado; // pendiente | pagado | sin_anticipo
+  // Fase 3: 'en_linea' si llegó por la página del taller (hetnacnc.com/t/...)
+  final String? origen;
+  final String? archivoRuta;   // en el bucket privado "solicitudes"
+  final String? archivoNombre;
+  final DateTime? updatedAt;
+  final String? motivoPerdida; // CRM: por qué se perdió (Rechazada/Vencida)
   // 'sencilla' (la de siempre) o 'profesional' (formato internacional).
   String tipo;
   // Datos técnicos de la cotización profesional (proyecto, alcance,
@@ -272,6 +334,12 @@ class Cotizacion {
   Map<String, dynamic> datosPro;
 
   bool get esProfesional => tipo == 'profesional';
+
+  /// Liga que se manda al cliente para ver, aceptar y pagar el anticipo.
+  String? get ligaPublica =>
+    (tokenPublico == null || tokenPublico!.isEmpty) ? null : 'https://hetnacnc.com/c/$tokenPublico';
+  bool get anticipoPagadoCompleto => anticipoEstado == 'pagado';
+  bool get esEnLinea => origen == 'en_linea';
 
   Cotizacion({
     this.id,
@@ -293,6 +361,18 @@ class Cotizacion {
     this.pdfUrl,
     this.createdAt,
     this.totalBd,
+    this.tokenPublico,
+    this.ligaVistaEn,
+    this.aceptadaEn,
+    this.aceptadaPor,
+    this.anticipoMonto,
+    this.anticipoPagado = 0,
+    this.anticipoEstado = 'pendiente',
+    this.origen,
+    this.archivoRuta,
+    this.archivoNombre,
+    this.updatedAt,
+    this.motivoPerdida,
     this.tipo = 'sencilla',
     Map<String, dynamic>? datosPro,
   }) : datosPro = datosPro ?? {};
@@ -307,6 +387,9 @@ class Cotizacion {
     fechaEntrega: fechaEntrega, diasHabiles: diasHabiles,
     vigenciaDias: vigenciaDias, notas: notas,
     pdfUrl: pdfUrl, createdAt: createdAt, totalBd: totalBd,
+    tokenPublico: tokenPublico, ligaVistaEn: ligaVistaEn, aceptadaEn: aceptadaEn, aceptadaPor: aceptadaPor,
+    anticipoMonto: anticipoMonto, anticipoPagado: anticipoPagado, anticipoEstado: anticipoEstado,
+    origen: origen, archivoRuta: archivoRuta, archivoNombre: archivoNombre,
     tipo: tipo, datosPro: datosPro);
 
   double get subtotal => items.fold(0, (s, i) => s + i.subtotal);
@@ -360,6 +443,18 @@ class Cotizacion {
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) : null,
       totalBd: (json['total'] as num?)?.toDouble(),
+      tokenPublico: json['token_publico'] as String?,
+      ligaVistaEn: json['liga_vista_en'] != null ? DateTime.tryParse(json['liga_vista_en']) : null,
+      aceptadaEn: json['aceptada_en'] != null ? DateTime.tryParse(json['aceptada_en']) : null,
+      aceptadaPor: json['aceptada_por'] as String?,
+      anticipoMonto: (json['anticipo_monto'] as num?)?.toDouble(),
+      anticipoPagado: (json['anticipo_pagado'] as num?)?.toDouble() ?? 0,
+      anticipoEstado: (json['anticipo_estado'] as String?) ?? 'pendiente',
+      origen: json['origen'] as String?,
+      archivoRuta: json['archivo_ruta'] as String?,
+      archivoNombre: json['archivo_nombre'] as String?,
+      updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
+      motivoPerdida: json['motivo_perdida'] as String?,
       tipo: (json['tipo'] as String?) ?? 'sencilla',
       datosPro: json['datos_pro'] is Map
           ? Map<String, dynamic>.from(json['datos_pro'] as Map) : null,
@@ -382,6 +477,10 @@ class Pedido {
   bool redesEnviadas;
   bool cuponSeguidorEnviado;
   final DateTime? createdAt;
+  // Guía de envío (Fase 2): el cliente la ve y la rastrea en su liga
+  String? paqueteria;
+  String? guia;
+  String? rastreoUrl;
 
   Pedido({
     this.id,
@@ -397,6 +496,9 @@ class Pedido {
     this.redesEnviadas = false,
     this.cuponSeguidorEnviado = false,
     this.createdAt,
+    this.paqueteria,
+    this.guia,
+    this.rastreoUrl,
   });
 
   int get porcentajeAvance {
@@ -434,6 +536,9 @@ class Pedido {
       cuponSeguidorEnviado: json['cupon_seguidor_enviado'] ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at']) : null,
+      paqueteria: json['paqueteria'] as String?,
+      guia: json['guia'] as String?,
+      rastreoUrl: json['rastreo_url'] as String?,
     );
   }
 }

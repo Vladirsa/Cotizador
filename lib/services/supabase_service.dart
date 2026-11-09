@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
+import 'whatsapp_service.dart';
 import '../models/models.dart';
 import '../i18n/tr.dart';
 
@@ -19,18 +20,37 @@ class SupabaseService {
       final list = res as List;
       if (list.isEmpty) {
         await _db.from('configuracion_empresa').insert({
-          'nombre_comercial': 'HETNA CNC',
+          'nombre_comercial': AuthService.nombreNegocio ?? '',
+          if (AuthService.telefonoNegocio != null) 'telefono1': AuthService.telefonoNegocio,
           if (negId != null) 'negocio_id': negId,
         });
         var query2 = _db.from('configuracion_empresa').select();
         if (negId != null) query2 = query2.eq('negocio_id', negId);
         final res2 = await query2.limit(1);
-        return (res2 as List).first as Map<String, dynamic>;
+        return _conDatosDelTaller((res2 as List).first as Map<String, dynamic>);
       }
-      return list.first as Map<String, dynamic>;
+      return _conDatosDelTaller(list.first as Map<String, dynamic>);
     } catch (e) {
-      return {'nombre_comercial': 'HETNA CNC'};
+      return _conDatosDelTaller({});
     }
+  }
+
+  // Antes la configuración nueva nacía con nombre "HETNA CNC" y los talleres
+  // que no lo cambiaron mandaban cotizaciones con ese nombre. Si el nombre está
+  // vacío o es el de HETNA (y el taller no es HETNA), se usa el del taller; lo
+  // mismo con el teléfono vacío. Sólo al leer: no se toca lo guardado.
+  static Map<String, dynamic> _conDatosDelTaller(Map<String, dynamic> cfg) {
+    final r = Map<String, dynamic>.from(cfg);
+    // Lada por defecto de WhatsApp según el país del taller
+    WhatsAppService.paisTaller = r['pais_factura'] == 'US' ? 'US' : 'MX';
+    final propio = (AuthService.nombreNegocio ?? '').trim();
+    final actual = (r['nombre_comercial'] ?? '').toString().trim();
+    final esDeHetna = actual.toUpperCase() == 'HETNA CNC' && !propio.toUpperCase().contains('HETNA');
+    if (propio.isNotEmpty && (actual.isEmpty || esDeHetna)) r['nombre_comercial'] = propio;
+    if (esDeHetna && propio.isEmpty) r['nombre_comercial'] = '';
+    final tel = (r['telefono1'] ?? '').toString().trim();
+    if (tel.isEmpty && (AuthService.telefonoNegocio ?? '').trim().isNotEmpty) r['telefono1'] = AuthService.telefonoNegocio;
+    return r;
   }
 
   static Future<void> guardarConfiguracion(Map<String, dynamic> datos) async {
@@ -190,15 +210,34 @@ class SupabaseService {
       final res = await _db.rpc('generar_folio_cotizacion');
       return res as String;
     } catch (_) {
+      // Folio provisional: el trigger del servidor lo reemplaza por el del
+      // taller al guardar (supabase/cupo_servidor.sql).
       return 'COT-${DateTime.now().millisecondsSinceEpoch}';
     }
   }
+
+  /// Cupo de cotizaciones del mes según el servidor (supabase/cupo_servidor.sql):
+  /// { limite (null = sin límite), usadas, quedan }. null si la función aún no
+  /// está instalada en la base: entonces la app usa su conteo de siempre.
+  static Future<Map<String, dynamic>?> cupoCotizaciones() async {
+    try {
+      final res = await _db.rpc('cupo_cotizaciones');
+      if (res is Map) return Map<String, dynamic>.from(res);
+      return null;
+    } catch (_) { return null; }
+  }
+
+  /// true si el error que devolvió Supabase es el rechazo del servidor por
+  /// cupo agotado (trigger cotizaciones_consumir_cupo).
+  static bool esErrorSinCupo(Object e) => e.toString().contains('SIN_CUPO');
 
   static Future<Cotizacion> crearCotizacion(
       Cotizacion cotizacion, List<CotizacionItem> items) async {
     final folio = await generarFolio();
     final resCot = await _db.from('cotizaciones').insert({
       'folio': folio,
+      // La fecha que eligió el taller en el formulario (antes se ignoraba)
+      if (cotizacion.createdAt != null) 'created_at': cotizacion.createdAt!.toIso8601String(),
       'cliente_id': cotizacion.clienteId ?? cotizacion.cliente?.id,
       'estado': cotizacion.estado,
       'subtotal': cotizacion.subtotal,
@@ -214,6 +253,8 @@ class SupabaseService {
       'dias_habiles': cotizacion.diasHabiles,
       'vigencia_dias': cotizacion.vigenciaDias,
       'notas': cotizacion.notas,
+      // Anticipo en monto fijo (Fase 2; la columna la crea supabase/liga_cotizacion.sql)
+      if (cotizacion.anticipoMonto != null) 'anticipo_monto': cotizacion.anticipoMonto,
       // Las columnas tipo/datos_pro solo se mandan en la profesional: así la
       // cotización sencilla se sigue guardando aunque la base aún no las tenga.
       if (cotizacion.esProfesional) 'tipo': 'profesional',
@@ -325,6 +366,7 @@ class SupabaseService {
       'metodo_pago': cotizacion.metodoPago,
       'condicion_entrega': cotizacion.condicionEntrega,
       'notas': cotizacion.notas,
+      if (cotizacion.anticipoMonto != null) 'anticipo_monto': cotizacion.anticipoMonto,
       if (incluirTipo || cotizacion.esProfesional) 'tipo': cotizacion.tipo,
       if (incluirTipo || cotizacion.esProfesional) 'datos_pro': cotizacion.datosPro,
       'updated_at': DateTime.now().toIso8601String(),
@@ -361,6 +403,12 @@ class SupabaseService {
       'total': cotizacion.total,
       'fecha_entrega_estimada': cotizacion.fechaEntrega?.toIso8601String().split('T')[0],
     }).select().single();
+    // Simulador 2.0: horas de máquina estimadas, para la fecha de entrega
+    // calculada y para compararlas con el tiempo real al maquinar
+    final minEst = cotizacion.items.fold(0.0, (s, i) => s + (i.tiempoMin ?? 0) * i.cantidad);
+    if (minEst > 0) {
+      try { await _db.from('pedidos').update({'tiempo_estimado_min': minEst}).eq('id', res['id']); } catch (_) {}
+    }
     return Pedido.fromJson(res as Map<String, dynamic>);
   }
 
@@ -390,6 +438,27 @@ class SupabaseService {
     await _db.from('pedido_avances').insert({
       'pedido_id': pedidoId, 'etapa': nuevaEtapa, 'descripcion': descripcion,
     });
+  }
+
+  // Guía de envío del pedido (columnas de supabase/avisos_y_seguimiento.sql)
+  static Future<void> guardarGuiaPedido(String pedidoId,
+      {String? paqueteria, String? guia, String? rastreoUrl}) async {
+    await _db.from('pedidos').update({
+      'paqueteria': (paqueteria ?? '').trim().isEmpty ? null : paqueteria!.trim(),
+      'guia': (guia ?? '').trim().isEmpty ? null : guia!.trim(),
+      'rastreo_url': (rastreoUrl ?? '').trim().isEmpty ? null : rastreoUrl!.trim(),
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', pedidoId);
+  }
+
+  /// Liga pública de la cotización del pedido: ahí el cliente ve también el
+  /// avance, las fotos y la guía (hetnacnc.com/c/<token>).
+  static Future<String?> ligaSeguimiento(String cotizacionId) async {
+    try {
+      final r = await _db.from('cotizaciones').select('token_publico').eq('id', cotizacionId).maybeSingle();
+      final t = (r as Map<String, dynamic>?)?['token_publico'] as String?;
+      return (t == null || t.isEmpty) ? null : 'https://hetnacnc.com/c/$t';
+    } catch (_) { return null; }
   }
 
   // ═══════════════════════════════════════════
@@ -724,7 +793,7 @@ class SupabaseService {
   static Future<Map<String, dynamic>> getDatosFiscalesCliente(String clienteId) async {
     try {
       final res = await _db.from('clientes')
-        .select('rfc_fiscal, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal')
+        .select('rfc_fiscal, razon_social, regimen_fiscal, uso_cfdi, cp_fiscal, correo')
         .eq('id', clienteId).single();
       return res as Map<String, dynamic>;
     } catch (_) { return {}; }
@@ -743,6 +812,16 @@ class SupabaseService {
       'estado': 'pendiente',
       'created_at': DateTime.now().toIso8601String(),
     });
+  }
+
+  /// Facturas timbradas (CFDI) del taller; las crea sólo el servidor.
+  static Future<List<Map<String, dynamic>>> getCfdiEmitidos({String? pedidoId, int limite = 50}) async {
+    try {
+      var q = _db.from('cfdi_emitidos').select();
+      if (pedidoId != null) q = q.eq('pedido_id', pedidoId);
+      final res = await q.order('creado', ascending: false).limit(limite);
+      return (res as List).map((j) => j as Map<String, dynamic>).toList();
+    } catch (_) { return []; }
   }
 
   static Future<List<Map<String, dynamic>>> getFacturasPedido(String pedidoId) async {
@@ -907,11 +986,14 @@ class SupabaseService {
   // ═══════════════════════════════════════════
   static Future<List<Map<String, dynamic>>> getColaMensajesHoy() async {
     try {
+      // Los de hoy y los que quedaron pendientes de días anteriores (antes
+      // desaparecían al día siguiente sin mandarse)
       final hoy = DateTime.now().toIso8601String().split('T')[0];
       final res = await _db.from('cola_mensajes_wa')
           .select('*, clientes(nombre, whatsapp, telefono)')
           .eq('estado', 'pendiente')
-          .eq('fecha_programada', hoy)
+          .lte('fecha_programada', hoy)
+          .order('fecha_programada')
           .order('created_at');
       return (res as List).map((j) => j as Map<String, dynamic>).toList();
     } catch (_) { return []; }
@@ -941,11 +1023,81 @@ class SupabaseService {
 
   static Future<int> countMensajesEnviadosHoy() async {
     try {
-      final hoy = DateTime.now().toIso8601String().split('T')[0];
+      final ahora = DateTime.now();
+      final inicio = DateTime(ahora.year, ahora.month, ahora.day).toUtc().toIso8601String();
       final res = await _db.from('cola_mensajes_wa')
-          .select().eq('estado', 'enviado').eq('fecha_programada', hoy);
+          .select('id').eq('estado', 'enviado').gte('enviado_at', inicio);
       return (res as List).length;
     } catch (_) { return 0; }
+  }
+
+  // ═══════════════════════════════════════════
+  // COTIZADOR EN LÍNEA (Fase 3)
+  // ═══════════════════════════════════════════
+  static Future<List<Map<String, dynamic>>> getSolicitudesEnLinea() async {
+    try {
+      final res = await _db.from('solicitudes_en_linea').select()
+        .order('creado', ascending: false).limit(40);
+      return (res as List).cast<Map<String, dynamic>>();
+    } catch (_) { return []; }
+  }
+
+  /// Liga temporal (1 hora) para abrir el archivo que subió el cliente.
+  static Future<String?> urlArchivoSolicitud(String ruta) async {
+    try {
+      return await _db.storage.from('solicitudes').createSignedUrl(ruta, 3600);
+    } catch (_) { return null; }
+  }
+
+  /// Convierte en cotización una solicitud que llegó sin cupo (o sin cotización).
+  static Future<Cotizacion> cotizacionDesdeSolicitud(Map<String, dynamic> s) async {
+    final medidas = Map<String, dynamic>.from((s['medidas'] as Map?) ?? {});
+    final partes = <String>[];
+    final largo = (medidas['largo'] as num?)?.toDouble() ?? 0;
+    final ancho = (medidas['ancho'] as num?)?.toDouble() ?? 0;
+    final alto = (medidas['alto'] as num?)?.toDouble() ?? 0;
+    if (largo > 0 && ancho > 0) partes.add('${largo.round()} × ${ancho.round()}${alto > 0 ? ' × ${alto.round()}' : ''} mm');
+    final corte = (medidas['corte_mm'] as num?)?.toDouble() ?? 0;
+    if (corte > 0) partes.add('corte ${(corte / 1000).toStringAsFixed(2)} m');
+    if ((s['archivo_nombre'] as String?)?.isNotEmpty == true) partes.add('Archivo: ${s['archivo_nombre']}');
+    if ((s['mensaje'] as String?)?.isNotEmpty == true) partes.add(s['mensaje'] as String);
+    final cantidad = (s['cantidad'] as num?)?.toInt() ?? 1;
+    final estimado = (s['estimado'] as num?)?.toDouble() ?? 0;
+    final item = CotizacionItem(
+      nombreProducto: (s['servicio'] as String?)?.isNotEmpty == true ? '${s['servicio']} — ${s['tipo'] ?? ''}' : 'Solicitud en línea',
+      descripcion: partes.join('\n'),
+      cantidad: cantidad,
+      precioUnitario: cantidad > 0 ? estimado / cantidad : estimado);
+    final cot = await crearCotizacion(Cotizacion(
+      clienteId: s['cliente_id'] as String?,
+      items: [item],
+      notas: '🌐 Solicitud desde tu cotizador en línea.'), [item]);
+    try {
+      await _db.from('cotizaciones').update({
+        'origen': 'en_linea',
+        if (s['archivo_ruta'] != null) 'archivo_ruta': s['archivo_ruta'],
+        if (s['archivo_nombre'] != null) 'archivo_nombre': s['archivo_nombre'],
+      }).eq('id', cot.id!);
+    } catch (_) {}
+    await _db.from('solicitudes_en_linea').update({'cotizacion_id': cot.id, 'estado': 'cotizada'}).eq('id', s['id']);
+    return cot;
+  }
+
+  /// Marketing automático: resultados de los últimos 30 días por receta
+  /// { receta: { enviados, correos, whatsapps, ganadas } }
+  static Future<Map<String, dynamic>> marketingResultados() async {
+    try {
+      final r = await _db.rpc('marketing_resultados');
+      return r is Map ? Map<String, dynamic>.from(r) : {};
+    } catch (_) { return {}; }
+  }
+
+  /// Comisiones HETNA de cobros con PayPal: { pendiente, en_cobro, liga }
+  static Future<Map<String, dynamic>> comisionesPendientes() async {
+    try {
+      final r = await _db.rpc('comisiones_pendientes');
+      return r is Map ? Map<String, dynamic>.from(r) : {};
+    } catch (_) { return {}; }
   }
 
   static Future<void> agregarAColaMarketing({

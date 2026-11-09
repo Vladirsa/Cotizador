@@ -544,11 +544,8 @@ class _AgendaScreenState extends State<AgendaScreen>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
-            border: Border(
-              left: BorderSide(color: e.completado ? AppColors.grisBorde : semaforo, width: 3),
-              top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-              right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-              bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+            border: Border.all(color: AppColors.grisBorde, width: 0.5),
+            boxShadow: [BoxShadow(color: e.completado ? AppColors.grisBorde : semaforo, offset: const Offset(-3, 0))]),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(children: [
@@ -1046,10 +1043,8 @@ class _AgendaBodyState extends State<AgendaBody>
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-          border: Border(left: BorderSide(color: e.completado ? AppColors.grisBorde : sem, width: 3),
-            top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-            right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-            bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5),
+          boxShadow: [BoxShadow(color: e.completado ? AppColors.grisBorde : sem, offset: const Offset(-3, 0))]),
         child: Padding(padding: const EdgeInsets.all(10),
           child: Row(children: [
             Text(tr(e.tipoEmoji), style: const TextStyle(fontSize: 18)),

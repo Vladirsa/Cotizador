@@ -4,9 +4,13 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'pagina_en_linea_screen.dart';
+import 'facturacion_config_screen.dart';
 import '../main.dart';
 import '../services/notificaciones_service.dart';
 import '../services/supabase_service.dart';
+import '../services/whatsapp_service.dart';
 import '../services/auth_service.dart';
 import '../services/hetna_api.dart';
 import '../services/woocommerce_service.dart';
@@ -62,6 +66,14 @@ class _ConfigScreenState extends State<ConfigScreen> {
   String _paisFactura = 'MX';
   final _codigoVinculo = TextEditingController();
   bool _vinculando = false;
+  // Cobros en línea (Fase 2): estado de la cuenta de Mercado Pago del taller
+  Map<String, dynamic>? _mp;
+  bool _mpCargando = false;
+  bool _mpTrabajando = false;
+  // PayPal del taller
+  Map<String, dynamic>? _pp;
+  Map<String, dynamic> _comisiones = {};
+  bool _ppTrabajando = false;
   String _regimenFiscal = '612';
 
   final _proveedores = ['Facturapi', 'SAT Directo', 'Contpaqi', 'Aspel', 'Otro'];
@@ -77,6 +89,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
   void initState() {
     super.initState();
     _cargar();
+    _cargarMp();
+    _cargarPp();
   }
 
   @override
@@ -163,13 +177,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
         'color_primario'        : _colorPrimario,
         'color_secundario'      : _colorSecundario,
         if (_logoUrl != null) 'logo_url': _logoUrl,
-        'factura_api_key'       : _apiKeyCtrl.text.trim(),
-        'factura_api_url'       : _apiUrlCtrl.text.trim(),
-        'factura_rfc_emisor'    : _rfcEmisorCtrl.text.trim().toUpperCase(),
-        'factura_serie'         : _serieCtrl.text.trim().toUpperCase(),
-        'factura_activo'        : _facturaActivo,
-        'factura_proveedor'     : _proveedor,
-        'factura_regimen_fiscal': _regimenFiscal,
+        // La llave de facturación ya no vive en la app (la maneja el servidor
+        // de HETNA): se borra la que se haya capturado antes.
+        'factura_api_key'       : '',
+        'factura_api_url'       : '',
       });
       // Aparte, para que si la base todavía no tiene estas columnas no se
       // pierda el resto de la configuración.
@@ -179,6 +190,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       });
       // Columna nueva: aparte, por si la base todavía no la tiene
       await SupabaseService.guardarConfiguracion({'pais_factura': _paisFactura});
+      WhatsAppService.paisTaller = _paisFactura;
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(tr('✅ Configuración guardada')),
         backgroundColor: AppColors.verde));
@@ -220,6 +232,30 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion(tr('🔗 CUENTA DE HETNACNC.COM')),
               const SizedBox(height: 8),
               _seccionVincular(),
+
+              const SizedBox(height: 20),
+
+              // ── COBROS EN LÍNEA ──
+              _seccion(tr('💳 COBROS EN LÍNEA · MERCADO PAGO Y PAYPAL')),
+              const SizedBox(height: 8),
+              _seccionMercadoPago(),
+              const SizedBox(height: 14),
+              _seccionPayPal(),
+
+              const SizedBox(height: 20),
+
+              // ── COTIZADOR EN LÍNEA (Fase 3) ──
+              _seccion(tr('🌐 TU COTIZADOR EN LÍNEA')),
+              const SizedBox(height: 8),
+              Material(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                    side: const BorderSide(color: AppColors.grisBorde, width: 0.5)),
+                  leading: const Icon(Icons.public, color: AppColors.azul),
+                  title: Text(tr('Tu página para que te lleguen clientes'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  subtitle: Text(tr('El cliente sube su archivo y ve el precio; te llega como cotización.'), style: const TextStyle(fontSize: 11)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PaginaEnLineaScreen())))),
 
               const SizedBox(height: 20),
 
@@ -353,26 +389,22 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion(tr('🧾 FACTURACIÓN ELECTRÓNICA')),
               const SizedBox(height: 8),
 
-              // Toggle activar facturación
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-                child: Row(children: [
-                  const Icon(Icons.receipt_long_outlined, size: 20, color: AppColors.azul),
-                  const SizedBox(width: 10),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(tr('Activar facturación'), style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    Text(tr('Habilita el botón de facturar en pedidos'),
-                      style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                  ])),
-                  Switch(
-                    value: _facturaActivo,
-                    activeColor: AppColors.azul,
-                    onChanged: (v) => setState(() => _facturaActivo = v)),
-                ])),
+              // Factura electrónica real (Fase 4): datos fiscales y CSD en su pantalla
+              Material(color: Colors.white, borderRadius: BorderRadius.circular(10),
+                child: ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
+                    side: const BorderSide(color: AppColors.grisBorde, width: 0.5)),
+                  leading: const Icon(Icons.receipt_long_outlined, color: AppColors.azul),
+                  title: Text(tr('Factura electrónica CFDI 4.0'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                  subtitle: Text(tr('Tus datos fiscales y tu CSD para timbrar desde cada pedido.'), style: const TextStyle(fontSize: 11)),
+                  trailing: Icon(AuthService.puede('facturacion') ? Icons.chevron_right : Icons.lock_outline),
+                  onTap: () async {
+                    if (!AuthService.puede('facturacion')) {
+                      await AuthService.exigirModulo(context, 'facturacion', funcion: tr('Facturación (CFDI)'));
+                      return;
+                    }
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturacionConfigScreen()));
+                  })),
 
               const SizedBox(height: 10),
               // País: cambia etiquetas (RFC / Tax ID, IVA / sales tax) en PDFs
@@ -400,113 +432,6 @@ class _ConfigScreenState extends State<ConfigScreen> {
                   Text(tr('🚚 Envíos: por el momento solo dentro de México. Esta leyenda sale en tus cotizaciones.'),
                     style: const TextStyle(fontSize: 11, color: AppColors.naranja, fontWeight: FontWeight.w600)),
                 ])),
-
-              if (_facturaActivo) ...[
-                const SizedBox(height: 10),
-
-                // Proveedor
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white, borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-                  child: DropdownButtonFormField<String>(
-                    value: _proveedor,
-                    decoration: InputDecoration(
-                      labelText: tr('Proveedor de facturación'),
-                      border: InputBorder.none,
-                      prefixIcon: Icon(Icons.cloud_outlined, size: 18, color: AppColors.azul)),
-                    items: _proveedores.map((p) => DropdownMenuItem(value: p, child: Text(tr(p)))).toList(),
-                    onChanged: (v) => setState(() => _proveedor = v!))),
-
-                const SizedBox(height: 8),
-
-                // Info box
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.azul.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.azul.withOpacity(0.2))),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(children: [
-                      const Icon(Icons.info_outline, size: 14, color: AppColors.azul),
-                      const SizedBox(width: 6),
-                      Text(trf('Configuración de {0}', [_proveedor]),
-                        style: const TextStyle(fontSize: 12, color: AppColors.azul, fontWeight: FontWeight.w600)),
-                    ]),
-                    const SizedBox(height: 6),
-                    Text(
-                      tr('Obtén tu API Key desde el panel de tu proveedor y pégala aquí. Cuando estés listo, la conexión se activa automáticamente.'),
-                      style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-                  ])),
-
-                const SizedBox(height: 8),
-
-                // API Key
-                _campoPassword(_apiKeyCtrl, tr('API Key'), Icons.key_outlined,
-                  hint: 'sk_live_xxxxxxxxxxxxxxxxxxxx'),
-
-                // API URL
-                _campo(_apiUrlCtrl, tr('URL del API'), Icons.link_outlined,
-                  tipo: TextInputType.url,
-                  hint: 'https://api.facturapi.io/v2'),
-
-                // RFC emisor
-                _campo(_rfcEmisorCtrl, tr('RFC del emisor (tu empresa)'), Icons.badge_outlined,
-                  mayusculas: true, hint: 'XAXX010101000'),
-
-                // Régimen fiscal
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white, borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.grisBorde, width: 0.5)),
-                  child: DropdownButtonFormField<String>(
-                    value: _regimenFiscal,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: tr('Régimen fiscal'),
-                      border: InputBorder.none,
-                      prefixIcon: Icon(Icons.account_balance_outlined, size: 18, color: AppColors.azul)),
-                    items: _regimenesFiscales.entries.map((e) =>
-                      DropdownMenuItem(value: e.key,
-                        child: Text(tr(e.value), style: const TextStyle(fontSize: 12)))).toList(),
-                    onChanged: (v) => setState(() => _regimenFiscal = v!))),
-
-                // Serie
-                _campo(_serieCtrl, tr('Serie de comprobante'), Icons.tag_outlined,
-                  hint: 'A', mayusculas: true),
-
-                const SizedBox(height: 8),
-
-                // Estado de conexión
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _apiKeyCtrl.text.isNotEmpty
-                      ? AppColors.verde.withOpacity(0.05)
-                      : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: _apiKeyCtrl.text.isNotEmpty
-                        ? AppColors.verde.withOpacity(0.3)
-                        : AppColors.grisBorde)),
-                  child: Row(children: [
-                    Icon(
-                      _apiKeyCtrl.text.isNotEmpty ? Icons.check_circle_outline : Icons.radio_button_unchecked,
-                      size: 16,
-                      color: _apiKeyCtrl.text.isNotEmpty ? AppColors.verde : AppColors.textoSecundario),
-                    const SizedBox(width: 8),
-                    Text(
-                      tr(_apiKeyCtrl.text.isNotEmpty
-                        ? tr('API Key configurada — lista para conectar')
-                        : tr('Pendiente configurar API Key')),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _apiKeyCtrl.text.isNotEmpty ? AppColors.verde : AppColors.textoSecundario)),
-                  ])),
-              ],
 
               const SizedBox(height: 32),
             ])));
@@ -593,6 +518,205 @@ class _ConfigScreenState extends State<ConfigScreen> {
 
   void _aviso(String m) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  // ── Mercado Pago del taller ──────────────────────────────────────────
+  Future<void> _cargarMp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null || !AuthService.esAdmin) return;
+    setState(() => _mpCargando = true);
+    try {
+      final e = await MercadoPagoApi.estado(token);
+      if (mounted) setState(() => _mp = e);
+    } catch (_) {
+      // sin red: se deja la sección con el botón para reintentar
+    } finally {
+      if (mounted) setState(() => _mpCargando = false);
+    }
+  }
+
+  Future<void> _conectarMp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null) return;
+    setState(() => _mpTrabajando = true);
+    try {
+      final url = await MercadoPagoApi.conectar(token);
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+      await showDialog(context: context, builder: (ctx) => AlertDialog(
+        title: Text(tr('Autoriza en Mercado Pago')),
+        content: Text(tr('Se abrió Mercado Pago. Entra con la cuenta de tu taller y presiona "Autorizar". Cuando termines, regresa aquí y toca "Ya autoricé".')),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Ya autoricé')))]));
+      await _cargarMp();
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _mpTrabajando = false);
+    }
+  }
+
+  Future<void> _desconectarMp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null) return;
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(tr('¿Desconectar Mercado Pago?')),
+      content: Text(tr('Tus clientes ya no podrán pagar el anticipo desde la liga de la cotización hasta que vuelvas a conectarla.')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancelar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Desconectar'))),
+      ]));
+    if (ok != true) return;
+    setState(() => _mpTrabajando = true);
+    try {
+      await MercadoPagoApi.desconectar(token);
+      await _cargarMp();
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _mpTrabajando = false);
+    }
+  }
+
+  // ── PayPal del taller ────────────────────────────────────────────────
+  Future<void> _cargarPp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null || !AuthService.esAdmin) return;
+    try {
+      final r = await Future.wait([PayPalTallerApi.estado(token), SupabaseService.comisionesPendientes()]);
+      if (mounted) setState(() { _pp = r[0]; _comisiones = r[1]; });
+    } catch (_) {}
+  }
+
+  Future<void> _conectarPp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null) return;
+    setState(() => _ppTrabajando = true);
+    try {
+      final url = await PayPalTallerApi.conectar(token);
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+      await showDialog(context: context, builder: (ctx) => AlertDialog(
+        title: Text(tr('Vincula tu PayPal')),
+        content: Text(tr('Se abrió PayPal. Entra con la cuenta de tu taller y acepta. Cuando termines, regresa aquí y toca "Ya lo vinculé".')),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Ya lo vinculé')))]));
+      await _cargarPp();
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _ppTrabajando = false);
+    }
+  }
+
+  Future<void> _desconectarPp() async {
+    final token = AuthService.sesion?.accessToken;
+    if (token == null) return;
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      title: Text(tr('¿Desvincular PayPal?')),
+      content: Text(tr('Tus clientes ya no verán el botón de PayPal en la liga de la cotización.')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Cancelar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Desvincular'))),
+      ]));
+    if (ok != true) return;
+    setState(() => _ppTrabajando = true);
+    try {
+      await PayPalTallerApi.desconectar(token);
+      await _cargarPp();
+    } catch (e) {
+      _aviso(e.toString());
+    } finally {
+      if (mounted) setState(() => _ppTrabajando = false);
+    }
+  }
+
+  Widget _seccionPayPal() {
+    if (!AuthService.esAdmin) return const SizedBox.shrink();
+    final conectado = _pp?['conectado'] == true;
+    final disponible = _pp == null || _pp?['disponible'] != false;
+    final pendiente = ((_comisiones['pendiente'] as num?) ?? (_pp?['comision_pendiente'] as num?) ?? 0).toDouble();
+    final enCobro = ((_comisiones['en_cobro'] as num?) ?? 0).toDouble();
+    final liga = _comisiones['liga'] as String?;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(tr('También puedes vincular tu PayPal: el cliente paga con su cuenta PayPal o tarjeta y el dinero te llega completo. La comisión HETNA de esos cobros (la misma de tu plan) se junta y se cobra el día 1 de cada mes.'),
+        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      const SizedBox(height: 10),
+      if (conectado)
+        Row(children: [
+          const Icon(Icons.check_circle, color: AppColors.verde, size: 20),
+          const SizedBox(width: 8),
+          Expanded(child: Text(trf('PayPal vinculado ({0})', [_pp?['email'] ?? '']),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+          TextButton(onPressed: _ppTrabajando ? null : _desconectarPp,
+            child: Text(tr('Desvincular'), style: const TextStyle(fontSize: 12, color: AppColors.rojo))),
+        ])
+      else
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFFC439), minimumSize: const Size(0, 46)),
+          onPressed: (_ppTrabajando || !disponible) ? null : _conectarPp,
+          icon: _ppTrabajando
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+            : const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Color(0xFF111111)),
+          label: Text(disponible ? tr('Vincular mi PayPal') : tr('Próximamente'),
+            style: const TextStyle(color: Color(0xFF111111), fontWeight: FontWeight.w700))),
+      if (pendiente > 0 || enCobro > 0) ...[
+        const SizedBox(height: 10),
+        Container(width: double.infinity, padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(color: AppColors.ambarClaro, borderRadius: BorderRadius.circular(10)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (pendiente > 0)
+              Text(trf('Comisión HETNA acumulada este mes: \${0}. Se cobra el día 1.', [pendiente.toStringAsFixed(2)]),
+                style: const TextStyle(fontSize: 12)),
+            if (enCobro > 0) ...[
+              Text(trf('Comisión por pagar: \${0}', [enCobro.toStringAsFixed(2)]),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              if (liga != null && liga.isNotEmpty)
+                TextButton(onPressed: () => launchUrl(Uri.parse(liga), mode: LaunchMode.externalApplication),
+                  child: Text(tr('Pagar comisión'))),
+            ],
+          ])),
+      ],
+    ]);
+  }
+
+  Widget _seccionMercadoPago() {
+    if (!AuthService.esAdmin) {
+      return Text(tr('Solo el administrador del taller puede conectar la cuenta de Mercado Pago.'),
+        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario));
+    }
+    final conectado = _mp?['conectado'] == true;
+    final disponible = _mp == null || _mp?['disponible'] != false;
+    final pct = _mp?['comision_pct'];
+    final tope = _mp?['comision_tope'];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(tr('Conecta la cuenta de Mercado Pago de tu taller y tus clientes podrán pagar el anticipo desde la liga de la cotización (tarjeta, transferencia, efectivo o saldo). El dinero entra directo a tu cuenta.'),
+        style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      if (pct != null) ...[
+        const SizedBox(height: 6),
+        Text(trf('Comisión HETNA con tu plan: {0}% por cobro (máximo \${1}). La comisión de Mercado Pago la cobra Mercado Pago. Con un plan más alto la comisión baja.', [pct, tope ?? 150]),
+          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+      ],
+      const SizedBox(height: 10),
+      if (_mpCargando)
+        const Center(child: Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))))
+      else if (conectado)
+        Row(children: [
+          const Icon(Icons.check_circle, color: AppColors.verde, size: 20),
+          const SizedBox(width: 8),
+          Expanded(child: Text(trf('Conectado (cuenta {0})', [_mp?['mp_user_id'] ?? '']),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+          TextButton(onPressed: _mpTrabajando ? null : _desconectarMp,
+            child: Text(tr('Desconectar'), style: const TextStyle(fontSize: 12, color: AppColors.rojo))),
+        ])
+      else
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF009EE3), minimumSize: const Size(0, 46)),
+          onPressed: (_mpTrabajando || !disponible) ? null : _conectarMp,
+          icon: _mpTrabajando
+            ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+            : const Icon(Icons.account_balance_wallet_outlined, size: 18, color: Colors.white),
+          label: Text(disponible ? tr('Conectar mi Mercado Pago') : tr('Próximamente'),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700))),
+    ]);
   }
 
   Widget _seccionVincular() {

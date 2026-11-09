@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -12,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import 'archivo_cad_service.dart';
 import 'auth_service.dart';
+import 'whatsapp_service.dart';
 import '../main.dart';
 
 class PdfService {
@@ -65,7 +67,11 @@ class PdfService {
 
   /// Pregunta en qué idioma sale el PDF. Devuelve null si el usuario cierra
   /// el diálogo sin elegir.
-  static Future<bool?> elegirIdioma(BuildContext context) {
+  // El PDF sale en el idioma de la app (Configuración → Idioma); ya no se
+  // pregunta cada vez. Para forzar otro idioma, generarCotizacion(ingles: …).
+  static Future<bool?> elegirIdioma(BuildContext context) async => enIngles;
+
+  static Future<bool?> elegirIdiomaDialogo(BuildContext context) {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -99,8 +105,9 @@ class PdfService {
     }
   }
 
-  // Descarga el logo configurado por el taller (logo_url). Si no hay
-  // logo propio o falla la descarga, usa el logo genérico por defecto.
+  // Descarga el logo configurado por el taller (logo_url). Si no hay logo
+  // propio o falla la descarga, no se pone ninguno: el encabezado muestra el
+  // nombre del taller (nunca el logo de HETNA en documentos de otro taller).
   static Future<Uint8List> _obtenerLogoBytes(Map<String, dynamic> empresa) async {
     final logoUrl = empresa['logo_url'] as String?;
     if (logoUrl != null && logoUrl.trim().isNotEmpty) {
@@ -112,14 +119,12 @@ class PdfService {
         }
       } catch (_) {}
     }
-    return _logoBytes;
+    return Uint8List(0);
   }
 
-  static const String _logoB64 = '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';
+  static bool _vacio(dynamic v) => v == null || v.toString().trim().isEmpty;
 
-  static Uint8List get _logoBytes {
-    try { return base64Decode(_logoB64); } catch (_) { return Uint8List(0); }
-  }
+
 
   static Future<void> verPdf(Uint8List bytes) async {
     await Printing.layoutPdf(onLayout: (_) async => bytes);
@@ -154,7 +159,46 @@ class PdfService {
   // u "Otra app" (el menú normal de Android, para cualquier otra cosa
   // — correo, Drive, la otra app de WhatsApp, etc.)
   static Future<void> mostrarOpcionesEnvio(
-      BuildContext context, Uint8List bytes, String nombre) async {
+      BuildContext context, Uint8List bytes, String nombre,
+      {String? whatsapp, String? mensaje}) async {
+    // En la web (computadora) no hay apps de Android: se descarga el PDF y, si
+    // hay número, se abre WhatsApp Web con el mensaje para adjuntar el archivo.
+    if (kIsWeb) {
+      await showModalBottomSheet(context: context, backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text(tr('¿Cómo quieres enviarlo?'),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            Text(tr('Descarga el PDF y adjúntalo en WhatsApp Web; el mensaje ya va listo.'),
+              style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario), textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            SizedBox(width: double.infinity, child: ElevatedButton.icon(
+              onPressed: () async { Navigator.pop(ctx); await compartirPdf(bytes, nombre); },
+              icon: const Icon(Icons.download_outlined, color: Colors.white),
+              label: Text(tr('Descargar PDF'), style: const TextStyle(color: Colors.white)),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.azul,
+                padding: const EdgeInsets.symmetric(vertical: 12)))),
+            if (whatsapp != null && whatsapp.trim().isNotEmpty) ...[
+              const SizedBox(height: 10),
+              SizedBox(width: double.infinity, child: ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await compartirPdf(bytes, nombre);
+                  await WhatsAppService.abrirChat(numero: whatsapp, mensaje: mensaje ?? '');
+                },
+                icon: const Icon(Icons.chat, color: Colors.white),
+                label: Text(tr('Descargar y abrir WhatsApp Web'), style: const TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366),
+                  padding: const EdgeInsets.symmetric(vertical: 12)))),
+            ],
+            const SizedBox(height: 8),
+          ])));
+      return;
+    }
     await showModalBottomSheet(context: context, backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
         padding: const EdgeInsets.all(20),
@@ -219,13 +263,13 @@ class PdfService {
     const verde = PdfColor.fromInt(0xFF1d9e75);
     const blanco70 = PdfColor.fromInt(0xB3FFFFFF);
 
-    final nombreEmpresa = empresa['nombre_comercial'] ?? _t('HETNA CNC');
+    final nombreEmpresa = (_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']);
     final rfcEmpresa = empresa['rfc'] ?? '';
     final direccion = empresa['direccion'] ?? '';
     final tel1 = empresa['telefono1'] ?? '';
     final tel2 = empresa['telefono2'] ?? '';
     final correoEmpresa = empresa['correo'] ?? '';
-    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final web = empresa['sitio_web'] ?? '';
     final cliente = cotizacion.cliente;
     final folio = cotizacion.folio ?? 'COT-${DateTime.now().millisecondsSinceEpoch}';
     final fecha = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
@@ -246,10 +290,9 @@ class PdfService {
             children: [
               pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                 if (logoImage != null)
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: pw.BoxDecoration(color: PdfColors.white, borderRadius: pw.BorderRadius.circular(4)),
-                    child: pw.Image(logoImage, width: 100, height: 28, fit: pw.BoxFit.contain))
+                  // Sin caja blanca: el logo va directo sobre el encabezado
+                  // (si el PNG tiene fondo transparente, se ve limpio)
+                  pw.Image(logoImage, width: 110, height: 32, fit: pw.BoxFit.contain)
                 else
                   pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
                 pw.SizedBox(height: 8),
@@ -312,16 +355,25 @@ class PdfService {
                 decoration: pw.BoxDecoration(color: i.isEven ? PdfColors.white : grisClaro),
                 children: [
                   pw.Padding(padding: const pw.EdgeInsets.all(7),
-                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                      pw.Text(nombreLimpio,
-                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
-                      if (descLimpia != null)
-                        pw.Padding(padding: const pw.EdgeInsets.only(top: 2),
-                          child: pw.Text(descLimpia,
-                            style: pw.TextStyle(fontSize: 8, color: grisTexto))),
-                      if (item.sku != null && item.sku!.isNotEmpty)
-                        pw.Text('SKU: ${item.sku}',
-                          style: pw.TextStyle(fontSize: 7, color: grisTexto)),
+                    child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      if (_miniatura(item.imagenPng) != null)
+                        pw.Container(width: 78, height: 50, margin: const pw.EdgeInsets.only(right: 6),
+                          decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400, width: 0.5)),
+                          child: pw.Image(_miniatura(item.imagenPng)!, fit: pw.BoxFit.contain)),
+                      pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                        pw.Text(nombreLimpio,
+                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+                        if (descLimpia != null)
+                          pw.Padding(padding: const pw.EdgeInsets.only(top: 2),
+                            child: pw.Text(descLimpia,
+                              style: pw.TextStyle(fontSize: 8, color: grisTexto))),
+                        if (item.medidas != null && item.medidas!.isNotEmpty)
+                          pw.Text('${_t('Medidas')}: ${_limpiarTexto(item.medidas!)}',
+                            style: pw.TextStyle(fontSize: 7.5, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+                        if (item.sku != null && item.sku!.isNotEmpty)
+                          pw.Text('SKU: ${item.sku}',
+                            style: pw.TextStyle(fontSize: 7, color: grisTexto)),
+                      ])),
                     ])),
                   _cD('${item.cantidad}', center: true),
                   _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
@@ -417,12 +469,12 @@ class PdfService {
       .map((l) => l.trim().replaceFirst(RegExp(r'^[-*]\s*'), ''))
       .where((l) => l.isNotEmpty).toList();
 
-    final nombreEmpresa = _limpiarTexto(empresa['nombre_comercial'] ?? _t('HETNA CNC'));
+    final nombreEmpresa = _limpiarTexto((_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']));
     final rfcEmpresa = empresa['rfc'] ?? '';
     final direccion = _limpiarTexto(empresa['direccion'] ?? '');
     final tel1 = empresa['telefono1'] ?? '';
     final correoEmpresa = empresa['correo'] ?? '';
-    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final web = empresa['sitio_web'] ?? '';
     final cliente = cotizacion.cliente;
     final folio = cotizacion.folio ?? 'COT-${DateTime.now().millisecondsSinceEpoch}';
     final revision = v('revision').isEmpty ? 'A' : v('revision');
@@ -505,6 +557,19 @@ class PdfService {
       espesor: numPro('croquis_espesor'), barrenoD: numPro('croquis_barreno_d'),
       barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto,
       trazos: trazosArch, es3D: infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj'));
+    // Dibujo de la pieza que mandó el Simulador 2.0 (3D sombreado o 2D con cotas)
+    pw.Widget? imagenPieza;
+    if (d['archivo_png'] is String) {
+      try {
+        final bytes = base64Decode(d['archivo_png'] as String);
+        if (bytes.isNotEmpty) {
+          imagenPieza = pw.Container(
+            width: double.infinity, height: 200, padding: const pw.EdgeInsets.all(4),
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: grisLinea, width: 0.5), borderRadius: pw.BorderRadius.circular(4)),
+            child: pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.contain));
+        }
+      } catch (_) {}
+    }
     // Datos técnicos que salen del archivo (DXF/SVG/STL/OBJ)
     if (infoArch != null) {
       String nf(dynamic x, [int dec = 1]) => _fmtN(((x as num?) ?? 0).toDouble(), dec);
@@ -554,7 +619,7 @@ class PdfService {
             pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
             if (rfcEmpresa.isNotEmpty) pw.Text('${_etqRfc(empresa)}: $rfcEmpresa', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
             if (direccion.isNotEmpty) pw.Text(direccion, style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
-            pw.Text([if (tel1.isNotEmpty) _tf('Tel: {0}', [tel1]), if (correoEmpresa.isNotEmpty) correoEmpresa, web].join('  ·  '),
+            pw.Text([if (tel1.isNotEmpty) _tf('Tel: {0}', [tel1]), if (correoEmpresa.isNotEmpty) correoEmpresa, if (web.toString().isNotEmpty) web].join('  ·  '),
               style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
           ])),
           pw.Container(
@@ -617,10 +682,12 @@ class PdfService {
         ],
 
         // ─── 3. DETALLE TÉCNICO ─────────────
-        if (hay(tecnicos) || croquis != null) ...[
+        if (hay(tecnicos) || croquis != null || imagenPieza != null) ...[
           titulo(sig(), _t('DETALLE TÉCNICO')),
           if (hay(tecnicos)) datos(tecnicos),
-          if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
+          // Pieza 3D: la imagen sombreada en vez del croquis plano; 2D: el croquis con cotas
+          if (imagenPieza != null && (croquis == null || (infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj')))) ...[pw.SizedBox(height: 8), imagenPieza]
+          else if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
         ],
 
         // ─── 4. FABRICACIÓN ─────────────────
@@ -649,12 +716,21 @@ class PdfService {
                 children: [
                   _cD('${i + 1}', center: true),
                   pw.Padding(padding: const pw.EdgeInsets.all(6),
-                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                      pw.Text(_limpiarTexto(item.nombreProducto),
-                        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
-                      if (desc.isNotEmpty) pw.Text(_limpiarTexto(desc), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
-                      if (item.sku != null && item.sku!.isNotEmpty)
-                        pw.Text(_tf('No. de parte: {0}', [(item.sku)]), style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
+                    child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      if (_miniatura(item.imagenPng) != null) ...[
+                        pw.Container(width: 78, height: 50, margin: const pw.EdgeInsets.only(right: 6),
+                          decoration: pw.BoxDecoration(border: pw.Border.all(color: grisLinea, width: 0.5)),
+                          child: pw.Image(_miniatura(item.imagenPng)!, fit: pw.BoxFit.contain)),
+                      ],
+                      pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                        pw.Text(_limpiarTexto(item.nombreProducto),
+                          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
+                        if (desc.isNotEmpty) pw.Text(_limpiarTexto(desc), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+                        if (item.medidas != null && item.medidas!.isNotEmpty)
+                          pw.Text('${_t('Medidas')}: ${_limpiarTexto(item.medidas!)}', style: pw.TextStyle(fontSize: 7.5, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+                        if (item.sku != null && item.sku!.isNotEmpty)
+                          pw.Text(_tf('No. de parte: {0}', [(item.sku)]), style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
+                      ])),
                     ])),
                   _cD('${item.cantidad}', center: true),
                   _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
@@ -757,6 +833,15 @@ class PdfService {
   // ── Croquis acotado de la pieza (vista superior + lateral) ──
   // Dibuja un rectángulo de largo × ancho con sus cotas, barrenos opcionales
   // y, si hay espesor, una vista lateral. Ilustrativo, no a escala real.
+  // Miniatura de la pieza guardada en la partida (PNG base64)
+  static final Map<String, pw.MemoryImage> _cacheMini = {};
+  static pw.MemoryImage? _miniatura(String? b64) {
+    if (b64 == null || b64.isEmpty) return null;
+    try {
+      return _cacheMini.putIfAbsent(b64.hashCode.toString(), () => pw.MemoryImage(base64Decode(b64)));
+    } catch (_) { return null; }
+  }
+
   static pw.Widget? _croquisPieza({
     required double largo, required double ancho, required double espesor,
     required double barrenoD, required int barrenos,
@@ -837,7 +922,7 @@ class PdfService {
                 // Pieza (vista superior): archivo real o rectángulo
                 c.setStrokeColor(azul);
                 if (trazos.isNotEmpty) {
-                  c.setLineWidth(es3D ? 0.25 : 0.9);
+                  c.setLineWidth(es3D ? 0.5 : 0.9);
                   for (final t in trazos) {
                     for (int i = 0; i < t.length; i++) {
                       final px = rx + t[i][0] * esc, py = Y(ryTop + rh - t[i][1] * esc);
@@ -952,10 +1037,10 @@ class PdfService {
     const grisTexto = PdfColor.fromInt(0xFF6B7280);
     const verde = PdfColor.fromInt(0xFF1d9e75);
 
-    final nombreEmpresa = empresa['nombre_comercial'] ?? _t('HETNA CNC');
+    final nombreEmpresa = (_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']);
     final tel = empresa['telefono'] ?? '';
     final correo = empresa['correo'] ?? '';
-    final web = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final web = empresa['sitio_web'] ?? '';
     final fecha = _fmtFecha.format(DateTime.now());
 
     pdf.addPage(pw.MultiPage(
@@ -968,11 +1053,7 @@ class PdfService {
           child: pw.Row(children: [
             logoImage != null
               ? pw.Container(
-                  width: 50, height: 50,
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.white,
-                    borderRadius: pw.BorderRadius.circular(8)),
-                  padding: const pw.EdgeInsets.all(4),
+                  width: 56, height: 50,
                   margin: const pw.EdgeInsets.only(right: 12),
                   child: pw.Image(logoImage, fit: pw.BoxFit.contain))
               : pw.SizedBox(width: 0),
@@ -1090,11 +1171,11 @@ class PdfService {
     const verde      = PdfColor.fromInt(0xFF1d9e75);
     const verdeClaro = PdfColor.fromInt(0xFFe6f7f0);
 
-    final nombreEmpresa    = empresa['nombre_comercial'] ?? _t('HETNA CNC');
+    final nombreEmpresa    = (_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']);
     final telEmpresa       = empresa['telefono'] ?? empresa['telefono2'] ?? '';
     final direccionEmpresa = empresa['direccion'] ?? '';
     final correo           = empresa['correo']   ?? '';
-    final web              = empresa['sitio_web'] ?? 'hetnacnc.com';
+    final web              = empresa['sitio_web'] ?? '';
     final fecha            = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
     final clienteNombre    = _limpiarTexto(cotizacion.cliente?.nombreCompleto ?? cotizacion.cliente?.nombre ?? _t('Cliente'));
     final folio            = folioPedido ?? cotizacion.folio ?? 'N/A';
@@ -1115,12 +1196,7 @@ class PdfService {
             // IZQUIERDA: logo + datos empresa
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               if (logoImage != null)
-                pw.Container(
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.white,
-                    borderRadius: pw.BorderRadius.circular(4)),
-                  child: pw.Image(logoImage, width: 100, height: 28, fit: pw.BoxFit.contain))
+                pw.Image(logoImage, width: 110, height: 32, fit: pw.BoxFit.contain)
               else
                 pw.Text(nombreEmpresa,
                   style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),

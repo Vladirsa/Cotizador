@@ -1,0 +1,47 @@
+diff --git a/lib/screens/simulador_screen.dart b/lib/screens/simulador_screen.dart
+index 13c3601..d574285 100644
+--- a/lib/screens/simulador_screen.dart
++++ b/lib/screens/simulador_screen.dart
+@@ -1566,28 +1566,14 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
+   GeoCad? _geoOriginal;
+   double _escala = 1;
+ 
++  double _escalaY = 1, _escalaZ = 1;
+   Future<void> _escalarArchivo() async {
+     final g0 = _geoOriginal;
+     if (g0 == null || g0.largo <= 0) return;
+-    final ctrl = TextEditingController(text: (g0.largo * _escala).toStringAsFixed(1));
+-    final nuevo = await showDialog<double>(context: context, builder: (ctx) => AlertDialog(
+-      title: Text(tr('Escalar la pieza')),
+-      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+-        Text(trf('El archivo mide {0} mm de largo. Escribe el largo que quieres y el resto se ajusta en proporción.', [g0.largo.toStringAsFixed(1)]),
+-          style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+-        const SizedBox(height: 10),
+-        TextField(controller: ctrl, autofocus: true,
+-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+-          decoration: InputDecoration(labelText: tr('Largo final (mm)'), isDense: true, border: const OutlineInputBorder())),
+-      ]),
+-      actions: [
+-        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tr('Cancelar'))),
+-        TextButton(onPressed: () => Navigator.pop(ctx, g0.largo), child: Text(tr('Tamaño original'))),
+-        ElevatedButton(onPressed: () => Navigator.pop(ctx, double.tryParse(ctrl.text.replaceAll(',', '.'))), child: Text(tr('Aplicar'))),
+-      ]));
+-    if (nuevo == null || nuevo <= 0) return;
+-    _escala = nuevo / g0.largo;
+-    _aplicarGeo(g0.escalado(_escala));
++    final r = await mostrarDialogoEscala(context, g0, _escala, _escalaY, _escalaZ);
++    if (r == null) return;
++    _escala = r[0]; _escalaY = r[1]; _escalaZ = r[2];
++    _aplicarGeo(g0.escaladoXYZ(r[0], r[1], r[2]));
+   }
+ 
+   void _aplicarGeo(GeoCad g) {
+@@ -1650,7 +1636,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
+           TextButton(onPressed: _escalarArchivo,
+             child: Text(_escala == 1 ? tr('Escalar') : '${(_escala * 100).round()}%', style: const TextStyle(fontSize: 12))),
+           IconButton(tooltip: tr('Quitar archivo'), icon: const Icon(Icons.close, size: 18),
+-            onPressed: () => setState(() { _geo = null; _geoOriginal = null; _escala = 1; _resultado = null; })),
++            onPressed: () => setState(() { _geo = null; _geoOriginal = null; _escala = 1; _escalaY = 1; _escalaZ = 1; _resultado = null; })),
+         ]
+         else
+           TextButton(onPressed: _subirArchivo, child: Text(tr('Subir archivo'))),

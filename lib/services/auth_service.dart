@@ -24,6 +24,10 @@ class AuthService {
   static Set<String> _modulosPermitidos = {};
   static bool _permisosConfigurados = false; // si el admin nunca configuró nada, no bloquear
   static String? _nombreUsuario;
+  // Nombre y teléfono del taller (negocios): lo que ven SUS clientes en
+  // mensajes y PDF. Nunca se cae a los datos de HETNA.
+  static String? _nombreNegocio;
+  static String? _telefonoNegocio;
 
   // Suscripción con Mercado Pago (las escribe sólo el servidor de hetnacnc.com)
   static String? _planEstado;   // activa | cancelada | pausada
@@ -49,6 +53,15 @@ class AuthService {
   static String? get negocioId     => _negocioId;
   static String? get rol           => _rol;
   static String? get plan          => _plan;
+  static String? get nombreNegocio  => _nombreNegocio;
+  static String? get telefonoNegocio => _telefonoNegocio;
+
+  /// Nombre del taller para mensajes y documentos; si aún no lo captura,
+  /// un genérico ("nuestro taller"), nunca "HETNA CNC".
+  static String get marcaTaller {
+    final n = _nombreNegocio?.trim() ?? '';
+    return n.isNotEmpty ? n : tr('nuestro taller');
+  }
 
   // ── Planes: qué abre cada uno está en services/planes.dart.
   //    Prueba vigente = todo abierto; prueba vencida = Gratis ──
@@ -190,11 +203,13 @@ class AuthService {
       if (_negocioId != null) {
         try {
           final negocio = await _sb.from('negocios')
-            .select('plan, trial_hasta')
+            .select('plan, trial_hasta, nombre, telefono')
             .eq('id', _negocioId!)
             .maybeSingle();
           if (negocio != null) {
             _plan = negocio['plan'] as String?;
+            _nombreNegocio = negocio['nombre'] as String?;
+            _telefonoNegocio = negocio['telefono'] as String?;
             _trialHasta = negocio['trial_hasta'] != null
               ? DateTime.tryParse(negocio['trial_hasta'])
               : null;
@@ -261,6 +276,8 @@ class AuthService {
     _negocioId     = null;
     _rol           = null;
     _nombreUsuario = null;
+    _nombreNegocio = null;
+    _telefonoNegocio = null;
     _plan          = null;
     _trialHasta    = null;
     _planEstado    = null;

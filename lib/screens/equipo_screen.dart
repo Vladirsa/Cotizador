@@ -44,7 +44,7 @@ class UsuarioNegocio {
       case 'administrador': return 'Administrador';
       case 'vendedor':      return 'Vendedor';
       case 'operador_cnc':  return 'Operador CNC';
-      case 'almacenista':   return 'Almacenista';
+      case 'almacenista':   return 'Almacén y envíos';
       case 'contador':      return 'Contador';
       default:              return rol;
     }
@@ -98,6 +98,7 @@ const _permisosRol = {
   'operador_cnc': [
     '✅ Ver pedidos asignados',
     '✅ Actualizar etapas de producción',
+    '✅ Escanear el QR de la orden y marcar maquinado y calidad',
     '✅ Ver inventario de materiales',
     '❌ Cotizaciones',
     '❌ Clientes',
@@ -107,6 +108,7 @@ const _permisosRol = {
     '✅ Inventario completo',
     '✅ Entradas y salidas de material',
     '✅ Ver pedidos (solo materiales)',
+    '✅ Escanear el QR de la orden: guía de envío y entregado',
     '❌ Cotizaciones',
     '❌ Clientes',
     '❌ Finanzas',

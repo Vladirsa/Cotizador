@@ -2,7 +2,11 @@
 // lib/screens/marketing_screen.dart
 // ============================================
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'cupones_screen.dart';
+import 'marketing_auto_tab.dart';
+import '../services/whatsapp_service.dart';
+import '../services/auth_service.dart';
 import 'plantillas_wa_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../main.dart';
@@ -23,7 +27,7 @@ class _MarketingScreenState extends State<MarketingScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    _tabs = TabController(length: 5, vsync: this);
   }
 
   @override
@@ -49,7 +53,9 @@ class _MarketingScreenState extends State<MarketingScreen>
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
           labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          isScrollable: true,
           tabs: [
+            Tab(icon: Icon(Icons.auto_mode, size: 16), text: tr('Automático')),
             Tab(icon: Icon(Icons.inbox_outlined, size: 16), text: tr('Cola de hoy')),
             Tab(icon: Icon(Icons.people_outline, size: 16), text: tr('Campañas')),
             Tab(icon: Icon(Icons.message_outlined, size: 16), text: tr('Plantillas WA')),
@@ -57,6 +63,7 @@ class _MarketingScreenState extends State<MarketingScreen>
           ]),
       ),
       body: TabBarView(controller: _tabs, children: [
+        MarketingAutoTab(irACola: () => _tabs.animateTo(1)),
         const _ColaTab(),
         const _CampanasTab(),
         const _PlantillasTab(),
@@ -86,6 +93,8 @@ void _mostrarAyudaMarketing(BuildContext context) {
           Text(
             tr('Este módulo te ayuda a mandar mensajes de WhatsApp a varios clientes a la vez, de forma organizada y sin saturar tu número (Meta limita cuántos mensajes puedes mandar por día).'),
             style: TextStyle(fontSize: 13, color: AppColors.textoSecundario, height: 1.4)),
+          _bloqueAyudaMkt(tr('🤖 Automático'),
+            tr('Prende las automatizaciones y olvídate: cada mañana revisamos tus cotizaciones y clientes. El correo sale solo con el nombre de tu taller y el WhatsApp te queda listo en "Cola de hoy". Empieza con "Activar las recomendadas".')),
           _bloqueAyudaMkt(tr('📥 Cola de hoy'),
             tr('Aquí aparecen los mensajes que ya están listos para mandarse hoy — vienen de una Campaña que lanzaste. Los revisas uno por uno y confirmas si ya los enviaste. Tiene un límite diario para no violar las reglas de WhatsApp Business (mandar demasiados mensajes seguidos puede hacer que Meta bloquee tu número).')),
           _bloqueAyudaMkt(tr('👥 Campañas y Segmento objetivo'),
@@ -124,10 +133,44 @@ class _ColaTabState extends State<_ColaTab> {
   List<Map<String, dynamic>> _historial = [];
   bool _cargando = true;
   int _enviadosHoy = 0;
-  static const int _limitesDiario = 5;
+  // Tope diario de mensajes (para no saturar tu WhatsApp). Antes era fijo en 5;
+  // ahora lo eliges tú y se recuerda en este dispositivo.
+  int _limitesDiario = 30;
+  bool _enSerie = false;
 
   @override
-  void initState() { super.initState(); _cargar(); }
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      final v = p.getInt('mkt_tope_diario');
+      if (v != null && mounted) setState(() => _limitesDiario = v);
+    }).catchError((_) {});
+    _cargar();
+  }
+
+  Future<void> _cambiarTope() async {
+    final v = await showDialog<int>(context: context, builder: (ctx) => SimpleDialog(
+      title: Text(tr('¿Cuántos WhatsApp por día como máximo?')),
+      children: [10, 20, 30, 50, 80].map((n) => SimpleDialogOption(
+        onPressed: () => Navigator.pop(ctx, n),
+        child: Text(trf('{0} al día', [n]), style: TextStyle(fontWeight: n == _limitesDiario ? FontWeight.w800 : FontWeight.normal)))).toList()));
+    if (v == null) return;
+    setState(() => _limitesDiario = v);
+    try { (await SharedPreferences.getInstance()).setInt('mkt_tope_diario', v); } catch (_) {}
+  }
+
+  /// Manda uno tras otro: abre WhatsApp, al volver confirma y sigue con el siguiente.
+  Future<void> _mandarEnSerie() async {
+    setState(() => _enSerie = true);
+    try {
+      while (mounted && _enSerie && _cola.isNotEmpty && _enviadosHoy < _limitesDiario) {
+        final seguir = await _enviar(_cola.first, enSerie: true);
+        if (!seguir) break;
+      }
+    } finally {
+      if (mounted) setState(() => _enSerie = false);
+    }
+  }
 
   Future<void> _cargar() async {
     setState(() => _cargando = true);
@@ -146,25 +189,25 @@ class _ColaTabState extends State<_ColaTab> {
     } catch (_) { if (mounted) setState(() => _cargando = false); }
   }
 
-  Future<void> _enviar(Map<String, dynamic> msg) async {
+  /// Devuelve true si se puede seguir con el siguiente (modo en serie).
+  Future<bool> _enviar(Map<String, dynamic> msg, {bool enSerie = false}) async {
     if (_enviadosHoy >= _limitesDiario) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(tr('⚠️ Límite diario alcanzado (5 mensajes). Continúa mañana.')),
+        content: Text(trf('⚠️ Llegaste a tu tope de {0} mensajes hoy. Puedes subirlo arriba o seguir mañana.', [_limitesDiario])),
         backgroundColor: AppColors.ambar));
-      return;
+      return false;
     }
     final cl = msg['clientes'] as Map<String, dynamic>?;
     final wa = cl?['whatsapp'] as String? ?? cl?['telefono'] as String? ?? '';
     if (wa.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(tr('Este cliente no tiene WhatsApp registrado'))));
-      return;
+      if (enSerie) { await _omitir(msg); return true; }
+      return false;
     }
 
-    // Normalizar número mexicano
-    String numero = wa.replaceAll(RegExp(r'[^0-9]'), '');
-    if (numero.length == 10) numero = '521$numero';
-    else if (numero.length == 12 && numero.startsWith('52')) numero = '521${numero.substring(2)}';
+    // Lada según el país del taller (México o EE. UU.)
+    final numero = WhatsAppService.normalizarNumero(wa);
 
     final texto = Uri.encodeComponent(msg['mensaje_final'] as String? ?? '');
     await launchUrl(Uri.parse('https://wa.me/$numero?text=$texto'),
@@ -186,8 +229,22 @@ class _ColaTabState extends State<_ColaTab> {
       if (confirmar == true) {
         await SupabaseService.marcarMensajeEnviado(msg['id']);
         await _cargar();
+        return true;
       }
+      if (confirmar == null) return false; // cerró el diálogo: se detiene la serie
+      return enSerie ? await _preguntarSeguir() : false;
     }
+    return false;
+  }
+
+  Future<bool> _preguntarSeguir() async {
+    final r = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
+      content: Text(tr('¿Sigues con el siguiente mensaje?')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(tr('Parar'))),
+        TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Siguiente'))),
+      ]));
+    return r == true;
   }
 
   Future<void> _omitir(Map<String, dynamic> msg) async {
@@ -221,14 +278,18 @@ class _ColaTabState extends State<_ColaTab> {
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                       color: restantes > 0 ? AppColors.azul : AppColors.rojo)),
                 ]),
-                Text(trf('{0}/{1} enviados', [_enviadosHoy, _limitesDiario]),
-                  style: TextStyle(fontSize: 11,
-                    color: restantes > 0 ? AppColors.azul : AppColors.rojo)),
+                InkWell(onTap: _cambiarTope, child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text(trf('{0}/{1} enviados', [_enviadosHoy, _limitesDiario]),
+                    style: TextStyle(fontSize: 11,
+                      color: restantes > 0 ? AppColors.azul : AppColors.rojo)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.tune, size: 14, color: restantes > 0 ? AppColors.azul : AppColors.rojo),
+                ])),
               ]),
               const SizedBox(height: 6),
               ClipRRect(borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: _enviadosHoy / _limitesDiario,
+                  value: (_enviadosHoy / _limitesDiario).clamp(0.0, 1.0),
                   backgroundColor: Colors.white,
                   minHeight: 6,
                   valueColor: AlwaysStoppedAnimation(
@@ -247,7 +308,7 @@ class _ColaTabState extends State<_ColaTab> {
                 Text(tr('No hay mensajes pendientes para hoy'),
                   style: TextStyle(color: AppColors.textoSecundario)),
                 const SizedBox(height: 6),
-                Text(tr('Ve a Campañas para agregar mensajes a la cola'),
+                Text(tr('Prende el piloto en "Automático" o lanza una campaña: los mensajes aparecen aquí.'),
                   style: TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
@@ -262,6 +323,18 @@ class _ColaTabState extends State<_ColaTab> {
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario,
                 fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
+            if (_cola.length > 1 && restantes > 0) ...[
+              SizedBox(width: double.infinity, child: ElevatedButton.icon(
+                onPressed: _enSerie ? null : _mandarEnSerie,
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), minimumSize: const Size(0, 46)),
+                icon: const Icon(Icons.playlist_play, color: Colors.white),
+                label: Text(_enSerie ? tr('Mandando…') : trf('Mandar los {0}, uno tras otro', [_cola.length]),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)))),
+              const SizedBox(height: 4),
+              Text(tr('Se abre WhatsApp con el mensaje listo; lo mandas, regresas y confirmas. Sigue solo con el siguiente.'),
+                style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+              const SizedBox(height: 10),
+            ],
             ..._cola.map((msg) => _TarjetaMensaje(
               msg: msg,
               puedeEnviar: restantes > 0,
@@ -343,7 +416,7 @@ class _TarjetaMensaje extends StatelessWidget {
         const SizedBox(height: 10),
         Container(padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8),
-            border: const Border(left: BorderSide(color: Color(0xFF25D366), width: 3))),
+            boxShadow: const [BoxShadow(color: Color(0xFF25D366), offset: Offset(-3, 0))]),
           child: Text(tr(mensaje), style: const TextStyle(fontSize: 12, height: 1.5, color: AppColors.azul))),
         const SizedBox(height: 10),
         Row(children: [
@@ -1051,6 +1124,35 @@ class _PlantillasTabState extends State<_PlantillasTab> {
     // Lógica ya ejecutada dentro del onPressed arriba
   }
 
+  // Paquete inicial: así nadie empieza con la pestaña vacía
+  Future<void> _cargarPlantillasListas() async {
+    final t = AuthService.marcaTaller;
+    final lista = <Map<String, String>>[
+      {'titulo': tr('Promoción del mes'), 'categoria': 'Promocion',
+       'cuerpo': trf('Hola *NOMBRE* 👋 Este mes en *{0}* tenemos promoción en cortes y grabados. Mándanos tu archivo o medidas y te cotizamos hoy mismo.', [t])},
+      {'titulo': tr('Seguimiento de cotización'), 'categoria': 'Seguimiento',
+       'cuerpo': trf('Hola *NOMBRE*, ¿pudiste revisar la cotización *FOLIO* por *MONTO*? Si quieres ajustar algo, con gusto lo vemos. — *{0}*', [t])},
+      {'titulo': tr('Cotización por vencer'), 'categoria': 'Cotizacion',
+       'cuerpo': trf('Hola *NOMBRE*, la cotización *FOLIO* está por vencer. Si la confirmas esta semana respetamos el precio. — *{0}*', [t])},
+      {'titulo': tr('Gracias por tu compra'), 'categoria': 'Pedido',
+       'cuerpo': trf('¡Gracias *NOMBRE*! Fue un gusto trabajar tu pedido *FOLIO*. Si te gustó, ¿nos recomiendas con alguien? 🙌 — *{0}*', [t])},
+      {'titulo': tr('Te extrañamos'), 'categoria': 'Promocion',
+       'cuerpo': trf('Hola *NOMBRE* 👋 Hace tiempo no trabajamos juntos. ¿Tienes un nuevo proyecto? Te cotizamos rápido. — *{0}*', [t])},
+      {'titulo': tr('Nuevo servicio'), 'categoria': 'General',
+       'cuerpo': trf('Hola *NOMBRE*, en *{0}* ya hacemos un nuevo servicio. ¿Te mando ejemplos y precios?', [t])},
+    ];
+    try {
+      for (final p in lista) {
+        await SupabaseService.guardarPlantillaWA({...p, 'activo': true});
+      }
+      await _cargar();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('✅ Plantillas cargadas')), backgroundColor: AppColors.verde));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.rojo));
+    }
+  }
+
   Future<void> _eliminar(Map<String, dynamic> p) async {
     final ok = await showDialog<bool>(context: context,
       builder: (_) => AlertDialog(
@@ -1082,8 +1184,21 @@ class _PlantillasTabState extends State<_PlantillasTab> {
         ? const Center(child: CircularProgressIndicator())
         : RefreshIndicator(onRefresh: _cargar,
             child: _plantillas.isEmpty
-              ? Center(child: Text(tr('Sin plantillas. Crea la primera.'),
-                  style: TextStyle(color: AppColors.textoSecundario)))
+              ? ListView(padding: const EdgeInsets.all(24), children: [
+                  const Icon(Icons.message_outlined, size: 44, color: AppColors.grisBorde),
+                  const SizedBox(height: 8),
+                  Text(tr('Sin plantillas todavía.'), textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textoSecundario)),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: _cargarPlantillasListas,
+                    icon: const Icon(Icons.auto_awesome, color: Colors.white, size: 18),
+                    label: Text(tr('Cargar 6 plantillas listas'), style: const TextStyle(color: Colors.white)),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde, minimumSize: const Size(0, 46))),
+                  const SizedBox(height: 6),
+                  Text(tr('Con el nombre de tu taller. Las puedes editar después.'), textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+                ])
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
                   itemCount: _plantillas.length,
@@ -1121,7 +1236,7 @@ class _PlantillasTabState extends State<_PlantillasTab> {
                         Container(padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(color: AppColors.gris,
                             borderRadius: BorderRadius.circular(8),
-                            border: Border(left: BorderSide(color: color, width: 3))),
+                            boxShadow: [BoxShadow(color: color, offset: const Offset(-3, 0))]),
                           child: Text(tr(p['cuerpo'] as String? ?? ''),
                             style: const TextStyle(fontSize: 11, height: 1.5, color: AppColors.azul))),
                       ])));

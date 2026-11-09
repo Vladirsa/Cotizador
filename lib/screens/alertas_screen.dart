@@ -4,6 +4,7 @@ import '../main.dart';
 import '../models/models.dart';
 import '../services/supabase_service.dart';
 import '../services/whatsapp_service.dart';
+import '../services/auth_service.dart';
 import '../i18n/tr.dart';
 
 class AlertasScreen extends StatefulWidget {
@@ -30,6 +31,13 @@ class _AlertasScreenState extends State<AlertasScreen> {
     'cliente_interesado':      {'label': 'Interesado',        'color': Color(0xFF7c3aed)},
     'recordatorio_cita':       {'label': 'Cita',              'color': Color(0xFF1a3a5c)},
     'nuevo_contacto_wa':       {'label': 'Nuevo contacto',    'color': Color(0xFF1d9e75)},
+    // Fase 2: avisos de la liga del cliente (los crea el servidor)
+    'cotizacion_vista':        {'label': '👀 Vio cotización',  'color': Color(0xFF185fa5)},
+    'cotizacion_aceptada':     {'label': '✅ Aceptó',          'color': Color(0xFF1d9e75)},
+    'anticipo_pagado':         {'label': '💰 Pagó',            'color': Color(0xFF059669)},
+    'solicitud_en_linea':      {'label': '🌐 Solicitud',       'color': Color(0xFFC2560A)},
+    'comision_hetna':          {'label': '🧾 Comisión',        'color': Color(0xFF6b7280)},
+    'mantenimiento':           {'label': '🔧 Mantenimiento',   'color': Color(0xFF1a3a5c)},
   };
 
   List<Alerta> get _filtradas => _filtro == 'todos'
@@ -399,31 +407,34 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
   void initState() { super.initState(); _mensaje = _buildMensaje(); }
 
   String _buildMensaje() {
+    // Las alertas que crea el servidor (liga del cliente) ya traen el mensaje
+    final guardado = (widget.alerta.mensajeWa ?? '').trim();
+    if (guardado.isNotEmpty) return guardado;
     final nombre = widget.alerta.clienteNombre ?? tr('Cliente');
     final folio  = widget.alerta.cotizacionFolio ?? '';
     switch (widget.alerta.tipo) {
       case 'seguimiento_dia3':
-        return 'Hola *$nombre* 👋 Te contactamos de *HETNA CNC*. ¿Tuviste oportunidad de revisar la cotización $folio? Con gusto resolvemos tus dudas 😊';
+        return 'Hola *$nombre* 👋 Te contactamos de *${AuthService.marcaTaller}*. ¿Tuviste oportunidad de revisar la cotización $folio? Con gusto resolvemos tus dudas 😊';
       case 'seguimiento_dia5':
-        return 'Hola *$nombre*, somos *HETNA CNC*. La cotización $folio sigue disponible. ¿Te interesa continuar? ✅';
+        return 'Hola *$nombre*, somos *${AuthService.marcaTaller}*. La cotización $folio sigue disponible. ¿Te interesa continuar? ✅';
       case 'seguimiento_dia7':
-        return 'Hola *$nombre* 🔔 Último recordatorio sobre la cotización $folio. La oferta vence pronto. — *HETNA CNC*';
+        return 'Hola *$nombre* 🔔 Último recordatorio sobre la cotización $folio. La oferta vence pronto. — *${AuthService.marcaTaller}*';
       case 'post_entrega':
-        return 'Hola *$nombre* ✅ Esperamos que estés disfrutando tu pedido. Tu opinión es importante para nosotros. ¡Gracias! — *HETNA CNC*';
+        return 'Hola *$nombre* ✅ Esperamos que estés disfrutando tu pedido. Tu opinión es importante para nosotros. ¡Gracias! — *${AuthService.marcaTaller}*';
       case 'pago_anticipo_pendiente':
-        return 'Hola *$nombre* 👋 Te recordamos que el anticipo del pedido *$folio* está pendiente. Para iniciar producción necesitamos confirmarlo. — *HETNA CNC*';
+        return 'Hola *$nombre* 👋 Te recordamos que el anticipo del pedido *$folio* está pendiente. Para iniciar producción necesitamos confirmarlo. — *${AuthService.marcaTaller}*';
       case 'pago_final_pendiente':
-        return 'Hola *$nombre* ✅ Tu pedido *$folio* está listo. Para proceder con la entrega necesitamos el saldo restante. — *HETNA CNC*';
+        return 'Hola *$nombre* ✅ Tu pedido *$folio* está listo. Para proceder con la entrega necesitamos el saldo restante. — *${AuthService.marcaTaller}*';
       case 'produccion_sin_avance':
-        return 'Hola *$nombre* 🔧 Tu pedido *$folio* está en producción. Te notificaremos cuando esté listo. — *HETNA CNC*';
+        return 'Hola *$nombre* 🔧 Tu pedido *$folio* está en producción. Te notificaremos cuando esté listo. — *${AuthService.marcaTaller}*';
       case 'cliente_interesado':
-        return 'Hola *$nombre* 👋 Vi que te interesa alguno de nuestros productos. ¿Te puedo ayudar a cotizar? — *HETNA CNC*';
+        return 'Hola *$nombre* 👋 Vi que te interesa alguno de nuestros productos. ¿Te puedo ayudar a cotizar? — *${AuthService.marcaTaller}*';
       case 'recordatorio_cita':
-        return 'Hola *$nombre* 📅 Te recuerdo nuestra cita programada. ¿Todo bien para la reunión? — *HETNA CNC*';
+        return 'Hola *$nombre* 📅 Te recuerdo nuestra cita programada. ¿Todo bien para la reunión? — *${AuthService.marcaTaller}*';
       case 'nuevo_contacto_wa':
-        return 'Hola *$nombre* 👋 Gracias por contactar a *HETNA CNC*. ¿En qué podemos ayudarte?';
+        return 'Hola *$nombre* 👋 Gracias por contactar a *${AuthService.marcaTaller}*. ¿En qué podemos ayudarte?';
       default:
-        return trf('Hola *{0}*, somos *HETNA CNC*. ¿En qué podemos ayudarte? 😊', [nombre]);
+        return trf('Hola *{0}*, somos *{1}*. ¿En qué podemos ayudarte? 😊', [nombre, AuthService.marcaTaller]);
     }
   }
 
@@ -461,11 +472,8 @@ class _TarjetaAlertaState extends State<_TarjetaAlerta> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border(
-            left: BorderSide(color: vencida ? AppColors.rojo : color, width: 3),
-            top: BorderSide(color: AppColors.grisBorde, width: 0.5),
-            right: BorderSide(color: AppColors.grisBorde, width: 0.5),
-            bottom: BorderSide(color: AppColors.grisBorde, width: 0.5))),
+          border: Border.all(color: AppColors.grisBorde, width: 0.5),
+          boxShadow: [BoxShadow(color: vencida ? AppColors.rojo : color, offset: const Offset(-3, 0))]),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
@@ -633,6 +641,12 @@ class _AlertasBodyState extends State<AlertasBody> {
     'produccion_sin_avance':   {'label': 'Produccion',     'color': Color(0xFFef9f27)},
     'cliente_interesado':      {'label': 'Interesado',     'color': Color(0xFF7c3aed)},
     'recordatorio_cita':       {'label': 'Cita',           'color': Color(0xFF1a3a5c)},
+    'cotizacion_vista':        {'label': 'Vio cotización', 'color': Color(0xFF185fa5)},
+    'cotizacion_aceptada':     {'label': 'Aceptó',         'color': Color(0xFF1d9e75)},
+    'anticipo_pagado':         {'label': 'Pagó',           'color': Color(0xFF059669)},
+    'solicitud_en_linea':      {'label': 'Solicitud',      'color': Color(0xFFC2560A)},
+    'comision_hetna':          {'label': 'Comisión',       'color': Color(0xFF6b7280)},
+    'mantenimiento':           {'label': 'Mantenimiento',  'color': Color(0xFF1a3a5c)},
   };
 
   List<Alerta> get _filtradas => _filtro == 'todos'

@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import 'cotizar_screen.dart';
+import 'package:file_picker/file_picker.dart';
+import '../services/archivo_cad_service.dart';
 import '../services/auth_service.dart';
 import '../i18n/tr.dart';
 
@@ -200,6 +202,9 @@ class ResultadoSimulador {
   final Map<String, double> costosDesglose;
   final bool incluyeIva;
   final String? materialNombre;
+  // Material de la bodega (para descontarlo al maquinar) y unidades usadas
+  final String? materialId;
+  final double materialUnidades;
   // Para compatibilidad con cotizacion
   final double maquila, extras, acabado, costoMaterial;
 
@@ -213,7 +218,7 @@ class ResultadoSimulador {
     required this.cm, required this.cmo, required this.cmaq,
     required this.cc, required this.ca, required this.ci,
     required this.costosDesglose, this.incluyeIva = false,
-    this.materialNombre, this.maquila = 0, this.extras = 0,
+    this.materialNombre, this.materialId, this.materialUnidades = 0, this.maquila = 0, this.extras = 0,
     this.acabado = 0, this.costoMaterial = 0,
     this.precioTarifa = 0, this.precioCosto = 0});
 }
@@ -401,6 +406,11 @@ class MotorCalculo {
     // Impresión 3D
     String materialImpresion = 'pla',
     String calidadImpresion = 'normal',
+    // Medidas leídas del archivo (DXF/SVG/STL/OBJ). 0 = no se subió archivo y
+    // se usan las medidas capturadas a mano, como antes.
+    double longitudCorteMm = 0,
+    int perforaciones = 0,
+    double volumenRealCm3 = 0,
   }) {
     final fmt = NumberFormat(r'$#,##0.00', 'es_MX');
     final formula = tipo.formula;
@@ -473,7 +483,9 @@ class MotorCalculo {
           final td = cfg.getTarifa('costo_diseno') > 0 ? cfg.getTarifa('costo_diseno') : 300;
           desglose['diseno_adicional'] = td.toDouble();
         }
-        tiempoHoras = areaM2 * 0.5 * cantidad; break;
+        // El tiempo ya se calculó arriba con los minutos por m² del taller;
+        // antes aquí se reemplazaba por "área × 0.5 h" y el costo salía mal.
+        break;
 
       // ── ROUTER 3D / IMPRESIÓN 3D / CARPINTERÍA ─────────
       case 'por_volumen':
@@ -486,7 +498,11 @@ class MotorCalculo {
 
         if (esImpresion) {
           final relleno = cfg.getTarifa('relleno_pct') > 0 ? cfg.getTarifa('relleno_pct') / 100 : 0.20;
-          final volEfectivo = volumen * relleno;
+          // Con STL/OBJ se usa el volumen real de la pieza; las paredes y tapas
+          // van sólidas (~30% del volumen) y el resto lleva el % de relleno.
+          final volEfectivo = volumenRealCm3 > 0
+            ? volumenRealCm3 * (0.30 + 0.70 * relleno)
+            : volumen * relleno;
           // Densidad según material
           final densidades = {'pla': 1.24, 'abs': 1.04, 'petg': 1.27, 'tpu': 1.20};
           final densidad = densidades[materialImpresion] ?? 1.24;
@@ -503,7 +519,7 @@ class MotorCalculo {
           tiempoHoras = minutos3D / 60 * cantidad;
           final tarifaHr3D = cfg.getTarifa('tarifa_hora') > 0 ? cfg.getTarifa('tarifa_hora') : 80;
           precioMaquila = tiempoHoras * tarifaHr3D;
-          desglose['volumen_cm3'] = volumen.toDouble();
+          desglose['volumen_cm3'] = (volumenRealCm3 > 0 ? volumenRealCm3 : volumen).toDouble();
           desglose['gramos_estimados'] = gramos.toDouble();
           desglose['tiempo_min'] = minutos3D.toDouble();
           // Mínimo
@@ -627,8 +643,13 @@ class MotorCalculo {
             : densidadLaser == 'denso'
               ? (cfg.getTarifa('intervalo_denso') > 0 ? cfg.getTarifa('intervalo_denso') : 0.1)
               : (cfg.getTarifa('intervalo_normal') > 0 ? cfg.getTarifa('intervalo_normal') : 0.15);
-          final perimetro = 2 * (largo + ancho) * 10;
-          final minCorte = perimetro / velCorte / 60;
+          // Con archivo: el largo real de corte; sin archivo, el perímetro
+          // del rectángulo (estimado). Cada perforación suma su tiempo.
+          final perimetro = longitudCorteMm > 0 ? longitudCorteMm : 2 * (largo + ancho) * 10;
+          final segPerf = cfg.getTarifa('seg_perforacion') > 0 ? cfg.getTarifa('seg_perforacion') : 0.5;
+          final minCorte = perimetro / velCorte / 60 + perforaciones * segPerf / 60;
+          if (longitudCorteMm > 0) desglose['corte_mm_archivo'] = longitudCorteMm;
+          if (perforaciones > 0) desglose['perforaciones'] = perforaciones.toDouble();
           final areaGrab = largo * ancho;
           final minGrabado = (areaGrab * 100) / (intervalo * velGrab * 60);
           switch (tipoLaser) {
@@ -683,7 +704,13 @@ class MotorCalculo {
         // antes se asumían 6 min por metro, 5 veces más de lo real
         final velM = cfg.getTarifa('vel_corte_m_min') > 0 ? cfg.getTarifa('vel_corte_m_min') : 1.2;
         final setupM = cfg.getTarifa('min_setup') > 0 ? cfg.getTarifa('min_setup') : 10.0;
-        tiempoHoras = (metros * cantidad / velM + setupM) / 60;
+        final segPerfM = cfg.getTarifa('seg_perforacion') > 0 ? cfg.getTarifa('seg_perforacion') : 2.0;
+        tiempoHoras = (metros * cantidad / velM + perforaciones * cantidad * segPerfM / 60 + setupM) / 60;
+        final costoPerf = cfg.getTarifa('costo_perforacion');
+        if (perforaciones > 0 && costoPerf > 0) {
+          desglose['perforaciones'] = perforaciones.toDouble();
+          precioMaquila += perforaciones * costoPerf * cantidad;
+        }
         desglose['metros'] = metros;
         desglose['tarifa_metro'] = tarifaMt;
         break;
@@ -887,6 +914,8 @@ class MotorCalculo {
       },
       incluyeIva: aplicarIva,
       materialNombre: materialNombre,
+      materialId: usarInventario && materialInv != null ? materialInv['id'] as String? : null,
+      materialUnidades: usarInventario && materialInv != null ? cantidad.toDouble() : 0,
       maquila: baseRec, costoMaterial: cm, acabado: ca, extras: extrasTotal,
       precioTarifa: precioTarifa, precioCosto: precioCosto);
   }
@@ -896,7 +925,12 @@ class MotorCalculo {
 // PANTALLA PRINCIPAL
 // ══════════════════════════════════════════════════════
 class SimuladorScreen extends StatefulWidget {
-  const SimuladorScreen({super.key});
+  // geoInicial: pieza ya leída (desde la cotización profesional) para llenar
+  // medidas, largo de corte y volumen. seleccionar: en vez de carrito, al
+  // elegir un precio se regresa el ResultadoSimulador a quien abrió la pantalla.
+  final GeoCad? geoInicial;
+  final bool seleccionar;
+  const SimuladorScreen({super.key, this.geoInicial, this.seleccionar = false});
   @override
   State<SimuladorScreen> createState() => _SimuladorScreenState();
 }
@@ -1039,9 +1073,15 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
             fontWeight: FontWeight.w700, fontSize: 12)))),
     ]));
 
+  ResultadoSimulador? _seleccion;
   Widget _cardServicio(SimServicio s) => GestureDetector(
-    onTap: () => Navigator.push(context, MaterialPageRoute(
-      builder: (_) => _PantallaServicio(servicio: s, onAgregar: _agregarAlCarrito))),
+    onTap: () async {
+      await Navigator.push(context, MaterialPageRoute(
+        builder: (_) => _PantallaServicio(servicio: s,
+          geoInicial: widget.geoInicial, seleccionar: widget.seleccionar,
+          onAgregar: widget.seleccionar ? (r) => _seleccion = r : _agregarAlCarrito)));
+      if (widget.seleccionar && _seleccion != null && mounted) Navigator.pop(context, _seleccion);
+    },
     onLongPress: () => _confirmarBorrarServicio(s),
     child: Container(
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),
@@ -1219,7 +1259,9 @@ class _SimuladorScreenState extends State<SimuladorScreen> {
 class _PantallaServicio extends StatefulWidget {
   final SimServicio servicio;
   final void Function(ResultadoSimulador) onAgregar;
-  const _PantallaServicio({required this.servicio, required this.onAgregar});
+  final GeoCad? geoInicial;
+  final bool seleccionar;
+  const _PantallaServicio({required this.servicio, required this.onAgregar, this.geoInicial, this.seleccionar = false});
   @override
   State<_PantallaServicio> createState() => _PantallaServicioState();
 }
@@ -1230,6 +1272,11 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
   bool _cargando = true;
   ResultadoSimulador? _resultado;
   bool _mostrarTarifas = false;
+
+  // Archivo de la pieza (DXF/SVG/STL/OBJ): llena las medidas y le da al motor
+  // el largo real de corte, las perforaciones y el volumen real.
+  GeoCad? _geo;
+  bool _leyendoArchivo = false;
 
   // Inputs Diseño Digital
   bool _clienteTraeArchivo = false;
@@ -1348,8 +1395,11 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       final inv = await SimuladorDataService.getMaterialesInventario();
       final costos = await SimuladorDataService.getCostosTaller();
       if (mounted) setState(() {
-        _config = cfg; _costosTaller = costos; _materialesInv = inv;
+        _config = cfg; _costosTaller = costos;
+        // Retazos primero: lo que ya se pagó se usa antes que una hoja nueva
+        _materialesInv = [...inv.where((m) => m['es_retazo'] == true), ...inv.where((m) => m['es_retazo'] != true)];
         _cargando = false;
+        if (widget.geoInicial != null) { _geoOriginal = widget.geoInicial; _aplicarGeo(widget.geoInicial!); }
         if (cfg.tipos.isNotEmpty) _tipoSel = cfg.tipos.first;
         if (cfg.acabados.isNotEmpty) _acabadoSel = cfg.acabados.first;
         for (final t in cfg.tarifas.values) {
@@ -1381,6 +1431,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       descParts.add('Acabado: ${_acabadoSel!.nombre}');
     }
     if (_cantidad > 1) descParts.add(trf('Cantidad: {0} piezas', [_cantidad]));
+    if (_geo != null) descParts.add(trf('Archivo: {0}', [_geo!.nombre]));
     final desc = _descripcionEditable.isNotEmpty
       ? _descripcionEditable : descParts.join('\n');
 
@@ -1421,7 +1472,10 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       llevaPlantilla: _llevaPlantilla,
       llevaRotativo: _llevaRotativo,
       materialImpresion: _materialImpresion,
-      calidadImpresion: _calidadImpresion);
+      calidadImpresion: _calidadImpresion,
+      longitudCorteMm: _geo?.longitudCorte ?? 0,
+      perforaciones: _geo?.contornos ?? 0,
+      volumenRealCm3: (_geo?.es3D ?? false) ? _geo!.volumenCm3 : 0);
 
     setState(() { _resultado = r; _descripcionEditable = desc; });
   }
@@ -1475,6 +1529,129 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
     SingleChildScrollView(padding: const EdgeInsets.all(14), child: child);
 
   Widget _buildBodyServicio(SimConfig cfg) {
+    final cuerpo = _cuerpoServicio(cfg);
+    final esDisenoDig = cfg.getTarifa('tarifa_hora_2d') > 0 ||
+                        cfg.getTarifa('tarifa_setup') > 0 ||
+                        cfg.getTarifa('cargo_urgente') > 0;
+    if (esDisenoDig) return cuerpo;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _tarjetaArchivo(),
+      const SizedBox(height: 10),
+      cuerpo,
+    ]);
+  }
+
+  String _num1(double v) => v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
+  void _ponerMedida(String etiqueta, double v) {
+    final ctrl = _medidaCtrls.putIfAbsent(etiqueta, () => TextEditingController());
+    ctrl.text = v > 0 ? _num1(v) : '';
+  }
+
+  Future<void> _subirArchivo() async {
+    try {
+      final res = await FilePicker.platform.pickFiles(
+        type: FileType.custom, allowedExtensions: ArchivoCadService.extensiones, withData: true);
+      if (res == null || res.files.isEmpty || res.files.first.bytes == null) return;
+      final f = res.files.first;
+      if (f.size > ArchivoCadService.maxBytes) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('El archivo pesa más de 120 MB.'))));
+        return;
+      }
+      setState(() => _leyendoArchivo = true);
+      final g = ArchivoCadService.leer(f.name, f.bytes!);
+      _geoOriginal = g;
+      _escala = 1;
+      _aplicarGeo(g);
+    } catch (e) {
+      setState(() => _leyendoArchivo = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(trf('No se pudo leer el archivo: {0}', [e.toString().replaceFirst('Exception: ', '')]))));
+    }
+  }
+
+  GeoCad? _geoOriginal;
+  double _escala = 1;
+
+  double _escalaY = 1, _escalaZ = 1;
+  Future<void> _escalarArchivo() async {
+    final g0 = _geoOriginal;
+    if (g0 == null || g0.largo <= 0) return;
+    final r = await mostrarDialogoEscala(context, g0, _escala, _escalaY, _escalaZ);
+    if (r == null) return;
+    _escala = r[0]; _escalaY = r[1]; _escalaZ = r[2];
+    _aplicarGeo(g0.escaladoXYZ(r[0], r[1], r[2]));
+  }
+
+  void _aplicarGeo(GeoCad g) {
+    try {
+      const cm = 10.0; // el archivo mide en mm; el simulador en cm
+      setState(() {
+        _geo = g;
+        _largo = g.largo / cm; _ancho = g.ancho / cm;
+        _ponerMedida(tr('Largo (cm)'), _largo);
+        _ponerMedida(tr('Ancho (cm)'), _ancho);
+        if (g.es3D) {
+          _alto = g.alto / cm;
+          _ponerMedida(tr('Alto (cm)'), _alto);
+          _ponerMedida(tr('Alto / Profundidad (cm)'), _alto);
+        } else if (g.longitudCorte > 0) {
+          _metros = g.longitudCorte / 1000;
+          _ponerMedida(tr('Metros lineales'), _metros);
+        }
+        _leyendoArchivo = false;
+        _resultado = null;
+      });
+    } catch (_) {
+      setState(() => _leyendoArchivo = false);
+    }
+  }
+
+  Widget _tarjetaArchivo() {
+    final g = _geo;
+    final datos = <String>[];
+    if (g != null) {
+      datos.add(g.es3D
+        ? '${_num1(g.largo / 10)} × ${_num1(g.ancho / 10)} × ${_num1(g.alto / 10)} cm'
+        : '${_num1(g.largo / 10)} × ${_num1(g.ancho / 10)} cm');
+      if (!g.es3D && g.longitudCorte > 0) datos.add(trf('{0} m de corte', [(g.longitudCorte / 1000).toStringAsFixed(2)]));
+      if (!g.es3D && g.contornos > 0) datos.add(trf('{0} perforaciones', [g.contornos]));
+      if (g.es3D && g.volumenCm3 > 0) datos.add(trf('{0} cm³ de pieza', [g.volumenCm3.toStringAsFixed(1)]));
+    }
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: g == null ? Colors.white : const Color(0xFFEFF7F1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: g == null ? const Color(0xFFE2E0D8) : const Color(0xFF1E7B3A))),
+      child: Row(children: [
+        Icon(g == null ? Icons.upload_file : Icons.check_circle,
+          color: g == null ? AppColors.azul : const Color(0xFF1E7B3A)),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(g == null ? tr('Calcular desde el archivo') : g.nombre,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          Text(g == null ? tr('Sube DXF, SVG, STL u OBJ y se llenan las medidas, el largo de corte y las perforaciones.') : datos.join(' · '),
+            style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+          if (g != null && g.avisos.isNotEmpty)
+            Text(g.avisos.first, style: const TextStyle(fontSize: 11, color: Color(0xFFB54708))),
+        ])),
+        const SizedBox(width: 8),
+        if (_leyendoArchivo)
+          const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+        else if (g != null) ...[
+          TextButton(onPressed: _escalarArchivo,
+            child: Text(_escala == 1 ? tr('Escalar') : '${(_escala * 100).round()}%', style: const TextStyle(fontSize: 12))),
+          IconButton(tooltip: tr('Quitar archivo'), icon: const Icon(Icons.close, size: 18),
+            onPressed: () => setState(() { _geo = null; _geoOriginal = null; _escala = 1; _escalaY = 1; _escalaZ = 1; _resultado = null; })),
+        ]
+        else
+          TextButton(onPressed: _subirArchivo, child: Text(tr('Subir archivo'))),
+      ]),
+    );
+  }
+
+  Widget _cuerpoServicio(SimConfig cfg) {
     final esPlasma = cfg.getTarifa('tarifa_m2_delgado') > 0;
     final esFibra  = cfg.getTarifa('precio_1_10') > 0;
     final esLaser  = cfg.getTarifa('vel_mdf_fino') > 0 && !esFibra;
@@ -3042,6 +3219,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
               ..._materialesInv.map((m) => DropdownMenuItem<String>(
                 value: m['id'] as String,
                 child: Row(children: [
+                  if (m['es_retazo'] == true) const Padding(padding: EdgeInsets.only(right: 4), child: Icon(Icons.content_cut, size: 12, color: AppColors.ambar)),
                   Expanded(child: Text(tr(m['nombre'] ?? ''), style: const TextStyle(fontSize: 13),
                     overflow: TextOverflow.ellipsis)),
                   Text('\$${((m['costo_unitario'] as num?)?.toDouble() ?? 0).toStringAsFixed(0)}',
@@ -3330,13 +3508,13 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
             widget.onAgregar(rFinal);
             Navigator.pop(context);
           },
-          icon: const Icon(Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
-          label: Text(tr('Agregar al carrito'),
+          icon: Icon(widget.seleccionar ? Icons.check_circle_outline : Icons.add_shopping_cart_outlined, color: Colors.white, size: 16),
+          label: Text(widget.seleccionar ? tr('Usar este precio en la cotización') : tr('Agregar al carrito'),
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde,
             padding: const EdgeInsets.symmetric(vertical: 12)))),
       const SizedBox(height: 8),
-      SizedBox(width: double.infinity,
+      if (!widget.seleccionar) SizedBox(width: double.infinity,
         child: ElevatedButton.icon(
           onPressed: () {
             final rFinal = _resultadoConPrecio(r, precioSelIdx);
@@ -3368,7 +3546,7 @@ class _PantallaServicioState extends State<_PantallaServicio> with TickerProvide
       tiempoHoras: r.tiempoHoras,
       cm: r.cm, cmo: r.cmo, cmaq: r.cmaq, cc: r.cc, ca: r.ca, ci: r.ci,
       costosDesglose: r.costosDesglose, incluyeIva: r.incluyeIva,
-      materialNombre: r.materialNombre, maquila: precio,
+      materialNombre: r.materialNombre, materialId: r.materialId, materialUnidades: r.materialUnidades, maquila: precio,
       costoMaterial: r.cm, acabado: r.ca, extras: r.extras);
   }
 

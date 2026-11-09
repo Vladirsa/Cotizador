@@ -7,6 +7,13 @@ import '../services/whatsapp_service.dart';
 import '../services/pdf_service.dart';
 import '../services/auth_service.dart';
 import 'factura_screen.dart';
+import 'costo_real_screen.dart';
+import 'envios_screen.dart';
+import 'orden_qr_screen.dart';
+import 'descontar_material_sheet.dart';
+import '../simulador2/aprender_tiempo_sheet.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../i18n/tr.dart';
 
 class AvancesScreen extends StatefulWidget {
@@ -107,7 +114,14 @@ class _AvancesScreenState extends State<AvancesScreen> {
     return Scaffold(
       backgroundColor: AppColors.gris,
       appBar: AppBar(title: Text(tr('Avances de pedidos')),
-        actions: [IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar)]),
+        actions: [
+          IconButton(tooltip: tr('Escanear orden'), icon: const Icon(Icons.qr_code_scanner),
+            onPressed: () async {
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const LectorOrdenScreen()));
+              _cargar();
+            }),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _cargar),
+        ]),
       body: Column(children: [
         // Búsqueda por nombre/folio + filtro de fechas
         Container(color: Colors.white,
@@ -234,6 +248,13 @@ class _TarjetaPedido extends StatefulWidget {
 }
 
 class _TarjetaPedidoState extends State<_TarjetaPedido> {
+  // % de anticipo del taller (Costos del taller); antes el "Resta" era siempre la mitad
+  double _anticipoPct = 50;
+  @override
+  void initState() {
+    super.initState();
+    WhatsAppService.anticipoPct().then((p) { if (mounted) setState(() => _anticipoPct = p); });
+  }
   bool _enviandoWA = false;
   bool _cambiando = false;
   bool _generandoPdf = false;
@@ -278,7 +299,7 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
             if (widget.pedido.total != null && widget.pedido.total! > 0 &&
                 (widget.pedido.estado == 'Pago50' || widget.pedido.estado == 'Produccion' ||
                  widget.pedido.estado == 'Pruebas'))
-              Text('Resta: ${fmt.format(widget.pedido.total! / 2)}',
+              Text('Resta: ${fmt.format(widget.pedido.total! * (1 - _anticipoPct / 100))}',
                 style: const TextStyle(fontSize: 10, color: Color(0xFFD97706), fontWeight: FontWeight.w600)),
             const SizedBox(height: 2),
             Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -369,6 +390,67 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
               foregroundColor: const Color(0xFF1a3a5c),
               side: const BorderSide(color: Color(0xFF1a3a5c)),
               padding: const EdgeInsets.symmetric(vertical: 7)))),
+        // Guía de envío y liga de seguimiento (Fase 2)
+        if ((widget.pedido.guia ?? '').isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(8)),
+            child: Row(children: [
+              const Icon(Icons.local_shipping_outlined, size: 16, color: AppColors.azul),
+              const SizedBox(width: 6),
+              Expanded(child: Text(
+                [if ((widget.pedido.paqueteria ?? '').isNotEmpty) widget.pedido.paqueteria!, trf('Guía {0}', [widget.pedido.guia!])].join(' · '),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+              InkWell(onTap: _editarGuia, child: const Padding(padding: EdgeInsets.all(2),
+                child: Icon(Icons.edit_outlined, size: 16, color: AppColors.textoSecundario))),
+            ])),
+        ],
+        if (!_cancelado) ...[
+          const SizedBox(height: 6),
+          Row(children: [
+            Expanded(child: OutlinedButton.icon(
+              onPressed: _editarGuia,
+              icon: const Icon(Icons.local_shipping_outlined, size: 14),
+              label: Text(tr((widget.pedido.guia ?? '').isEmpty ? 'Guía de envío' : 'Cambiar guía'), style: const TextStyle(fontSize: 12)),
+              style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+                side: const BorderSide(color: AppColors.grisBorde), padding: const EdgeInsets.symmetric(vertical: 7)))),
+            if (widget.pedido.cotizacionId != null) ...[
+              const SizedBox(width: 6),
+              Expanded(child: OutlinedButton.icon(
+                onPressed: _compartirSeguimiento,
+                icon: const Icon(Icons.link, size: 14),
+                label: Text(tr('Liga de seguimiento'), style: const TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+                  side: const BorderSide(color: AppColors.grisBorde), padding: const EdgeInsets.symmetric(vertical: 7)))),
+            ],
+          ]),
+        ],
+        // Orden de trabajo con QR: se imprime y viaja con la pieza
+        if (!_cancelado && widget.pedido.id != null) ...[
+          const SizedBox(height: 6),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => QrOrdenScreen(pedidoId: widget.pedido.id!, folio: widget.pedido.folio))),
+            icon: const Icon(Icons.qr_code_2, size: 14),
+            label: Text(tr('QR y hoja de orden'), style: const TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+              side: const BorderSide(color: AppColors.grisBorde), padding: const EdgeInsets.symmetric(vertical: 7)))),
+        ],
+        const SizedBox(height: 6),
+        // Costo real y utilidad del pedido (Fase 4)
+        if (!_cancelado && widget.pedido.id != null)
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () async {
+              if (!AuthService.puede('costo_real')) {
+                await AuthService.exigirModulo(context, 'costo_real', funcion: tr('Costo real y utilidad'));
+                return;
+              }
+              Navigator.push(context, MaterialPageRoute(builder: (_) => CostoRealScreen(pedido: widget.pedido)));
+            },
+            icon: Icon(AuthService.puede('costo_real') ? Icons.calculate_outlined : Icons.lock_outline, size: 14),
+            label: Text(tr('Costo real y utilidad'), style: const TextStyle(fontSize: 12)),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul,
+              side: const BorderSide(color: AppColors.grisBorde), padding: const EdgeInsets.symmetric(vertical: 7)))),
         const SizedBox(height: 6),
         // Botón Facturar — visible cuando ya pagaron
         if (widget.pedido.estado == 'PagoCompleto' ||
@@ -498,6 +580,11 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     setState(() => _cambiando = true);
     try {
       await SupabaseService.actualizarEtapaPedido(widget.pedido.id!, nueva);
+      // Inventario conectado: al entrar a producción sale el material; al
+      // terminar (control de calidad) se puede guardar el retazo
+      if (nueva == 'Produccion' && mounted) await descontarMaterialSheet(context, pedidoId: widget.pedido.id!, folio: widget.pedido.folio);
+      if (nueva == 'Pruebas' && mounted) await aprenderTiempoSheet(context, pedidoId: widget.pedido.id!, folio: widget.pedido.folio);
+      if (nueva == 'Pruebas' && mounted) await retazoSheet(context, folio: widget.pedido.folio);
       widget.onActualizar();
       // Sin notificación automática por ahora — usa el botón manual
       // "Notificar WA" cuando quieras avisarle al cliente.
@@ -508,16 +595,149 @@ class _TarjetaPedidoState extends State<_TarjetaPedido> {
     }
   }
 
+  // ── Guía de envío ────────────────────────────────────────────────
+  static const _paqueterias = ['DHL', 'Estafeta', 'FedEx', 'Paquetexpress', 'UPS', '99 Minutos', 'J&T Express', 'Redpack', 'Castores', 'Tres Guerras', 'Otra'];
+
+  Future<void> _editarGuia() async {
+    final p = widget.pedido;
+    String paq = _paqueterias.contains(p.paqueteria) ? p.paqueteria! : ((p.paqueteria ?? '').isEmpty ? 'DHL' : 'Otra');
+    final otraCtrl = TextEditingController(text: _paqueterias.contains(p.paqueteria) ? '' : (p.paqueteria ?? ''));
+    final guiaCtrl = TextEditingController(text: p.guia ?? '');
+    final urlCtrl = TextEditingController(text: p.rastreoUrl ?? '');
+    final ok = await showModalBottomSheet<bool>(context: context, isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setM) => Padding(
+        padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr('Guía de envío'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(tr('Tu cliente la ve y la rastrea desde la liga de su cotización. ¿Todavía no tienes guía? Cotízala y cómprala con Envíos HETNA.'),
+            style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+          const SizedBox(height: 8),
+          SizedBox(width: double.infinity, child: OutlinedButton.icon(
+            onPressed: () {
+              Navigator.push(ctx, MaterialPageRoute(builder: (_) => const EnviosScreen()));
+            },
+            icon: const Icon(Icons.calculate_outlined, size: 16),
+            label: Text(tr('Cotizar y comprar guía con Envíos HETNA'), style: const TextStyle(fontSize: 12)))),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: paq, isExpanded: true,
+            decoration: InputDecoration(labelText: tr('Paquetería'), isDense: true, border: const OutlineInputBorder()),
+            items: _paqueterias.map((x) => DropdownMenuItem(value: x, child: Text(x == 'Otra' ? tr('Otra') : x))).toList(),
+            onChanged: (v) => setM(() => paq = v ?? 'DHL')),
+          if (paq == 'Otra') ...[
+            const SizedBox(height: 8),
+            TextField(controller: otraCtrl, decoration: InputDecoration(labelText: tr('¿Cuál paquetería?'), isDense: true, border: const OutlineInputBorder())),
+          ],
+          const SizedBox(height: 8),
+          TextField(controller: guiaCtrl, decoration: InputDecoration(labelText: tr('Número de guía'), isDense: true, border: const OutlineInputBorder())),
+          const SizedBox(height: 8),
+          TextField(controller: urlCtrl, keyboardType: TextInputType.url,
+            decoration: InputDecoration(labelText: tr('Liga de rastreo (opcional)'),
+              helperText: tr('Para DHL, FedEx y UPS se arma sola.'), isDense: true, border: const OutlineInputBorder())),
+          const SizedBox(height: 12),
+          Row(children: [
+            if ((p.guia ?? '').isNotEmpty) TextButton(
+              onPressed: () { guiaCtrl.clear(); urlCtrl.clear(); Navigator.pop(ctx, true); },
+              child: Text(tr('Quitar guía'), style: const TextStyle(color: AppColors.rojo))),
+            const Spacer(),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(minimumSize: const Size(120, 44)),
+              onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Guardar'))),
+          ]),
+        ]))));
+    if (ok != true) return;
+    final url = urlCtrl.text.trim();
+    if (url.isNotEmpty && !url.startsWith('https://')) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('La liga de rastreo debe empezar con https://'))));
+      return;
+    }
+    try {
+      final nombrePaq = paq == 'Otra' ? otraCtrl.text.trim() : paq;
+      await SupabaseService.guardarGuiaPedido(p.id!,
+        paqueteria: guiaCtrl.text.trim().isEmpty ? null : nombrePaq, guia: guiaCtrl.text, rastreoUrl: url);
+      widget.onActualizar();
+      if (mounted && guiaCtrl.text.trim().isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Guía guardada. Tu cliente ya la ve en su liga.'))));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(trf('No se pudo guardar la guía: {0}', [e])), backgroundColor: AppColors.rojo));
+    }
+  }
+
+  // ── Liga de seguimiento ─────────────────────────────────────────
+  Future<void> _compartirSeguimiento() async {
+    final liga = await SupabaseService.ligaSeguimiento(widget.pedido.cotizacionId!);
+    if (!mounted) return;
+    if (liga == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Esta cotización todavía no tiene liga. Revisa que se haya corrido liga_cotizacion.sql.'))));
+      return;
+    }
+    final nombre = widget.pedido.cliente?.nombre ?? '';
+    final msg = trf('¡Hola {0}! 😊 Aquí puedes ver en todo momento cómo va tu pedido *{1}* (etapas, fotos y guía de envío):\n{2}\n\n— *{3}*',
+      [nombre, widget.pedido.folio, liga, AuthService.marcaTaller]);
+    await showModalBottomSheet(context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(tr('Liga de seguimiento'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(tr('Es la misma liga de la cotización: ahora también muestra el avance, las fotos y la guía.'),
+            style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
+          const SizedBox(height: 10),
+          Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(color: AppColors.gris, borderRadius: BorderRadius.circular(10)),
+            child: Row(children: [
+              Expanded(child: SelectableText(liga, style: const TextStyle(fontSize: 12))),
+              IconButton(icon: const Icon(Icons.copy, size: 18), tooltip: tr('Copiar'), onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: liga));
+                if (ctx.mounted) ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text(tr('Liga copiada'))));
+              }),
+            ])),
+          const SizedBox(height: 10),
+          Row(children: [
+            if ((widget.pedido.cliente?.whatsappNumero ?? '').isNotEmpty) ...[
+              Expanded(child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), minimumSize: const Size(0, 44)),
+                icon: const Icon(Icons.chat, size: 16, color: Colors.white),
+                label: Text(tr('Mandar por WhatsApp'), style: const TextStyle(fontSize: 12, color: Colors.white)),
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  await WhatsAppService.abrirChatConSelector(context,
+                    numero: widget.pedido.cliente!.whatsappNumero, mensaje: msg);
+                })),
+              const SizedBox(width: 8),
+            ],
+            Expanded(child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+              icon: const Icon(Icons.open_in_new, size: 16),
+              label: Text(tr('Abrir'), style: const TextStyle(fontSize: 12)),
+              onPressed: () => launchUrl(Uri.parse(liga), mode: LaunchMode.externalApplication))),
+          ]),
+        ]))));
+  }
+
   Future<void> _notificarCliente({String? etapa}) async {
     setState(() => _enviandoWA = true);
     try {
-      final msg = await WhatsAppService.getPlantillaAvance(
+      var msg = await WhatsAppService.getPlantillaAvance(
         etapa: etapa ?? widget.pedido.estado,
         nombreCliente: widget.pedido.cliente?.nombre ?? tr('Cliente'),
         folio: widget.pedido.folio,
         montoTotal: widget.pedido.total,
         pedidoId: widget.pedido.id,
       );
+      // Guía y liga de seguimiento al final del mensaje
+      final p = widget.pedido;
+      if ((p.guia ?? '').isNotEmpty) {
+        msg += trf('\n\n📦 Guía {0}: {1}', [p.paqueteria ?? '', p.guia!]);
+      }
+      if (p.cotizacionId != null) {
+        final liga = await SupabaseService.ligaSeguimiento(p.cotizacionId!);
+        if (liga != null) msg += trf('\n\nSigue tu pedido aquí: {0}', [liga]);
+      }
       // Deja elegir con cuál WhatsApp mandarlo (Business u otra app).
       if (mounted) await WhatsAppService.abrirChatConSelector(context,
         numero: widget.pedido.cliente!.whatsappNumero, mensaje: msg);

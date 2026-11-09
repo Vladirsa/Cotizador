@@ -27,6 +27,9 @@ class GeoCad {
   // Dibujo: polilíneas en mm, origen en (0,0), Y hacia arriba
   List<List<List<double>>> trazos;
   List<String> avisos;
+  // 3D: muestra de la malla para el visor (≤ 40,000 triángulos, 9 números
+  // cada uno, centrada en el origen). null en archivos 2D.
+  Float32List? malla;
 
   GeoCad({
     required this.nombre, required this.tipo, this.unidades = 'mm',
@@ -37,6 +40,40 @@ class GeoCad {
   }) : trazos = trazos ?? [], avisos = avisos ?? [];
 
   bool get es3D => tipo == 'stl' || tipo == 'obj';
+
+  /// Copia escalada por un factor (p. ej. 1.5 = 150%). Medidas y largo de
+  /// corte ×f, áreas ×f², volumen ×f³. Sirve cuando el cliente quiere la
+  /// pieza más grande o más chica que el archivo.
+  GeoCad escalado(double f) => escaladoXYZ(f, f, f);
+
+  /// Escala distinta por eje (largo, ancho, alto). Con factores iguales es la
+  /// escala proporcional. Largo de corte y área superficial se aproximan.
+  GeoCad escaladoXYZ(double fx, double fy, double fz) {
+    if (fx <= 0 || fy <= 0 || fz <= 0) return this;
+    if (fx == 1 && fy == 1 && fz == 1) return this;
+    final fxy = (fx + fy) / 2;
+    final uniforme = (fx - fy).abs() < 1e-6 && (fx - fz).abs() < 1e-6;
+    final nota = uniforme
+      ? 'Escalado al ${(fx * 100).round()}% del archivo original'
+      : 'Escalado por eje: largo ${(fx * 100).round()}%, ancho ${(fy * 100).round()}%, alto ${(fz * 100).round()}%';
+    return GeoCad(
+      nombre: nombre, tipo: tipo, unidades: unidades,
+      largo: largo * fx, ancho: ancho * fy, alto: alto * fz,
+      longitudCorte: longitudCorte * fxy, contornos: contornos, barrenos: barrenos,
+      areaPieza: areaPieza * fx * fy,
+      triangulos: triangulos, volumenCm3: volumenCm3 * fx * fy * fz,
+      areaSuperficialCm2: areaSuperficialCm2 * (fx * fy + fx * fz + fy * fz) / 3,
+      trazos: trazos.map((p) => p.map((q) => [q[0] * fx, q[1] * fy]).toList()).toList(),
+      avisos: [...avisos.where((a) => !a.startsWith('Escalado')), nota],
+    )..malla = _escalarMalla(malla, fx, fy, fz);
+  }
+
+  static Float32List? _escalarMalla(Float32List? m, double fx, double fy, double fz) {
+    if (m == null) return null;
+    final o = Float32List(m.length);
+    for (int i = 0; i + 2 < m.length; i += 3) { o[i] = m[i] * fx; o[i + 1] = m[i + 1] * fy; o[i + 2] = m[i + 2] * fz; }
+    return o;
+  }
 
   // Lo que se guarda en datos_pro['archivo_info'] (jsonb)
   Map<String, dynamic> toInfo() => {
@@ -77,12 +114,12 @@ class GeoCad {
 
 class ArchivoCadService {
   static const extensiones = ['dxf', 'svg', 'stl', 'obj'];
-  static const int maxBytes = 40 * 1024 * 1024;
-  static const int maxPuntosDibujo = 4000;
+  static const int maxBytes = 120 * 1024 * 1024;
+  static const int maxPuntosDibujo = 6000;
 
   static GeoCad leer(String nombre, Uint8List bytes) {
     final ext = nombre.contains('.') ? nombre.split('.').last.toLowerCase() : '';
-    if (bytes.length > maxBytes) throw Exception('El archivo pesa más de 40 MB');
+    if (bytes.length > maxBytes) throw Exception('El archivo pesa más de 120 MB');
     switch (ext) {
       case 'dxf': return _leerDxf(nombre, _texto(bytes));
       case 'svg': return _leerSvg(nombre, _texto(bytes));
@@ -715,14 +752,147 @@ class ArchivoCadService {
       g.avisos.add('El modelo mide menos de 5 mm: puede estar en pulgadas o centímetros. Revisa las unidades de exportación.');
     }
     if (g.largo <= 0 || g.ancho <= 0) throw Exception('El modelo no tiene medidas');
-    // Dibujo: vista superior (XY) con una muestra de aristas
-    final maxTris = 1200;
-    final paso = tris.length <= maxTris ? 1 : (tris.length / maxTris).ceil();
-    final trazos = <List<List<double>>>[];
-    for (int i = 0; i < tris.length; i += paso) {
-      final t = tris[i];
-      trazos.add([[t[0] - minX, t[1] - minY], [t[3] - minX, t[4] - minY], [t[6] - minX, t[7] - minY], [t[0] - minX, t[1] - minY]]);
+    // Dibujo: vista superior (XY). Antes se dibujaba una muestra de 1,200
+    // triángulos y un modelo grande (1.6 millones) se veía como puntos. Ahora
+    // se proyecta todo el modelo en un mapa de alturas y se trazan la silueta
+    // y varias curvas de nivel (como un plano topográfico): la pieza se
+    // reconoce aunque tenga millones de triángulos.
+    g.trazos = _curvasDeNivel(tris, minX, minY, minZ, maxX, maxY, maxZ);
+    g.malla = _muestraMalla(tris, (minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
+  }
+
+  // Malla simplificada para el visor: si el STL es chico se manda completo;
+  // si es grande (un relieve de 2 millones de triángulos) se agrupan los
+  // vértices que caen en la misma celda de una rejilla y se quitan los
+  // triángulos que se colapsan. Así la superficie queda COMPLETA (no una
+  // nube de puntos como con un muestreo) y cabe en la tarjeta de video.
+  static Float32List _muestraMalla(List<List<double>> tris, double cx, double cy, double cz) {
+    const maxTris = 160000;
+    if (tris.length <= maxTris) {
+      final out = Float32List(tris.length * 9);
+      int k = 0;
+      for (final t in tris) {
+        for (int v = 0; v < 3; v++) { out[k++] = t[v * 3] - cx; out[k++] = t[v * 3 + 1] - cy; out[k++] = t[v * 3 + 2] - cz; }
+      }
+      return out;
     }
-    g.trazos = trazos;
+    double minX = double.infinity, minY = double.infinity, minZ = double.infinity;
+    double maxX = -double.infinity, maxY = -double.infinity, maxZ = -double.infinity;
+    for (final t in tris) {
+      for (int v = 0; v < 3; v++) {
+        final x = t[v * 3], y = t[v * 3 + 1], z = t[v * 3 + 2];
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+      }
+    }
+    final diag = math.sqrt(math.pow(maxX - minX, 2) + math.pow(maxY - minY, 2) + math.pow(maxZ - minZ, 2));
+    double celda = diag / 220;
+    Float32List? mejor;
+    for (int intento = 0; intento < 5; intento++) {
+      // 1) promedio de los vértices por celda
+      final suma = <int, List<double>>{};
+      int clave(double x, double y, double z) {
+        final ix = ((x - minX) / celda).floor(), iy = ((y - minY) / celda).floor(), iz = ((z - minZ) / celda).floor();
+        return (ix * 73856093) ^ (iy * 19349663) ^ (iz * 83492791);
+      }
+      for (final t in tris) {
+        for (int v = 0; v < 3; v++) {
+          final x = t[v * 3], y = t[v * 3 + 1], z = t[v * 3 + 2];
+          final s = suma.putIfAbsent(clave(x, y, z), () => [0, 0, 0, 0]);
+          s[0] += x; s[1] += y; s[2] += z; s[3] += 1;
+        }
+      }
+      // 2) triángulos con sus tres vértices en celdas distintas
+      final out = <double>[];
+      final vistos = <String>{};
+      for (final t in tris) {
+        final a = clave(t[0], t[1], t[2]), b = clave(t[3], t[4], t[5]), c = clave(t[6], t[7], t[8]);
+        if (a == b || b == c || a == c) continue;
+        final ks = [a, b, c]..sort();
+        if (!vistos.add('${ks[0]}_${ks[1]}_${ks[2]}')) continue;
+        for (final k in [a, b, c]) {
+          final s = suma[k]!;
+          out.add(s[0] / s[3] - cx); out.add(s[1] / s[3] - cy); out.add(s[2] / s[3] - cz);
+        }
+      }
+      mejor = Float32List.fromList(out);
+      if (out.length / 9 <= maxTris) break;
+      celda *= 1.5;
+    }
+    return mejor!;
+  }
+
+  // Mapa de alturas (Z máxima por celda) de la vista superior y curvas de
+  // nivel con "marching squares". Celdas de ~1 mm o las que quepan en 240.
+  static List<List<List<double>>> _curvasDeNivel(List<List<double>> tris,
+      double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+    final largo = maxX - minX, ancho = maxY - minY, alto = maxZ - minZ;
+    final lado = math.max(largo, ancho) / 180; // mm por celda
+    final nx = (largo / lado).ceil() + 1, ny = (ancho / lado).ceil() + 1;
+    final h = List<double>.filled(nx * ny, double.negativeInfinity);
+    // Rasterizar cada triángulo en su caja envolvente (prueba de baricéntricas)
+    for (final t in tris) {
+      final x0 = (t[0] - minX) / lado, y0 = (t[1] - minY) / lado, z0 = t[2];
+      final x1 = (t[3] - minX) / lado, y1 = (t[4] - minY) / lado, z1 = t[5];
+      final x2 = (t[6] - minX) / lado, y2 = (t[7] - minY) / lado, z2 = t[8];
+      final cx0 = math.max(0, math.min(x0, math.min(x1, x2)).floor());
+      final cx1 = math.min(nx - 1, math.max(x0, math.max(x1, x2)).ceil());
+      final cy0 = math.max(0, math.min(y0, math.min(y1, y2)).floor());
+      final cy1 = math.min(ny - 1, math.max(y0, math.max(y1, y2)).ceil());
+      final zt = math.max(z0, math.max(z1, z2));
+      final det = (y1 - y2) * (x0 - x2) + (x2 - x1) * (y0 - y2);
+      for (int cy = cy0; cy <= cy1; cy++) {
+        for (int cx = cx0; cx <= cx1; cx++) {
+          final i = cy * nx + cx;
+          if (h[i] >= zt) continue;
+          if (det.abs() < 1e-12) { h[i] = zt; continue; } // triángulo degenerado: celda pequeña
+          final px = cx + 0.5, py = cy + 0.5;
+          final l0 = ((y1 - y2) * (px - x2) + (x2 - x1) * (py - y2)) / det;
+          final l1 = ((y2 - y0) * (px - x2) + (x0 - x2) * (py - y2)) / det;
+          final l2 = 1 - l0 - l1;
+          const e = -0.02;
+          if (l0 >= e && l1 >= e && l2 >= e) {
+            final z = l0 * z0 + l1 * z1 + l2 * z2;
+            if (z > h[i]) h[i] = z;
+          }
+        }
+      }
+    }
+    // Niveles: la silueta (apenas por encima del fondo) y 3 alturas más
+    final niveles = <double>[minZ + alto * 0.02];
+    if (alto > 0.5) for (int k = 1; k <= 3; k++) niveles.add(minZ + alto * k / 4);
+    final out = <List<List<double>>>[];
+    const maxSegmentos = 9000; // el dibujo se guarda con la cotización: que no pese
+    double v(int cx, int cy) => h[cy * nx + cx].isFinite ? h[cy * nx + cx] : minZ - 1;
+    for (final nivel in niveles) {
+      if (out.length > maxSegmentos) break; // la silueta siempre entra; los niveles, si caben
+      for (int cy = 0; cy < ny - 1; cy++) {
+        for (int cx = 0; cx < nx - 1; cx++) {
+          final a = v(cx, cy), b = v(cx + 1, cy), c = v(cx + 1, cy + 1), d = v(cx, cy + 1);
+          final code = (a >= nivel ? 8 : 0) | (b >= nivel ? 4 : 0) | (c >= nivel ? 2 : 0) | (d >= nivel ? 1 : 0);
+          if (code == 0 || code == 15) continue;
+          List<double> pt(double xa, double ya, double za, double xb, double yb, double zb) {
+            final t = (zb - za).abs() < 1e-9 ? 0.5 : ((nivel - za) / (zb - za)).clamp(0.0, 1.0);
+            return [(xa + (xb - xa) * t) * lado, (ya + (yb - ya) * t) * lado];
+          }
+          final top = pt(cx.toDouble(), cy.toDouble(), a, cx + 1.0, cy.toDouble(), b);
+          final right = pt(cx + 1.0, cy.toDouble(), b, cx + 1.0, cy + 1.0, c);
+          final bottom = pt(cx.toDouble(), cy + 1.0, d, cx + 1.0, cy + 1.0, c);
+          final left = pt(cx.toDouble(), cy.toDouble(), a, cx.toDouble(), cy + 1.0, d);
+          switch (code) {
+            case 1: case 14: out.add([left, bottom]); break;
+            case 2: case 13: out.add([bottom, right]); break;
+            case 3: case 12: out.add([left, right]); break;
+            case 4: case 11: out.add([top, right]); break;
+            case 5: out.add([left, top]); out.add([bottom, right]); break;
+            case 6: case 9: out.add([top, bottom]); break;
+            case 7: case 8: out.add([left, top]); break;
+            case 10: out.add([top, right]); out.add([left, bottom]); break;
+          }
+        }
+      }
+    }
+    return out;
   }
 }
