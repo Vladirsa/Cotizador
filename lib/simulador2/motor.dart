@@ -346,7 +346,7 @@ Resultado2 calcular({
   required Servicio2 servicio, required Pieza2 pieza, required Maquina2 maquina,
   required Material2 material, required Velocidad2 vel, required Taller2 taller,
   required int cantidad, double? margenPct, List<Acabado2> acabados = const [],
-  double rellenoPct = 20, double? tiempoMinManual,
+  double rellenoPct = 20, double? tiempoMinManual, double? costoMaterialFijo,
 }) {
   final n = math.max(1, cantidad);
   final margen = (margenPct ?? taller.margenPct).clamp(0, 95).toDouble();
@@ -371,7 +371,7 @@ Resultado2 calcular({
   faltantes.addAll(m.faltantes); avisos.addAll(m.avisos);
   final merma = 1 + material.mermaPct / 100;
   final markup = 1 + taller.markupMaterialPct / 100;
-  final costoMaterial = m.unidades * material.precio * merma * markup;
+  final costoMaterial = costoMaterialFijo ?? m.unidades * material.precio * merma * markup;
 
   // Tiempos del pedido
   final tMaquina = tPieza * n;
@@ -433,4 +433,90 @@ List<Resultado2> tablaVolumen({
 double velocidadPonderada(double actual, int muestras, double nueva) {
   if (muestras <= 0) return nueva;
   return (actual * muestras + nueva) / (muestras + 1);
+}
+
+// ─────────────────────── Anidado de varias piezas ───────────────────────
+/// Una pieza colocada en una hoja: [x, y, w, h] en mm y el índice del tipo.
+class Colocada {
+  final double x, y, w, h; final int tipo;
+  const Colocada(this.x, this.y, this.w, this.h, this.tipo);
+}
+
+class AnidadoMulti {
+  final List<List<Colocada>> hojas;   // piezas de cada hoja
+  final List<int> noCaben;            // índices de tipos que no caben ni solos
+  final double areaPiezasMm2, areaHojasMm2;
+  final double retazoLargo, retazoAncho; // sobrante de la última hoja
+  const AnidadoMulti({required this.hojas, required this.noCaben, required this.areaPiezasMm2, required this.areaHojasMm2,
+    required this.retazoLargo, required this.retazoAncho});
+  int get hojasCompra => hojas.length;
+  double get aprovechamiento => areaHojasMm2 > 0 ? areaPiezasMm2 / areaHojasMm2 : 0;
+}
+
+/// Acomoda varios tipos de pieza (cada uno con su cantidad) en hojas iguales,
+/// por repisas (shelf, primero las más altas), girando la pieza cuando cabe
+/// mejor. Es lo que un taller haría a mano para comprar las hojas justas.
+AnidadoMulti anidarVarias({required double hojaLargo, required double hojaAncho,
+    required List<({double largo, double ancho, int cantidad})> tipos, double separacion = 6, double margen = 10}) {
+  final utilL = hojaLargo - 2 * margen, utilA = hojaAncho - 2 * margen;
+  final noCaben = <int>[];
+  final instancias = <({double l, double a, int tipo})>[];
+  double areaPiezas = 0;
+  for (int i = 0; i < tipos.length; i++) {
+    final t = tipos[i];
+    final cabe = (t.largo <= utilL && t.ancho <= utilA) || (t.ancho <= utilL && t.largo <= utilA);
+    if (!cabe) { noCaben.add(i); continue; }
+    for (int k = 0; k < t.cantidad; k++) { instancias.add((l: t.largo, a: t.ancho, tipo: i)); areaPiezas += t.largo * t.ancho; }
+  }
+  // Más altas primero (lado corto como altura de repisa) y luego más anchas
+  instancias.sort((p, q) {
+    final hp = math.min(p.l, p.a), hq = math.min(q.l, q.a);
+    if (hq != hp) return hq.compareTo(hp);
+    return math.max(q.l, q.a).compareTo(math.max(p.l, p.a));
+  });
+  final hojas = <List<Colocada>>[];
+  // repisas por hoja: [y, altura, xUsado]
+  final repisas = <List<List<double>>>[];
+  double retL = 0, retA = 0;
+  for (final p in instancias) {
+    bool puesta = false;
+    for (int h = 0; h < hojas.length && !puesta; h++) {
+      for (final r in repisas[h]) {
+        // orientación que quepa en la altura de la repisa
+        for (final (w, ht) in [(math.max(p.l, p.a), math.min(p.l, p.a)), (math.min(p.l, p.a), math.max(p.l, p.a))]) {
+          if (ht <= r[1] && r[2] + w <= utilL) {
+            hojas[h].add(Colocada(margen + r[2], margen + r[0], w, ht, p.tipo));
+            r[2] += w + separacion; puesta = true; break;
+          }
+        }
+        if (puesta) break;
+      }
+      if (puesta) break;
+      // nueva repisa en esta hoja
+      final yLibre = repisas[h].isEmpty ? 0.0 : repisas[h].last[0] + repisas[h].last[1] + separacion;
+      final w = math.max(p.l, p.a), ht = math.min(p.l, p.a);
+      final usaW = w <= utilL ? w : ht, usaH = w <= utilL ? ht : w;
+      if (yLibre + usaH <= utilA) {
+        repisas[h].add([yLibre, usaH, usaW + separacion]);
+        hojas[h].add(Colocada(margen, margen + yLibre, usaW, usaH, p.tipo));
+        puesta = true;
+      }
+    }
+    if (!puesta) {
+      final w = math.max(p.l, p.a), ht = math.min(p.l, p.a);
+      final usaW = w <= utilL ? w : ht, usaH = w <= utilL ? ht : w;
+      hojas.add([Colocada(margen, margen, usaW, usaH, p.tipo)]);
+      repisas.add([[0, usaH, usaW + separacion]]);
+    }
+  }
+  if (repisas.isNotEmpty) {
+    final ult = repisas.last;
+    final yUsado = ult.last[0] + ult.last[1];
+    final abajo = utilA - yUsado;
+    final derecha = utilL - ult.last[2];
+    if (abajo * hojaLargo >= derecha * ult.last[1]) { retL = hojaLargo; retA = math.max(0, abajo); }
+    else { retL = math.max(0, derecha); retA = ult.last[1]; }
+  }
+  return AnidadoMulti(hojas: hojas, noCaben: noCaben, areaPiezasMm2: areaPiezas, areaHojasMm2: hojas.length * hojaLargo * hojaAncho,
+    retazoLargo: retL, retazoAncho: retA);
 }
