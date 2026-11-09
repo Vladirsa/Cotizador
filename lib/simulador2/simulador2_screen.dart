@@ -221,12 +221,19 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   Future<void> _pasarACotizacion() async {
     final r = _r;
     if (r == null || _maq == null || _mat == null || _pieza == null) return;
+    final png = _geo != null && !_aMano ? await renderPiezaPng(_geo!, ancho: 560, alto: 360) : null;
+    if (!mounted) return;
+    String mm(double v) => v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+    final pz = _pieza!;
+    final medidas = pz.es3D || pz.alto > 0
+      ? '${mm(pz.largo)} × ${mm(pz.ancho)} × ${mm(pz.alto > 0 ? pz.alto : _mat!.espesorMm)} mm${pz.volumenCm3 > 0 ? ' · ${pz.volumenCm3.toStringAsFixed(1)} cm³' : ''}'
+      : '${mm(pz.largo)} × ${mm(pz.ancho)}${_mat!.espesorMm > 0 ? ' × ${mm(_mat!.espesorMm)}' : ''} mm${pz.metrosCorte > 0 ? ' · ${pz.metrosCorte.toStringAsFixed(2)} m de corte' : ''}';
     final partida = Partida2(
       emoji: _maq!.emoji, servicio: '${nombreServicio2(_servicio)} · ${_maq!.nombre}',
       descripcion: '${_pieza!.nombre} · ${_mat!.nombre}${_acabSel.isNotEmpty ? ' · ${_acabados.where((a) => _acabSel.contains(a.id)).map((a) => a.nombre).join(', ')}' : ''}',
       cantidad: r.cantidad, precioUnitario: r.precioPieza, total: r.precioTotal, costoTotal: r.costoTotal,
       tiempoMin: r.tiempoMaquinaMinPieza, materialId: Simulador2Data.esReferenciaMaterial(_mat!) ? null : _mat!.id, maquinaId: esReferencia(_maq!) ? null : _maq!.id, tipoMaterial: _mat!.tipo,
-      materialUnidades: r.unidadesMaterial, espesorMm: _mat!.espesorMm);
+      materialUnidades: r.unidadesMaterial, espesorMm: _mat!.espesorMm, geo: _aMano ? null : _geo, imagenPng: png, medidas: medidas);
     Simulador2Data.guardarHistorial(r: r, pieza: _pieza!, maq: _maq!, mat: _mat!);
     if (widget.seleccionar) { Navigator.pop(context, partida); return; }
     Navigator.push(context, MaterialPageRoute(builder: (_) => CotizarScreen(carritoSimulador: [partida])));
