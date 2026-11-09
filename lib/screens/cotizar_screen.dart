@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -522,6 +523,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   double _escalaArchivo = 1; // largo
   double _escalaY = 1, _escalaZ = 1; // ancho y alto (iguales a la del largo si es proporcional)
   List<List<List<double>>> _archivoGeo = [];
+  Uint8List? _archivoPng; // dibujo de la pieza (del Simulador 2.0) para el PDF
   bool _leyendoArchivo = false;
 
   TextEditingController _ctrlPro(String k, String inicial) =>
@@ -536,6 +538,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       d['archivo_info'] = _archivoInfo;
       d['archivo_geo'] = _archivoGeo.map((t) => t.map((q) => [
         (q[0] * 100).round() / 100, (q[1] * 100).round() / 100]).toList()).toList();
+      if (_archivoPng != null) d['archivo_png'] = base64Encode(_archivoPng!);
     }
     return d;
   }
@@ -642,12 +645,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       builder: (_) => Simulador2Screen(geoInicial: g, seleccionar: true)));
     if (r == null || !mounted) return;
     final desc = r.descripcion;
+    if (r.geo != null && _archivoInfo == null) _aplicarGeo(r.geo!);
+    if (r.imagenPng != null) _archivoPng = r.imagenPng;
     setState(() {
       _items.add(CotizacionItem(
         nombreProducto: '${r.emoji} ${r.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
         cantidad: r.cantidad, precioUnitario: r.precioUnitario, sku: null,
         materialId: r.materialId, materialCantidad: r.materialUnidades > 0 ? r.materialUnidades : null,
-        tiempoMin: r.tiempoMin, maquinaId: r.maquinaId, tipoMaterial: r.tipoMaterial, espesorMm: r.espesorMm));
+        tiempoMin: r.tiempoMin, maquinaId: r.maquinaId, tipoMaterial: r.tipoMaterial, espesorMm: r.espesorMm,
+        imagenPng: r.imagenPng != null ? base64Encode(r.imagenPng!) : null, medidas: r.medidas.isNotEmpty ? r.medidas : null));
       if (_ctrlPro('proceso', '').text.trim().isEmpty) _ctrlPro('proceso', '').text = r.servicio;
       if (r.tiempoHoras > 0 && _ctrlPro('operaciones', '').text.trim().isEmpty) {
         _ctrlPro('operaciones', '').text = trf('Tiempo de máquina estimado: {0} h', [r.tiempoHoras.toStringAsFixed(1)]);
@@ -710,7 +716,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             label: Text(tr('Calcular precio con el simulador'), style: const TextStyle(fontSize: 12, color: Colors.white)),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.naranja)),
           TextButton.icon(
-            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; _geoOriginal = null; _escalaArchivo = 1; _escalaY = 1; _escalaZ = 1; }),
+            onPressed: () => setState(() { _archivoInfo = null; _archivoGeo = []; _archivoPng = null; _geoOriginal = null; _escalaArchivo = 1; _escalaY = 1; _escalaZ = 1; }),
             icon: const Icon(Icons.close, size: 16),
             label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12))),
         ]),
@@ -871,7 +877,14 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             nombreProducto: '${sv.emoji} ${sv.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
             cantidad: sv.cantidad, precioUnitario: sv.precioUnitario, sku: sv.servicio,
             materialId: sv.materialId, materialCantidad: sv.materialUnidades > 0 ? sv.materialUnidades : null,
-            tiempoMin: sv.tiempoMin, maquinaId: sv.maquinaId, tipoMaterial: sv.tipoMaterial, espesorMm: sv.espesorMm));
+            tiempoMin: sv.tiempoMin, maquinaId: sv.maquinaId, tipoMaterial: sv.tipoMaterial, espesorMm: sv.espesorMm,
+            imagenPng: sv.imagenPng != null ? base64Encode(sv.imagenPng!) : null, medidas: sv.medidas.isNotEmpty ? sv.medidas : null));
+          // El dibujo y las medidas de la pieza van a la cotización profesional
+          if (sv.geo != null && _archivoInfo == null) {
+            final g = sv.geo!;
+            _archivoPng = sv.imagenPng;
+            WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _aplicarGeo(g); });
+          }
           continue;
         }
         try {
@@ -907,6 +920,9 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       _tipo = c.tipo;
       _tipoOriginal = c.tipo;
       _muestraGratis = c.datosPro['muestra'] == true;
+      if (c.datosPro['archivo_png'] is String) {
+        try { _archivoPng = base64Decode(c.datosPro['archivo_png'] as String); } catch (_) {}
+      }
       if (c.datosPro['archivo_info'] is Map) {
         _archivoInfo = Map<String, dynamic>.from(c.datosPro['archivo_info'] as Map);
         _archivoGeo = GeoCad.geoDeJson(c.datosPro['archivo_geo']);
