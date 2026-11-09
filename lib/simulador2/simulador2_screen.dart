@@ -19,6 +19,8 @@ import 'velocidades_hetna.dart';
 import 'visor_pieza.dart';
 import 'config_maquina_sheet.dart';
 import 'capacidad.dart';
+import 'recetas.dart';
+import 'receta_widget.dart';
 
 class Simulador2Screen extends StatefulWidget {
   // geoInicial: pieza ya leída (desde la cotización). seleccionar: al pasar a
@@ -93,6 +95,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     final res = await Future.wait([
       Simulador2Data.maquinas(), Simulador2Data.materiales(mermaDefault: 15), Simulador2Data.acabados(),
       Simulador2Data.cargarVelocidades(),
+      Simulador2Data.cargarRecetas(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -123,9 +126,32 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   List<Material2> _materialesParaMaq() {
     if (_maq == null) return _materiales;
     final grupos = materialesParaMaquina(_maq!.tipo).map((t) => t.clave).toSet();
-    final l = _materiales.where((m) => grupos.contains(m.tipo)).toList();
-    return l.isEmpty ? _materiales : l;
+    final propios = _materiales.where((m) => grupos.contains(m.tipo)).toList();
+    // Después de los del inventario van los de referencia HETNA que no tenga
+    // (mismo tipo y espesor), para que todo servicio tenga con qué cotizar
+    final refs = Simulador2Data.materialesReferencia(_maq!.tipo)
+      .where((r) => !propios.any((m) => m.tipo == r.tipo && (m.espesorMm - r.espesorMm).abs() < 0.6)).toList();
+    return [...propios, ...refs];
   }
+
+  // ── Receta técnica: de aquí sale el tiempo ──
+  Receta? get _receta => (_maq == null || _mat == null) ? null : Simulador2Data.receta(_maq!, _mat!, _servicio.name, rellenoPct: _relleno);
+  bool get _recetaDelTaller => _maq != null && _mat != null && !esReferencia(_maq!) &&
+    Simulador2Data.ajustesReceta(_maq!, _mat!, Simulador2Data.operacionDe(_maq!.tipo, _servicio.name)).isNotEmpty;
+
+  /// Velocidad para el motor: lo que el taller guardó (velocidad o tiempos
+  /// reales) manda; si no, la que sale de la receta (HETNA o ajustada).
+  Velocidad2 _velPara(Maquina2 maq, Material2 mat, Servicio2 servicio) {
+    final guardada = Simulador2Data.velocidad(maq, mat);
+    if (!guardada.sugerido) return guardada;
+    final r = Simulador2Data.receta(maq, mat, servicio.name, rellenoPct: _relleno);
+    final editada = !esReferencia(maq) && Simulador2Data.ajustesReceta(maq, mat, Simulador2Data.operacionDe(maq.tipo, servicio.name)).isNotEmpty;
+    return Simulador2Data.velocidadDeReceta(r, tallerLaEdito: editada);
+  }
+
+  Maquina2 _conSegEntrada(Maquina2 m, double seg) => Maquina2(id: m.id, nombre: m.nombre, tipo: m.tipo, emoji: m.emoji, costoHora: m.costoHora,
+    preparacionMin: m.preparacionMin, perforacionSeg: seg, mesaLargo: m.mesaLargo, mesaAncho: m.mesaAncho, mesaAlto: m.mesaAlto,
+    remocionCm3Min: m.remocionCm3Min, impresionCm3H: m.impresionCm3H);
 
   Pieza2 _piezaDeGeo(GeoCad g) => Pieza2(
     nombre: g.nombre, largo: g.largo, ancho: g.ancho, alto: g.alto,
@@ -165,9 +191,11 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   void _recalcular() {
     if (_aMano) _piezaAMano();
     if (_pieza == null || _maq == null || _mat == null) { setState(() => _r = null); return; }
-    final vel = Simulador2Data.velocidad(_maq!, _mat!);
+    final vel = _velPara(_maq!, _mat!, _servicio);
+    final rec = _receta;
+    final maqCalc = rec != null ? _conSegEntrada(_maq!, rec.segPorEntrada) : _maq!;
     final acs = _acabados.where((a) => _acabSel.contains(a.id)).toList();
-    final r = calcular(servicio: _servicio, pieza: _pieza!, maquina: _maq!, material: _mat!, vel: vel, taller: _taller,
+    final r = calcular(servicio: _servicio, pieza: _pieza!, maquina: maqCalc, material: _mat!, vel: vel, taller: _taller,
       cantidad: _cantidad, margenPct: _margen, acabados: acs, rellenoPct: _relleno, tiempoMinManual: _tiempoManual);
     setState(() => _r = r);
     _buscarParecidos();
@@ -187,7 +215,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     if (mounted) setState(() => _parecidos = p);
   }
 
-  Velocidad2 get _vel => (_maq != null && _mat != null) ? Simulador2Data.velocidad(_maq!, _mat!) : const Velocidad2();
+  Velocidad2 get _vel => (_maq != null && _mat != null) ? _velPara(_maq!, _mat!, _servicio) : const Velocidad2();
 
   // ── Pasar a cotización ──
   Future<void> _pasarACotizacion() async {
@@ -197,7 +225,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
       emoji: _maq!.emoji, servicio: '${nombreServicio2(_servicio)} · ${_maq!.nombre}',
       descripcion: '${_pieza!.nombre} · ${_mat!.nombre}${_acabSel.isNotEmpty ? ' · ${_acabados.where((a) => _acabSel.contains(a.id)).map((a) => a.nombre).join(', ')}' : ''}',
       cantidad: r.cantidad, precioUnitario: r.precioPieza, total: r.precioTotal, costoTotal: r.costoTotal,
-      tiempoMin: r.tiempoMaquinaMinPieza, materialId: _mat!.id, maquinaId: esReferencia(_maq!) ? null : _maq!.id, tipoMaterial: _mat!.tipo,
+      tiempoMin: r.tiempoMaquinaMinPieza, materialId: Simulador2Data.esReferenciaMaterial(_mat!) ? null : _mat!.id, maquinaId: esReferencia(_maq!) ? null : _maq!.id, tipoMaterial: _mat!.tipo,
       materialUnidades: r.unidadesMaterial, espesorMm: _mat!.espesorMm);
     Simulador2Data.guardarHistorial(r: r, pieza: _pieza!, maq: _maq!, mat: _mat!);
     if (widget.seleccionar) { Navigator.pop(context, partida); return; }
@@ -228,6 +256,8 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
           _tarjeta(n: 1, titulo: tr('Pieza'), child: _campoPieza()),
           _tarjeta(n: 2, titulo: tr('Máquina'), child: _campoMaquina()),
           _tarjeta(n: 3, titulo: tr('Material'), child: _campoMaterial()),
+          if (_receta != null) RecetaCard(receta: _receta!, maquina: _maq!, material: _mat!, servicio: _servicio.name, tallerLaEdito: _recetaDelTaller,
+            onCambio: () async { await Simulador2Data.cargarRecetas(); _recalcular(); }),
           _tarjeta(n: 4, titulo: tr('Cantidad'), child: _campoCantidad()),
           _tarjeta(n: 5, titulo: tr('Acabado'), child: _campoAcabado()),
           const SizedBox(height: 6),
@@ -387,7 +417,8 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
         if (velTxt.isNotEmpty) InkWell(onTap: _editarVelocidad, child: _chip('$velTxt${vel.sugerido ? ' · ${tr('sugerido')}' : vel.origen == 'tiempo_real' ? ' · ${tr('aprendido')}' : ''} ✎',
           vel.sugerido ? AppColors.ambarClaro : AppColors.verdeClaro, vel.sugerido ? AppColors.naranja : AppColors.verde)),
         if (_mat!.stock > 0) _chip('${tr('stock')}: ${_mat!.stock % 1 == 0 ? _mat!.stock.toInt() : _mat!.stock}', AppColors.gris, AppColors.textoSecundario),
-        InkWell(onTap: _completarMaterial, child: _chip('${tr('datos del material')} ✎', AppColors.gris, AppColors.textoSecundario)),
+        if (Simulador2Data.esReferenciaMaterial(_mat!)) InkWell(onTap: _agregarRefAlInventario, child: _chip('${tr('precio de referencia · agregar a mi inventario')} +', AppColors.ambarClaro, AppColors.naranja))
+        else InkWell(onTap: _completarMaterial, child: _chip('${tr('datos del material')} ✎', AppColors.gris, AppColors.textoSecundario)),
       ])),
     ]);
   }
@@ -407,8 +438,19 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     if (v == true) { await Simulador2Data.cargarVelocidades(); _recalcular(); }
   }
 
+  Future<void> _agregarRefAlInventario() async {
+    final m = _mat; if (m == null) return;
+    final id = await Simulador2Data.agregarMaterialAlInventario(m);
+    if (id == null) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('No se pudo agregar al inventario.')), backgroundColor: AppColors.rojo)); return; }
+    await _cargar();
+    setState(() { _mat = _materiales.firstWhere((x) => x.id == id, orElse: () => _mat!); });
+    _recalcular();
+    if (mounted) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Agregado a tu inventario con precio de referencia: corrígelo con "datos del material".')), backgroundColor: AppColors.verde)); }
+  }
+
   Future<void> _completarMaterial() async {
     final m = _mat; if (m == null || m.id == null) return;
+    if (Simulador2Data.esReferenciaMaterial(m)) { await _agregarRefAlInventario(); return; }
     final tipoC = ValueNotifier<String>(m.tipo);
     final esp = TextEditingController(text: m.espesorMm > 0 ? '${m.espesorMm}' : '');
     final hl = TextEditingController(text: m.hojaLargo > 0 ? '${m.hojaLargo.round()}' : '');
@@ -690,7 +732,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
       final s = svs.contains(_servicio) ? _servicio : (svs.first);
       // Sólo tiene sentido comparar el mismo tipo de trabajo
       if (s != _servicio && !(_servicio == Servicio2.corte2D && s == Servicio2.corte2D)) continue;
-      final vel = Simulador2Data.velocidad(m, _mat!);
+      final vel = _velPara(m, _mat!, s);
       final r = calcular(servicio: s, pieza: _pieza!, maquina: m, material: _mat!, vel: vel, taller: _taller,
         cantidad: _cantidad, margenPct: _margen, acabados: acs, rellenoPct: _relleno);
       filas.add((m, s, r));
