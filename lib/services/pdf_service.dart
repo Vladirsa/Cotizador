@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -279,7 +280,7 @@ class PdfService {
     pdf.addPage(pw.MultiPage(
       pageTheme: _tema(const pw.EdgeInsets.all(28)),
       build: (ctx) => [
-        // ─── ENCABEZADO ─────────────────────
+        // ─── ENCABEZADO ────────────────────
         pw.Container(
           decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(8)),
           padding: const pw.EdgeInsets.all(16),
@@ -354,16 +355,25 @@ class PdfService {
                 decoration: pw.BoxDecoration(color: i.isEven ? PdfColors.white : grisClaro),
                 children: [
                   pw.Padding(padding: const pw.EdgeInsets.all(7),
-                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                      pw.Text(nombreLimpio,
-                        style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
-                      if (descLimpia != null)
-                        pw.Padding(padding: const pw.EdgeInsets.only(top: 2),
-                          child: pw.Text(descLimpia,
-                            style: pw.TextStyle(fontSize: 8, color: grisTexto))),
-                      if (item.sku != null && item.sku!.isNotEmpty)
-                        pw.Text('SKU: ${item.sku}',
-                          style: pw.TextStyle(fontSize: 7, color: grisTexto)),
+                    child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      if (_miniatura(item.imagenPng) != null)
+                        pw.Container(width: 78, height: 50, margin: const pw.EdgeInsets.only(right: 6),
+                          decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400, width: 0.5)),
+                          child: pw.Image(_miniatura(item.imagenPng)!, fit: pw.BoxFit.contain)),
+                      pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                        pw.Text(nombreLimpio,
+                          style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
+                        if (descLimpia != null)
+                          pw.Padding(padding: const pw.EdgeInsets.only(top: 2),
+                            child: pw.Text(descLimpia,
+                              style: pw.TextStyle(fontSize: 8, color: grisTexto))),
+                        if (item.medidas != null && item.medidas!.isNotEmpty)
+                          pw.Text('${_t('Medidas')}: ${_limpiarTexto(item.medidas!)}',
+                            style: pw.TextStyle(fontSize: 7.5, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+                        if (item.sku != null && item.sku!.isNotEmpty)
+                          pw.Text('SKU: ${item.sku}',
+                            style: pw.TextStyle(fontSize: 7, color: grisTexto)),
+                      ])),
                     ])),
                   _cD('${item.cantidad}', center: true),
                   _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
@@ -547,6 +557,19 @@ class PdfService {
       espesor: numPro('croquis_espesor'), barrenoD: numPro('croquis_barreno_d'),
       barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto,
       trazos: trazosArch, es3D: infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj'));
+    // Dibujo de la pieza que mandó el Simulador 2.0 (3D sombreado o 2D con cotas)
+    pw.Widget? imagenPieza;
+    if (d['archivo_png'] is String) {
+      try {
+        final bytes = base64Decode(d['archivo_png'] as String);
+        if (bytes.isNotEmpty) {
+          imagenPieza = pw.Container(
+            width: double.infinity, height: 200, padding: const pw.EdgeInsets.all(4),
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: grisLinea, width: 0.5), borderRadius: pw.BorderRadius.circular(4)),
+            child: pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.contain));
+        }
+      } catch (_) {}
+    }
     // Datos técnicos que salen del archivo (DXF/SVG/STL/OBJ)
     if (infoArch != null) {
       String nf(dynamic x, [int dec = 1]) => _fmtN(((x as num?) ?? 0).toDouble(), dec);
@@ -585,7 +608,7 @@ class PdfService {
             style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
         ])),
       build: (ctx) => [
-        // ─── ENCABEZADO ─────────────────────
+        // ─── ENCABEZADO ────────────────────
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
             if (logoImage != null)
@@ -642,13 +665,13 @@ class PdfService {
             ]))),
         ]),
 
-        // ─── 1. RESUMEN ─────────────────────
+        // ─── 1. RESUMEN ───────────────────
         if (v('resumen').isNotEmpty) ...[
           titulo(sig(), _t('RESUMEN')),
           pw.Text(v('resumen'), style: const pw.TextStyle(fontSize: 9, lineSpacing: 2)),
         ],
 
-        // ─── 2. ALCANCE ─────────────────────
+        // ─── 2. ALCANCE ───────────────────
         if (incluye.isNotEmpty || noIncluye.isNotEmpty) ...[
           titulo(sig(), _t('ALCANCE DEL TRABAJO')),
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
@@ -659,10 +682,12 @@ class PdfService {
         ],
 
         // ─── 3. DETALLE TÉCNICO ─────────────
-        if (hay(tecnicos) || croquis != null) ...[
+        if (hay(tecnicos) || croquis != null || imagenPieza != null) ...[
           titulo(sig(), _t('DETALLE TÉCNICO')),
           if (hay(tecnicos)) datos(tecnicos),
-          if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
+          // Pieza 3D: la imagen sombreada en vez del croquis plano; 2D: el croquis con cotas
+          if (imagenPieza != null && (croquis == null || (infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj')))) ...[pw.SizedBox(height: 8), imagenPieza]
+          else if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
         ],
 
         // ─── 4. FABRICACIÓN ─────────────────
@@ -691,12 +716,21 @@ class PdfService {
                 children: [
                   _cD('${i + 1}', center: true),
                   pw.Padding(padding: const pw.EdgeInsets.all(6),
-                    child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-                      pw.Text(_limpiarTexto(item.nombreProducto),
-                        style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
-                      if (desc.isNotEmpty) pw.Text(_limpiarTexto(desc), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
-                      if (item.sku != null && item.sku!.isNotEmpty)
-                        pw.Text(_tf('No. de parte: {0}', [(item.sku)]), style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
+                    child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                      if (_miniatura(item.imagenPng) != null) ...[
+                        pw.Container(width: 78, height: 50, margin: const pw.EdgeInsets.only(right: 6),
+                          decoration: pw.BoxDecoration(border: pw.Border.all(color: grisLinea, width: 0.5)),
+                          child: pw.Image(_miniatura(item.imagenPng)!, fit: pw.BoxFit.contain)),
+                      ],
+                      pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                        pw.Text(_limpiarTexto(item.nombreProducto),
+                          style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: azul)),
+                        if (desc.isNotEmpty) pw.Text(_limpiarTexto(desc), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+                        if (item.medidas != null && item.medidas!.isNotEmpty)
+                          pw.Text('${_t('Medidas')}: ${_limpiarTexto(item.medidas!)}', style: pw.TextStyle(fontSize: 7.5, color: grisTexto, fontWeight: pw.FontWeight.bold)),
+                        if (item.sku != null && item.sku!.isNotEmpty)
+                          pw.Text(_tf('No. de parte: {0}', [(item.sku)]), style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
+                      ])),
                     ])),
                   _cD('${item.cantidad}', center: true),
                   _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
@@ -725,7 +759,7 @@ class PdfService {
         titulo(sig(), _t('CONDICIONES COMERCIALES')),
         datos(comerciales),
 
-        // ─── 7. CALIDAD ─────────────────────
+        // ─── 7. CALIDAD ───────────────────
         if (v('calidad').isNotEmpty || v('tolerancia').isNotEmpty) ...[
           titulo(sig(), _t('CONDICIONES TÉCNICAS Y DE CALIDAD')),
           pw.Container(
@@ -799,6 +833,15 @@ class PdfService {
   // ── Croquis acotado de la pieza (vista superior + lateral) ──
   // Dibuja un rectángulo de largo × ancho con sus cotas, barrenos opcionales
   // y, si hay espesor, una vista lateral. Ilustrativo, no a escala real.
+  // Miniatura de la pieza guardada en la partida (PNG base64)
+  static final Map<String, pw.MemoryImage> _cacheMini = {};
+  static pw.MemoryImage? _miniatura(String? b64) {
+    if (b64 == null || b64.isEmpty) return null;
+    try {
+      return _cacheMini.putIfAbsent(b64.hashCode.toString(), () => pw.MemoryImage(base64Decode(b64)));
+    } catch (_) { return null; }
+  }
+
   static pw.Widget? _croquisPieza({
     required double largo, required double ancho, required double espesor,
     required double barrenoD, required int barrenos,
