@@ -64,7 +64,27 @@ class _VisorPiezaState extends State<VisorPieza> {
     child: Icon(i, size: 16, color: widget.oscuro ? Colors.white70 : AppColors.azul)));
 }
 
-// ── 2D ──────────────────────────────────────────────────────────────
+/// Dibuja la pieza en un PNG (para la cotización en PDF): 2D con trazos y
+/// cotas, 3D con la malla sombreada en vista isométrica. Fondo blanco.
+Future<Uint8List?> renderPiezaPng(GeoCad g, {int ancho = 720, int alto = 440}) async {
+  try {
+    final rec = ui.PictureRecorder();
+    final c = Canvas(rec);
+    final size = Size(ancho.toDouble(), alto.toDouble());
+    c.drawRect(Offset.zero & size, Paint()..color = Colors.white);
+    final es3D = g.es3D && g.malla != null && g.malla!.isNotEmpty;
+    if (es3D) {
+      _Malla3DPainter(g.malla!, -1.0, 0.6, 1, false, g.largo, g.ancho, g.alto).paint(c, size);
+    } else {
+      _Trazos2DPainter(g, false).paint(c, size);
+    }
+    final img = await rec.endRecording().toImage(ancho, alto);
+    final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+    return bytes?.buffer.asUint8List();
+  } catch (_) { return null; }
+}
+
+// ── 2D ────────────────────────────────────────────────────────────────
 class _Trazos2DPainter extends CustomPainter {
   final GeoCad g; final bool oscuro;
   _Trazos2DPainter(this.g, this.oscuro);
@@ -123,7 +143,7 @@ class _Trazos2DPainter extends CustomPainter {
   bool shouldRepaint(_Trazos2DPainter old) => old.g != g || old.oscuro != oscuro;
 }
 
-// ── 3D ──────────────────────────────────────────────────────────────
+// ── 3D ────────────────────────────────────────────────────────────────
 class _Malla3DPainter extends CustomPainter {
   final Float32List m; final double rx, rz, zoom; final bool oscuro;
   final double largo, ancho, alto;
@@ -199,7 +219,7 @@ class _Malla3DPainter extends CustomPainter {
   bool shouldRepaint(_Malla3DPainter old) => old.m != m || old.rx != rx || old.rz != rz || old.zoom != zoom || old.oscuro != oscuro;
 }
 
-// ── Hoja anidada ────────────────────────────────────────────────────
+// ── Hoja anidada ────────────────────────────────────────────────────────────────
 class VisorHoja extends StatelessWidget {
   final Anidado anidado;
   final double hojaLargo, hojaAncho;
