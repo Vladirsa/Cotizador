@@ -280,7 +280,7 @@ class PdfService {
     pdf.addPage(pw.MultiPage(
       pageTheme: _tema(const pw.EdgeInsets.all(28)),
       build: (ctx) => [
-        // ─── ENCABEZADO ────────────────────
+        // ─── ENCABEZADO ─────────────────────
         pw.Container(
           decoration: pw.BoxDecoration(color: azul, borderRadius: pw.BorderRadius.circular(8)),
           padding: const pw.EdgeInsets.all(16),
@@ -608,7 +608,7 @@ class PdfService {
             style: const pw.TextStyle(fontSize: 7, color: grisTexto)),
         ])),
       build: (ctx) => [
-        // ─── ENCABEZADO ────────────────────
+        // ─── ENCABEZADO ─────────────────────
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
             if (logoImage != null)
@@ -665,13 +665,13 @@ class PdfService {
             ]))),
         ]),
 
-        // ─── 1. RESUMEN ───────────────────
+        // ─── 1. RESUMEN ─────────────────────
         if (v('resumen').isNotEmpty) ...[
           titulo(sig(), _t('RESUMEN')),
           pw.Text(v('resumen'), style: const pw.TextStyle(fontSize: 9, lineSpacing: 2)),
         ],
 
-        // ─── 2. ALCANCE ───────────────────
+        // ─── 2. ALCANCE ─────────────────────
         if (incluye.isNotEmpty || noIncluye.isNotEmpty) ...[
           titulo(sig(), _t('ALCANCE DEL TRABAJO')),
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
@@ -759,7 +759,7 @@ class PdfService {
         titulo(sig(), _t('CONDICIONES COMERCIALES')),
         datos(comerciales),
 
-        // ─── 7. CALIDAD ───────────────────
+        // ─── 7. CALIDAD ─────────────────────
         if (v('calidad').isNotEmpty || v('tolerancia').isNotEmpty) ...[
           titulo(sig(), _t('CONDICIONES TÉCNICAS Y DE CALIDAD')),
           pw.Container(
