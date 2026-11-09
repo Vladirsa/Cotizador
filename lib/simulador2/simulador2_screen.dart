@@ -170,10 +170,21 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
 
   Future<void> _subirArchivo() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ArchivoCadService.extensiones, withData: true);
+      // En celular el selector filtrado por .dxf/.stl deja los archivos en gris
+      // (el teléfono no conoce esos tipos): se abre "cualquier archivo" y se
+      // revisa la extensión aquí.
+      final result = await FilePicker.platform.pickFiles(type: FileType.any, withData: true);
       if (result == null || result.files.isEmpty) return;
       final f = result.files.first;
-      if (f.bytes == null) return;
+      final ext = f.name.contains('.') ? f.name.split('.').last.toLowerCase() : '';
+      if (!ArchivoCadService.extensiones.contains(ext)) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Ese archivo es .{0}; sube DXF, SVG, STL u OBJ.', [ext])), backgroundColor: AppColors.naranja));
+        return;
+      }
+      if (f.bytes == null) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('El navegador no entregó el archivo. Intenta de nuevo o desde "Archivos" del teléfono.')), backgroundColor: AppColors.naranja));
+        return;
+      }
       final g = ArchivoCadService.leer(f.name, f.bytes!);
       setState(() {
         _geo = g; _pieza = _piezaDeGeo(g); _aMano = false; _tiempoManual = null;

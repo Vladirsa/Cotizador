@@ -899,4 +899,6 @@ const Map<String, String> textosEnExtra = {
   'Mismo precio': 'Same price',
   'Misma receta': 'Same recipe',
   'margen': 'margin',
+  'Ese archivo es .{0}; sube DXF, SVG, STL u OBJ.': 'That file is .{0}; upload DXF, SVG, STL or OBJ.',
+  'El navegador no entregó el archivo. Intenta de nuevo o desde "Archivos" del teléfono.': 'The browser did not hand over the file. Try again or from the phone "Files" app.',
 };

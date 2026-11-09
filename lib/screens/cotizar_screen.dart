@@ -545,10 +545,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   Future<void> _subirArchivoPieza() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom, allowedExtensions: ArchivoCadService.extensiones, withData: true);
+      // FileType.any: en celular el filtro por extensión deja los archivos en gris
+      final result = await FilePicker.platform.pickFiles(type: FileType.any, withData: true);
       if (result == null || result.files.isEmpty) return;
       final f = result.files.first;
+      final extSel = f.name.contains('.') ? f.name.split('.').last.toLowerCase() : '';
+      if (!ArchivoCadService.extensiones.contains(extSel)) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Ese archivo es .{0}; sube DXF, SVG, STL u OBJ.', [extSel])), backgroundColor: AppColors.naranja));
+        return;
+      }
       final bytes = f.bytes;
       if (bytes == null) return;
       setState(() => _leyendoArchivo = true);
