@@ -1,6 +1,12 @@
 // lib/simulador2/aprender_tiempo_sheet.dart
 // HETNA CNC — El simulador aprende de los tiempos reales.
 //
+// Además, al terminar el maquinado se anotan SOLOS los costos reales del
+// pedido (horas de máquina por máquina y horas de operador) en pedido_costos,
+// que es lo que alimenta Reportes → Rentabilidad por máquina y el contador de
+// horas de Mantenimiento. Si el taller no usa el QR, se anotan las horas
+// estimadas (y se marca que son estimadas).
+//
 // Cuando el operador marca "maquinado terminado" (la orden pasa de Producción
 // a control de calidad), se compara cuánto se estimó en la cotización
 // (cotizacion_items.tiempo_min × cantidad + preparación) con cuánto tardó de
@@ -14,6 +20,7 @@ import '../i18n/tr.dart';
 import 'motor.dart';
 import 'simulador2_data.dart';
 import 'velocidades_hetna.dart';
+import '../services/costos_service.dart';
 
 class _Partida {
   final String maquinaId, tipoMaterial; final double espesor, tiempoMin; final int cantidad;
@@ -40,7 +47,7 @@ Future<void> aprenderTiempoSheet(BuildContext context, {required String pedidoId
     final av = await db.from('pedido_avances').select('created_at').eq('pedido_id', pedidoId).eq('etapa', 'Produccion').order('created_at', ascending: false).limit(1);
     if ((av as List).isNotEmpty) inicio = DateTime.tryParse(av.first['created_at'].toString());
   } catch (_) { return; }
-  if (inicio == null) return;
+  // Sin avance "Produccion" (no usaron el QR) se anotan horas estimadas abajo
 
   final maquinas = await Simulador2Data.maquinas();
   await Simulador2Data.cargarVelocidades();
@@ -49,14 +56,16 @@ Future<void> aprenderTiempoSheet(BuildContext context, {required String pedidoId
   prepMin = maq.preparacionMin;
 
   final estimado = partidas.fold(0.0, (s, p) => s + p.tiempoMin * p.cantidad) + prepMin;
-  final real = DateTime.now().difference(inicio).inMinutes.toDouble();
-  if (real <= 0 || estimado <= 0) return;
+  double real = inicio == null ? 0.0 : DateTime.now().difference(inicio).inMinutes.toDouble();
+  if (estimado <= 0) return;
   // Si tardó más de 12 h seguramente pasó la noche sin escanear: no se aprende
-  if (real > 12 * 60) {
-    try { await db.from('pedidos').update({'tiempo_estimado_min': estimado, 'tiempo_real_min': real}).eq('id', pedidoId); } catch (_) {}
-    return;
-  }
-  try { await db.from('pedidos').update({'tiempo_estimado_min': estimado, 'tiempo_real_min': real}).eq('id', pedidoId); } catch (_) {}
+  final realConfiable = real > 0 && real <= 12 * 60;
+  try { await db.from('pedidos').update({'tiempo_estimado_min': estimado, if (real > 0) 'tiempo_real_min': real}).eq('id', pedidoId); } catch (_) {}
+
+  // Costos reales automáticos: horas de máquina (por máquina) y de operador
+  await _registrarCostos(pedidoId: pedidoId, folio: folio, partidas: partidas, maquinas: maquinas,
+    minutosTotales: realConfiable ? real : estimado, estimadoTotal: estimado, esEstimado: !realConfiable, context: context);
+  if (!realConfiable) return;
 
   final factor = real / estimado;
   if ((factor - 1).abs() < 0.15) {
@@ -127,4 +136,48 @@ Future<void> aprenderTiempoSheet(BuildContext context, {required String pedidoId
   } catch (e) {
     if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('No se pudo guardar: {0}', [e])), backgroundColor: AppColors.rojo));
   }
+}
+
+/// Anota en pedido_costos las horas de máquina y de operador del pedido, una
+/// sola vez (si ya hay una línea de esa máquina, no se duplica). Las horas se
+/// reparten entre las máquinas según lo estimado en la cotización.
+Future<void> _registrarCostos({required String pedidoId, required String folio, required List<_Partida> partidas,
+    required List<Maquina2> maquinas, required double minutosTotales, required double estimadoTotal, required bool esEstimado,
+    required BuildContext context}) async {
+  try {
+    final existentes = await CostosService.costosPedido(pedidoId);
+    final yaMaq = existentes.where((c) => c['tipo'] == 'maquina').map((c) => c['maquina_id']?.toString()).toSet();
+    final yaOp = existentes.any((c) => c['tipo'] == 'mano_obra');
+    // minutos estimados por máquina
+    final porMaq = <String, double>{};
+    for (final p in partidas) { porMaq[p.maquinaId] = (porMaq[p.maquinaId] ?? 0) + p.tiempoMin * p.cantidad; }
+    final sumaMaq = porMaq.values.fold(0.0, (s, v) => s + v);
+    if (sumaMaq <= 0) return;
+    final factor = minutosTotales / estimadoTotal; // real ÷ estimado (1 si es estimado)
+    final etiqueta = esEstimado ? 'estimadas' : 'reales (QR)';
+    double horasTotal = 0;
+    for (final e in porMaq.entries) {
+      final m = maquinas.cast<Maquina2?>().firstWhere((x) => x!.id == e.key, orElse: () => null);
+      if (m == null) continue;
+      // la preparación se reparte proporcional
+      final min = (e.value + (estimadoTotal - sumaMaq) * e.value / sumaMaq) * factor;
+      final horas = double.parse((min / 60).toStringAsFixed(2));
+      horasTotal += horas;
+      if (yaMaq.contains(m.id) || horas <= 0) continue;
+      await CostosService.agregarCosto(pedidoId: pedidoId, folio: folio, tipo: 'maquina',
+        concepto: 'Horas $etiqueta · ${m.nombre}', cantidad: horas, costoUnitario: m.costoHora, maquinaId: m.id);
+    }
+    if (!yaOp && horasTotal > 0) {
+      final t = await Simulador2Data.taller();
+      if (t.costoHoraOperador > 0) {
+        await CostosService.agregarCosto(pedidoId: pedidoId, folio: folio, tipo: 'mano_obra',
+          concepto: 'Operador · horas $etiqueta', cantidad: horasTotal, costoUnitario: t.costoHoraOperador);
+      }
+    }
+    if (context.mounted && !yaMaq.contains(partidas.first.maquinaId)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(trf('Costo real anotado: {0} h de máquina ({1}). Se ve en Reportes → Rentabilidad y en Mantenimiento.', [horasTotal.toStringAsFixed(1), esEstimado ? tr('estimadas') : tr('reales')])),
+        backgroundColor: AppColors.azul));
+    }
+  } catch (_) {}
 }
