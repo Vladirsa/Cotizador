@@ -219,7 +219,7 @@ class _Malla3DPainter extends CustomPainter {
   bool shouldRepaint(_Malla3DPainter old) => old.m != m || old.rx != rx || old.rz != rz || old.zoom != zoom || old.oscuro != oscuro;
 }
 
-// ── Hoja anidada ───────────────────────────────────────────────────
+// ── Hoja anidada ────────────────────────────────────────────────────
 class VisorHoja extends StatelessWidget {
   final Anidado anidado;
   final double hojaLargo, hojaAncho;
