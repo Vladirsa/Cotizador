@@ -210,7 +210,7 @@ class Simulador2Data {
     try {
       await _sb.from('sim2_historial').insert({
         'negocio_id': _neg, 'cliente_id': clienteId, 'cliente_nombre': clienteNombre,
-        'archivo': pieza.nombre, 'servicio': r.servicio.name, 'maquina_id': maq.id,
+        'archivo': pieza.nombre, 'servicio': r.servicio.name, 'maquina_id': maq.id.startsWith('ref_') ? null : maq.id,
         'tipo_material': mat.tipo, 'espesor_mm': mat.espesorMm,
         'largo_mm': pieza.largo, 'ancho_mm': pieza.ancho, 'alto_mm': pieza.alto,
         'metros_corte': pieza.metrosCorte, 'volumen_cm3': pieza.volumenCm3,
