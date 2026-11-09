@@ -208,6 +208,9 @@ class CotizacionItem {
   final String? maquinaId;
   final String? tipoMaterial;
   final double? espesorMm;
+  // Dibujo (PNG base64) y medidas de la pieza, para que salgan en el PDF
+  final String? imagenPng;
+  final String? medidas;
   String nombreProducto;
   String? descripcion;
   final String? sku;
@@ -224,6 +227,8 @@ class CotizacionItem {
     this.maquinaId,
     this.tipoMaterial,
     this.espesorMm,
+    this.imagenPng,
+    this.medidas,
     required this.nombreProducto,
     this.descripcion,
     this.sku,
@@ -254,6 +259,8 @@ class CotizacionItem {
         maquinaId: json['maquina_id'],
         tipoMaterial: json['tipo_material'],
         espesorMm: (json['espesor_mm'] as num?)?.toDouble(),
+        imagenPng: json['imagen_png'],
+        medidas: json['medidas'],
         nombreProducto: json['nombre_producto'] ?? '',
         descripcion: json['descripcion'],
         sku: json['sku'],
@@ -272,6 +279,8 @@ class CotizacionItem {
         if (maquinaId != null) 'maquina_id': maquinaId,
         if (tipoMaterial != null) 'tipo_material': tipoMaterial,
         if (espesorMm != null) 'espesor_mm': espesorMm,
+        if (imagenPng != null) 'imagen_png': imagenPng,
+        if (medidas != null) 'medidas': medidas,
         'nombre_producto': nombreProducto,
         'descripcion': descripcion,
         'sku': sku,
