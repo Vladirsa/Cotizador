@@ -84,7 +84,7 @@ Future<Uint8List?> renderPiezaPng(GeoCad g, {int ancho = 720, int alto = 440}) a
   } catch (_) { return null; }
 }
 
-// ── 2D ────────────────────────────────────────────────────────────────
+// ── 2D ──────────────────────────────────────────────────────────────
 class _Trazos2DPainter extends CustomPainter {
   final GeoCad g; final bool oscuro;
   _Trazos2DPainter(this.g, this.oscuro);
@@ -143,7 +143,7 @@ class _Trazos2DPainter extends CustomPainter {
   bool shouldRepaint(_Trazos2DPainter old) => old.g != g || old.oscuro != oscuro;
 }
 
-// ── 3D ────────────────────────────────────────────────────────────────
+// ── 3D ──────────────────────────────────────────────────────────────
 class _Malla3DPainter extends CustomPainter {
   final Float32List m; final double rx, rz, zoom; final bool oscuro;
   final double largo, ancho, alto;
@@ -219,7 +219,7 @@ class _Malla3DPainter extends CustomPainter {
   bool shouldRepaint(_Malla3DPainter old) => old.m != m || old.rx != rx || old.rz != rz || old.zoom != zoom || old.oscuro != oscuro;
 }
 
-// ── Hoja anidada ────────────────────────────────────────────────────
+// ── Hoja anidada ────────────────────────────────────────────
 class VisorHoja extends StatelessWidget {
   final Anidado anidado;
   final double hojaLargo, hojaAncho;
