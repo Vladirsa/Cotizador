@@ -641,19 +641,25 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // Abre el simulador con la pieza cargada; el precio elegido entra como partida
   Future<void> _calcularConSimulador() async {
     final g = _geoOriginal?.escalado(_escalaArchivo);
-    final r = await Navigator.push<Partida2>(context, MaterialPageRoute(
+    final res = await Navigator.push<dynamic>(context, MaterialPageRoute(
       builder: (_) => Simulador2Screen(geoInicial: g, seleccionar: true)));
-    if (r == null || !mounted) return;
-    final desc = r.descripcion;
+    if (res == null || !mounted) return;
+    // Una partida o un juego de piezas
+    final lista = res is Partida2 ? [res] : res is List ? res.whereType<Partida2>().toList() : <Partida2>[];
+    if (lista.isEmpty) return;
+    final r = lista.first;
     if (r.geo != null && _archivoInfo == null) _aplicarGeo(r.geo!);
     if (r.imagenPng != null) _archivoPng = r.imagenPng;
     setState(() {
+      for (final r in lista) {
+      final desc = r.descripcion;
       _items.add(CotizacionItem(
         nombreProducto: '${r.emoji} ${r.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
         cantidad: r.cantidad, precioUnitario: r.precioUnitario, sku: null,
         materialId: r.materialId, materialCantidad: r.materialUnidades > 0 ? r.materialUnidades : null,
         tiempoMin: r.tiempoMin, maquinaId: r.maquinaId, tipoMaterial: r.tipoMaterial, espesorMm: r.espesorMm,
         imagenPng: r.imagenPng != null ? base64Encode(r.imagenPng!) : null, medidas: r.medidas.isNotEmpty ? r.medidas : null));
+      }
       if (_ctrlPro('proceso', '').text.trim().isEmpty) _ctrlPro('proceso', '').text = r.servicio;
       if (r.tiempoHoras > 0 && _ctrlPro('operaciones', '').text.trim().isEmpty) {
         _ctrlPro('operaciones', '').text = trf('Tiempo de máquina estimado: {0} h', [r.tiempoHoras.toStringAsFixed(1)]);
@@ -1555,6 +1561,17 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     return false;
   }
 
+  // "Ya lo hiciste antes": liga lo que simuló con la cotización y el cliente
+  void _ligarHistorial(String? cotId) {
+    if (cotId == null) return;
+    final nombreCli = _cliente?.empresa?.isNotEmpty == true ? _cliente!.empresa! : _cliente?.nombre;
+    for (final it in _items) {
+      if (it.tiempoMin == null) continue; // sólo partidas del simulador
+      final archivo = it.nombreProducto.contains(' — ') ? it.nombreProducto.split(' — ').last.split(' · ').first.trim() : null;
+      if (archivo != null && archivo.isNotEmpty) Simulador2Data.ligarHistorial(archivo: archivo, cotizacionId: cotId, clienteNombre: nombreCli);
+    }
+  }
+
   Future<void> _guardar() async {
     if (_cliente == null || _items.isEmpty) return;
     if (!await _hayCupo()) return;
@@ -1582,7 +1599,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         }
       } else {
         final cot = _buildCotizacion(estado: 'Borrador');
-        await SupabaseService.crearCotizacion(cot, _items);
+        final creada = await SupabaseService.crearCotizacion(cot, _items);
+        _ligarHistorial(creada.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(tr('✅ Borrador guardado')), backgroundColor: AppColors.azul));
@@ -1618,6 +1636,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     if (_tipo == 'profesional' && !await _permiteProfesional()) return null;
     try {
       final creada = await SupabaseService.crearCotizacion(_buildCotizacion(estado: 'Borrador'), _items);
+      _ligarHistorial(creada.id);
       _guardadaEnSesion = creada;
       widget.onGuardada?.call();
       _cargarCupo();
@@ -2262,9 +2281,9 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
   }
 }
 
-// ══════════════════════════════════════════════
+// ════════════════════════════════════════════════
 // Botón PDF + compartir por WA
-// ══════════════════════════════════════════════
+// ════════════════════════════════════════════════
 /// Renglón para el mensaje de WhatsApp con la liga pública (si ya existe).
 String _lineaLiga(Cotizacion cot) {
   final liga = cot.ligaPublica;
