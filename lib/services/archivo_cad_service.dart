@@ -761,23 +761,66 @@ class ArchivoCadService {
     g.malla = _muestraMalla(tris, (minX + maxX) / 2, (minY + maxY) / 2, (minZ + maxZ) / 2);
   }
 
-  // Muestra uniforme de la malla, centrada, para dibujarla girando en el
-  // visor sin que un STL de 2 millones de triángulos trabe la pantalla.
+  // Malla simplificada para el visor: si el STL es chico se manda completo;
+  // si es grande (un relieve de 2 millones de triángulos) se agrupan los
+  // vértices que caen en la misma celda de una rejilla y se quitan los
+  // triángulos que se colapsan. Así la superficie queda COMPLETA (no una
+  // nube de puntos como con un muestreo) y cabe en la tarjeta de video.
   static Float32List _muestraMalla(List<List<double>> tris, double cx, double cy, double cz) {
-    const maxTris = 40000;
-    final paso = tris.length <= maxTris ? 1 : (tris.length / maxTris).ceil();
-    final n = (tris.length / paso).ceil();
-    final out = Float32List(n * 9);
-    int k = 0;
-    for (int i = 0; i < tris.length && k + 9 <= out.length; i += paso) {
-      final t = tris[i];
+    const maxTris = 160000;
+    if (tris.length <= maxTris) {
+      final out = Float32List(tris.length * 9);
+      int k = 0;
+      for (final t in tris) {
+        for (int v = 0; v < 3; v++) { out[k++] = t[v * 3] - cx; out[k++] = t[v * 3 + 1] - cy; out[k++] = t[v * 3 + 2] - cz; }
+      }
+      return out;
+    }
+    double minX = double.infinity, minY = double.infinity, minZ = double.infinity;
+    double maxX = -double.infinity, maxY = -double.infinity, maxZ = -double.infinity;
+    for (final t in tris) {
       for (int v = 0; v < 3; v++) {
-        out[k++] = t[v * 3] - cx;
-        out[k++] = t[v * 3 + 1] - cy;
-        out[k++] = t[v * 3 + 2] - cz;
+        final x = t[v * 3], y = t[v * 3 + 1], z = t[v * 3 + 2];
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+        if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
       }
     }
-    return k == out.length ? out : Float32List.sublistView(out, 0, k);
+    final diag = math.sqrt(math.pow(maxX - minX, 2) + math.pow(maxY - minY, 2) + math.pow(maxZ - minZ, 2));
+    double celda = diag / 220;
+    Float32List? mejor;
+    for (int intento = 0; intento < 5; intento++) {
+      // 1) promedio de los vértices por celda
+      final suma = <int, List<double>>{};
+      int clave(double x, double y, double z) {
+        final ix = ((x - minX) / celda).floor(), iy = ((y - minY) / celda).floor(), iz = ((z - minZ) / celda).floor();
+        return (ix * 73856093) ^ (iy * 19349663) ^ (iz * 83492791);
+      }
+      for (final t in tris) {
+        for (int v = 0; v < 3; v++) {
+          final x = t[v * 3], y = t[v * 3 + 1], z = t[v * 3 + 2];
+          final s = suma.putIfAbsent(clave(x, y, z), () => [0, 0, 0, 0]);
+          s[0] += x; s[1] += y; s[2] += z; s[3] += 1;
+        }
+      }
+      // 2) triángulos con sus tres vértices en celdas distintas
+      final out = <double>[];
+      final vistos = <String>{};
+      for (final t in tris) {
+        final a = clave(t[0], t[1], t[2]), b = clave(t[3], t[4], t[5]), c = clave(t[6], t[7], t[8]);
+        if (a == b || b == c || a == c) continue;
+        final ks = [a, b, c]..sort();
+        if (!vistos.add('${ks[0]}_${ks[1]}_${ks[2]}')) continue;
+        for (final k in [a, b, c]) {
+          final s = suma[k]!;
+          out.add(s[0] / s[3] - cx); out.add(s[1] / s[3] - cy); out.add(s[2] / s[3] - cz);
+        }
+      }
+      mejor = Float32List.fromList(out);
+      if (out.length / 9 <= maxTris) break;
+      celda *= 1.5;
+    }
+    return mejor!;
   }
 
   // Mapa de alturas (Z máxima por celda) de la vista superior y curvas de
