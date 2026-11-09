@@ -154,3 +154,7 @@ drop policy if exists "negocio sim2_recetas" on sim2_recetas;
 create policy "negocio sim2_recetas" on sim2_recetas for all to authenticated
   using (negocio_id = negocio_del_usuario()) with check (negocio_id = negocio_del_usuario());
 commit;
+
+-- Cada partida con su dibujo y medidas (para la cotización en PDF)
+alter table cotizacion_items add column if not exists imagen_png text;  -- PNG en base64 (miniatura)
+alter table cotizacion_items add column if not exists medidas text;     -- "300 × 200 × 18 mm · 2.1 m de corte"
