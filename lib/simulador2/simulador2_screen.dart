@@ -5,6 +5,7 @@
 // volumen y "ya cotizaste algo parecido" van abajo, plegados.
 // Fórmula y anidado: motor.dart. Datos: simulador2_data.dart.
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
@@ -218,25 +219,173 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   Velocidad2 get _vel => (_maq != null && _mat != null) ? _velPara(_maq!, _mat!, _servicio) : const Velocidad2();
 
   // ── Pasar a cotización ──
-  Future<void> _pasarACotizacion() async {
-    final r = _r;
-    if (r == null || _maq == null || _mat == null || _pieza == null) return;
-    final png = _geo != null && !_aMano ? await renderPiezaPng(_geo!, ancho: 560, alto: 360) : null;
-    if (!mounted) return;
+  // ── Juego de piezas (varias piezas distintas en la misma cotización) ──
+  final List<_ItemJuego> _juego = [];
+  final Map<String, ({AnidadoMulti an, Material2 mat, List<int> idx, double hojasSeparadas})> _anidadosJuego = {};
+  bool _verJuego = true;
+
+  String _medidasDe(Pieza2 pz, Material2 mat) {
     String mm(double v) => v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
-    final pz = _pieza!;
-    final medidas = pz.es3D || pz.alto > 0
-      ? '${mm(pz.largo)} × ${mm(pz.ancho)} × ${mm(pz.alto > 0 ? pz.alto : _mat!.espesorMm)} mm${pz.volumenCm3 > 0 ? ' · ${pz.volumenCm3.toStringAsFixed(1)} cm³' : ''}'
-      : '${mm(pz.largo)} × ${mm(pz.ancho)}${_mat!.espesorMm > 0 ? ' × ${mm(_mat!.espesorMm)}' : ''} mm${pz.metrosCorte > 0 ? ' · ${pz.metrosCorte.toStringAsFixed(2)} m de corte' : ''}';
-    final partida = Partida2(
-      emoji: _maq!.emoji, servicio: '${nombreServicio2(_servicio)} · ${_maq!.nombre}',
-      descripcion: '${_pieza!.nombre} · ${_mat!.nombre}${_acabSel.isNotEmpty ? ' · ${_acabados.where((a) => _acabSel.contains(a.id)).map((a) => a.nombre).join(', ')}' : ''}',
+    return pz.es3D || pz.alto > 0
+      ? '${mm(pz.largo)} × ${mm(pz.ancho)} × ${mm(pz.alto > 0 ? pz.alto : mat.espesorMm)} mm${pz.volumenCm3 > 0 ? ' · ${pz.volumenCm3.toStringAsFixed(1)} cm³' : ''}'
+      : '${mm(pz.largo)} × ${mm(pz.ancho)}${mat.espesorMm > 0 ? ' × ${mm(mat.espesorMm)}' : ''} mm${pz.metrosCorte > 0 ? ' · ${pz.metrosCorte.toStringAsFixed(2)} m de corte' : ''}';
+  }
+
+  Partida2 _partidaDe(_ItemJuego it) {
+    final r = it.resultado;
+    return Partida2(
+      emoji: it.maq.emoji, servicio: '${nombreServicio2(it.servicio)} · ${it.maq.nombre}',
+      descripcion: '${it.pieza.nombre} · ${it.mat.nombre}${it.acabados.isNotEmpty ? ' · ${it.acabados.map((a) => a.nombre).join(', ')}' : ''}',
       cantidad: r.cantidad, precioUnitario: r.precioPieza, total: r.precioTotal, costoTotal: r.costoTotal,
-      tiempoMin: r.tiempoMaquinaMinPieza, materialId: Simulador2Data.esReferenciaMaterial(_mat!) ? null : _mat!.id, maquinaId: esReferencia(_maq!) ? null : _maq!.id, tipoMaterial: _mat!.tipo,
-      materialUnidades: r.unidadesMaterial, espesorMm: _mat!.espesorMm, geo: _aMano ? null : _geo, imagenPng: png, medidas: medidas);
-    Simulador2Data.guardarHistorial(r: r, pieza: _pieza!, maq: _maq!, mat: _mat!);
+      tiempoMin: r.tiempoMaquinaMinPieza, materialId: Simulador2Data.esReferenciaMaterial(it.mat) ? null : it.mat.id,
+      maquinaId: esReferencia(it.maq) ? null : it.maq.id, tipoMaterial: it.mat.tipo,
+      materialUnidades: r.unidadesMaterial, espesorMm: it.mat.espesorMm, geo: it.geo, imagenPng: it.png, medidas: _medidasDe(it.pieza, it.mat));
+  }
+
+  Future<_ItemJuego?> _itemActual() async {
+    final r = _r;
+    if (r == null || _maq == null || _mat == null || _pieza == null) return null;
+    final png = _geo != null && !_aMano ? await renderPiezaPng(_geo!, ancho: 560, alto: 360) : null;
+    final rec = _receta;
+    return _ItemJuego(pieza: _pieza!, geo: _aMano ? null : _geo, maq: rec != null ? _conSegEntrada(_maq!, rec.segPorEntrada) : _maq!,
+      servicio: _servicio, mat: _mat!, cantidad: _cantidad, acabados: _acabados.where((a) => _acabSel.contains(a.id)).toList(),
+      margen: _margen, relleno: _relleno, tiempoManual: _tiempoManual, vel: _velPara(_maq!, _mat!, _servicio), resultado: r, png: png);
+  }
+
+  Future<void> _pasarACotizacion() async {
+    final it = await _itemActual();
+    if (it == null || !mounted) return;
+    final partida = _partidaDe(it);
+    _guardarHist(it);
     if (widget.seleccionar) { Navigator.pop(context, partida); return; }
     Navigator.push(context, MaterialPageRoute(builder: (_) => CotizarScreen(carritoSimulador: [partida])));
+  }
+
+  void _guardarHist(_ItemJuego it) {
+    final aj = esReferencia(it.maq) ? const <String, double>{} : Simulador2Data.ajustesReceta(it.maq, it.mat, Simulador2Data.operacionDe(it.maq.tipo, it.servicio.name));
+    Simulador2Data.guardarHistorial(r: it.resultado, pieza: it.pieza, maq: it.maq, mat: it.mat,
+      ajustes: aj.isEmpty ? null : aj, acabados: it.acabados.isEmpty ? null : it.acabados.map((a) => a.nombre).join(', '));
+  }
+
+  /// Recotizar con el precio de aquella vez: mueve el margen para que el
+  /// precio por pieza quede igual (si el costo lo permite).
+  void _usarPrecioAnterior(Map<String, dynamic> h) {
+    final r = _r; if (r == null) return;
+    final precio = (h['precio_pieza'] as num?)?.toDouble() ?? 0;
+    final costoPieza = r.costoTotal / r.cantidad;
+    if (precio <= 0 || costoPieza <= 0) return;
+    final mg = ((1 - costoPieza / precio) * 100).clamp(0, 80).toDouble();
+    setState(() => _margen = mg);
+    _recalcular();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Margen ajustado a {0} % para quedar en {1} por pieza.', [mg.round(), _fmt2.format(precio)])), backgroundColor: AppColors.azul));
+  }
+
+  /// Recotizar con la receta de aquella vez (se guarda como tu receta).
+  Future<void> _usarRecetaAnterior(Map<String, dynamic> h) async {
+    if (_maq == null || _mat == null || esReferencia(_maq!)) return;
+    final a = h['ajustes'];
+    if (a is! Map || a.isEmpty) return;
+    final ajustes = a.map((k, v) => MapEntry(k.toString(), (v as num?)?.toDouble() ?? 0));
+    try {
+      await Simulador2Data.guardarReceta(maq: _maq!, mat: _mat!, operacion: Simulador2Data.operacionDe(_maq!.tipo, _servicio.name), ajustes: ajustes, nota: 'De ${h['archivo'] ?? 'trabajo anterior'}');
+      _recalcular();
+    } catch (_) {}
+  }
+
+  Future<void> _agregarAlJuego() async {
+    final it = await _itemActual();
+    if (it == null || !mounted) return;
+    setState(() { _juego.add(it); _verJuego = true; });
+    _recalcularJuego();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Agregada al juego ({0} piezas). Sube la siguiente o cotiza el juego.', [_juego.length])), backgroundColor: AppColors.azul, duration: const Duration(seconds: 2)));
+  }
+
+  /// Las piezas del juego que comparten hoja (mismo material) se anidan
+  /// juntas: se compran las hojas justas y el costo del material se reparte
+  /// por área entre las piezas.
+  void _recalcularJuego() {
+    _anidadosJuego.clear();
+    final porMat = <String, List<int>>{};
+    for (int i = 0; i < _juego.length; i++) {
+      final it = _juego[i];
+      final clave = it.mat.id ?? '${it.mat.tipo}_${it.mat.espesorMm}';
+      if (it.mat.esHoja && !it.mat.porPeso && it.servicio != Servicio2.impresion3D) porMat.putIfAbsent(clave, () => []).add(i);
+      else it.resultado = _calcItem(it, null);
+    }
+    porMat.forEach((clave, idx) {
+      final mat = _juego[idx.first].mat;
+      final an = anidarVarias(hojaLargo: mat.hojaLargo, hojaAncho: mat.hojaAncho,
+        tipos: idx.map((i) => (largo: _juego[i].pieza.largo, ancho: _juego[i].pieza.ancho, cantidad: _juego[i].cantidad)).toList());
+      final separadas = idx.fold(0.0, (s, i) => s + _calcItem(_juego[i], null).anidado.hojasUsadas);
+      _anidadosJuego[clave] = (an: an, mat: mat, idx: idx, hojasSeparadas: separadas);
+      final costoTotal = an.hojasCompra * mat.precio * (1 + mat.mermaPct / 100) * (1 + _taller.markupMaterialPct / 100);
+      final areaTotal = idx.fold(0.0, (s, i) => s + _juego[i].pieza.largo * _juego[i].pieza.ancho * _juego[i].cantidad);
+      for (final i in idx) {
+        final it = _juego[i];
+        final parte = areaTotal > 0 ? it.pieza.largo * it.pieza.ancho * it.cantidad / areaTotal : 1 / idx.length;
+        it.resultado = _calcItem(it, an.hojasCompra > 0 ? costoTotal * parte : null);
+      }
+    });
+    setState(() {});
+  }
+
+  Resultado2 _calcItem(_ItemJuego it, double? costoMaterialFijo) => calcular(servicio: it.servicio, pieza: it.pieza, maquina: it.maq,
+    material: it.mat, vel: it.vel, taller: _taller, cantidad: it.cantidad, margenPct: it.margen, acabados: it.acabados,
+    rellenoPct: it.relleno, tiempoMinManual: it.tiempoManual, costoMaterialFijo: costoMaterialFijo);
+
+  double get _totalJuego => _juego.fold(0.0, (s, it) => s + it.resultado.precioTotal);
+
+  Future<void> _cotizarJuego() async {
+    if (_juego.isEmpty) return;
+    final partidas = _juego.map(_partidaDe).toList();
+    for (final it in _juego) { _guardarHist(it); }
+    if (widget.seleccionar) { Navigator.pop(context, partidas); return; }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => CotizarScreen(carritoSimulador: partidas)));
+  }
+
+  Widget _tarjetaJuego() {
+    final total = _totalJuego;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.azul, width: 1.5)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        InkWell(onTap: () => setState(() => _verJuego = !_verJuego), child: Padding(padding: const EdgeInsets.fromLTRB(12, 10, 8, 10), child: Row(children: [
+          const Text('🧩', style: TextStyle(fontSize: 16)), const SizedBox(width: 6),
+          Expanded(child: Text(trf('Juego de piezas · {0} partidas', [_juego.length]), style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800))),
+          Text(_fmt.format(total), style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.verde)),
+          Icon(_verJuego ? Icons.expand_less : Icons.expand_more, size: 20, color: AppColors.textoSecundario),
+        ]))),
+        if (_verJuego) Padding(padding: const EdgeInsets.fromLTRB(12, 0, 12, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          for (int i = 0; i < _juego.length; i++) Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(children: [
+            Container(width: 10, height: 10, margin: const EdgeInsets.only(right: 6), decoration: BoxDecoration(color: _colorJuego(i), borderRadius: BorderRadius.circular(2))),
+            Expanded(child: Text('${_juego[i].pieza.nombre} · ${_juego[i].mat.nombre}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+            Text('${_juego[i].cantidad} × ${_fmt2.format(_juego[i].resultado.precioPieza)}', style: const TextStyle(fontSize: 12)),
+            IconButton(icon: const Icon(Icons.close, size: 16, color: AppColors.textoSecundario), visualDensity: VisualDensity.compact,
+              onPressed: () { setState(() => _juego.removeAt(i)); _recalcularJuego(); }),
+          ])),
+          for (final e in _anidadosJuego.entries) ...[
+            const Divider(height: 14),
+            Text('${e.value.mat.nombre}: ${trf('{0} hoja(s) para todo el juego', [e.value.an.hojasCompra])}'
+              '${e.value.hojasSeparadas > 0 ? ' · ${trf('por separado serían {0}', [e.value.hojasSeparadas.toStringAsFixed(1)])}' : ''}'
+              ' · ${trf('aprovechamiento {0} %', [(e.value.an.aprovechamiento * 100).round()])}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            if (e.value.an.retazoLargo > 0) Text(trf('Sobra un retazo de {0}×{1} mm', [e.value.an.retazoLargo.round(), e.value.an.retazoAncho.round()]), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            if (e.value.an.noCaben.isNotEmpty) Text(tr('Alguna pieza no cabe en la hoja: se cobra aparte.'), style: const TextStyle(fontSize: 11, color: AppColors.naranja)),
+            const SizedBox(height: 6),
+            VisorHojas(anidado: e.value.an, hojaLargo: e.value.mat.hojaLargo, hojaAncho: e.value.mat.hojaAncho,
+              nombres: e.value.idx.map((i) => '${_juego[i].pieza.nombre} ×${_juego[i].cantidad}').toList()),
+          ],
+          const SizedBox(height: 4),
+          Text(tr('El material se cobra por las hojas completas del juego, repartido por área entre las piezas.'), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+        ])),
+      ]));
+  }
+
+  Color _colorJuego(int i) {
+    const cs = [Color(0xFF2563eb), Color(0xFF16a34a), Color(0xFFd97706), Color(0xFF9333ea), Color(0xFFdc2626), Color(0xFF0891b2), Color(0xFF65a30d), Color(0xFFdb2777)];
+    // mismo color que en el dibujo de hojas: índice dentro de su material
+    for (final e in _anidadosJuego.values) { final k = e.idx.indexOf(i); if (k >= 0) return cs[k % cs.length]; }
+    return AppColors.textoSecundario;
   }
 
   // ═══════════════════════════ UI ═══════════════════════════
@@ -259,6 +408,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
       body: _cargando ? const Center(child: CircularProgressIndicator()) : ListView(
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
         children: [
+          if (_juego.isNotEmpty) _tarjetaJuego(),
           if (_maquinas.isEmpty) _avisoSinMaquinas(),
           _tarjeta(n: 1, titulo: tr('Pieza'), child: _campoPieza()),
           _tarjeta(n: 2, titulo: tr('Máquina'), child: _campoMaquina()),
@@ -271,13 +421,22 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
           if (_r != null) _resultado(_r!),
           if (_r != null) ..._plegables(_r!),
         ]),
-      bottomNavigationBar: _r == null ? null : SafeArea(child: Padding(
+      bottomNavigationBar: (_r == null && _juego.isEmpty) ? null : SafeArea(child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
-        child: SizedBox(height: 50, child: ElevatedButton.icon(
-          onPressed: _r!.precioTotal > 0 ? _pasarACotizacion : null,
-          icon: const Icon(Icons.receipt_long, color: Colors.white),
-          label: Text(trf('Pasar a cotización · {0}', [_fmt.format(_r!.precioTotal)]), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 15)),
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))))))),
+        child: Row(children: [
+          if (_r != null) Expanded(flex: 2, child: SizedBox(height: 50, child: OutlinedButton.icon(
+            onPressed: _r!.precioTotal > 0 ? _agregarAlJuego : null,
+            icon: const Icon(Icons.add_box_outlined, size: 18),
+            label: Text(_juego.isEmpty ? tr('Agregar al juego') : tr('Otra pieza'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul, side: const BorderSide(color: AppColors.azul), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))))),
+          if (_r != null) const SizedBox(width: 8),
+          Expanded(flex: 3, child: SizedBox(height: 50, child: ElevatedButton.icon(
+            onPressed: _juego.isNotEmpty ? _cotizarJuego : (_r != null && _r!.precioTotal > 0 ? _pasarACotizacion : null),
+            icon: const Icon(Icons.receipt_long, color: Colors.white),
+            label: Text(_juego.isNotEmpty ? trf('Cotizar juego ({0}) · {1}', [_juego.length, _fmt.format(_totalJuego)]) : trf('Pasar a cotización · {0}', [_fmt.format(_r?.precioTotal ?? 0)]),
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14), overflow: TextOverflow.ellipsis),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.verde, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))))),
+        ]))),
     );
   }
 
@@ -704,14 +863,28 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
       ])),
       if (_maquinas.length > 1) _plegable(tr('Comparar máquinas'), _verComparar, () => setState(() => _verComparar = !_verComparar), _tablaComparar()),
       _plegable(tr('Precio por volumen'), _verVolumen, () => setState(() => _verVolumen = !_verVolumen), _tablaVolumen()),
-      if (_parecidos.isNotEmpty) _plegable(trf('Ya cotizaste algo parecido ({0})', [_parecidos.length]), true, null, Column(children: [
-        for (final p in _parecidos) Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${p['archivo'] ?? ''}${p['cliente_nombre'] != null ? ' · ${p['cliente_nombre']}' : ''}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
-            Text('${(p['largo_mm'] as num?)?.round()}×${(p['ancho_mm'] as num?)?.round()} mm · ${p['cantidad']} pzas · ${_fecha(p['created_at'])}', style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+      if (_parecidos.isNotEmpty) _plegable(_parecidos.any((p) => p['igual'] == true) ? tr('Ya hiciste esta pieza antes') : trf('Ya cotizaste algo parecido ({0})', [_parecidos.length]), true, null, Column(children: [
+        for (final p in _parecidos) Container(
+          margin: const EdgeInsets.only(bottom: 6), padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+          decoration: BoxDecoration(color: p['igual'] == true ? AppColors.verdeClaro : AppColors.gris, borderRadius: BorderRadius.circular(10)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              if (p['igual'] == true) const Padding(padding: EdgeInsets.only(right: 4), child: Icon(Icons.check_circle, size: 14, color: AppColors.verde)),
+              Expanded(child: Text('${p['archivo'] ?? ''}${p['cliente_nombre'] != null ? ' · ${p['cliente_nombre']}' : ''}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis)),
+              Text('${_fmt2.format((p['precio_pieza'] as num?) ?? 0)}/pza', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.azul)),
+            ]),
+            Text('${_fecha(p['created_at'])} · ${p['cantidad']} pzas · ${(p['largo_mm'] as num?)?.round()}×${(p['ancho_mm'] as num?)?.round()} mm'
+              '${p['maquina_nombre'] != null ? ' · ${p['maquina_nombre']}' : ''}'
+              '${p['tiempo_min'] != null ? ' · ${((p['tiempo_min'] as num).toDouble()).toStringAsFixed(1)} min/pza' : ''}'
+              '${p['margen_pct'] != null ? ' · ${tr('margen')} ${(p['margen_pct'] as num).round()} %' : ''}'
+              '${p['acabados'] != null ? ' · ${p['acabados']}' : ''}',
+              style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+            Row(children: [
+              TextButton(onPressed: () => _usarPrecioAnterior(p), style: TextButton.styleFrom(visualDensity: VisualDensity.compact), child: Text(tr('Mismo precio'), style: const TextStyle(fontSize: 11.5))),
+              if (p['ajustes'] is Map && (p['ajustes'] as Map).isNotEmpty && _maq != null && !esReferencia(_maq!))
+                TextButton(onPressed: () => _usarRecetaAnterior(p), style: TextButton.styleFrom(visualDensity: VisualDensity.compact), child: Text(tr('Misma receta'), style: const TextStyle(fontSize: 11.5))),
+            ]),
           ])),
-          Text('${_fmt.format((p['precio_pieza'] as num?) ?? 0)}/pza', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.azul)),
-        ])),
       ])),
     ];
   }
@@ -802,4 +975,14 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     ])),
     Text(_fmt.format(v), style: TextStyle(fontSize: 13, fontWeight: negrita ? FontWeight.w800 : FontWeight.w600, color: color)),
   ]));
+}
+
+/// Una pieza del juego con todo lo necesario para recalcularla.
+class _ItemJuego {
+  final Pieza2 pieza; final GeoCad? geo; final Maquina2 maq; final Servicio2 servicio; final Material2 mat;
+  final int cantidad; final List<Acabado2> acabados; final double? margen; final double relleno; final double? tiempoManual;
+  final Velocidad2 vel; final Uint8List? png;
+  Resultado2 resultado;
+  _ItemJuego({required this.pieza, this.geo, required this.maq, required this.servicio, required this.mat, required this.cantidad,
+    required this.acabados, this.margen, required this.relleno, this.tiempoManual, required this.vel, required this.resultado, this.png});
 }
