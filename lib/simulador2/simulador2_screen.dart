@@ -184,7 +184,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
       cantidad: r.cantidad, precioUnitario: r.precioPieza, total: r.precioTotal, costoTotal: r.costoTotal,
       tiempoMin: r.tiempoMaquinaMinPieza, materialId: _mat!.id, maquinaId: _maq!.id, tipoMaterial: _mat!.tipo,
       materialUnidades: r.unidadesMaterial, espesorMm: _mat!.espesorMm);
-    Simulador2Data.guardarHistorial(r: r, pieza: _pieza!, maquina: _maq!, mat: _mat!);
+    Simulador2Data.guardarHistorial(r: r, pieza: _pieza!, maq: _maq!, mat: _mat!);
     if (widget.seleccionar) { Navigator.pop(context, partida); return; }
     Navigator.push(context, MaterialPageRoute(builder: (_) => CotizarScreen(carritoSimulador: [partida])));
   }
