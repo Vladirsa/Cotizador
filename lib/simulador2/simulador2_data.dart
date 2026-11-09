@@ -337,11 +337,12 @@ class Simulador2Data {
 
   // ── Historial ──
   static Future<void> guardarHistorial({required Resultado2 r, required Pieza2 pieza, required Maquina2 maq,
-      required Material2 mat, String? clienteId, String? clienteNombre}) async {
+      required Material2 mat, String? clienteId, String? clienteNombre, Map<String, double>? ajustes, String? acabados}) async {
     try {
       await _sb.from('sim2_historial').insert({
         'negocio_id': _neg, 'cliente_id': clienteId, 'cliente_nombre': clienteNombre,
         'archivo': pieza.nombre, 'servicio': r.servicio.name, 'maquina_id': maq.id.startsWith('ref_') ? null : maq.id,
+        'maquina_nombre': maq.nombre, 'ajustes': ajustes, 'acabados': acabados,
         'tipo_material': mat.tipo, 'espesor_mm': mat.espesorMm,
         'largo_mm': pieza.largo, 'ancho_mm': pieza.ancho, 'alto_mm': pieza.alto,
         'metros_corte': pieza.metrosCorte, 'volumen_cm3': pieza.volumenCm3,
@@ -351,16 +352,42 @@ class Simulador2Data {
     } catch (_) {}
   }
 
-  /// "Ya cotizaste algo parecido": mismo material/espesor y medidas ±20 %.
+  /// "Ya lo hiciste antes": primero el mismo archivo (por nombre), luego mismo
+  /// material/espesor con medidas ±20 %. Cada fila trae `igual` = true si es
+  /// el mismo archivo.
   static Future<List<Map<String, dynamic>>> parecidos(Pieza2 pieza, Material2 mat) async {
     try {
+      final out = <Map<String, dynamic>>[];
+      final vistos = <String>{};
+      final nombre = pieza.nombre.trim();
+      if (nombre.isNotEmpty && !nombre.startsWith('Pieza ')) {
+        final mismos = await _sb.from('sim2_historial').select().eq('negocio_id', _neg).eq('archivo', nombre)
+          .order('created_at', ascending: false).limit(5);
+        for (final h in (mismos as List).cast<Map<String, dynamic>>()) {
+          if (vistos.add(h['id'].toString())) out.add({...h, 'igual': true});
+        }
+      }
       final rows = await _sb.from('sim2_historial').select()
         .eq('negocio_id', _neg).eq('tipo_material', mat.tipo)
         .gte('largo_mm', pieza.largo * 0.8).lte('largo_mm', pieza.largo * 1.2)
         .gte('ancho_mm', pieza.ancho * 0.8).lte('ancho_mm', pieza.ancho * 1.2)
-        .order('created_at', ascending: false).limit(5);
-      return (rows as List).cast<Map<String, dynamic>>()
-        .where((h) => (_d(h['espesor_mm']) - mat.espesorMm).abs() < 0.6).toList();
+        .order('created_at', ascending: false).limit(8);
+      for (final h in (rows as List).cast<Map<String, dynamic>>()) {
+        if ((_d(h['espesor_mm']) - mat.espesorMm).abs() >= 0.6) continue;
+        if (vistos.add(h['id'].toString())) out.add({...h, 'igual': false});
+      }
+      return out.take(6).toList();
     } catch (_) { return []; }
+  }
+
+  /// Liga el último registro del historial con la cotización guardada (para
+  /// saber a quién se le cotizó).
+  static Future<void> ligarHistorial({required String archivo, required String cotizacionId, String? clienteNombre}) async {
+    try {
+      final r = await _sb.from('sim2_historial').select('id').eq('negocio_id', _neg).eq('archivo', archivo)
+        .is_('cotizacion_id', null).order('created_at', ascending: false).limit(1);
+      if ((r as List).isEmpty) return;
+      await _sb.from('sim2_historial').update({'cotizacion_id': cotizacionId, if (clienteNombre != null) 'cliente_nombre': clienteNombre}).eq('id', r.first['id']);
+    } catch (_) {}
   }
 }
