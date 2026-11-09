@@ -122,3 +122,35 @@ alter table pedidos add column if not exists tiempo_estimado_min numeric(10,1);
 alter table pedidos add column if not exists tiempo_real_min numeric(10,1);
 
 commit;
+
+-- ════════════════════════════════════════════════════════════════════
+-- Receta técnica (9 nov 2026). Se puede correr aparte si simulador2.sql ya
+-- se había corrido: todo es "if not exists".
+-- ════════════════════════════════════════════════════════════════════
+begin;
+-- Datos de la máquina que las recetas necesitan
+alter table maquinaria add column if not exists potencia numeric(8,2);     -- kW spindle · W tubo láser · A plasma · kW fibra
+alter table maquinaria add column if not exists rpm_max int;               -- router
+alter table maquinaria add column if not exists rpm_min int;
+alter table maquinaria add column if not exists avance_max numeric(8,0);   -- mm/min
+
+-- Receta del taller por máquina + material + espesor + operación. Guarda sólo
+-- los valores que el taller cambió (rpm, avance, pasadas, velocidad, potencia,
+-- amperaje…); lo demás lo vuelve a calcular HETNA.
+create table if not exists sim2_recetas (
+  id uuid primary key default uuid_generate_v4(),
+  negocio_id uuid not null references negocios(id) on delete cascade,
+  maquina_id uuid references maquinaria(id) on delete cascade,
+  tipo_material text not null,
+  espesor_mm numeric(6,2) not null default 0,
+  operacion text not null,            -- perfil | grabado_v | relieve | laser_corte | laser_grabado | plasma | fibra | impresion
+  ajustes jsonb not null default '{}',
+  nota text,
+  updated_at timestamptz default now(),
+  unique (negocio_id, maquina_id, tipo_material, espesor_mm, operacion)
+);
+alter table sim2_recetas enable row level security;
+drop policy if exists "negocio sim2_recetas" on sim2_recetas;
+create policy "negocio sim2_recetas" on sim2_recetas for all to authenticated
+  using (negocio_id = negocio_del_usuario()) with check (negocio_id = negocio_del_usuario());
+commit;

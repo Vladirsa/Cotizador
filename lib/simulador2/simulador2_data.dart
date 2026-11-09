@@ -8,6 +8,7 @@ import '../services/auth_service.dart';
 import '../services/costos_service.dart';
 import 'motor.dart';
 import 'velocidades_hetna.dart';
+import 'recetas.dart';
 
 /// Lo que regresa el simulador a la cotización.
 class Partida2 {
@@ -42,8 +43,13 @@ class Simulador2Data {
     return CostosService.costoHoraMaquina(m); // misma fórmula que Costos del taller
   }
 
+  // Datos para las recetas (potencia, RPM, avance máx.) por máquina
+  static final Map<String, MaquinaReceta> _datosReceta = {};
+  static MaquinaReceta datosReceta(Maquina2 m) => _datosReceta[m.id] ?? MaquinaReceta(tipo: m.tipo);
+
   static Maquina2 maquinaDeFila(Map<String, dynamic> m) {
     final tipo = (m['tipo'] ?? 'router').toString();
+    _datosReceta[m['id'] as String] = MaquinaReceta(tipo: tipo, potencia: _d(m['potencia']), rpmMax: _d(m['rpm_max']), rpmMin: _d(m['rpm_min']), avanceMax: _d(m['avance_max']));
     return Maquina2(
       id: m['id'] as String, nombre: (m['nombre'] ?? 'Máquina').toString(), tipo: tipo,
       emoji: (m['emoji'] ?? emojiTipoMaquina[tipo] ?? '⚙️').toString(),
@@ -99,6 +105,56 @@ class Simulador2Data {
       });
       return l;
     } catch (_) { return []; }
+  }
+
+  /// Materiales de referencia HETNA (precio típico en México) para cuando el
+  /// taller no tiene en su inventario material de ese tipo de máquina.
+  static List<Material2> materialesReferencia(String tipoMaquina) {
+    const hoja = [1220.0, 2440.0], acr = [1220.0, 1830.0];
+    Material2 h(String tipo, String nombre, double esp, double precio, [List<double> dim = hoja]) => Material2(
+      id: 'ref_${tipo}_${esp.toStringAsFixed(1)}', nombre: '$nombre (referencia)', tipo: tipo, espesorMm: esp, precio: precio,
+      unidad: 'hoja', hojaLargo: dim[0], hojaAncho: dim[1], mermaPct: 15, densidad: tipoMaterialPorClave(tipo)?.densidad ?? 0);
+    Material2 kg(String tipo, String nombre, double esp, double precio) => Material2(
+      id: 'ref_${tipo}_${esp.toStringAsFixed(1)}', nombre: '$nombre (referencia)', tipo: tipo, espesorMm: esp, precio: precio,
+      unidad: 'kg', mermaPct: 15, densidad: tipoMaterialPorClave(tipo)?.densidad ?? 1);
+    final tablas = [
+      h('mdf', 'MDF 3 mm', 3, 190), h('mdf', 'MDF 6 mm', 6, 270), h('mdf', 'MDF 9 mm', 9, 340), h('mdf', 'MDF 12 mm', 12, 430), h('mdf', 'MDF 15 mm', 15, 530), h('mdf', 'MDF 18 mm', 18, 620),
+      h('triplay', 'Triplay 6 mm', 6, 420), h('triplay', 'Triplay 12 mm', 12, 700), h('triplay', 'Triplay 18 mm', 18, 980),
+      h('melamina', 'Melamina 16 mm', 16, 760, [1830, 2440]),
+      h('acrilico', 'Acrílico 3 mm', 3, 1150, acr), h('acrilico', 'Acrílico 6 mm', 6, 2200, acr), h('acrilico', 'Acrílico 10 mm', 10, 3600, acr),
+      h('pvc', 'PVC espumado 3 mm', 3, 720), h('pvc', 'PVC espumado 6 mm', 6, 1250),
+      h('espuma', 'Espuma alta densidad 50 mm', 50, 900),
+      h('carton', 'Cartón 3 mm', 3, 60, [1000, 700]), h('cuero', 'Piel 2 mm', 2, 900, [1500, 1000]),
+    ];
+    final metales = [
+      kg('acero', 'Acero cal. 14 (1.9 mm)', 1.9, 34), kg('acero', 'Acero 3 mm (1/8")', 3.2, 34), kg('acero', 'Acero 6 mm (1/4")', 6.4, 34), kg('acero', 'Acero 10 mm (3/8")', 9.5, 34), kg('acero', 'Acero 12 mm (1/2")', 12.7, 34),
+      kg('inox', 'Inoxidable 1.5 mm', 1.5, 110), kg('inox', 'Inoxidable 3 mm', 3, 110), kg('inox', 'Inoxidable 6 mm', 6, 110),
+      kg('aluminio', 'Aluminio 3 mm', 3, 95), kg('aluminio', 'Aluminio 6 mm', 6, 95),
+    ];
+    final filamentos = [kg('pla', 'PLA', 0, 450), kg('petg', 'PETG', 0, 520), kg('abs', 'ABS / ASA', 0, 520), kg('tpu', 'TPU flexible', 0, 750), kg('resina', 'Resina', 0, 950)];
+    switch (tipoMaquina) {
+      case 'impresora_3d': return filamentos;
+      case 'plasma': case 'laser_fibra': return metales;
+      case 'torno': return [...metales, h('hdpe', 'Nylon / HDPE barra', 0, 400)];
+      case 'laser_co2': return tablas.where((m) => m.tipo != 'pvc' && m.tipo != 'melamina' && m.espesorMm <= 12).toList();
+      case 'router_3d': return tablas.where((m) => m.espesorMm >= 12).toList();
+      default: return [...tablas.where((m) => m.tipo != 'carton' && m.tipo != 'cuero'), kg('aluminio', 'Aluminio 3 mm', 3, 95)];
+    }
+  }
+
+  static bool esReferenciaMaterial(Material2 m) => (m.id ?? '').startsWith('ref_');
+
+  /// Agrega un material de referencia al inventario del taller (para que lo
+  /// ajuste a su precio real).
+  static Future<String?> agregarMaterialAlInventario(Material2 m) async {
+    try {
+      final res = await _sb.from('inventario_bodega').insert({
+        'negocio_id': _neg, 'nombre': m.nombre.replaceAll(' (referencia)', ''), 'tipo_material': m.tipo, 'espesor_mm': m.espesorMm > 0 ? m.espesorMm : null,
+        'costo_unitario': m.precio, 'unidad': m.unidad == 'hoja' ? 'hojas' : m.unidad, 'largo_mm': m.hojaLargo > 0 ? m.hojaLargo : null, 'ancho_mm': m.hojaAncho > 0 ? m.hojaAncho : null,
+        'stock_actual': 0, 'stock_minimo': 0, 'activo': true, 'categoria': 'Material',
+      }).select('id').single();
+      return res['id'] as String?;
+    } catch (_) { return null; }
   }
 
   static Material2 materialDeFila(Map<String, dynamic> m, double mermaDefault) {
@@ -157,6 +213,65 @@ class Simulador2Data {
     return Velocidad2(corteMMin: corte, grabadoCm2Min: grab, remocionCm3Min: rem, impresionCm3H: imp,
       sugerido: true, origen: hay ? 'hetna' : 'ninguno');
   }
+
+  // ── Recetas del taller ──
+  static List<Map<String, dynamic>>? _recCache;
+  static Future<void> cargarRecetas() async {
+    try {
+      final rows = await _sb.from('sim2_recetas').select().eq('negocio_id', _neg);
+      _recCache = (rows as List).cast<Map<String, dynamic>>();
+    } catch (_) { _recCache = []; }
+  }
+
+  static Map<String, double> ajustesReceta(Maquina2 maq, Material2 mat, String operacion) {
+    for (final r in _recCache ?? const <Map<String, dynamic>>[]) {
+      if (r['maquina_id'] == maq.id && r['tipo_material'] == mat.tipo && (_d(r['espesor_mm']) - mat.espesorMm).abs() < 0.26 && r['operacion'] == operacion) {
+        final a = r['ajustes'];
+        if (a is Map) return a.map((k, v) => MapEntry(k.toString(), (v as num?)?.toDouble() ?? 0));
+      }
+    }
+    return const {};
+  }
+
+  static Future<void> guardarReceta({required Maquina2 maq, required Material2 mat, required String operacion,
+      required Map<String, double> ajustes, String? nota}) async {
+    await _sb.from('sim2_recetas').upsert({
+      'negocio_id': _neg, 'maquina_id': maq.id, 'tipo_material': mat.tipo, 'espesor_mm': mat.espesorMm,
+      'operacion': operacion, 'ajustes': ajustes, 'nota': nota, 'updated_at': DateTime.now().toIso8601String(),
+    }, onConflict: 'negocio_id,maquina_id,tipo_material,espesor_mm,operacion');
+    await cargarRecetas();
+  }
+
+  static Future<void> borrarReceta(Maquina2 maq, Material2 mat, String operacion) async {
+    await _sb.from('sim2_recetas').delete().eq('negocio_id', _neg).eq('maquina_id', maq.id)
+      .eq('tipo_material', mat.tipo).eq('espesor_mm', mat.espesorMm).eq('operacion', operacion);
+    await cargarRecetas();
+  }
+
+  /// La receta del trabajo (HETNA + los ajustes guardados del taller).
+  static Receta receta(Maquina2 maq, Material2 mat, String servicio, {double rellenoPct = 20}) {
+    final op = operacionDe(maq.tipo, servicio);
+    final ajustes = maq.id.startsWith('ref_') ? const <String, double>{} : ajustesReceta(maq, mat, op);
+    return recetaPara(tipoMaquina: maq.tipo, servicio: servicio, material: mat.tipo, espesor: mat.espesorMm,
+      maq: datosReceta(maq), ajustes: ajustes, rellenoPct: rellenoPct);
+  }
+
+  static String operacionDe(String tipoMaquina, String servicio) {
+    switch (tipoMaquina) {
+      case 'laser_co2': return servicio == 'grabado' ? 'laser_grabado' : 'laser_corte';
+      case 'plasma': return 'plasma';
+      case 'laser_fibra': return 'fibra';
+      case 'impresora_3d': return 'impresion';
+      case 'torno': return 'relieve';
+      default: return servicio == 'relieve3D' ? 'relieve' : servicio == 'grabado' ? 'grabado_v' : 'perfil';
+    }
+  }
+
+  /// Velocidad2 que sale de la receta (para el motor de precio).
+  static Velocidad2 velocidadDeReceta(Receta r, {required bool tallerLaEdito}) => Velocidad2(
+    corteMMin: r.corteMMin, grabadoCm2Min: r.grabadoCm2Min, remocionCm3Min: r.remocionCm3Min,
+    acabadoCm2Min: r.acabadoCm2Min, impresionCm3H: r.impresionCm3H,
+    sugerido: !tallerLaEdito, origen: tallerLaEdito ? 'receta' : 'hetna');
 
   static int muestras(Maquina2 maq, Material2 mat) {
     for (final v in _velCache ?? const <Map<String, dynamic>>[]) {
