@@ -792,4 +792,8 @@ const Map<String, String> textosEnExtra = {
   'Sólo una de tus máquinas puede hacer este trabajo con este material.': 'Only one of your machines can do this job with this material.',
   'ganas': 'you earn',
   'Toca una máquina para cotizar con ella.': 'Tap a machine to quote with it.',
+  'Máquina de referencia HETNA': 'HETNA reference machine',
+  'Registra tu máquina en Costos del taller': 'Register your machine in Shop costs',
+  'No tienes una máquina de este tipo registrada: se usa un costo por hora de referencia. Regístrala en Costos del taller para cotizar con tu costo real.': 'You have no machine of this type registered: a reference hourly cost is used. Register it in Shop costs to quote with your real cost.',
+  'Para guardar velocidades primero registra tu máquina en Costos del taller.': 'To save speeds, first register your machine in Shop costs.',
 };
