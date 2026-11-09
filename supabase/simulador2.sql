@@ -158,3 +158,10 @@ commit;
 -- Cada partida con su dibujo y medidas (para la cotización en PDF)
 alter table cotizacion_items add column if not exists imagen_png text;  -- PNG en base64 (miniatura)
 alter table cotizacion_items add column if not exists medidas text;     -- "300 × 200 × 18 mm · 2.1 m de corte"
+
+-- Historial: guarda también la receta usada y el nombre del cliente de la
+-- cotización, para "ya lo hiciste antes" → recotizar en un toque
+alter table sim2_historial add column if not exists ajustes jsonb;
+alter table sim2_historial add column if not exists acabados text;
+alter table sim2_historial add column if not exists maquina_nombre text;
+alter table sim2_historial add column if not exists cotizacion_id uuid;
