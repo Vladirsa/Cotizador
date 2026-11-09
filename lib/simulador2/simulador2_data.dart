@@ -53,8 +53,17 @@ class Simulador2Data {
   static final Map<String, MaquinaReceta> _datosReceta = {};
   static MaquinaReceta datosReceta(Maquina2 m) => _datosReceta[m.id] ?? MaquinaReceta(tipo: m.tipo);
 
+  // La Fase 4 (mantenimiento) guardó el tipo en `tipo_maquina` (router, laser,
+  // plasma, fibra, impresora3d, otra); el simulador usa `tipo`. Se leen los dos
+  // y se escriben los dos para que mantenimiento y simulador coincidan.
+  static const _deFase4 = {'laser': 'laser_co2', 'fibra': 'laser_fibra', 'impresora3d': 'impresora_3d', 'otra': 'otro', 'router': 'router', 'plasma': 'plasma'};
+  static const aFase4 = {'laser_co2': 'laser', 'laser_fibra': 'fibra', 'impresora_3d': 'impresora3d', 'otro': 'otra', 'router': 'router', 'router_3d': 'router', 'plasma': 'plasma', 'torno': 'otra'};
+
   static Maquina2 maquinaDeFila(Map<String, dynamic> m) {
-    final tipo = (m['tipo'] ?? 'router').toString();
+    String tipo = (m['tipo'] ?? '').toString();
+    if (tipo.isEmpty || (tipo == 'router' && m['tipo_maquina'] != null && m['tipo_maquina'] != 'router')) {
+      tipo = _deFase4[(m['tipo_maquina'] ?? 'router').toString()] ?? 'router';
+    }
     _datosReceta[m['id'] as String] = MaquinaReceta(tipo: tipo, potencia: _d(m['potencia']), rpmMax: _d(m['rpm_max']), rpmMin: _d(m['rpm_min']), avanceMax: _d(m['avance_max']));
     return Maquina2(
       id: m['id'] as String, nombre: (m['nombre'] ?? 'Máquina').toString(), tipo: tipo,
@@ -66,6 +75,7 @@ class Simulador2Data {
   }
 
   static Future<void> guardarMaquina(String id, Map<String, dynamic> datos) async {
+    if (datos['tipo'] != null) datos = {...datos, 'tipo_maquina': aFase4[datos['tipo']] ?? 'otra'};
     await _sb.from('maquinaria').update(datos).eq('id', id);
   }
 
