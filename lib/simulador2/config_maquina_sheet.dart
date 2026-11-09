@@ -30,6 +30,11 @@ Future<void> configMaquinaSheet(BuildContext context, {required Maquina2 maquina
   final rem = TextEditingController(text: maquina.remocionCm3Min > 0 ? maquina.remocionCm3Min.toStringAsFixed(1) : '');
   final imp = TextEditingController(text: maquina.impresionCm3H > 0 ? maquina.impresionCm3H.toStringAsFixed(0) : '');
   final costo = TextEditingController(text: '');
+  final dr = Simulador2Data.datosReceta(maquina);
+  final potencia = TextEditingController(text: dr.potencia > 0 ? (dr.potencia % 1 == 0 ? dr.potencia.toInt().toString() : dr.potencia.toString()) : '');
+  final rpmMax = TextEditingController(text: dr.rpmMax > 0 ? dr.rpmMax.toStringAsFixed(0) : '');
+  final rpmMin = TextEditingController(text: dr.rpmMin > 0 ? dr.rpmMin.toStringAsFixed(0) : '');
+  final avMax = TextEditingController(text: dr.avanceMax > 0 ? dr.avanceMax.toStringAsFixed(0) : '');
   bool guardado = false;
 
   await showModalBottomSheet<void>(context: context, isScrollControlled: true,
@@ -70,6 +75,24 @@ Future<void> configMaquinaSheet(BuildContext context, {required Maquina2 maquina
             const SizedBox(height: 8),
             TextField(controller: imp, keyboardType: TextInputType.number, decoration: _dec(tr('Velocidad de impresión (si no hay dato por material)'), 'cm³/h')),
           ],
+          const SizedBox(height: 10),
+          Text(tr('Para la receta técnica'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          if (tipo == 'router' || tipo == 'router_3d' || tipo == 'torno') ...[
+            Row(children: [
+              Expanded(child: TextField(controller: potencia, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _dec(tr('Spindle'), 'kW'))), const SizedBox(width: 6),
+              Expanded(child: TextField(controller: rpmMax, keyboardType: TextInputType.number, decoration: _dec(tr('RPM máx.')))), const SizedBox(width: 6),
+              Expanded(child: TextField(controller: rpmMin, keyboardType: TextInputType.number, decoration: _dec(tr('RPM mín.')))),
+            ]),
+            const SizedBox(height: 8),
+            TextField(controller: avMax, keyboardType: TextInputType.number, decoration: _dec(tr('Avance máximo de corte'), 'mm/min')),
+            const SizedBox(height: 4),
+            Text(tr('Típico: spindle 2.2 kW, 24,000 RPM máx., 6,000 RPM mín., avance 6,000 mm/min.'), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+          ],
+          if (tipo == 'laser_co2') TextField(controller: potencia, keyboardType: TextInputType.number, decoration: _dec(tr('Potencia del tubo'), 'W')),
+          if (tipo == 'plasma') TextField(controller: potencia, keyboardType: TextInputType.number, decoration: _dec(tr('Amperaje de la fuente'), 'A')),
+          if (tipo == 'laser_fibra') TextField(controller: potencia, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: _dec(tr('Potencia de la fuente'), 'kW')),
+          if (tipo == 'impresora_3d') Text(tr('La receta usa boquilla 0.4, capa 0.2 y 60 mm/s; ajústala desde el simulador.'), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           const SizedBox(height: 8),
           TextField(controller: costo, keyboardType: TextInputType.number, decoration: _dec(tr('Costo por hora a mano (vacío = calculado)'), '\$/h')),
           const SizedBox(height: 14),
@@ -90,6 +113,7 @@ Future<void> configMaquinaSheet(BuildContext context, {required Maquina2 maquina
                   'preparacion_min': _p(prep) ?? 15, 'perforacion_seg': _p(perf) ?? 2,
                   'remocion_cm3_min': _p(rem), 'impresion_cm3_h': _p(imp),
                   'costo_hora_manual': _p(costo),
+                  'potencia': _p(potencia), 'rpm_max': _p(rpmMax)?.round(), 'rpm_min': _p(rpmMin)?.round(), 'avance_max': _p(avMax),
                 });
                 guardado = true;
                 if (ctx.mounted) Navigator.pop(ctx);

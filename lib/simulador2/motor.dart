@@ -106,10 +106,11 @@ class Acabado2 {
 /// Velocidades de ESTA máquina con ESTE material/espesor.
 class Velocidad2 {
   final double corteMMin, grabadoCm2Min, remocionCm3Min, impresionCm3H;
+  final double acabadoCm2Min; // relieve 3D: superficie por minuto en el acabado (0 = estimación fija)
   final bool sugerido;  // true = valor de HETNA sin confirmar
-  final String origen;  // hetna | taller | tiempo_real | ninguno
+  final String origen;  // hetna | receta | taller | tiempo_real | ninguno
   const Velocidad2({this.corteMMin = 0, this.grabadoCm2Min = 0, this.remocionCm3Min = 0,
-    this.impresionCm3H = 0, this.sugerido = true, this.origen = 'ninguno'});
+    this.impresionCm3H = 0, this.acabadoCm2Min = 0, this.sugerido = true, this.origen = 'ninguno'});
 }
 
 /// La pieza (del archivo o de medidas a mano). Todo en mm salvo volumen.
@@ -274,8 +275,8 @@ String _f(double v, [int d = 1]) => v.toStringAsFixed(d);
       }
       final cajaCm3 = pieza.largo * pieza.ancho * (pieza.alto > 0 ? pieza.alto : material.espesorMm) / 1000;
       final quitar = math.max(0.0, cajaCm3 - pieza.volumenCm3);
-      // Acabado fino: pasa por toda la superficie superior, ~0.6 min por 100 cm²
-      final acabado = pieza.areaRectMm2 / 100 * 0.006;
+      // Acabado: superficie ÷ (paso lateral × avance) de la receta; si no hay, ~0.6 min por 100 cm²
+      final acabado = vel.acabadoCm2Min > 0 ? pieza.areaRectMm2 / 100 / vel.acabadoCm2Min : pieza.areaRectMm2 / 100 * 0.006;
       return (min: quitar / rem + acabado,
         como: '${_f(quitar, 0)} cm³ a quitar ÷ ${_f(rem, 1)} cm³/min + acabado ${_f(acabado, 0)} min',
         faltantes: falt);
