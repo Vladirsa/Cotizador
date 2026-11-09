@@ -13,6 +13,9 @@ import '../models/models.dart';
 import '../i18n/tr.dart';
 import '../services/costos_service.dart';
 import '../services/supabase_service.dart';
+import '../simulador2/capacidad.dart';
+import '../simulador2/velocidades_hetna.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RentabilidadTab extends StatefulWidget {
   const RentabilidadTab({super.key});
@@ -38,6 +41,10 @@ class _RentabilidadTabState extends State<RentabilidadTab> {
   final Map<String, _Suma> _porMaquina = {};
   final Map<String, _Suma> _porCliente = {};
   final List<({Pedido p, double ventas, double costo})> _pedidos = [];
+  final Map<String, _Suma> _porMaterial = {};
+  double _horasDisponibles = 0;     // por máquina en el periodo (jornada × días hábiles)
+  double _estimadoMin = 0, _realMin = 0; // precisión del simulador
+  int _conReal = 0;
 
   final _fmt = NumberFormat.currency(locale: 'es_MX', symbol: '\$', decimalDigits: 0);
 
@@ -73,10 +80,32 @@ class _RentabilidadTabState extends State<RentabilidadTab> {
         CostosService.ivaDeCotizaciones(cotIds),
         CostosService.costosDePedidos(pedidos.map((p) => p.id!).toList()),
         CostosService.maquinas(soloActivas: false),
+        _itemsDe(cotIds),
+        _tiemposDe(pedidos.map((p) => p.id!).toList()),
+        Capacidad.jornada(),
       ]);
       final iva = r[0] as Map<String, double>;
       final costos = r[1] as List<Map<String, dynamic>>;
       final nombres = {for (final m in r[2] as List<Map<String, dynamic>>) m['id'].toString(): (m['nombre'] ?? '').toString()};
+      final items = r[3] as List<Map<String, dynamic>>;
+      final tiempos = r[4] as List<Map<String, dynamic>>;
+      final jornada = r[5] as ({double horasDia, int diasSemana});
+      // Horas disponibles por máquina en el periodo
+      int habiles = 0;
+      for (var d = desde; d.isBefore(hasta) && d.isBefore(DateTime.now()); d = d.add(const Duration(days: 1))) {
+        if (d.weekday == DateTime.sunday && jornada.diasSemana < 7) continue;
+        if (d.weekday == DateTime.saturday && jornada.diasSemana < 6) continue;
+        habiles++;
+      }
+      _horasDisponibles = habiles * jornada.horasDia;
+      // Precisión del simulador
+      _estimadoMin = 0; _realMin = 0; _conReal = 0;
+      for (final t in tiempos) {
+        final e = ((t['tiempo_estimado_min'] ?? 0) as num).toDouble(), rl = ((t['tiempo_real_min'] ?? 0) as num).toDouble();
+        if (e > 0 && rl > 0 && rl <= 12 * 60) { _estimadoMin += e; _realMin += rl; _conReal++; }
+      }
+      final itemsPorCot = <String, List<Map<String, dynamic>>>{};
+      for (final i in items) { itemsPorCot.putIfAbsent(i['cotizacion_id'].toString(), () => []).add(i); }
 
       final porPedido = <String, List<Map<String, dynamic>>>{};
       for (final c in costos) {
@@ -88,6 +117,7 @@ class _RentabilidadTabState extends State<RentabilidadTab> {
       _sinCostos = 0;
       _porMaquina.clear();
       _porCliente.clear();
+      _porMaterial.clear();
       _pedidos.clear();
 
       for (final p in pedidos) {
@@ -102,6 +132,20 @@ class _RentabilidadTabState extends State<RentabilidadTab> {
         final cli = p.cliente?.empresa?.isNotEmpty == true ? p.cliente!.empresa! : (p.cliente?.nombre ?? tr('Sin cliente'));
         final sc = _porCliente.putIfAbsent(cli, () => _Suma());
         sc..ventas += ventas..costo += costo..pedidos += 1;
+
+        // Por material: la venta y el costo del pedido se reparten entre sus
+        // partidas según su importe; cada partida sabe su material
+        final its = p.cotizacionId == null ? const <Map<String, dynamic>>[] : (itemsPorCot[p.cotizacionId] ?? const []);
+        final sumaIt = its.fold<double>(0, (s, i) => s + ((i['subtotal'] ?? 0) as num).toDouble());
+        if (sumaIt > 0) {
+          for (final i in its) {
+            final parte = ((i['subtotal'] ?? 0) as num).toDouble() / sumaIt;
+            final tm = i['tipo_material'] as String?;
+            final nombreMat = tm == null ? tr('Sin material / productos') : '${tipoMaterialPorClave(tm)?.nombre ?? tm}${i['espesor_mm'] != null ? ' ${_mm(i['espesor_mm'])} mm' : ''}';
+            final sm = _porMaterial.putIfAbsent(nombreMat, () => _Suma());
+            sm..ventas += ventas * parte..costo += costo * parte..pedidos += 1;
+          }
+        }
 
         // Horas por máquina dentro del pedido → reparto de venta y costo
         final horas = <String, double>{};
@@ -133,6 +177,24 @@ class _RentabilidadTabState extends State<RentabilidadTab> {
     }
   }
 
+  static String _mm(dynamic v) { final d = ((v ?? 0) as num).toDouble(); return d % 1 == 0 ? d.toStringAsFixed(0) : d.toStringAsFixed(1); }
+
+  Future<List<Map<String, dynamic>>> _itemsDe(List<String> cotIds) async {
+    if (cotIds.isEmpty) return [];
+    try {
+      final r = await Supabase.instance.client.from('cotizacion_items').select('cotizacion_id, subtotal, tipo_material, espesor_mm').in_('cotizacion_id', cotIds);
+      return (r as List).cast<Map<String, dynamic>>();
+    } catch (_) { return []; }
+  }
+
+  Future<List<Map<String, dynamic>>> _tiemposDe(List<String> ids) async {
+    if (ids.isEmpty) return [];
+    try {
+      final r = await Supabase.instance.client.from('pedidos').select('id, tiempo_estimado_min, tiempo_real_min').in_('id', ids);
+      return (r as List).cast<Map<String, dynamic>>();
+    } catch (_) { return []; }
+  }
+
   Color _color(double margen) => margen >= 30 ? AppColors.verde : margen >= 15 ? AppColors.naranja : AppColors.rojo;
 
   @override
@@ -159,7 +221,7 @@ class _RentabilidadTabState extends State<RentabilidadTab> {
           Text(tr('Aún no hay pedidos con costo real en este periodo.'), textAlign: TextAlign.center,
             style: const TextStyle(fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
-          Text(tr('En Avances, abre un pedido y toca "Costo real y utilidad" para anotar horas de máquina, material y operador.'),
+          Text(tr('Las horas de máquina y operador se anotan solas al terminar el maquinado (QR o Avances); el material, al pasar a producción. También puedes anotarlas en "Costo real y utilidad" del pedido.'),
             textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario)),
           if (_ventasTodas > 0) Padding(padding: const EdgeInsets.only(top: 8),
             child: Text(trf('Ventas del periodo (sin IVA): {0}', [_fmt.format(_ventasTodas)]), style: const TextStyle(fontSize: 12))),
@@ -178,6 +240,24 @@ class _RentabilidadTabState extends State<RentabilidadTab> {
       if (maquinas.isEmpty) Text(tr('Anota horas de máquina en los pedidos para ver esta parte.'),
         style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario))
       else ...maquinas.map((e) => _filaMaquina(e.key, e.value)),
+      if (_conReal > 0) ...[
+        const SizedBox(height: 8),
+        _caja(Row(children: [
+          const Icon(Icons.timer_outlined, color: AppColors.azul), const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(tr('Precisión del simulador'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+            Text(trf('{0} pedidos: cotizaste {1} h de máquina y fueron {2} h reales ({3}).', [
+              _conReal, (_estimadoMin / 60).toStringAsFixed(1), (_realMin / 60).toStringAsFixed(1),
+              _realMin > _estimadoMin ? '+${((_realMin / _estimadoMin - 1) * 100).round()} %' : '−${((1 - _realMin / _estimadoMin) * 100).round()} %']),
+              style: const TextStyle(fontSize: 11.5, color: AppColors.textoSecundario)),
+            if ((_realMin / _estimadoMin - 1).abs() > 0.15) Text(tr('Acepta las correcciones de velocidad que te propone la app al terminar cada maquinado y esto se acerca a 0 %.'), style: const TextStyle(fontSize: 11, color: AppColors.naranja)),
+          ])),
+        ])),
+      ],
+      const SizedBox(height: 16),
+      _titulo(tr('Por material')),
+      if (_porMaterial.isEmpty) Text(tr('Las cotizaciones hechas con el simulador nuevo traen el material de cada partida.'), style: const TextStyle(fontSize: 12, color: AppColors.textoSecundario))
+      else ...(_porMaterial.entries.toList()..sort((a, b) => b.value.utilidad.compareTo(a.value.utilidad))).take(8).map((e) => _fila(e.key, e.value, trf('{0} partidas', [e.value.pedidos]))),
       const SizedBox(height: 16),
       _titulo(tr('Clientes que más utilidad dejan')),
       ...clientes.take(8).map((e) => _fila(e.key, e.value, trf('{0} pedidos', [e.value.pedidos]))),
@@ -233,7 +313,9 @@ class _RentabilidadTabState extends State<RentabilidadTab> {
           Text('${s.margen.toStringAsFixed(0)}%', style: TextStyle(fontWeight: FontWeight.w800, color: _color(s.margen))),
         ]),
         const SizedBox(height: 6),
-        Text(trf('Horas trabajadas: {0} h', [s.horas.toStringAsFixed(1)]), style: const TextStyle(fontSize: 12)),
+        Text(_horasDisponibles > 0
+            ? trf('Horas trabajadas: {0} h de {1} disponibles · utilización {2} %', [s.horas.toStringAsFixed(1), _horasDisponibles.toStringAsFixed(0), (s.horas / _horasDisponibles * 100).clamp(0, 999).round()])
+            : trf('Horas trabajadas: {0} h', [s.horas.toStringAsFixed(1)]), style: const TextStyle(fontSize: 12)),
         Text(trf('Ingresos: {0}  ·  Costo: {1}', [_fmt.format(s.ventas), _fmt.format(s.costo)]), style: const TextStyle(fontSize: 12)),
         Text(trf('Utilidad: {0}  ({1} por hora)', [_fmt.format(s.utilidad), _fmt.format(porHora)]),
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _color(s.margen))),
