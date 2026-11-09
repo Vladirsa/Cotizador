@@ -3,7 +3,9 @@
 // costos del taller, velocidades por máquina/material, acabados e historial.
 // Si la base todavía no tiene las columnas de simulador2.sql, todo sigue
 // funcionando con valores por defecto (nunca truena por una columna que falta).
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../services/archivo_cad_service.dart';
 import '../services/auth_service.dart';
 import '../services/costos_service.dart';
 import 'motor.dart';
@@ -17,9 +19,13 @@ class Partida2 {
   final double precioUnitario, total, costoTotal, tiempoMin, tiempoHoras;
   final String? materialId, maquinaId, tipoMaterial;
   final double materialUnidades, espesorMm;
+  // La pieza leída del archivo y su dibujo (PNG) para la cotización en PDF
+  final GeoCad? geo;
+  final Uint8List? imagenPng;
+  final String medidas;
   const Partida2({required this.emoji, required this.servicio, required this.descripcion, required this.cantidad,
     required this.precioUnitario, required this.total, required this.costoTotal, required this.tiempoMin,
-    this.materialId, this.maquinaId, this.tipoMaterial, this.materialUnidades = 0, this.espesorMm = 0})
+    this.materialId, this.maquinaId, this.tipoMaterial, this.materialUnidades = 0, this.espesorMm = 0, this.geo, this.imagenPng, this.medidas = ''})
     : tiempoHoras = tiempoMin / 60;
 }
 
