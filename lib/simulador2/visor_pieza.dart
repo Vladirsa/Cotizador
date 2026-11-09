@@ -270,3 +270,63 @@ class _HojaPainter extends CustomPainter {
   @override
   bool shouldRepaint(_HojaPainter old) => old.a != a || old.hl != hl || old.ha != ha;
 }
+
+// ── Varias piezas en varias hojas (juego) ───────────────────────────
+const _coloresTipo = [Color(0xFF2563eb), Color(0xFF16a34a), Color(0xFFd97706), Color(0xFF9333ea), Color(0xFFdc2626), Color(0xFF0891b2), Color(0xFF65a30d), Color(0xFFdb2777)];
+
+class VisorHojas extends StatelessWidget {
+  final AnidadoMulti anidado;
+  final double hojaLargo, hojaAncho;
+  final List<String> nombres; // por índice de tipo
+  const VisorHojas({super.key, required this.anidado, required this.hojaLargo, required this.hojaAncho, required this.nombres});
+
+  @override
+  Widget build(BuildContext context) {
+    if (anidado.hojas.isEmpty || hojaLargo <= 0 || hojaAncho <= 0) return const SizedBox.shrink();
+    final ratio = hojaLargo / hojaAncho;
+    return LayoutBuilder(builder: (ctx, cons) {
+      final w = cons.maxWidth;
+      final h = (w / ratio).clamp(60.0, 200.0);
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Wrap(spacing: 10, runSpacing: 4, children: [
+          for (int i = 0; i < nombres.length; i++) Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 10, height: 10, color: _coloresTipo[i % _coloresTipo.length]), const SizedBox(width: 4),
+            Text(nombres[i], style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+          ]),
+        ]),
+        const SizedBox(height: 6),
+        for (int i = 0; i < anidado.hojas.length && i < 6; i++) Padding(padding: const EdgeInsets.only(bottom: 6), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Hoja ${i + 1} · ${anidado.hojas[i].length} piezas', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textoSecundario)),
+          SizedBox(width: w, height: h, child: CustomPaint(painter: _HojasPainter(anidado.hojas[i], hojaLargo, hojaAncho,
+            i == anidado.hojas.length - 1 ? anidado.retazoLargo : 0, i == anidado.hojas.length - 1 ? anidado.retazoAncho : 0))),
+        ])),
+        if (anidado.hojas.length > 6) Text('… y ${anidado.hojas.length - 6} hojas más iguales', style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+      ]);
+    });
+  }
+}
+
+class _HojasPainter extends CustomPainter {
+  final List<Colocada> piezas; final double hl, ha, rl, ra;
+  _HojasPainter(this.piezas, this.hl, this.ha, this.rl, this.ra);
+  @override
+  void paint(Canvas c, Size s) {
+    final esc = math.min(s.width / hl, s.height / ha);
+    final w = hl * esc, h = ha * esc;
+    final r = Rect.fromLTWH(0, 0, w, h);
+    c.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(3)), Paint()..color = const Color(0xFFf3e8d2));
+    c.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(3)), Paint()..color = const Color(0xFFc9b48c)..style = PaintingStyle.stroke..strokeWidth = 1);
+    if (rl > 0 && ra > 0) {
+      final rr = rl >= hl - 1 ? Rect.fromLTWH(0, h - ra * esc, w, ra * esc) : Rect.fromLTWH(w - rl * esc, 0, rl * esc, h);
+      c.drawRect(rr, Paint()..color = AppColors.ambar.withOpacity(0.18));
+    }
+    for (final p in piezas) {
+      final col = _coloresTipo[p.tipo % _coloresTipo.length];
+      final pr = Rect.fromLTWH(p.x * esc, p.y * esc, p.w * esc, p.h * esc);
+      c.drawRect(pr, Paint()..color = col.withOpacity(0.55));
+      c.drawRect(pr, Paint()..color = col..style = PaintingStyle.stroke..strokeWidth = 0.8);
+    }
+  }
+  @override
+  bool shouldRepaint(_HojasPainter old) => old.piezas != piezas || old.rl != rl;
+}
