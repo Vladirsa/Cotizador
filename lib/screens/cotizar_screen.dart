@@ -2281,9 +2281,9 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
   }
 }
 
-// ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════
 // Botón PDF + compartir por WA
-// ════════════════════════════════════════════════
+// ══════════════════════════════════════════════
 /// Renglón para el mensaje de WhatsApp con la liga pública (si ya existe).
 String _lineaLiga(Cotizacion cot) {
   final liga = cot.ligaPublica;
