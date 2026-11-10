@@ -10,6 +10,7 @@ import '../services/hetna_api.dart';
 import 'calculadora_cnc_screen.dart';
 import 'envios_screen.dart';
 import '../i18n/tr.dart';
+import '../widgets/checklist_arranque.dart';
 
 class InicioScreen extends StatefulWidget {
   const InicioScreen({super.key});
@@ -339,6 +340,9 @@ class _InicioScreenState extends State<InicioScreen> with SingleTickerProviderSt
     final etiquetaPeriodo = {'dia': 'HOY', 'semana': 'ESTA SEMANA', 'mes': 'ESTE MES'}[_periodoDash] ?? tr('ESTE MES');
 
     return RefreshIndicator(onRefresh: _cargar, child: ListView(padding: const EdgeInsets.all(14), children: [
+
+      // ── Checklist de arranque (se esconde solo al completarse) ──
+      ChecklistArranque(key: ValueKey('arranque-${_cotizaciones.length}-${_pedidos.length}')),
 
       // ── Selector de periodo ──
       _selectorPeriodo(),

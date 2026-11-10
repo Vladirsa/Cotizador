@@ -1541,8 +1541,9 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     final fmt = NumberFormat('\$#,##0', 'es_MX');
     final itemsTexto = _items.map((i) => trf('• {0} x{1} = {2}', [(i.nombreProducto), (i.cantidad), (fmt.format(i.subtotal))])).join('\n');
     final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *{7}*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *{7}*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? trf('\nIVA {0}%: {1}', [pctTexto(_ivaPct), (fmt.format(_montoIva))]) : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago, AuthService.marcaTaller]);
+    final msgFinal = msg + WhatsAppService.pieHetna();
     if (mounted) await WhatsAppService.abrirChatConSelector(context,
-      numero: _cliente!.whatsappNumero, mensaje: msg);
+      numero: _cliente!.whatsappNumero, mensaje: msgFinal);
   }
 
   // Plan Gratis: 5 cotizaciones nuevas al mes (igual que en hetnacnc.com)

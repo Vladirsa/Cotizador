@@ -3,6 +3,7 @@
 // HETNA CNC - Punto de entrada
 // ============================================
 
+import 'services/referidos_service.dart';
 import 'dart:async';
 import 'dart:convert' show utf8;
 import 'package:crypto/crypto.dart' show sha256;
@@ -68,6 +69,8 @@ void main() async {
   if (kIsWeb) usePathUrlStrategy();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   await _cerrarSesionAjena();
+  // Liga de invitación (?ref=CODIGO): se guarda para aplicarla al entrar
+  await ReferidosService.capturarDeLaLiga();
   // Inglés si el usuario lo eligió o si el teléfono/navegador está en inglés
   await cargarIdioma();
 
