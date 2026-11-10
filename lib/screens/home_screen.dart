@@ -31,6 +31,8 @@ import 'calculadora_cnc_screen.dart';
 import 'envios_screen.dart';
 import 'orden_qr_screen.dart';
 import 'alta_guiada_screen.dart';
+import 'invitar_screen.dart';
+import '../services/referidos_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../simulador2/pieza_ejemplo.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -76,7 +78,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void initState() { super.initState(); _cargarAlertas(); _abrirPlanesSiLoPide(); _abrirAltaGuiadaSiEsNuevo(); }
+  void initState() { super.initState(); _cargarAlertas(); _abrirPlanesSiLoPide(); _abrirAltaGuiadaSiEsNuevo(); _referidos(); }
+
+  // Aplica la invitación pendiente (si entró por una liga ?ref=) y deja
+  // cargado mi código para el pie de los mensajes de WhatsApp.
+  Future<void> _referidos() async {
+    final msg = await ReferidosService.aplicarPendiente();
+    if (msg != null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('🎁 $msg'), backgroundColor: AppColors.verde, duration: const Duration(seconds: 6)));
+    }
+    await ReferidosService.miCodigo();
+  }
 
   // Taller nuevo (sin máquinas y sin haber visto la alta guiada): se le abre
   // la alta guiada de 4 pantallas para que cotice su primera pieza hoy mismo.
@@ -250,6 +262,14 @@ class _HomeScreenState extends State<HomeScreen> {
       _dLink(Icons.science_outlined, tr('Laboratorio CAM'), HetnaApi.urlLaboratorio),
       _dLink(Icons.gavel_outlined, tr('Licitaciones (RFQ)'), HetnaApi.urlLicitaciones),
       const Divider(height: 1),
+      ListTile(
+        leading: const Icon(Icons.card_giftcard_outlined, color: AppColors.verde, size: 22),
+        title: Text(tr('Invitar a un taller'), style: const TextStyle(fontSize: 14)),
+        subtitle: Text(tr('1 mes gratis para los dos'), style: const TextStyle(fontSize: 11)),
+        onTap: () {
+          Navigator.pop(context);
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const InvitarScreen()));
+        }),
       ListTile(
         leading: const Icon(Icons.workspace_premium_outlined, color: AppColors.naranja, size: 22),
         title: Text(tr('Mi plan'), style: TextStyle(fontSize: 14)),
