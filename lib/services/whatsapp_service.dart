@@ -1,6 +1,7 @@
 // lib/services/whatsapp_service.dart
 // HETNA CNC — Servicio WhatsApp
 // Usa WhatsApp Business API para enviar desde el número correcto
+import 'referidos_service.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
@@ -614,6 +615,15 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     }
   }
 
+  // Pie "Cotizado con HETNA" para los mensajes de cotización. Sale en el plan
+  // Gratis (igual que la marca del PDF); con plan Taller el mensaje va limpio.
+  // La liga lleva el código del taller: si quien la abre es otro taller y se
+  // registra, cuenta como invitado suyo.
+  static String pieHetna() {
+    if (AuthService.puede('pdf_sin_marca')) return '';
+    return '\n\n_${tr('Cotizado con HETNA Cotizador')} · ${ReferidosService.liga().replaceFirst('https://', '')}_';
+  }
+
   // ── Enviar cotización por WhatsApp ───────────────────
   static Future<void> enviarCotizacion({
     required dynamic cotizacion,
@@ -622,7 +632,7 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     required String empresa,
   }) async {
     final folio = cotizacion?.folio ?? '';
-    final msg = trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! 💙', [nombreCliente, folio, empresa.trim().isNotEmpty ? empresa : AuthService.marcaTaller]);
+    final msg = trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! 💙', [nombreCliente, folio, empresa.trim().isNotEmpty ? empresa : AuthService.marcaTaller]) + pieHetna();
     await abrirChat(numero: whatsapp, mensaje: msg);
   }
 
