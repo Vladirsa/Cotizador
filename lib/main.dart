@@ -271,7 +271,7 @@ class AppColors {
   static const whatsapp       = Color(0xFF25D366);
 }
 
-// ════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 // AuthGate — el "portero" de la app.
 //
 // Antes, la app abría directo en HomeScreen sin revisar si de
@@ -284,7 +284,7 @@ class AppColors {
 // AuthGate revisa la sesión real de Supabase cada vez que la app
 // arranca (o cada vez que cambia el estado de sesión), y solo
 // entonces decide: ¿Login o Home?
-// ════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
   @override
@@ -327,7 +327,7 @@ class _AuthGateState extends State<AuthGate> {
   }
 
   Future<void> _revisarSesion() async {
-    final sesion = Supabase.instance.client.currentSession;
+    final sesion = Supabase.instance.client.auth.currentSession;
     if (sesion == null) {
       if (mounted) setState(() { _autenticado = false; _cargando = false; });
       return;
