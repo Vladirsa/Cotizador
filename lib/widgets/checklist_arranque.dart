@@ -30,6 +30,9 @@ class _ChecklistArranqueState extends State<ChecklistArranque> {
       final d = Map<String, dynamic>.from(r);
       final nuevo = d['bonus_nuevo'] == true;
       setState(() { _d = d; _oculto = d['bonus_dado'] == true && !nuevo; });
+      if (d['referido_nuevo'] == true && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('🎁 Completaste tu arranque con invitación: tú y quien te invitó ganaron 1 mes.')), backgroundColor: AppColors.verde, duration: const Duration(seconds: 6)));
+      }
       if (nuevo && mounted) {
         showDialog(context: context, builder: (ctx) => AlertDialog(
           title: Text(tr('🎉 ¡Arranque completo!')),
