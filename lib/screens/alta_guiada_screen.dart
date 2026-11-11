@@ -20,9 +20,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart';
 import '../i18n/tr.dart';
 import '../services/auth_service.dart';
+import '../services/supabase_service.dart';
+import '../services/whatsapp_service.dart';
 import '../simulador2/motor.dart';
 import '../simulador2/simulador2_data.dart';
 import '../simulador2/velocidades_hetna.dart';
+import '../services/pais.dart';
 
 class AltaGuiadaScreen extends StatefulWidget {
   const AltaGuiadaScreen({super.key});
@@ -41,7 +44,7 @@ class _MaqAlta {
 
 class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
   final _sb = Supabase.instance.client;
-  final _fmt = NumberFormat('\$#,##0', 'es_MX');
+  NumberFormat get _fmt => Pais.fmt(centavos: false);
   final _pageCtrl = PageController();
   int _paso = 0;
   static const _total = 4;
@@ -55,6 +58,40 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
   static const _potenciaRef = {'router': 2.2, 'laser_co2': 100.0, 'plasma': 65.0, 'laser_fibra': 1.5, 'router_3d': 2.2, 'impresora_3d': 0.0, 'torno': 3.0};
   static const _unidadPotencia = {'router': 'kW', 'laser_co2': 'W', 'plasma': 'A', 'laser_fibra': 'kW', 'router_3d': 'kW', 'impresora_3d': '', 'torno': 'kW'};
   static const _nombreRef = {'router': 'Router 1325', 'laser_co2': 'Láser CO2 1390', 'plasma': 'Plasma 1530', 'laser_fibra': 'Fibra 3015', 'router_3d': 'Router 3D', 'impresora_3d': 'Impresora 3D', 'torno': 'Torno CNC'};
+
+  // País del taller: moneda, impuesto y precios de referencia
+  late InfoPais _pais;
+  // Lo que había antes: si el taller sale sin guardar, se regresa a eso
+  late InfoPais _paisPrevio;
+  late String _monedaPrevia;
+  bool _paisGuardado = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _paisPrevio = Pais.actual;
+    _monedaPrevia = Pais.moneda;
+    _pais = Pais.delDispositivo();
+    _aplicarPais(_pais);
+  }
+
+  // Cambia el país y vuelve a poner los valores de referencia en su moneda.
+  void _aplicarPais(InfoPais p) {
+    _pais = p;
+    Pais.actual = p;
+    Pais.moneda = p.moneda;
+    for (final m in _maquinas) {
+      m.costoHora.text = Pais.refHora(_costoRef[m.tipo] ?? 350).toStringAsFixed(0);
+    }
+    final ids = _materiales.keys.toSet();
+    _materiales.clear();
+    for (final maq in _maquinas) {
+      for (final m in Simulador2Data.materialesReferencia(maq.tipo)) {
+        if (ids.contains(m.id)) _materiales[m.id!] = m;
+      }
+    }
+    _operadorC.text = Pais.refHora(60).toStringAsFixed(0);
+  }
 
   final List<_MaqAlta> _maquinas = [];
   // Materiales marcados (por id de referencia)
@@ -71,7 +108,7 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
       if (_tiene(tipo)) {
         _maquinas.removeWhere((m) => m.tipo == tipo);
       } else {
-        _maquinas.add(_MaqAlta(tipo, _nombreRef[tipo] ?? tipo, _costoRef[tipo] ?? 350, _potenciaRef[tipo] ?? 0));
+        _maquinas.add(_MaqAlta(tipo, _nombreRef[tipo] ?? tipo, Pais.refHora(_costoRef[tipo] ?? 350), _potenciaRef[tipo] ?? 0));
         _preseleccionarMateriales(tipo);
       }
     });
@@ -167,6 +204,19 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
     emoji: '🏭', titulo: tr('¿Qué máquinas tienes?'),
     sub: tr('Marca las que uses. Te ponemos el costo por hora y la potencia típicos; los cambias cuando quieras.'),
     hijos: [
+      Text(tr('¿En qué país está tu taller?'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 6),
+      Wrap(spacing: 8, runSpacing: 8, children: Pais.lista.map((p) => ChoiceChip(
+        selected: _pais.codigo == p.codigo,
+        label: Text('${p.bandera} ${tr(p.nombre)}'),
+        selectedColor: AppColors.azulClaro,
+        onSelected: (_) => setState(() => _aplicarPais(p)))).toList()),
+      const SizedBox(height: 4),
+      Text(trf('Precios en {0} con {1} de {2}%. Lo cambias en Configuración.', [_pais.moneda, tr(_pais.etqImpuesto), _pais.impuesto.toInt()]),
+        style: const TextStyle(fontSize: 11.5, color: AppColors.textoSecundario)),
+      const SizedBox(height: 16),
+      Text(tr('Tus máquinas'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 6),
       Wrap(spacing: 8, runSpacing: 8, children: _tipos.map((t) => FilterChip(
         selected: _tiene(t),
         label: Text('${emojiTipoMaquina[t] ?? ''} ${nombresTipoMaquina[t] ?? t}'),
@@ -194,7 +244,7 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
       const SizedBox(height: 10),
       Row(children: [
         Expanded(child: TextField(controller: m.costoHora, keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: InputDecoration(isDense: true, labelText: tr('Costo por hora'), prefixText: '\$ ', suffixText: '/h', border: const OutlineInputBorder()))),
+          decoration: InputDecoration(isDense: true, labelText: tr('Costo por hora'), prefixText: Pais.simbolo, suffixText: '/h', border: const OutlineInputBorder()))),
         if ((_unidadPotencia[m.tipo] ?? '').isNotEmpty) ...[
           const SizedBox(width: 8),
           Expanded(child: TextField(controller: m.potencia, keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -233,7 +283,7 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
     emoji: '🧮', titulo: tr('Tu taller en 3 números'),
     sub: tr('Con esto el simulador calcula el precio completo: material + máquina + operador + margen. Luego afinas renta, luz y lo demás en "Costos del taller".'),
     hijos: [
-      _campo(_operadorC, tr('Lo que cuesta tu operador por hora'), prefijo: '\$ ', sufijo: '/h', ayuda: tr('Sueldo mensual con prestaciones ÷ horas trabajadas. 60 es típico en México.')),
+      _campo(_operadorC, tr('Lo que cuesta tu operador por hora'), prefijo: Pais.simbolo, sufijo: '/h', ayuda: trf('Sueldo mensual con prestaciones ÷ horas trabajadas. Referencia en {0}: {1}.', [tr(_pais.nombre), Pais.fmt(centavos: false).format(Pais.refHora(60))])),
       const SizedBox(height: 12),
       _campo(_margenC, tr('Margen que quieres ganar'), sufijo: '%', ayuda: tr('Sobre el costo total. 30–40 % es común en corte CNC.')),
       const SizedBox(height: 12),
@@ -300,6 +350,14 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
     if (neg == null) { setState(() => _error = tr('No encontré tu taller. Cierra sesión y vuelve a entrar.')); return; }
     setState(() { _guardando = true; _error = null; });
     try {
+      // País, moneda e impuesto del taller (aparte: si la base aún no tiene las
+      // columnas, el resto de la alta guiada se guarda igual)
+      try {
+        await SupabaseService.guardarConfiguracion({'pais_factura': _pais.codigo});
+        await SupabaseService.guardarConfiguracion({'moneda': _pais.moneda, 'impuesto_pct': _pais.impuesto});
+        WhatsAppService.paisTaller = _pais.codigo;
+        _paisGuardado = true;
+      } catch (_) {}
       // Máquinas: costo manual + potencia; horas_mes para que Costos del taller tenga base
       for (final m in _maquinas) {
         final pot = _num(m.potencia, 0);
@@ -309,7 +367,7 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
           'emoji': emojiTipoMaquina[m.tipo] ?? '⚙️',
           'tipo': m.tipo,
           'tipo_maquina': Simulador2Data.aFase4[m.tipo] ?? 'otra',
-          'costo_hora_manual': _num(m.costoHora, _costoRef[m.tipo] ?? 350),
+          'costo_hora_manual': _num(m.costoHora, Pais.refHora(_costoRef[m.tipo] ?? 350)),
           if (pot > 0) 'potencia': pot,
           'preparacion_min': m.tipo == 'impresora_3d' ? 5 : m.tipo.startsWith('laser') ? 8 : 15,
           'perforacion_seg': m.tipo == 'router' ? 2 : m.tipo.startsWith('laser') ? 0.5 : 1.5,
@@ -327,7 +385,7 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
         'margen_recomendado': _num(_margenC, 35),
         'horas_dia': horas,
       });
-      final opHora = _num(_operadorC, 60);
+      final opHora = _num(_operadorC, Pais.refHora(60));
       try {
         final ops = await _sb.from('mano_obra').select('id').eq('negocio_id', neg).limit(1);
         if ((ops as List).isEmpty) {
@@ -347,6 +405,7 @@ class _AltaGuiadaScreenState extends State<AltaGuiadaScreen> {
 
   @override
   void dispose() {
+    if (!_paisGuardado) { Pais.actual = _paisPrevio; Pais.moneda = _monedaPrevia; }
     _pageCtrl.dispose();
     for (final m in _maquinas) { m.nombre.dispose(); m.costoHora.dispose(); m.potencia.dispose(); }
     _operadorC.dispose(); _margenC.dispose(); _horasC.dispose();
