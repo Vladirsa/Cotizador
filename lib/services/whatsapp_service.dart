@@ -10,15 +10,16 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
+import 'pais.dart';
 import '../main.dart';
 import '../i18n/tr.dart';
 
 class WhatsAppService {
 
   // ── Normalizar número del CLIENTE ───────────────────
-  // País del taller para la lada por defecto: 'MX' (52) o 'US' (1). Lo pone
-  // AuthService/Configuración (pais_factura). Un número con '+' o con lada ya
-  // escrita se respeta tal cual.
+  // País del taller para la lada por defecto: MX 52, US 1, CO 57, PE 51,
+  // CL 56. Lo pone SupabaseService/Configuración (pais_factura). Un número con
+  // '+' o con lada ya escrita se respeta tal cual.
   static String paisTaller = 'MX';
 
   static String normalizarNumero(String numero) {
@@ -26,9 +27,10 @@ class WhatsAppService {
     var n = numero.replaceAll(RegExp(r'[^0-9]'), '');
     if (n.isEmpty) return '';
     if (conMas) return n; // ya trae lada internacional
-    if (paisTaller == 'US') {
-      if (n.length == 10) return '1$n';
-      return n; // 11 dígitos con 1 al frente u otra lada: tal cual
+    if (paisTaller != 'MX') {
+      final p = Pais.de(paisTaller);
+      if (n.length == p.digitosTel) return '${p.lada}$n';
+      return n; // ya trae lada u otro formato: tal cual
     }
     // México: WhatsApp usa 52 + 1 + 10 dígitos
     if (n.length == 10) return '521$n';

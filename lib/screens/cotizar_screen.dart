@@ -21,6 +21,7 @@ import 'crm_seguimiento_screen.dart';
 import '../services/crm_service.dart';
 import '../services/auth_service.dart';
 import '../i18n/tr.dart';
+import '../services/pais.dart';
 
 class CotizarScreen extends StatefulWidget {
   final dynamic itemInicial;
@@ -79,7 +80,7 @@ class _ListaCotizacionesState extends State<_ListaCotizaciones> {
   String _busqueda = '';
   DateTimeRange? _rangoFechas;
   final _busquedaCtrl = TextEditingController();
-  final _fmt = NumberFormat('\$#,##0', 'es_MX');
+  NumberFormat get _fmt => Pais.fmt(centavos: false);
   final _estados = ['Todos', 'Borrador', 'Enviada', 'Aprobada', 'Pedido', 'Vencida'];
   final _colores = {
     'Borrador': Colors.grey, 'Enviada': Color(0xFF185fa5),
@@ -233,7 +234,7 @@ class _TarjetaCotizacion extends StatelessWidget {
   const _TarjetaCotizacion({required this.cotizacion, required this.colores, required this.onActualizar});
   @override
   Widget build(BuildContext context) {
-    final fmt = NumberFormat('\$#,##0', 'es_MX');
+    final fmt = Pais.fmt(centavos: false);
     final color = colores[cotizacion.estado] ?? Colors.grey;
     final nombre = cotizacion.cliente?.nombre ?? cotizacion.cliente?.empresa ?? tr('Sin cliente');
     final montoItems = cotizacion.items.fold(0.0, (s, i) => s + i.subtotal);
@@ -671,7 +672,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(trf('✅ Partida agregada: {0}', [NumberFormat('\$#,##0', 'es_MX').format(r.total)])), backgroundColor: AppColors.verde));
+      content: Text(trf('✅ Partida agregada: {0}', [Pais.fmt(centavos: false).format(r.total)])), backgroundColor: AppColors.verde));
   }
 
   Widget _resumenArchivo() {
@@ -805,7 +806,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   void _aplicarAnticipo() {
     final v = double.tryParse(_anticipoCtrl.text.replaceAll(',', '.')) ?? 0;
     if (v <= 0) return;
-    final fmt = NumberFormat('\$#,##0', 'es_MX');
+    final fmt = Pais.fmt(centavos: false);
     final txt = _anticipoEnMonto
       ? trf('Anticipo de {0}, el resto a la entrega', [fmt.format(v)])
       : trf('{0}% de anticipo / {1}% a la entrega', [pctTexto(v.clamp(1, 100)), pctTexto(100 - v.clamp(1, 100))]);
@@ -852,11 +853,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       final cfg = await SupabaseService.getConfiguracion();
       final v = double.tryParse('${cfg['impuesto_pct'] ?? ''}');
       if (v != null && v >= 0 && mounted) {
-        setState(() { _ivaPct = v > 0 ? v : 16; _aplicaIva = v > 0; });
+        setState(() { _ivaPct = v > 0 ? v : (Pais.actual.impuesto > 0 ? Pais.actual.impuesto : 16); _aplicaIva = v > 0; });
       }
       // Moneda por defecto de la cotización profesional
       final m = (cfg['moneda'] ?? '').toString().toUpperCase();
-      if ((m == 'USD' || m == 'MXN') && mounted) {
+      if (Pais.monedas.contains(m) && mounted) {
         final c = _ctrlPro('moneda', m);
         if (c.text.trim().isEmpty || c.text.trim() == 'MXN') c.text = m;
       }
@@ -990,7 +991,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   }
 
   Widget build(BuildContext context) {
-    final fmt = NumberFormat('\$#,##0.00', 'es_MX');
+    final fmt = Pais.fmt();
     final avisoCupo = _avisoCupo();
     return ListView(padding: const EdgeInsets.all(14), children: [
       if (avisoCupo != null) avisoCupo,
@@ -1199,9 +1200,9 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             border: Border.all(color: _aplicaIva ? AppColors.verde : AppColors.grisBorde)),
           child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(trf('IVA {0}%', [pctTexto(_ivaPct)]), style: TextStyle(fontWeight: FontWeight.w600,
+              Text('${tr(Pais.actual.etqImpuesto)} ${pctTexto(_ivaPct)}%', style: TextStyle(fontWeight: FontWeight.w600,
                 color: _aplicaIva ? AppColors.verde : AppColors.textoSecundario)),
-              Text(tr(_aplicaIva ? tr('Incluido en el total') : tr('No aplica IVA')),
+              Text(_aplicaIva ? tr('Incluido en el total') : trf('No aplica {0}', [tr(Pais.actual.etqImpuesto)]),
                 style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
             ]),
             Switch(value: _aplicaIva, onChanged: (v) => setState(() => _aplicaIva = v),
@@ -1209,7 +1210,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           ])),
         const SizedBox(height: 10),
         if (_descuentoPct > 0) _fila(trf('Descuento {0}%', [(_descuentoPct.toInt())]), '-${fmt.format(_montoDescuento)}', AppColors.verde),
-        if (_aplicaIva) _fila(trf('IVA {0}%', [pctTexto(_ivaPct)]), fmt.format(_montoIva), AppColors.textoSecundario),
+        if (_aplicaIva) _fila('${tr(Pais.actual.etqImpuesto)} ${pctTexto(_ivaPct)}%', fmt.format(_montoIva), AppColors.textoSecundario),
         if (_costoEnvio > 0) _fila(tr('Envío'), fmt.format(_costoEnvio), AppColors.textoSecundario),
         const Divider(),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -1538,9 +1539,9 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   Future<void> _enviarWA() async {
     if (_cliente == null) return;
     if (await _asegurarGuardada() == null) return;
-    final fmt = NumberFormat('\$#,##0', 'es_MX');
+    final fmt = Pais.fmt(centavos: false);
     final itemsTexto = _items.map((i) => trf('• {0} x{1} = {2}', [(i.nombreProducto), (i.cantidad), (fmt.format(i.subtotal))])).join('\n');
-    final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *{7}*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *{7}*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? trf('\nIVA {0}%: {1}', [pctTexto(_ivaPct), (fmt.format(_montoIva))]) : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago, AuthService.marcaTaller]);
+    final msg = trf('¡Hola {0}! 👋\n\nTe comparto tu cotización de *{7}*:\n\n{1}\n\nSubtotal: {2}{3}\n*TOTAL: {4}*\n\nTiempo de entrega: {5}\nMétodo de pago: {6}\n\n¿Te parece bien? 😊 — *{7}*', [(_cliente!.nombre), itemsTexto, (fmt.format(_baseIva)), (_aplicaIva ? '\n${tr(Pais.actual.etqImpuesto)} ${pctTexto(_ivaPct)}%: ${fmt.format(_montoIva)}' : ""), (fmt.format(_total)), _tiempoEntrega, _metodoPago, AuthService.marcaTaller]);
     final msgFinal = msg + WhatsAppService.pieHetna();
     if (mounted) await WhatsAppService.abrirChatConSelector(context,
       numero: _cliente!.whatsappNumero, mensaje: msgFinal);
@@ -1766,7 +1767,7 @@ class _ItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fmt = NumberFormat('\$#,##0.00', 'es_MX');
+    final fmt = Pais.fmt();
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
@@ -1982,7 +1983,7 @@ class _CatalogoPDFsState extends State<_CatalogoPDFs> with SingleTickerProviderS
   bool _cargando = true;
   bool _subiendo = false;
   final Set<String> _seleccionados = {};
-  final _fmt = NumberFormat('\$#,##0', 'es_MX');
+  NumberFormat get _fmt => Pais.fmt(centavos: false);
   @override
   void initState() {
     super.initState();
@@ -2354,7 +2355,7 @@ Future<void> mostrarLigaCliente(BuildContext context, Cotizacion cot) async {
 
 /// Seguimiento de la liga: la abrió / la aceptó / pagó el anticipo.
 Widget _seguimientoLiga(Cotizacion cot) {
-  final fmt = NumberFormat('\$#,##0', 'es_MX');
+  final fmt = Pais.fmt(centavos: false);
   final chips = <Widget>[];
   Widget chip(String t, Color c, IconData i) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
