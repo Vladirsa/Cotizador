@@ -15,6 +15,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'en.dart';
 import 'en_extra.dart';
+import 'en_paises.dart';
 
 final ValueNotifier<Locale> idiomaActual = ValueNotifier(const Locale('es', 'MX'));
 
@@ -44,7 +45,7 @@ Future<void> cargarIdioma() async {
 }
 
 /// Traduce un texto escrito en español al idioma de la app.
-String tr(String es) => enIngles ? (textosEn[es] ?? textosEnExtra[es] ?? es) : es;
+String tr(String es) => enIngles ? (textosEn[es] ?? textosEnExtra[es] ?? textosEnPaises[es] ?? es) : es;
 
 /// Igual que tr() pero con valores: trf('Hola {0}', [nombre])
 /// Los valores que también son textos de la app (p. ej. 'ESTE MES') se traducen.
@@ -52,7 +53,7 @@ String trf(String es, List<Object?> valores) => _rellenar(
     tr(es), enIngles ? [for (final v in valores) v is String ? tr(v) : v] : valores);
 
 /// Para documentos con su propio idioma (p. ej. el PDF de una cotización).
-String trIdioma(String es, bool ingles) => ingles ? (textosEn[es] ?? textosEnExtra[es] ?? es) : es;
+String trIdioma(String es, bool ingles) => ingles ? (textosEn[es] ?? textosEnExtra[es] ?? textosEnPaises[es] ?? es) : es;
 
 String trfIdioma(String es, bool ingles, List<Object?> valores) => _rellenar(trIdioma(es, ingles), valores);
 
