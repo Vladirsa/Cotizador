@@ -11,6 +11,7 @@ import '../services/costos_service.dart';
 import 'motor.dart';
 import 'velocidades_hetna.dart';
 import 'recetas.dart';
+import '../services/pais.dart';
 
 /// Lo que regresa el simulador a la cotización.
 class Partida2 {
@@ -123,15 +124,16 @@ class Simulador2Data {
     } catch (_) { return []; }
   }
 
-  /// Materiales de referencia HETNA (precio típico en México) para cuando el
-  /// taller no tiene en su inventario material de ese tipo de máquina.
+  /// Materiales de referencia HETNA (precio típico en México, convertido a la
+  /// moneda del taller) para cuando no tiene en su inventario material de ese
+  /// tipo de máquina.
   static List<Material2> materialesReferencia(String tipoMaquina) {
     const hoja = [1220.0, 2440.0], acr = [1220.0, 1830.0];
     Material2 h(String tipo, String nombre, double esp, double precio, [List<double> dim = hoja]) => Material2(
-      id: 'ref_${tipo}_${esp.toStringAsFixed(1)}', nombre: '$nombre (referencia)', tipo: tipo, espesorMm: esp, precio: precio,
+      id: 'ref_${tipo}_${esp.toStringAsFixed(1)}', nombre: '$nombre (referencia)', tipo: tipo, espesorMm: esp, precio: Pais.refMaterial(precio),
       unidad: 'hoja', hojaLargo: dim[0], hojaAncho: dim[1], mermaPct: 15, densidad: tipoMaterialPorClave(tipo)?.densidad ?? 0);
     Material2 kg(String tipo, String nombre, double esp, double precio) => Material2(
-      id: 'ref_${tipo}_${esp.toStringAsFixed(1)}', nombre: '$nombre (referencia)', tipo: tipo, espesorMm: esp, precio: precio,
+      id: 'ref_${tipo}_${esp.toStringAsFixed(1)}', nombre: '$nombre (referencia)', tipo: tipo, espesorMm: esp, precio: Pais.refMaterial(precio),
       unidad: 'kg', mermaPct: 15, densidad: tipoMaterialPorClave(tipo)?.densidad ?? 1);
     final tablas = [
       h('mdf', 'MDF 3 mm', 3, 190), h('mdf', 'MDF 6 mm', 6, 270), h('mdf', 'MDF 9 mm', 9, 340), h('mdf', 'MDF 12 mm', 12, 430), h('mdf', 'MDF 15 mm', 15, 530), h('mdf', 'MDF 18 mm', 18, 620),

@@ -15,19 +15,22 @@ import 'archivo_cad_service.dart';
 import 'auth_service.dart';
 import 'whatsapp_service.dart';
 import '../main.dart';
+import 'pais.dart';
 
 class PdfService {
-  static final _fmt = NumberFormat('#,##0.00', 'es_MX');
+  static NumberFormat get _fmt => Pais.fmtNumero();
 
   // Idioma del documento que se está generando. Cada cotización puede salir en
   // español o en inglés sin importar el idioma de la app (ver elegirIdioma).
   static bool _en = false;
   static String _t(String es) => trIdioma(es, _en);
   // Etiquetas fiscales según el país de facturación del taller
-  static bool _esUS(Map<String, dynamic> e) => e['pais_factura'] == 'US';
-  static String _etqRfc(Map<String, dynamic> e) => _esUS(e) ? 'Tax ID' : 'RFC';
-  static String _etqIva(Map<String, dynamic> e) => _esUS(e) ? 'Sales tax' : 'IVA';
-  static String _leyendaEnvio() => _t('Envíos: por el momento solo dentro de México.');
+  // (MX: RFC/IVA · US: Tax ID/Sales tax · CO: NIT/IVA · PE: RUC/IGV · CL: RUT/IVA)
+  static InfoPais _pais(Map<String, dynamic> e) => Pais.de(e['pais_factura']?.toString());
+  static String _etqRfc(Map<String, dynamic> e) => _pais(e).etqId;
+  static String _etqIva(Map<String, dynamic> e) => _pais(e).etqImpuesto;
+  static String _leyendaEnvio([Map<String, dynamic>? e]) =>
+      _tf('Envíos: por el momento solo dentro de {0}.', [_t((e == null ? Pais.actual : _pais(e)).nombre)]);
   static String _fmtN(double v, int dec) {
     final f = NumberFormat(dec == 0 ? '#,##0' : '#,##0.${'0' * dec}', 'es_MX');
     return f.format(v);
@@ -376,8 +379,8 @@ class PdfService {
                       ])),
                     ])),
                   _cD('${item.cantidad}', center: true),
-                  _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
-                  _cD('\$${_fmt.format(item.subtotal)}', right: true),
+                  _cD('${Pais.simbolo}${_fmt.format(item.precioUnitario)}', right: true),
+                  _cD('${Pais.simbolo}${_fmt.format(item.subtotal)}', right: true),
                 ]);
             }),
           ]),
@@ -385,14 +388,14 @@ class PdfService {
         // ─── TOTALES ────────────────────────
         pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
           pw.Container(width: 220, child: pw.Column(children: [
-            if (cotizacion.descuentoPct > 0) _tR(_t('Subtotal'), '\$${_fmt.format(cotizacion.subtotal)}', grisTexto),
+            if (cotizacion.descuentoPct > 0) _tR(_t('Subtotal'), '${Pais.simbolo}${_fmt.format(cotizacion.subtotal)}', grisTexto),
             if (cotizacion.descuentoPct > 0) _tR(_tf('Descuento {0}%', [(cotizacion.descuentoPct.toInt())]), '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-            if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
-            if (cotizacion.costoEnvio > 0) _tR(_t('Envío'), '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
+            if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '${Pais.simbolo}${_fmt.format(cotizacion.montoIva)}', grisTexto),
+            if (cotizacion.costoEnvio > 0) _tR(_t('Envío'), '${Pais.simbolo}${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
             pw.Divider(color: azul),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
               pw.Text('TOTAL ${_moneda(empresa)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
-              pw.Text('\$${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
+              pw.Text('${Pais.simbolo}${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: azul)),
             ]),
           ])),
         ]),
@@ -544,7 +547,7 @@ class PdfService {
       (_t('Vigencia de la oferta'), _tf('{0} días (hasta {1})', [vigenciaDias, fechaVigencia])),
       (_t('Moneda'), moneda),
       (_t('Impuestos'), cotizacion.ivaPct > 0 ? _tf('{0} {1}% incluido en el total', [_etqIva(empresa), pctTexto(cotizacion.ivaPct)]) : _tf('Precios sin {0}', [_etqIva(empresa)])),
-      (_t('Envíos'), _leyendaEnvio()),
+      (_t('Envíos'), _leyendaEnvio(empresa)),
       (_t('Cambios y cancelaciones'), _t(v('cambios'))),
       (_t('Notas'), _limpiarTexto(cotizacion.notas ?? '')),
     ];
@@ -733,24 +736,24 @@ class PdfService {
                       ])),
                     ])),
                   _cD('${item.cantidad}', center: true),
-                  _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
-                  _cD('\$${_fmt.format(item.subtotal)}', right: true),
+                  _cD('${Pais.simbolo}${_fmt.format(item.precioUnitario)}', right: true),
+                  _cD('${Pais.simbolo}${_fmt.format(item.subtotal)}', right: true),
                 ]);
             }),
           ]),
         pw.SizedBox(height: 8),
         pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
           pw.Container(width: 230, child: pw.Column(children: [
-            _tR(_t('Subtotal'), '\$${_fmt.format(cotizacion.subtotal)}', grisTexto),
+            _tR(_t('Subtotal'), '${Pais.simbolo}${_fmt.format(cotizacion.subtotal)}', grisTexto),
             if (cotizacion.montoDescuento > 0)
               _tR(_tf('Descuento{0}', [(cotizacion.descuentoPct > 0 ? " ${cotizacion.descuentoPct.toInt()}%" : "")]),
                 '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-            if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
-            if (cotizacion.costoEnvio > 0) _tR(_t('Envío'), '\$${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
+            if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '${Pais.simbolo}${_fmt.format(cotizacion.montoIva)}', grisTexto),
+            if (cotizacion.costoEnvio > 0) _tR(_t('Envío'), '${Pais.simbolo}${_fmt.format(cotizacion.costoEnvio)}', grisTexto),
             pw.Divider(color: azul),
             pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
               pw.Text('TOTAL $moneda', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
-              pw.Text('\$${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
+              pw.Text('${Pais.simbolo}${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
             ]),
           ])),
         ]),
@@ -1119,7 +1122,7 @@ class PdfService {
                     child: pw.Text(p.unidadMedida,
                       style: const pw.TextStyle(fontSize: 9))),
                   pw.Padding(padding: const pw.EdgeInsets.all(8),
-                    child: pw.Text('\$${_fmt.format(p.precioVenta)}',
+                    child: pw.Text('${Pais.simbolo}${_fmt.format(p.precioVenta)}',
                       style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: verde))),
                 ]);
             }),
@@ -1131,7 +1134,7 @@ class PdfService {
           child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
             pw.Text(_tf('Total de productos: {0}', [(productos.length)]),
               style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: azul)),
-            pw.Text(_t('Los precios no incluyen IVA'),
+            pw.Text(_tf('Los precios no incluyen {0}', [_t(Pais.actual.etqImpuesto)]),
               style: const pw.TextStyle(fontSize: 9, color: grisTexto)),
           ])),
         pw.SizedBox(height: 8),
@@ -1280,8 +1283,8 @@ class PdfService {
                           style: pw.TextStyle(fontSize: 7, color: grisTexto)),
                     ])),
                   _cD('${item.cantidad}', center: true),
-                  _cD('\$${_fmt.format(item.precioUnitario)}', right: true),
-                  _cD('\$${_fmt.format(item.subtotal)}', right: true),
+                  _cD('${Pais.simbolo}${_fmt.format(item.precioUnitario)}', right: true),
+                  _cD('${Pais.simbolo}${_fmt.format(item.subtotal)}', right: true),
                 ]);
             }),
           ]),
@@ -1294,11 +1297,11 @@ class PdfService {
               border: pw.Border.all(color: verde, width: 1)),
             child: pw.Column(children: [
               if (cotizacion.descuentoPct > 0) _tR(_t('Descuento'), '-\$${_fmt.format(cotizacion.montoDescuento)}', verde),
-              if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '\$${_fmt.format(cotizacion.montoIva)}', grisTexto),
+              if (cotizacion.ivaPct > 0) _tR('${_etqIva(empresa)} ${pctTexto(cotizacion.ivaPct)}%', '${Pais.simbolo}${_fmt.format(cotizacion.montoIva)}', grisTexto),
               pw.Divider(color: verde),
               pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
                 pw.Text(_t('TOTAL PAGADO'), style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold, color: verde)),
-                pw.Text('\$${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: verde)),
+                pw.Text('${Pais.simbolo}${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: verde)),
               ]),
             ])),
         ]),

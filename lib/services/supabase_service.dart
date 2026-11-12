@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_service.dart';
+import 'pais.dart';
 import 'whatsapp_service.dart';
 import '../models/models.dart';
 import '../i18n/tr.dart';
@@ -42,7 +43,8 @@ class SupabaseService {
   static Map<String, dynamic> _conDatosDelTaller(Map<String, dynamic> cfg) {
     final r = Map<String, dynamic>.from(cfg);
     // Lada por defecto de WhatsApp según el país del taller
-    WhatsAppService.paisTaller = r['pais_factura'] == 'US' ? 'US' : 'MX';
+    Pais.desdeConfig(r);
+    WhatsAppService.paisTaller = Pais.actual.codigo;
     final propio = (AuthService.nombreNegocio ?? '').trim();
     final actual = (r['nombre_comercial'] ?? '').toString().trim();
     final esDeHetna = actual.toUpperCase() == 'HETNA CNC' && !propio.toUpperCase().contains('HETNA');

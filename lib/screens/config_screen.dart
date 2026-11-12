@@ -15,6 +15,7 @@ import '../services/auth_service.dart';
 import '../services/hetna_api.dart';
 import '../services/woocommerce_service.dart';
 import '../i18n/tr.dart';
+import '../services/pais.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 class ConfigScreen extends StatefulWidget {
@@ -122,11 +123,11 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _serieCtrl.text     = cfg['factura_serie'] ?? 'A';
       _facturaActivo      = cfg['factura_activo'] ?? false;
       _proveedor          = cfg['factura_proveedor'] ?? 'Facturapi';
-      _paisFactura        = cfg['pais_factura'] == 'US' ? 'US' : 'MX';
+      _paisFactura        = Pais.de(cfg['pais_factura']?.toString()).codigo;
       // Moneda e impuesto (si la base aún no tiene las columnas, quedan MXN / 16%)
       final m = (cfg['moneda'] ?? 'MXN').toString().toUpperCase();
-      _moneda = m == 'USD' ? 'USD' : 'MXN';
-      final imp = double.tryParse('${cfg['impuesto_pct'] ?? 16}') ?? 16;
+      _moneda = Pais.monedas.contains(m) ? m : Pais.de(_paisFactura).moneda;
+      final imp = double.tryParse('${cfg['impuesto_pct'] ?? Pais.de(_paisFactura).impuesto}') ?? 16;
       _impuestoCtrl.text = imp == imp.roundToDouble() ? imp.toInt().toString() : imp.toString();
       _regimenFiscal      = cfg['factura_regimen_fiscal'] ?? '612';
       _cargando = false;
@@ -191,6 +192,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
       // Columna nueva: aparte, por si la base todavía no la tiene
       await SupabaseService.guardarConfiguracion({'pais_factura': _paisFactura});
       WhatsAppService.paisTaller = _paisFactura;
+      Pais.desdeConfig({'pais_factura': _paisFactura, 'moneda': _moneda});
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(tr('✅ Configuración guardada')),
         backgroundColor: AppColors.verde));
@@ -263,8 +265,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion(tr('🏢 DATOS DE LA EMPRESA')),
               const SizedBox(height: 8),
               _campo(_nombreCtrl, tr('Nombre comercial'), Icons.store_outlined, requerido: true),
-              _campo(_rfcCtrl, tr('RFC'), Icons.badge_outlined, mayusculas: true,
-                hint: 'XAXX010101000'),
+              _campo(_rfcCtrl, Pais.de(_paisFactura).etqId, Icons.badge_outlined, mayusculas: true,
+                hint: _paisFactura == 'MX' ? 'XAXX010101000' : ''),
               _campo(_telefonoCtrl, tr('Teléfono / WhatsApp'), Icons.phone_outlined,
                 tipo: TextInputType.phone),
               _campo(_correoCtrl, tr('Correo electrónico'), Icons.email_outlined,
@@ -389,7 +391,8 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion(tr('🧾 FACTURACIÓN ELECTRÓNICA')),
               const SizedBox(height: 8),
 
-              // Factura electrónica real (Fase 4): datos fiscales y CSD en su pantalla
+              // Factura electrónica real (Fase 4): sólo México (CFDI con CSD)
+              if (_paisFactura == 'MX')
               Material(color: Colors.white, borderRadius: BorderRadius.circular(10),
                 child: ListTile(
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
@@ -406,36 +409,35 @@ class _ConfigScreenState extends State<ConfigScreen> {
                     Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturacionConfigScreen()));
                   })),
 
-              const SizedBox(height: 10),
-              // País: cambia etiquetas (RFC / Tax ID, IVA / sales tax) en PDFs
+              if (_paisFactura == 'MX') const SizedBox(height: 10),
+              // Etiquetas fiscales según el país (se elige en "Idioma, moneda e impuestos")
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: Colors.white, borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: AppColors.grisBorde, width: 0.5)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(tr('¿Dónde facturas?'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  SegmentedButton<String>(
-                    segments: [
-                      ButtonSegment(value: 'MX', label: Text(tr('🇲🇽 México (CFDI)'))),
-                      ButtonSegment(value: 'US', label: Text(tr('🇺🇸 EE.UU. (Invoice)'))),
-                    ],
-                    selected: {_paisFactura},
-                    onSelectionChanged: (s) => setState(() => _paisFactura = s.first)),
+                  Text('${Pais.de(_paisFactura).bandera} ${tr(Pais.de(_paisFactura).nombre)}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
-                  Text(_paisFactura == 'US'
-                      ? tr('Tus PDFs mostrarán Tax ID / EIN en lugar de RFC y "Sales tax" en lugar de IVA. La factura se emite como invoice (sin timbrado SAT).')
-                      : tr('Factura electrónica CFDI 4.0 con RFC, régimen fiscal y uso de CFDI, timbrada por tu proveedor.'),
+                  Text(switch (_paisFactura) {
+                      'MX' => tr('Factura electrónica CFDI 4.0 con RFC, régimen fiscal y uso de CFDI, timbrada por tu proveedor.'),
+                      'US' => tr('Tus PDFs mostrarán Tax ID / EIN en lugar de RFC y "Sales tax" en lugar de IVA. La factura se emite como invoice (sin timbrado SAT).'),
+                      _ => trf('Tus PDFs muestran {0} y {1}. La factura electrónica de tu país todavía no se emite desde la app: usa tu sistema de facturación de siempre.', [Pais.de(_paisFactura).etqId, tr(Pais.de(_paisFactura).etqImpuesto)]),
+                    },
                     style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
                   const SizedBox(height: 6),
-                  Text(tr('🚚 Envíos: por el momento solo dentro de México. Esta leyenda sale en tus cotizaciones.'),
+                  Text(trf('🚚 Envíos: por el momento solo dentro de {0}. Esta leyenda sale en tus cotizaciones.', [tr(Pais.de(_paisFactura).nombre)]),
                     style: const TextStyle(fontSize: 11, color: AppColors.naranja, fontWeight: FontWeight.w600)),
                 ])),
 
               const SizedBox(height: 32),
             ])));
   }
+
+  static const _nombreMoneda = {
+    'MXN': 'Peso mexicano', 'USD': 'Dólar estadounidense', 'COP': 'Peso colombiano',
+    'PEN': 'Sol peruano', 'CLP': 'Peso chileno',
+  };
 
   Widget _seccionIdiomaMoneda() {
     final idioma = idiomaActual.value.languageCode == 'en' ? 'en' : 'es';
@@ -467,17 +469,36 @@ class _ConfigScreenState extends State<ConfigScreen> {
         Text(tr('Se guarda en este dispositivo. El PDF de cada cotización te pregunta su idioma.'),
           style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         const SizedBox(height: 14),
+        Text(tr('País de tu taller'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: _paisFactura, isExpanded: true,
+          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+          items: [for (final p in Pais.lista)
+            DropdownMenuItem(value: p.codigo, child: Text('${p.bandera}  ${tr(p.nombre)} · ${p.moneda}'))],
+          onChanged: (c) {
+            if (c == null) return;
+            final p = Pais.de(c);
+            setState(() {
+              _paisFactura = c;
+              // Al cambiar de país se proponen su moneda y su impuesto (se pueden cambiar)
+              _moneda = p.moneda;
+              _impuestoCtrl.text = p.impuesto == p.impuesto.roundToDouble() ? p.impuesto.toInt().toString() : p.impuesto.toString();
+            });
+          }),
+        const SizedBox(height: 4),
+        Text(tr('Cambia la lada de WhatsApp, las etiquetas fiscales de tus PDFs y los precios de referencia.'),
+          style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+        const SizedBox(height: 14),
         Text(tr('Moneda de tus cotizaciones'), style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 6),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'MXN', label: Text('MXN')),
-            ButtonSegment(value: 'USD', label: Text('USD')),
-          ],
-          selected: {_moneda},
-          onSelectionChanged: (s) => setState(() => _moneda = s.first)),
+        DropdownButtonFormField<String>(
+          value: _moneda, isExpanded: true,
+          decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+          items: [for (final m in Pais.monedas) DropdownMenuItem(value: m, child: Text('$m · ${tr(_nombreMoneda[m] ?? m)}'))],
+          onChanged: (m) { if (m != null) setState(() => _moneda = m); }),
         const SizedBox(height: 4),
-        Text(tr('Sale en el PDF de tus cotizaciones (pesos mexicanos o dólares).'),
+        Text(tr('Sale en el PDF de tus cotizaciones y en la liga que le mandas al cliente.'),
           style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
         const SizedBox(height: 14),
         TextFormField(
@@ -485,7 +506,10 @@ class _ConfigScreenState extends State<ConfigScreen> {
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(
             labelText: tr('Impuesto por defecto (%)'),
-            helperText: tr('IVA en México (16%) o sales tax de tu estado en EE. UU. (ej. 8.25)'),
+            helperText: switch (_paisFactura) {
+              'US' => tr('Sales tax de tu estado (ej. 8.25)'),
+              _ => trf('{0} en {1}: {2}%', [tr(Pais.de(_paisFactura).etqImpuesto), tr(Pais.de(_paisFactura).nombre), Pais.de(_paisFactura).impuesto.toInt()]),
+            },
             prefixIcon: const Icon(Icons.percent, size: 18)),
           validator: (v) {
             final n = double.tryParse((v ?? '').trim().replaceAll(',', '.'));

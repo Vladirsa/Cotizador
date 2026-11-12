@@ -22,6 +22,7 @@ import 'config_maquina_sheet.dart';
 import 'capacidad.dart';
 import 'recetas.dart';
 import 'receta_widget.dart';
+import '../services/pais.dart';
 
 class Simulador2Screen extends StatefulWidget {
   // geoInicial: pieza ya leída (desde la cotización). seleccionar: al pasar a
@@ -34,8 +35,8 @@ class Simulador2Screen extends StatefulWidget {
 }
 
 class _Simulador2ScreenState extends State<Simulador2Screen> {
-  final _fmt = NumberFormat(r'$#,##0', 'es_MX');
-  final _fmt2 = NumberFormat(r'$#,##0.00', 'es_MX');
+  NumberFormat get _fmt => Pais.fmt(centavos: false);
+  NumberFormat get _fmt2 => Pais.fmt();
   bool _cargando = true;
 
   // Datos del taller
@@ -55,11 +56,12 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   Servicio2 _servicio = Servicio2.corte2D;
 
   // Si el taller no tiene máquina de ese tipo, se cotiza con una de referencia
-  // HETNA ($/h típico en México) para que todos los servicios estén siempre.
+  // HETNA ($/h típico en México, convertido a la moneda del taller) para que
+  // todos los servicios estén siempre.
   static const _costoRef = {'router': 350.0, 'laser_co2': 320.0, 'plasma': 480.0, 'laser_fibra': 950.0, 'router_3d': 350.0, 'impresora_3d': 60.0, 'torno': 450.0, 'otro': 350.0};
   static bool esReferencia(Maquina2 m) => m.id.startsWith('ref_');
   Maquina2 _referencia(String tipo) => Maquina2(id: 'ref_$tipo', nombre: tr('Máquina de referencia HETNA'), tipo: tipo,
-    emoji: emojiTipoMaquina[tipo] ?? '⚙️', costoHora: _costoRef[tipo] ?? 350, preparacionMin: tipo == 'impresora_3d' ? 5 : tipo.startsWith('laser') ? 8 : 15,
+    emoji: emojiTipoMaquina[tipo] ?? '⚙️', costoHora: Pais.refHora(_costoRef[tipo] ?? 350), preparacionMin: tipo == 'impresora_3d' ? 5 : tipo.startsWith('laser') ? 8 : 15,
     perforacionSeg: tipo == 'router' ? 2 : tipo.startsWith('laser') ? 0.5 : 1.5, remocionCm3Min: 15, impresionCm3H: 12);
   List<Maquina2> _maquinasDeTipo(String tipo) {
     final l = _maquinas.where((m) => m.tipo == tipo).toList();
