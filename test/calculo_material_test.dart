@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hetna_cnc/services/aprovechamiento.dart';
 import 'package:hetna_cnc/widgets/calculo_material.dart';
+import 'package:hetna_cnc/simulador2/motor.dart' show Material2;
 
 void main() {
   test('tablón 100 × 2400 mm, pieza 80 × 110 mm, 10 mm de separación', () {
@@ -34,5 +35,29 @@ void main() {
     await tester.tap(find.text('Usar en el producto'));
     expect(aplicado?['piezas'], 320);
     expect(aplicado?['desc'], contains('16 tablones de 2400 × 100 mm (20 pz por tablón)'));
+  });
+
+  testWidgets('elegir el material de la bodega: llena medidas y precio, y dice cuánto falta comprar', (tester) async {
+    Map<String, dynamic> guardado = {};
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: CalculoMaterial(
+      pzLargo: 80, pzAncho: 110,
+      datos: const {'sep': '10', 'piezas': '320'},
+      onCambio: (m) => guardado = m,
+      cargarInventario: () async => const [
+        Material2(id: 'inv1', nombre: 'Pino tablón 3/4', tipo: 'madera', espesorMm: 19, precio: 330, unidad: 'pza', hojaLargo: 2400, hojaAncho: 100, stock: 5),
+      ],
+    )))));
+    await tester.tap(find.text('Elegir material de mi bodega'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pino tablón 3/4'));
+    await tester.pumpAndSettle();
+    expect(guardado['material'], 'Pino tablón 3/4');
+    expect(guardado['espesor'], '19');
+    expect(guardado['mat_l'], '2400');
+    expect(guardado['precio'], '330');
+    expect(guardado['material_id'], 'inv1');
+    expect(find.textContaining('20 piezas por tablón'), findsOneWidget);
+    expect(find.textContaining('En bodega: 5 tablones'), findsOneWidget);
+    expect(find.textContaining('Faltan 11 tablones por comprar'), findsOneWidget);
   });
 }

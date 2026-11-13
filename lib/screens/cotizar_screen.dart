@@ -15,6 +15,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/archivo_cad_service.dart';
 import '../services/cotas_service.dart';
+import '../services/puente_cotizacion.dart';
 import '../widgets/calculo_material.dart';
 import 'simulador_screen.dart';
 import '../simulador2/simulador2_screen.dart';
@@ -993,8 +994,48 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
 
   @override
   void dispose() {
+    if (_esCotizacionDePestana) {
+      PuenteCotizacion.cambios.removeListener(_recibirDelSimulador);
+      PuenteCotizacion.quitarCotizacion();
+    }
     for (final c in _pro.values) { c.dispose(); }
     super.dispose();
+  }
+
+  bool get _esCotizacionDePestana => widget.cotizacionEditar == null && widget.carritoSimulador == null && widget.itemInicial == null;
+
+  // Lo que llega del simulador abierto desde su pestaña: si es de un diseño que ya
+  // está en la cotización (mismo archivo), se pone en ese producto; si no, se agrega.
+  void _recibirDelSimulador() {
+    final llegan = PuenteCotizacion.tomar().whereType<Partida2>().toList();
+    if (llegan.isEmpty || !mounted) return;
+    setState(() {
+      for (final r in llegan) {
+        final desc = r.descripcion;
+        final nueva = CotizacionItem(
+          nombreProducto: '${r.emoji} ${r.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
+          cantidad: r.cantidad, precioUnitario: r.precioUnitario, sku: null,
+          materialId: r.materialId, materialCantidad: r.materialUnidades > 0 ? r.materialUnidades : null,
+          tiempoMin: r.tiempoMin, maquinaId: r.maquinaId, tipoMaterial: r.tipoMaterial, espesorMm: r.espesorMm,
+          imagenPng: r.imagenPng != null ? base64Encode(r.imagenPng!) : null, medidas: r.medidas.isNotEmpty ? r.medidas : null);
+        final archivo = r.geo?.nombre;
+        CotizacionItem? ligada;
+        _PiezaExtra? extra;
+        if (archivo != null) {
+          if (_archivoInfo?['nombre'] == archivo) { ligada = _partidaPrincipal; }
+          else { for (final p in _otrasPiezas) { if (p.info['nombre'] == archivo) { ligada = p.partida; extra = p; break; } } }
+        }
+        if (ligada != null && _items.any((x) => identical(x, ligada))) {
+          _reemplazarPartida(ligada, nueva);
+          if (extra != null) extra.partida = nueva; else _partidaPrincipal = nueva;
+        } else {
+          _items.add(nueva);
+        }
+      }
+    });
+    final total = llegan.fold(0.0, (s, r) => s + r.total);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(trf('✅ Del simulador a esta cotización: {0}', [Pais.fmt(centavos: false).format(total)])), backgroundColor: AppColors.verde));
   }
   List<CotizacionItem> _items = [];
   double _descuentoPct = 0;
@@ -1101,6 +1142,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   @override
   void initState() {
     super.initState();
+    // La cotización nueva de la pestaña Cotizar recibe lo que se calcula en el simulador
+    if (_esCotizacionDePestana) {
+      PuenteCotizacion.registrarCotizacion();
+      PuenteCotizacion.cambios.addListener(_recibirDelSimulador);
+    }
     if (widget.cotizacionEditar == null) _cargarImpuestoDefault();
     _cargarAnticipo();
     _cargarCupo();

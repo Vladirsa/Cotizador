@@ -13,6 +13,7 @@ import '../main.dart';
 import '../i18n/tr.dart';
 import '../services/archivo_cad_service.dart';
 import '../screens/cotizar_screen.dart';
+import '../services/puente_cotizacion.dart';
 import '../screens/simulador_screen.dart' show SimuladorScreen;
 import 'motor.dart';
 import 'simulador2_data.dart';
@@ -267,12 +268,30 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   }
 
   Future<void> _pasarACotizacion() async {
-    final it = await _itemActual();
-    if (it == null || !mounted) return;
-    final partida = _partidaDe(it);
-    _guardarHist(it);
-    if (widget.seleccionar) { Navigator.pop(context, partida); return; }
-    Navigator.push(context, MaterialPageRoute(builder: (_) => CotizarScreen(carritoSimulador: [partida])));
+    try {
+      final it = await _itemActual();
+      if (!mounted) return;
+      if (it == null) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Falta elegir máquina, material o la pieza para pasar el precio.')), backgroundColor: AppColors.naranja));
+        return;
+      }
+      final partida = _partidaDe(it);
+      _guardarHist(it);
+      _entregar([partida]);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('No se pudo pasar a la cotización: {0}', [e])), backgroundColor: AppColors.rojo));
+    }
+  }
+
+  // Abierto desde una cotización: regresa ahí. Desde la pestaña o el menú: va a la
+  // cotización que está abierta en la pestaña Cotizar; si no hay, abre una nueva.
+  void _entregar(List<Partida2> partidas) {
+    if (widget.seleccionar) { Navigator.pop(context, partidas.length == 1 ? partidas.first : partidas); return; }
+    if (PuenteCotizacion.enviar(partidas)) {
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      return;
+    }
+    Navigator.push(context, MaterialPageRoute(builder: (_) => CotizarScreen(carritoSimulador: partidas)));
   }
 
   void _guardarHist(_ItemJuego it) {
@@ -354,7 +373,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     final partidas = _juego.map(_partidaDe).toList();
     for (final it in _juego) { _guardarHist(it); }
     if (widget.seleccionar) { Navigator.pop(context, partidas); return; }
-    Navigator.push(context, MaterialPageRoute(builder: (_) => CotizarScreen(carritoSimulador: partidas)));
+    _entregar(partidas);
   }
 
   Widget _tarjetaJuego() {
