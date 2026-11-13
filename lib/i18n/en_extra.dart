@@ -1040,4 +1040,16 @@ const Map<String, String> textosEnExtra = {
   'Croquis, cotas, material y espesor de cada pieza: ver anexos al final ({0}).': 'Drawings, dimensions, material and thickness of each part: see annexes at the end ({0}).',
   '{0} pz por {1} de {2} x {3} mm · {4} {5} para {6} pz': '{0} pcs per {1} of {2} x {3} mm · {4} {5} for {6} pcs',
   'Sube los DXF, SVG, STL u OBJ: la app saca las medidas, la longitud de corte, contornos, barrenos o volumen y todas las cotas. En "Material y aprovechamiento" de cada pieza pon su material y espesor. El PDF lleva al final, como anexo, el croquis de cada pieza con sus cotas.': 'Upload DXF, SVG, STL or OBJ files: the app reads sizes, cut length, contours, holes or volume and every dimension. In each part\'s "Material and yield" enter its material and thickness. The PDF ends with an annex: each part\'s drawing with its dimensions.',
+  // Bodega y simulador → cotización
+  'Falta elegir máquina, material o la pieza para pasar el precio.': 'Pick a machine, material and part to send the price.',
+  'No se pudo pasar a la cotización: {0}': 'Could not send to the quote: {0}',
+  '✅ Del simulador a esta cotización: {0}': '✅ From the simulator to this quote: {0}',
+  'Tu bodega no tiene materiales en hoja o tablón. Agrégalos en Inventario con su medida, precio y existencias.': 'Your warehouse has no sheet or board materials. Add them in Inventory with size, price and stock.',
+  'Elige el material de tu bodega': 'Pick a material from your warehouse',
+  '{0} en bodega': '{0} in stock',
+  'sin existencias': 'out of stock',
+  'Cambiar material de la bodega': 'Change warehouse material',
+  'Elegir material de mi bodega': 'Pick material from my warehouse',
+  'Alcanza con lo de bodega; te quedan {0}.': 'Stock is enough; {0} left over.',
+  'Faltan {0} {1} por comprar{2}.': '{0} {1} still to buy{2}.',
 };

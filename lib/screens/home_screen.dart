@@ -38,6 +38,7 @@ import '../simulador2/pieza_ejemplo.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/hetna_api.dart';
 import '../i18n/tr.dart';
+import '../services/puente_cotizacion.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -78,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  void initState() { super.initState(); _cargarAlertas(); _abrirPlanesSiLoPide(); _abrirAltaGuiadaSiEsNuevo(); _referidos(); }
+  void initState() { super.initState(); PuenteCotizacion.irACotizacion = () { if (mounted) setState(() => _tab = 2); }; _cargarAlertas(); _abrirPlanesSiLoPide(); _abrirAltaGuiadaSiEsNuevo(); _referidos(); }
 
   // Aplica la invitación pendiente (si entró por una liga ?ref=) y deja
   // cargado mi código para el pie de los mensajes de WhatsApp.
