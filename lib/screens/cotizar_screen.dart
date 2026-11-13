@@ -2671,6 +2671,27 @@ String _lineaLiga(Cotizacion cot) {
   return trf('\n\nPuedes verla, aceptarla y pagar el anticipo aquí:\n{0}', [liga]);
 }
 
+/// Sube el PDF de la cotización para que el cliente lo vea y lo descargue desde la liga.
+/// Si no se pasan los bytes, se genera aquí (en el idioma de la app). No detiene al
+/// taller: si falla, la liga sigue funcionando sin el botón de PDF.
+Future<void> subirPdfALiga(Cotizacion cot, {Uint8List? bytes, bool? ingles}) async {
+  final id = cot.id;
+  if (id == null) return;
+  try {
+    var pdf = bytes;
+    if (pdf == null) {
+      var c = cot;
+      if (c.items.isEmpty) c = c.copiaConItems(await SupabaseService.getCotizacionItems(id));
+      final cfg = await SupabaseService.getConfiguracion();
+      pdf = await PdfService.generarCotizacion(cotizacion: c, empresa: cfg, ingles: ingles);
+    }
+    final ruta = await SupabaseService.subirPdfCotizacion(id, pdf);
+    if (ruta != null) cot.pdfUrl = ruta;
+  } catch (e) {
+    debugPrint('subirPdfALiga: $e');
+  }
+}
+
 /// Liga pública: copiar, mandar por WhatsApp o abrir. Fase 2 del Cotizador 2.0.
 Future<void> mostrarLigaCliente(BuildContext context, Cotizacion cot) async {
   final liga = cot.ligaPublica;
@@ -2679,8 +2700,10 @@ Future<void> mostrarLigaCliente(BuildContext context, Cotizacion cot) async {
       tr('Guarda la cotización primero; la liga se crea al guardarla. Si ya está guardada, vuelve a abrir la lista.'))));
     return;
   }
+  // El PDF al día se sube mientras el taller copia o manda la liga
+  subirPdfALiga(cot);
   final nombreCliente = cot.cliente?.nombre ?? cot.cliente?.empresa ?? '';
-  final msg = trf('¡Hola *{0}*! 😊\n\nAquí está tu cotización *{1}* de *{2}*. Puedes verla, aceptarla y pagar el anticipo desde esta liga:\n{3}\n\n¡Quedamos a tus órdenes! 💙',
+  final msg = trf('¡Hola *{0}*! 😊\n\nAquí está tu cotización *{1}* de *{2}*. Puedes verla, aceptarla y pagar el anticipo desde esta liga:\n{3}\n\n¡Quedamos a tus órdenes! ⚙️',
     [nombreCliente, cot.folio ?? '', AuthService.marcaTaller, liga]);
   await showModalBottomSheet(context: context, shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
@@ -2771,11 +2794,13 @@ class _BtnPdfWAState extends State<_BtnPdfWA> {
       }
       final cfg = await SupabaseService.getConfiguracion();
       final bytes = await PdfService.generarCotizacion(cotizacion: cot, empresa: cfg, ingles: ingles);
+      // El mismo PDF queda en la liga del cliente para verlo y descargarlo
+      subirPdfALiga(widget.cotizacion, bytes: bytes);
       final folio = cot.folio ?? 'cotizacion';
       final nombreCliente = cot.cliente?.nombre ?? cot.cliente?.empresa ?? '';
       if (mounted) await PdfService.mostrarOpcionesEnvio(context, bytes, '$folio.pdf',
         whatsapp: cot.cliente?.whatsappNumero,
-        mensaje: trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.{3}\n\n¡Quedamos a tus órdenes! 💙',
+        mensaje: trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.{3}\n\n¡Quedamos a tus órdenes! ⚙️',
           [nombreCliente, folio, AuthService.marcaTaller, _lineaLiga(cot)]));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(

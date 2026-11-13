@@ -582,7 +582,7 @@ class _PlantillasWaScreenState extends State<PlantillasWaScreen>
       {'tipo': 'avance_entrega', 'nombre': tr('Listo para entrega'),
        'mensaje': tr('¡Hola *NOMBRE*! 📦 Tu pedido *FOLIO* está LISTO. ¿Cuándo coordinamos? 📱 *TELEFONO*')},
       {'tipo': 'avance_entregado', 'nombre': tr('Entregado'),
-       'mensaje': tr('¡Hola *NOMBRE*! 🎉 Tu pedido *FOLIO* fue entregado. ¡Gracias por confiar en *EMPRESA*! 💙')},
+       'mensaje': tr('¡Hola *NOMBRE*! 🎉 Tu pedido *FOLIO* fue entregado. ¡Gracias por confiar en *EMPRESA*! ⚙️')},
     ];
 
     for (final d in defaults) {

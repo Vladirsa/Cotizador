@@ -524,7 +524,7 @@ Si tienes un momento, comparte tu experiencia. ¡Tu opinión nos ayuda a mejorar
 Síguenos en redes para ver más trabajos:
 📲 @hetna_cnc
 
-¡Gracias por confiar en nosotros! 💙''';
+¡Gracias por confiar en nosotros! ⚙️''';
 
       // ── Recordatorio de pago ──
       case 'pago_anticipo_pendiente':
@@ -634,7 +634,7 @@ Queremos asegurarnos de que todo va según lo acordado. Si tienes alguna pregunt
     required String empresa,
   }) async {
     final folio = cotizacion?.folio ?? '';
-    final msg = trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! 💙', [nombreCliente, folio, empresa.trim().isNotEmpty ? empresa : AuthService.marcaTaller]) + pieHetna();
+    final msg = trf('¡Hola *{0}*! 😊\n\nTe comparto la cotización *{1}* de *{2}*.\n\nIncluye todos los detalles del trabajo solicitado. Cualquier ajuste con gusto lo hacemos.\n\n¡Quedamos a tus órdenes! ⚙️', [nombreCliente, folio, empresa.trim().isNotEmpty ? empresa : AuthService.marcaTaller]) + pieHetna();
     await abrirChat(numero: whatsapp, mensaje: msg);
   }
 

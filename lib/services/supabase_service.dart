@@ -79,6 +79,21 @@ class SupabaseService {
     }
   }
 
+  // ── PDF de la cotización para la liga del cliente (hetnacnc.com/c/…) ──
+  // Va a un bucket PRIVADO, en la carpeta del taller; en pdf_url se guarda la
+  // ruta ("cotizaciones-pdf/<negocio>/<id>.pdf") y la página de la liga la
+  // firma por una hora para que el cliente la vea o la descargue.
+  static Future<String?> subirPdfCotizacion(String cotizacionId, Uint8List bytes) async {
+    final negId = AuthService.negocioId;
+    if (negId == null) return null;
+    final path = '$negId/$cotizacionId.pdf';
+    await _db.storage.from('cotizaciones-pdf').uploadBinary(path, bytes,
+      fileOptions: const FileOptions(upsert: true, contentType: 'application/pdf'));
+    final ruta = 'cotizaciones-pdf/$path';
+    await _db.from('cotizaciones').update({'pdf_url': ruta}).eq('id', cotizacionId);
+    return ruta;
+  }
+
   // ── Subir logo del taller a Supabase Storage, devuelve la URL pública ──
   static Future<String?> subirLogo(Uint8List bytes, String extension) async {
     try {
