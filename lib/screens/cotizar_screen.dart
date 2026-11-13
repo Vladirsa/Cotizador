@@ -15,6 +15,7 @@ import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/archivo_cad_service.dart';
 import '../services/cotas_service.dart';
+import '../widgets/calculo_material.dart';
 import 'simulador_screen.dart';
 import '../simulador2/simulador2_screen.dart';
 import '../simulador2/simulador2_data.dart';
@@ -531,6 +532,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // Más diseños en la misma cotización: cada uno con sus medidas y su dibujo
   final List<_PiezaExtra> _otrasPiezas = [];
   CotizacionItem? _partidaPrincipal; // el producto que entró solo al subir la pieza principal
+  Map<String, dynamic> _materialPrincipal = {}; // "Material y aprovechamiento" de la pieza principal
 
   TextEditingController _ctrlPro(String k, String inicial) =>
     _pro.putIfAbsent(k, () => TextEditingController(text: inicial));
@@ -547,6 +549,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (_archivoPng != null) d['archivo_png'] = base64Encode(_archivoPng!);
     }
     if (_otrasPiezas.isNotEmpty) d['otras_piezas'] = _otrasPiezas.map((p) => p.toJson()).toList();
+    if (_materialPrincipal.isNotEmpty) d['material_principal'] = _materialPrincipal;
     return d;
   }
 
@@ -768,24 +771,64 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       content: Text(trf('✅ Partida agregada: {0}', [Pais.fmt(centavos: false).format(r.total)])), backgroundColor: AppColors.verde));
   }
 
-  Widget _resumenArchivo() {
-    final i = _archivoInfo!;
+  // Datos técnicos del archivo, iguales para la pieza principal y los demás diseños
+  List<Widget> _filasFicha(Map<String, dynamic> i) {
     final es3D = i['tipo'] == 'stl' || i['tipo'] == 'obj';
     String n(dynamic v, [int d = 1]) => ((v as num?) ?? 0).toStringAsFixed(d);
     final filas = <(String, String)>[
-      (tr('Archivo'), '${i['nombre']} · ${(i['tipo'] as String).toUpperCase()} · ${i['unidades']}'),
+      (tr('Archivo'), '${i['nombre']} · ${(i['tipo'] as String? ?? '').toUpperCase()} · ${i['unidades'] ?? 'mm'}'),
       (tr('Medidas'), es3D
         ? '${n(i['largo'])} × ${n(i['ancho'])} × ${n(i['alto'])} mm'
         : '${n(i['largo'])} × ${n(i['ancho'])} mm'),
       if (!es3D) (tr('Longitud de corte'), '${n((i['longitud_corte'] as num? ?? 0) / 1000, 2)} m'),
-      if (!es3D) (tr('Contornos cerrados'), '${i['contornos']}'),
-      if (!es3D) (tr('Barrenos (círculos)'), '${i['barrenos']}'),
+      if (!es3D) (tr('Contornos cerrados'), '${i['contornos'] ?? 0}'),
+      if (!es3D) (tr('Barrenos (círculos)'), '${i['barrenos'] ?? 0}'),
       if (!es3D && ((i['area_pieza'] as num?) ?? 0) > 0) (tr('Área de la pieza'), '${n((i['area_pieza'] as num) / 100, 1)} cm²'),
       if (es3D) (tr('Triángulos'), '${i['triangulos']}'),
       if (es3D) (tr('Volumen'), '${n(i['volumen_cm3'], 2)} cm³'),
       if (es3D) (tr('Área superficial'), '${n(i['area_superficial_cm2'], 1)} cm²'),
     ];
     final avisos = (i['avisos'] as List?)?.cast<String>() ?? const [];
+    return [
+      ...filas.map((f) => Padding(padding: const EdgeInsets.only(bottom: 2),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 130, child: Text(f.$1, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
+          Expanded(child: Text(f.$2, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+        ]))),
+      ...avisos.map((a) => Padding(padding: const EdgeInsets.only(top: 4),
+        child: Text('⚠️ $a', style: const TextStyle(fontSize: 11, color: AppColors.naranja)))),
+    ];
+  }
+
+  // "Material y aprovechamiento": cuántas piezas salen del tablón u hoja y cuánto material se compra
+  Widget _plegableMaterial(Map<String, dynamic> info, Map<String, dynamic> datos, ValueChanged<Map<String, dynamic>> onCambio, CotizacionItem? partida) {
+    final l = ((info['largo'] as num?) ?? 0).toDouble(), a = ((info['ancho'] as num?) ?? 0).toDouble();
+    if (l <= 0 || a <= 0) return const SizedBox.shrink();
+    final enCotizacion = partida != null && _items.any((x) => identical(x, partida));
+    final inicial = {...datos};
+    if (!inicial.containsKey('piezas') && partida != null) inicial['piezas'] = '${partida.cantidad}';
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      decoration: BoxDecoration(color: Colors.white.withOpacity(0.6), borderRadius: BorderRadius.circular(8)),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 8), dense: true, childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+          leading: const Icon(Icons.grid_on_outlined, size: 18, color: AppColors.azul),
+          title: Text(tr('Material y aprovechamiento'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+          subtitle: Text(tr('Piezas por tablón u hoja, cuánto material compras y su costo por pieza'), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+          children: [
+            CalculoMaterial(pzLargo: l, pzAncho: a, datos: inicial, onCambio: onCambio,
+              onAplicar: !enCotizacion ? null : (r, desc) {
+                setState(() { partida.cantidad = r.piezas; partida.descripcion = desc; });
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Producto actualizado: {0} piezas', [r.piezas])), backgroundColor: AppColors.verde));
+              }),
+          ])));
+  }
+
+  Widget _resumenArchivo() {
+    final i = _archivoInfo!;
+    final es3D = i['tipo'] == 'stl' || i['tipo'] == 'obj';
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
@@ -800,13 +843,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
               largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D,
               cotas: _verCotas && !es3D ? _cotasArchivo : null))),
         if (_archivoGeo.isNotEmpty && !es3D && _cotasArchivo.isNotEmpty) _tablaCotas(),
-        ...filas.map((f) => Padding(padding: const EdgeInsets.only(bottom: 2),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            SizedBox(width: 130, child: Text(f.$1, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
-            Expanded(child: Text(f.$2, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
-          ]))),
-        ...avisos.map((a) => Padding(padding: const EdgeInsets.only(top: 4),
-          child: Text('⚠️ $a', style: const TextStyle(fontSize: 11, color: AppColors.naranja)))),
+        ..._filasFicha(i),
+        _plegableMaterial(i, _materialPrincipal, (m) => _materialPrincipal = m, _partidaPrincipal),
         const SizedBox(height: 6),
         Wrap(spacing: 6, runSpacing: 4, alignment: WrapAlignment.end, children: [
           OutlinedButton.icon(
@@ -859,47 +897,69 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         ]));
   }
 
-  // Un diseño más de la cotización: dibujo, medidas y sus botones
+  // Un diseño más de la cotización: la misma ficha, cotas, material y botones que la pieza principal
   Widget _tarjetaOtraPieza(_PiezaExtra p) {
     final i = p.info;
     final es3D = i['tipo'] == 'stl' || i['tipo'] == 'obj';
-    String n(dynamic v, [int d = 1]) => ((v as num?) ?? 0).toStringAsFixed(d);
-    final datos = [
-      _medidasDeInfo(i),
-      if (!es3D) trf('{0} m de corte', [n(((i['longitud_corte'] as num?) ?? 0) / 1000, 2)]),
-      if (!es3D && ((i['barrenos'] as num?) ?? 0) > 0) trf('{0} barrenos', [i['barrenos']]),
-      if (es3D) '${n(i['volumen_cm3'], 1)} cm³',
-    ].join(' · ');
     final cs = es3D ? const <Cota>[] : p.cotas;
+    final enCotizacion = p.partida != null && _items.any((x) => identical(x, p.partida));
     return Container(
-      margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // El diseño en grande, con todas sus cotas, igual que la pieza principal
-        Container(height: p.trazos.isEmpty ? 84 : 260, width: double.infinity,
+        Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(trf('Diseño {0}', [_otrasPiezas.indexOf(p) + 2]),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.azul))),
+        Container(height: p.trazos.isEmpty ? 84 : (cs.isEmpty ? 230 : 300), width: double.infinity,
+          margin: const EdgeInsets.only(bottom: 4),
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
           child: p.trazos.isEmpty ? const Icon(Icons.view_in_ar_outlined, color: AppColors.textoSecundario)
             : CustomPaint(painter: _PiezaPainter(p.trazos, largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D,
                 cotas: cs.isEmpty ? null : cs))),
         if (cs.isNotEmpty) _listaCotas(cs),
-        const SizedBox(height: 4),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${i['nombre']}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
-          Text(datos, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
-          Wrap(spacing: 2, children: [
-            TextButton.icon(onPressed: () => _calcularConSimulador(p), icon: const Icon(Icons.calculate_outlined, size: 15),
-              label: Text(tr('Simulador'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact)),
-            TextButton.icon(onPressed: () => _agregarPiezaComoPartida(p), icon: const Icon(Icons.edit_outlined, size: 15),
-              label: Text(tr('Precio y cantidad'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact)),
-            TextButton.icon(onPressed: () => setState(() {
-                _otrasPiezas.remove(p);
-                final it = p.partida;
-                if (it != null && it.precioUnitario == 0) _items.removeWhere((x) => identical(x, it));
-              }), icon: const Icon(Icons.close, size: 15),
-              label: Text(tr('Quitar'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact, foregroundColor: AppColors.rojo)),
-          ]),
+        ..._filasFicha(i),
+        _plegableMaterial(i, p.material, (m) => p.material = m, p.partida),
+        const SizedBox(height: 6),
+        Wrap(spacing: 6, runSpacing: 4, alignment: WrapAlignment.end, children: [
+          OutlinedButton.icon(
+            onPressed: () => _agregarPiezaComoPartida(p),
+            icon: Icon(enCotizacion ? Icons.edit_outlined : Icons.playlist_add, size: 15),
+            label: Text(enCotizacion ? tr('Precio y cantidad') : tr('Agregar como partida'), style: const TextStyle(fontSize: 12))),
+          if (p.geoOriginal != null) OutlinedButton.icon(
+            onPressed: () => _escalarOtra(p),
+            icon: const Icon(Icons.open_in_full, size: 15),
+            label: Text(p.ex == 1 ? tr('Escalar') : trf('Escala {0}%', [(p.ex * 100).round()]), style: const TextStyle(fontSize: 12))),
+          ElevatedButton.icon(
+            onPressed: () => _calcularConSimulador(p),
+            icon: const Icon(Icons.calculate_outlined, size: 15, color: Colors.white),
+            label: Text(tr('Calcular precio con el simulador'), style: const TextStyle(fontSize: 12, color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.naranja)),
+          TextButton.icon(
+            onPressed: () => setState(() {
+              _otrasPiezas.remove(p);
+              final it = p.partida;
+              if (it != null && it.precioUnitario == 0) _items.removeWhere((x) => identical(x, it));
+            }),
+            icon: const Icon(Icons.close, size: 16),
+            label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12))),
         ]),
       ]));
+  }
+
+  // Escalar un diseño extra: igual que la pieza principal, y su producto toma las medidas nuevas
+  Future<void> _escalarOtra(_PiezaExtra p) async {
+    final g0 = p.geoOriginal;
+    if (g0 == null || g0.largo <= 0) return;
+    final r = await mostrarDialogoEscala(context, g0, p.ex, p.ey, p.ez);
+    if (r == null) return;
+    final g = g0.escaladoXYZ(r[0], r[1], r[2]);
+    final vieja = p.partida;
+    final nueva = vieja != null && _items.any((x) => identical(x, vieja)) ? await _partidaDeDiseno(g.toInfo(), g.trazos, base: vieja) : null;
+    if (!mounted) return;
+    setState(() {
+      p.ex = r[0]; p.ey = r[1]; p.ez = r[2];
+      p.usarGeo(g);
+      if (vieja != null && nueva != null) { _reemplazarPartida(vieja, nueva); p.partida = nueva; }
+    });
   }
 
   // Lista plegable de cotas de un diseño extra
@@ -1120,6 +1180,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         _archivoInfo = Map<String, dynamic>.from(c.datosPro['archivo_info'] as Map);
         _archivoGeo = GeoCad.geoDeJson(c.datosPro['archivo_geo']);
       }
+      if (c.datosPro['material_principal'] is Map) _materialPrincipal = Map<String, dynamic>.from(c.datosPro['material_principal'] as Map);
       if (c.datosPro['otras_piezas'] is List) {
         _otrasPiezas
           ..clear()
@@ -2866,17 +2927,24 @@ Future<List<double>?> mostrarDialogoEscala(BuildContext context, GeoCad g0, doub
 /// pieza completa (para el simulador); al reabrir una cotización guardada sólo
 /// vuelven la ficha y el dibujo.
 class _PiezaExtra {
-  final Map<String, dynamic> info;
-  final List<List<List<double>>> trazos;
-  final GeoCad? geo;
+  Map<String, dynamic> info;
+  List<List<List<double>>> trazos;
+  GeoCad? geo; // la pieza (escalada si se escaló), para el simulador
+  final GeoCad? geoOriginal; // tal como se leyó, para escalar sin perder precisión
+  double ex = 1, ey = 1, ez = 1;
   CotizacionItem? partida; // el producto de la cotización que corresponde a este diseño
-  late final List<Cota> cotas = cotasDe(trazos);
-  _PiezaExtra(this.info, this.trazos, this.geo);
-  factory _PiezaExtra.deGeo(GeoCad g) => _PiezaExtra(g.toInfo(), g.trazos, g);
+  Map<String, dynamic> material = {}; // "Material y aprovechamiento"
+  List<Cota>? _cotas;
+  List<Cota> get cotas => _cotas ??= cotasDe(trazos);
+  _PiezaExtra(this.info, this.trazos, this.geo, this.geoOriginal);
+  factory _PiezaExtra.deGeo(GeoCad g) => _PiezaExtra(g.toInfo(), g.trazos, g, g);
   factory _PiezaExtra.deJson(Map<String, dynamic> m) =>
-    _PiezaExtra(Map<String, dynamic>.from((m['info'] as Map?) ?? const {}), GeoCad.geoDeJson(m['geo']), null);
+    _PiezaExtra(Map<String, dynamic>.from((m['info'] as Map?) ?? const {}), GeoCad.geoDeJson(m['geo']), null, null)
+      ..material = m['material'] is Map ? Map<String, dynamic>.from(m['material'] as Map) : {};
+  void usarGeo(GeoCad g) { geo = g; info = g.toInfo(); trazos = g.trazos; _cotas = null; }
   Map<String, dynamic> toJson() => {
     'info': info,
+    if (material.isNotEmpty) 'material': material,
     'geo': trazos.map((t) => t.map((q) => [(q[0] * 100).round() / 100, (q[1] * 100).round() / 100]).toList()).toList(),
   };
 }
