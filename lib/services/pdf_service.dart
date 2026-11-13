@@ -876,8 +876,9 @@ class PdfService {
     final ryTop = oy + (boxH - rh) / 2; // desde arriba (coordenadas de Stack)
     // Vista lateral a la derecha
     final tieneLado = espesor > 0;
-    final lx = ox + boxW + 60;
     final lw = rw > 90 ? 90.0 : rw;
+    // La vista lateral y su cota deben caber completas en el croquis (antes el espesor quedaba cortado a la derecha)
+    final lx = math.min(ox + boxW + 50, W - lw - 70);
     double lh = espesor * (lw / largo);
     if (lh < 6) lh = 6;
     if (lh > 60) lh = 60;
@@ -994,9 +995,12 @@ class PdfService {
                 child: pw.Text('${holes.length} x Ø${mm(barrenoD)}', style: estilo, textAlign: pw.TextAlign.center))),
             if (tieneLado) ...[
               pw.Positioned(left: lx + lw + 28, top: lyTop + lh / 2 - 5,
-                child: pw.Text(mm(espesor), style: estilo)),
-              pw.Positioned(left: lx, top: lyTop + lh + 6, child: pw.SizedBox(width: lw,
-                child: pw.Text(_t('Vista lateral'), style: estiloGris, textAlign: pw.TextAlign.center))),
+                child: pw.Text('${mm(espesor)} mm', style: estilo)),
+              pw.Positioned(left: lx - 10, top: lyTop + lh + 6, child: pw.SizedBox(width: lw + 20,
+                child: pw.Column(children: [
+                  pw.Text(_t('Vista lateral'), style: estiloGris, textAlign: pw.TextAlign.center),
+                  pw.Text('${_t('Espesor')}: ${mm(espesor)} mm', style: estilo, textAlign: pw.TextAlign.center),
+                ]))),
             ],
           ])),
         pw.Text(_t('Medidas en mm. Croquis ilustrativo, no a escala.'), style: estiloGris),
