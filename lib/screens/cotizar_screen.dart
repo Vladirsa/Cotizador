@@ -13,6 +13,7 @@ import '../services/whatsapp_service.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/archivo_cad_service.dart';
+import '../services/cotas_service.dart';
 import 'simulador_screen.dart';
 import '../simulador2/simulador2_screen.dart';
 import '../simulador2/simulador2_data.dart';
@@ -526,6 +527,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   List<List<List<double>>> _archivoGeo = [];
   Uint8List? _archivoPng; // dibujo de la pieza (del Simulador 2.0) para el PDF
   bool _leyendoArchivo = false;
+  // Más diseños en la misma cotización: cada uno con sus medidas y su dibujo
+  final List<_PiezaExtra> _otrasPiezas = [];
 
   TextEditingController _ctrlPro(String k, String inicial) =>
     _pro.putIfAbsent(k, () => TextEditingController(text: inicial));
@@ -541,27 +544,41 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         (q[0] * 100).round() / 100, (q[1] * 100).round() / 100]).toList()).toList();
       if (_archivoPng != null) d['archivo_png'] = base64Encode(_archivoPng!);
     }
+    if (_otrasPiezas.isNotEmpty) d['otras_piezas'] = _otrasPiezas.map((p) => p.toJson()).toList();
     return d;
   }
 
   Future<void> _subirArchivoPieza() async {
     try {
       // FileType.any: en celular el filtro por extensión deja los archivos en gris
-      final result = await FilePicker.platform.pickFiles(type: FileType.any, withData: true);
+      // Se pueden elegir varios diseños a la vez: el primero queda como pieza
+      // principal (llena la ficha) y los demás se agregan a la lista de diseños
+      final result = await FilePicker.platform.pickFiles(type: FileType.any, withData: true, allowMultiple: true);
       if (result == null || result.files.isEmpty) return;
-      final f = result.files.first;
-      final extSel = f.name.contains('.') ? f.name.split('.').last.toLowerCase() : '';
-      if (!ArchivoCadService.extensiones.contains(extSel)) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Ese archivo es .{0}; sube DXF, SVG, STL u OBJ.', [extSel])), backgroundColor: AppColors.naranja));
-        return;
-      }
-      final bytes = f.bytes;
-      if (bytes == null) return;
       setState(() => _leyendoArchivo = true);
-      final g = ArchivoCadService.leer(f.name, bytes);
-      _geoOriginal = g;
-      _escalaArchivo = 1;
-      _aplicarGeo(g);
+      final errores = <String>[];
+      for (final f in result.files) {
+        final extSel = f.name.contains('.') ? f.name.split('.').last.toLowerCase() : '';
+        if (!ArchivoCadService.extensiones.contains(extSel)) { errores.add(trf('{0}: sube DXF, SVG, STL u OBJ', [f.name])); continue; }
+        final bytes = f.bytes;
+        if (bytes == null) continue;
+        try {
+          final g = ArchivoCadService.leer(f.name, bytes);
+          if (_archivoInfo == null) {
+            _geoOriginal = g;
+            _escalaArchivo = 1; _escalaY = 1; _escalaZ = 1;
+            _aplicarGeo(g);
+          } else {
+            setState(() => _otrasPiezas.add(_PiezaExtra.deGeo(g)));
+          }
+        } catch (e) {
+          errores.add('${f.name}: ${e.toString().replaceFirst('Exception: ', '')}');
+        }
+      }
+      if (mounted) setState(() => _leyendoArchivo = false);
+      if (errores.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('No se pudo leer: {0}', [errores.join(' · ')])), backgroundColor: AppColors.naranja));
+      }
     } catch (e) {
       setState(() => _leyendoArchivo = false);
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -613,8 +630,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // La pieza del archivo como partida de la cotización (nombre, cantidad y
   // precio), sin pasar por el catálogo. Si quiere el precio calculado, usa
   // "Calcular precio con el simulador".
-  Future<void> _agregarPiezaComoPartida() async {
-    final i = _archivoInfo;
+  Future<void> _agregarPiezaComoPartida([_PiezaExtra? extra]) async {
+    final i = extra?.info ?? _archivoInfo;
     if (i == null) return;
     final n = TextEditingController(text: (i['nombre'] as String? ?? '').replaceFirst(RegExp(r'\.[^.]+$'), ''));
     final c = TextEditingController(text: '1');
@@ -641,12 +658,23 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       nombreProducto: n.text.trim(),
       cantidad: int.tryParse(c.text) ?? 1,
       precioUnitario: double.tryParse(p.text.replaceAll(',', '.')) ?? 0,
-      sku: null)));
+      sku: null, medidas: _medidasDeInfo(i))));
+  }
+
+  // "120 × 80 mm" o "120 × 80 × 15 mm" desde la ficha técnica de un archivo
+  String _medidasDeInfo(Map<String, dynamic> i) {
+    String mm(dynamic v) { final d = ((v as num?) ?? 0).toDouble(); return d == d.roundToDouble() ? d.toStringAsFixed(0) : d.toStringAsFixed(1); }
+    final es3D = i['tipo'] == 'stl' || i['tipo'] == 'obj';
+    return es3D ? '${mm(i['largo'])} × ${mm(i['ancho'])} × ${mm(i['alto'])} mm' : '${mm(i['largo'])} × ${mm(i['ancho'])} mm';
   }
 
   // Abre el simulador con la pieza cargada; el precio elegido entra como partida
-  Future<void> _calcularConSimulador() async {
-    final g = _geoOriginal?.escalado(_escalaArchivo);
+  Future<void> _calcularConSimulador([_PiezaExtra? extra]) async {
+    final g = extra != null ? extra.geo : _geoOriginal?.escalado(_escalaArchivo);
+    if (extra != null && g == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tr('Vuelve a subir este archivo para calcularlo en el simulador.')), backgroundColor: AppColors.naranja));
+      return;
+    }
     final res = await Navigator.push<dynamic>(context, MaterialPageRoute(
       builder: (_) => Simulador2Screen(geoInicial: g, seleccionar: true)));
     if (res == null || !mounted) return;
@@ -654,8 +682,10 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     final lista = res is Partida2 ? [res] : res is List ? res.whereType<Partida2>().toList() : <Partida2>[];
     if (lista.isEmpty) return;
     final r = lista.first;
-    if (r.geo != null && _archivoInfo == null) _aplicarGeo(r.geo!);
-    if (r.imagenPng != null) _archivoPng = r.imagenPng;
+    if (extra == null) {
+      if (r.geo != null && _archivoInfo == null) _aplicarGeo(r.geo!);
+      if (r.imagenPng != null) _archivoPng = r.imagenPng;
+    }
     setState(() {
       for (final r in lista) {
       final desc = r.descripcion;
@@ -699,12 +729,14 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         if (_archivoGeo.isNotEmpty)
-          Container(height: 230, width: double.infinity,
-            margin: const EdgeInsets.only(bottom: 8),
+          Container(height: _verCotas && !es3D ? 300 : 230, width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 4),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6),
               border: Border.all(color: AppColors.grisBorde, width: 0.5)),
             child: CustomPaint(painter: _PiezaPainter(_archivoGeo,
-              largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D))),
+              largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D,
+              cotas: _verCotas && !es3D ? _cotasArchivo : null))),
+        if (_archivoGeo.isNotEmpty && !es3D && _cotasArchivo.isNotEmpty) _tablaCotas(),
         ...filas.map((f) => Padding(padding: const EdgeInsets.only(bottom: 2),
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             SizedBox(width: 130, child: Text(f.$1, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
@@ -732,6 +764,70 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
             icon: const Icon(Icons.close, size: 16),
             label: Text(tr('Quitar archivo'), style: const TextStyle(fontSize: 12))),
         ]),
+      ]));
+  }
+
+  // Cotas de la pieza principal (se calculan una vez por dibujo)
+  bool _verCotas = true;
+  List<List<List<double>>>? _cotasDeGeo;
+  List<Cota> _cotasCache = const [];
+  List<Cota> get _cotasArchivo {
+    if (!identical(_cotasDeGeo, _archivoGeo)) { _cotasDeGeo = _archivoGeo; _cotasCache = cotasDe(_archivoGeo); }
+    return _cotasCache;
+  }
+
+  Widget _tablaCotas() {
+    final cs = _cotasArchivo;
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        tilePadding: EdgeInsets.zero, dense: true, childrenPadding: const EdgeInsets.only(bottom: 6),
+        title: Text(trf('Todas las cotas · {0}', [resumenCotas(cs)]), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(tr('En el dibujo'), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+          Switch(value: _verCotas, onChanged: (v) => setState(() => _verCotas = v)),
+        ]),
+        children: [
+          Wrap(spacing: 10, runSpacing: 2, children: [
+            for (final c in cs) SizedBox(width: 150, child: Text(
+              '${c.n}. ${tr(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' · ${tr('arco')} ${fmtMm(c.largoArco)}' : ''}',
+              style: const TextStyle(fontSize: 11.5))),
+          ]),
+        ]));
+  }
+
+  // Un diseño más de la cotización: dibujo, medidas y sus botones
+  Widget _tarjetaOtraPieza(_PiezaExtra p) {
+    final i = p.info;
+    final es3D = i['tipo'] == 'stl' || i['tipo'] == 'obj';
+    String n(dynamic v, [int d = 1]) => ((v as num?) ?? 0).toStringAsFixed(d);
+    final datos = [
+      _medidasDeInfo(i),
+      if (!es3D) trf('{0} m de corte', [n(((i['longitud_corte'] as num?) ?? 0) / 1000, 2)]),
+      if (!es3D && ((i['barrenos'] as num?) ?? 0) > 0) trf('{0} barrenos', [i['barrenos']]),
+      if (es3D) '${n(i['volumen_cm3'], 1)} cm³',
+    ].join(' · ');
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(width: 84, height: 84,
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
+          child: p.trazos.isEmpty ? const Icon(Icons.view_in_ar_outlined, color: AppColors.textoSecundario)
+            : CustomPaint(painter: _PiezaPainter(p.trazos, largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D))),
+        const SizedBox(width: 8),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${i['nombre']}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+          Text(datos, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+          Wrap(spacing: 2, children: [
+            TextButton.icon(onPressed: () => _calcularConSimulador(p), icon: const Icon(Icons.calculate_outlined, size: 15),
+              label: Text(tr('Simulador'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact)),
+            TextButton.icon(onPressed: () => _agregarPiezaComoPartida(p), icon: const Icon(Icons.playlist_add, size: 15),
+              label: Text(tr('Partida'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact)),
+            TextButton.icon(onPressed: () => setState(() => _otrasPiezas.remove(p)), icon: const Icon(Icons.close, size: 15),
+              label: Text(tr('Quitar'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact, foregroundColor: AppColors.rojo)),
+          ]),
+        ])),
       ]));
   }
 
@@ -939,6 +1035,11 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         _archivoInfo = Map<String, dynamic>.from(c.datosPro['archivo_info'] as Map);
         _archivoGeo = GeoCad.geoDeJson(c.datosPro['archivo_geo']);
       }
+      if (c.datosPro['otras_piezas'] is List) {
+        _otrasPiezas
+          ..clear()
+          ..addAll((c.datosPro['otras_piezas'] as List).whereType<Map>().map((m) => _PiezaExtra.deJson(Map<String, dynamic>.from(m))));
+      }
       c.datosPro.forEach((k, v) {
         if (k == 'tiempo_entrega') {
           if (_tiempos.contains(v)) _tiempoEntrega = v as String;
@@ -1100,6 +1201,17 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                     side: const BorderSide(color: AppColors.azul),
                     padding: const EdgeInsets.symmetric(vertical: 12)))))
           else _resumenArchivo(),
+          if (_archivoInfo != null) ...[
+            ..._otrasPiezas.map(_tarjetaOtraPieza),
+            Padding(padding: const EdgeInsets.only(bottom: 10),
+              child: SizedBox(width: double.infinity, child: OutlinedButton.icon(
+                onPressed: _leyendoArchivo ? null : _subirArchivoPieza,
+                icon: _leyendoArchivo
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.add, size: 18),
+                label: Text(_otrasPiezas.isEmpty ? tr('Agregar otro diseño a esta cotización') : trf('Agregar otro diseño ({0} en total)', [_otrasPiezas.length + 1]), style: const TextStyle(fontSize: 13)),
+                style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul, side: const BorderSide(color: AppColors.azul))))),
+          ],
           ..._camposCroquis.map((f) => Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: TextField(
@@ -2510,7 +2622,8 @@ class _PiezaPainter extends CustomPainter {
   final List<List<List<double>>> trazos;
   final double largo, ancho;
   final bool es3D;
-  _PiezaPainter(this.trazos, {this.largo = 0, this.ancho = 0, this.es3D = false});
+  final List<Cota>? cotas; // todas las cotas del dibujo (null = sólo las totales)
+  _PiezaPainter(this.trazos, {this.largo = 0, this.ancho = 0, this.es3D = false, this.cotas});
   @override
   void paint(Canvas canvas, Size size) {
     double maxX = 0, maxY = 0;
@@ -2563,9 +2676,48 @@ class _PiezaPainter extends CustomPainter {
     }
     texto('${mm(L)} mm', Offset(ox + rw / 2, yC + 3));
     texto('${mm(A)} mm', Offset(xC + 4, oyTop + rh / 2), vertical: true);
+    final cs = cotas;
+    if (cs == null || cs.isEmpty || es3D) return;
+    // Cada cota con su medida; si el texto no cabe en el tramo, va su número (la tabla de abajo trae la medida)
+    final soloNumeros = cs.length > 80;
+    final cx0 = X(maxX / 2), cy0 = Y(maxY / 2);
+    void etiqueta(String s, Offset o, {Color color = const Color(0xFFC2560A)}) {
+      final tp = TextPainter(text: TextSpan(text: s, style: TextStyle(fontSize: 8.5, color: color, fontWeight: FontWeight.w700)), textDirection: TextDirection.ltr)..layout();
+      final r = Rect.fromCenter(center: o, width: tp.width + 4, height: tp.height + 1);
+      canvas.drawRRect(RRect.fromRectAndRadius(r, const Radius.circular(3)), Paint()..color = Colors.white.withOpacity(0.85));
+      tp.paint(canvas, Offset(o.dx - tp.width / 2, o.dy - tp.height / 2));
+    }
+    double anchoTexto(String s) => (TextPainter(text: TextSpan(text: s, style: const TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700)), textDirection: TextDirection.ltr)..layout()).width;
+    for (final c in cs) {
+      switch (c.tipo) {
+        case TipoCota.linea:
+          final a = Offset(X(c.x1), Y(c.y1)), b = Offset(X(c.x2), Y(c.y2));
+          final mid = (a + b) / 2, d = b - a, largoPx = d.distance;
+          if (largoPx < 1) break;
+          // separada del tramo, hacia afuera de la pieza
+          var nrm = Offset(-d.dy, d.dx) / largoPx;
+          if (((mid + nrm) - Offset(cx0, cy0)).distance < (mid - Offset(cx0, cy0)).distance) nrm = -nrm;
+          final cabe = !soloNumeros && largoPx >= anchoTexto(c.texto) + 6;
+          etiqueta(cabe ? c.texto : '${c.n}', mid + nrm * 7, color: cabe ? const Color(0xFFC2560A) : const Color(0xFF6B7280));
+          break;
+        case TipoCota.arco:
+          final cen = Offset(X(c.cx), Y(c.cy)), p = Offset(X(c.ex), Y(c.ey));
+          final v = p - cen, dist = v.distance;
+          final o = dist > 0 ? p + v / dist * 8 : p;
+          etiqueta(soloNumeros ? '${c.n}' : c.texto, o);
+          break;
+        case TipoCota.diametro:
+          final cen = Offset(X(c.cx), Y(c.cy)), rPx = c.r * esc;
+          // línea de referencia del centro hacia afuera
+          final dir = const Offset(0.7071, -0.7071);
+          canvas.drawLine(cen + dir * rPx, cen + dir * (rPx + 8), Paint()..color = const Color(0xFFC2560A)..strokeWidth = 0.7);
+          etiqueta(soloNumeros ? '${c.n}' : c.texto, cen + dir * (rPx + 14));
+          break;
+      }
+    }
   }
   @override
-  bool shouldRepaint(covariant _PiezaPainter old) => old.trazos != trazos || old.largo != largo || old.ancho != ancho;
+  bool shouldRepaint(covariant _PiezaPainter old) => old.trazos != trazos || old.largo != largo || old.ancho != ancho || old.cotas != cotas;
 }
 
 /// Diálogo de escala: largo, ancho y alto en mm, proporcional o libre por eje.
@@ -2620,4 +2772,21 @@ Future<List<double>?> mostrarDialogoEscala(BuildContext context, GeoCad g0, doub
         }, child: Text(tr('Aplicar'))),
       ]);
   }));
+}
+
+/// Un diseño adicional de la cotización profesional. Al subirlo se guarda la
+/// pieza completa (para el simulador); al reabrir una cotización guardada sólo
+/// vuelven la ficha y el dibujo.
+class _PiezaExtra {
+  final Map<String, dynamic> info;
+  final List<List<List<double>>> trazos;
+  final GeoCad? geo;
+  _PiezaExtra(this.info, this.trazos, this.geo);
+  factory _PiezaExtra.deGeo(GeoCad g) => _PiezaExtra(g.toInfo(), g.trazos, g);
+  factory _PiezaExtra.deJson(Map<String, dynamic> m) =>
+    _PiezaExtra(Map<String, dynamic>.from((m['info'] as Map?) ?? const {}), GeoCad.geoDeJson(m['geo']), null);
+  Map<String, dynamic> toJson() => {
+    'info': info,
+    'geo': trazos.map((t) => t.map((q) => [(q[0] * 100).round() / 100, (q[1] * 100).round() / 100]).toList()).toList(),
+  };
 }

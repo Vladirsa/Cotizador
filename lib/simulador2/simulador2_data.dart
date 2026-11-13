@@ -128,7 +128,8 @@ class Simulador2Data {
   /// moneda del taller) para cuando no tiene en su inventario material de ese
   /// tipo de máquina.
   static List<Material2> materialesReferencia(String tipoMaquina) {
-    const hoja = [1220.0, 2440.0], acr = [1220.0, 1830.0];
+    // tabla = tablón de madera sólida de 8 pies × 12" (2440 × 300 mm)
+    const hoja = [1220.0, 2440.0], acr = [1220.0, 1830.0], tabla = [2440.0, 300.0];
     Material2 h(String tipo, String nombre, double esp, double precio, [List<double> dim = hoja]) => Material2(
       id: 'ref_${tipo}_${esp.toStringAsFixed(1)}', nombre: '$nombre (referencia)', tipo: tipo, espesorMm: esp, precio: Pais.refMaterial(precio),
       unidad: 'hoja', hojaLargo: dim[0], hojaAncho: dim[1], mermaPct: 15, densidad: tipoMaterialPorClave(tipo)?.densidad ?? 0);
@@ -139,8 +140,14 @@ class Simulador2Data {
       h('mdf', 'MDF 3 mm', 3, 190), h('mdf', 'MDF 6 mm', 6, 270), h('mdf', 'MDF 9 mm', 9, 340), h('mdf', 'MDF 12 mm', 12, 430), h('mdf', 'MDF 15 mm', 15, 530), h('mdf', 'MDF 18 mm', 18, 620),
       h('triplay', 'Triplay 6 mm', 6, 420), h('triplay', 'Triplay 12 mm', 12, 700), h('triplay', 'Triplay 18 mm', 18, 980),
       h('melamina', 'Melamina 16 mm', 16, 760, [1830, 2440]),
+      // Madera sólida: se vende en tablas, no en hojas; precio por tabla de 2440 × 300 mm
+      h('madera', 'Pino tabla 12 mm', 12, 230, tabla), h('madera', 'Pino tabla 19 mm (3/4")', 19, 330, tabla), h('madera', 'Pino tabla 25 mm (1")', 25, 430, tabla),
+      h('madera', 'Cedro tabla 19 mm', 19, 1100, tabla), h('madera', 'Encino tabla 19 mm', 19, 950, tabla), h('madera', 'Parota tabla 25 mm', 25, 1250, tabla),
+      h('madera', 'Triplay de pino 3 mm (laser)', 3, 260),
       h('acrilico', 'Acrílico 3 mm', 3, 1150, acr), h('acrilico', 'Acrílico 6 mm', 6, 2200, acr), h('acrilico', 'Acrílico 10 mm', 10, 3600, acr),
       h('pvc', 'PVC espumado 3 mm', 3, 720), h('pvc', 'PVC espumado 6 mm', 6, 1250),
+      h('policarbonato', 'Policarbonato 3 mm', 3, 1400, acr), h('policarbonato', 'Policarbonato 6 mm', 6, 2600, acr),
+      h('hdpe', 'HDPE / Celorón 12 mm', 12, 2900),
       h('espuma', 'Espuma alta densidad 50 mm', 50, 900),
       h('carton', 'Cartón 3 mm', 3, 60, [1000, 700]), h('cuero', 'Piel 2 mm', 2, 900, [1500, 1000]),
     ];
@@ -154,7 +161,8 @@ class Simulador2Data {
       case 'impresora_3d': return filamentos;
       case 'plasma': case 'laser_fibra': return metales;
       case 'torno': return [...metales, h('hdpe', 'Nylon / HDPE barra', 0, 400)];
-      case 'laser_co2': return tablas.where((m) => m.tipo != 'pvc' && m.tipo != 'melamina' && m.espesorMm <= 12).toList();
+      // PVC suelta cloro; policarbonato y HDPE se funden y amarillean con CO₂
+      case 'laser_co2': return tablas.where((m) => !const {'pvc', 'melamina', 'policarbonato', 'hdpe'}.contains(m.tipo) && m.espesorMm <= 12).toList();
       case 'router_3d': return tablas.where((m) => m.espesorMm >= 12).toList();
       default: return [...tablas.where((m) => m.tipo != 'carton' && m.tipo != 'cuero'), kg('aluminio', 'Aluminio 3 mm', 3, 95)];
     }
