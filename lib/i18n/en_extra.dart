@@ -1000,4 +1000,6 @@ const Map<String, String> textosEnExtra = {
   'Barreno': 'Hole',
   'arco': 'arc',
   'COTAS DE LA PIEZA': 'PART DIMENSIONS',
+  'DISEÑO': 'DESIGN',
+  'Precio y cantidad': 'Price and quantity',
 };

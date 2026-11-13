@@ -19,6 +19,10 @@ void main() {
     final c = Cotizacion(tipo: 'profesional', folio: 'T-1', datosPro: {
       'archivo_info': {'nombre': 'placa.dxf', 'tipo': 'dxf', 'unidades': 'mm', 'largo': 120, 'ancho': 80, 'alto': 0, 'longitud_corte': 520, 'contornos': 3, 'barrenos': 2, 'area_pieza': 9500},
       'archivo_geo': geo, 'croquis_espesor': '6',
+      'otras_piezas': [
+        {'info': {'nombre': 'PIEZA 2.dxf', 'tipo': 'dxf', 'largo': 120, 'ancho': 150}, 'geo': [[[0.0, 0.0], [120.0, 0.0], [120.0, 150.0], [90.0, 150.0], [90.0, 110.0], [30.0, 110.0], [30.0, 150.0], [0.0, 150.0], [0.0, 0.0]]]},
+        {'info': {'nombre': 'PIEZA 3.dxf', 'tipo': 'dxf', 'largo': 80, 'ancho': 110}, 'geo': [[[0.0, 0.0], [80.0, 0.0], [80.0, 110.0], [60.0, 110.0], ...arco(40, 110, 20, 0, -math.pi, 16).skip(1), [0.0, 110.0], [0.0, 0.0]]]},
+      ],
     });
     final bytes = await tester.runAsync(() => PdfService.generarCotizacionProfesional(cotizacion: c, empresa: {'nombre': 'Taller de prueba'}, ingles: false));
     expect(bytes, isNotNull);

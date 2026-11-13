@@ -560,6 +560,24 @@ class PdfService {
     // Todas las cotas del archivo 2D: van sobre el croquis y en una tabla
     final es3DArch = infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj');
     final cotasPdf = es3DArch ? <Cota>[] : cotasDe(trazosArch);
+    // Los demás diseños de la cotización, cada uno con su croquis y sus cotas
+    final otrasPiezas = <pw.Widget>[];
+    if (d['otras_piezas'] is List) {
+      int k = 1;
+      for (final m in (d['otras_piezas'] as List).whereType<Map>()) {
+        final info = Map<String, dynamic>.from((m['info'] as Map?) ?? const {});
+        final tz = GeoCad.geoDeJson(m['geo']);
+        final es3D = info['tipo'] == 'stl' || info['tipo'] == 'obj';
+        final cs = es3D ? <Cota>[] : cotasDe(tz);
+        final cq = _croquisPieza(largo: ((info['largo'] as num?) ?? 0).toDouble(), ancho: ((info['ancho'] as num?) ?? 0).toDouble(),
+          espesor: es3D ? ((info['alto'] as num?) ?? 0).toDouble() : 0, barrenoD: 0, barrenos: 0, azul: azul, gris: grisTexto,
+          trazos: tz, es3D: es3D, cotas: cs, titulo: _limpiarTexto('${_t('DISEÑO')} ${++k}: ${info['nombre'] ?? ''}'));
+        if (cq == null) continue;
+        otrasPiezas.add(pw.SizedBox(height: 8));
+        otrasPiezas.add(cq);
+        if (cs.isNotEmpty) { otrasPiezas.add(pw.SizedBox(height: 4)); otrasPiezas.add(_tablaCotasPdf(cs, grisTexto)); }
+      }
+    }
     final croquis = _croquisPieza(
       largo: numPro('croquis_largo'), ancho: numPro('croquis_ancho'),
       espesor: numPro('croquis_espesor'), barrenoD: numPro('croquis_barreno_d'),
@@ -691,13 +709,14 @@ class PdfService {
         ],
 
         // ─── 3. DETALLE TÉCNICO ─────────────
-        if (hay(tecnicos) || croquis != null || imagenPieza != null) ...[
+        if (hay(tecnicos) || croquis != null || imagenPieza != null || otrasPiezas.isNotEmpty) ...[
           titulo(sig(), _t('DETALLE TÉCNICO')),
           if (hay(tecnicos)) datos(tecnicos),
           // Pieza 3D: la imagen sombreada en vez del croquis plano; 2D: el croquis con cotas
           if (imagenPieza != null && (croquis == null || (infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj')))) ...[pw.SizedBox(height: 8), imagenPieza]
           else if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
           if (cotasPdf.isNotEmpty) ...[pw.SizedBox(height: 6), _tablaCotasPdf(cotasPdf, grisTexto)],
+          ...otrasPiezas,
         ],
 
         // ─── 4. FABRICACIÓN ─────────────────
@@ -858,6 +877,7 @@ class PdfService {
     required PdfColor azul, required PdfColor gris,
     List<List<List<double>>> trazos = const [], bool es3D = false,
     List<Cota> cotas = const [],
+    String? titulo,
   }) {
     // Con archivo: el dibujo es la pieza real y las medidas salen de él
     if (trazos.isNotEmpty) {
@@ -906,7 +926,7 @@ class PdfService {
         borderRadius: pw.BorderRadius.circular(4)),
       padding: const pw.EdgeInsets.all(6),
       child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-        pw.Text(_t('CROQUIS DE LA PIEZA'), style: pw.TextStyle(fontSize: 8, color: gris, fontWeight: pw.FontWeight.bold)),
+        pw.Text(titulo ?? _t('CROQUIS DE LA PIEZA'), style: pw.TextStyle(fontSize: 8, color: gris, fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(
           width: W, height: H,
           child: pw.Stack(children: [

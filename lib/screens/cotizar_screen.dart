@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -529,6 +530,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   bool _leyendoArchivo = false;
   // Más diseños en la misma cotización: cada uno con sus medidas y su dibujo
   final List<_PiezaExtra> _otrasPiezas = [];
+  CotizacionItem? _partidaPrincipal; // el producto que entró solo al subir la pieza principal
 
   TextEditingController _ctrlPro(String k, String inicial) =>
     _pro.putIfAbsent(k, () => TextEditingController(text: inicial));
@@ -564,12 +566,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         if (bytes == null) continue;
         try {
           final g = ArchivoCadService.leer(f.name, bytes);
+          // Cada diseño entra solo como producto de la cotización (precio por llenar o con el simulador)
+          final partida = await _partidaDeDiseno(g.toInfo(), g.trazos);
           if (_archivoInfo == null) {
             _geoOriginal = g;
             _escalaArchivo = 1; _escalaY = 1; _escalaZ = 1;
             _aplicarGeo(g);
+            setState(() { _partidaPrincipal = partida; _items.add(partida); });
           } else {
-            setState(() => _otrasPiezas.add(_PiezaExtra.deGeo(g)));
+            setState(() { _otrasPiezas.add(_PiezaExtra.deGeo(g)..partida = partida); _items.add(partida); });
           }
         } catch (e) {
           errores.add('${f.name}: ${e.toString().replaceFirst('Exception: ', '')}');
@@ -624,7 +629,50 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     final r = await mostrarDialogoEscala(context, g0, _escalaArchivo, _escalaY, _escalaZ);
     if (r == null) return;
     _escalaArchivo = r[0]; _escalaY = r[1]; _escalaZ = r[2];
-    _aplicarGeo(g0.escaladoXYZ(r[0], r[1], r[2]), sobrescribir: true);
+    final g = g0.escaladoXYZ(r[0], r[1], r[2]);
+    _aplicarGeo(g, sobrescribir: true);
+    final vieja = _partidaPrincipal;
+    if (vieja != null && _items.any((x) => identical(x, vieja))) {
+      final nueva = await _partidaDeDiseno(g.toInfo(), g.trazos, base: vieja);
+      if (!mounted) return;
+      setState(() { _reemplazarPartida(vieja, nueva); _partidaPrincipal = nueva; });
+    }
+  }
+
+  // Producto de la cotización para un diseño: nombre del archivo, medidas y el dibujo con sus cotas
+  Future<CotizacionItem> _partidaDeDiseno(Map<String, dynamic> info, List<List<List<double>>> trazos, {CotizacionItem? base}) async {
+    final nombre = (info['nombre'] as String? ?? tr('Pieza')).replaceFirst(RegExp(r'\.[^.]+$'), '');
+    final png = await _pngDeDiseno(info, trazos);
+    return CotizacionItem(
+      nombreProducto: base?.nombreProducto ?? nombre,
+      cantidad: base?.cantidad ?? 1,
+      precioUnitario: base?.precioUnitario ?? 0,
+      sku: null, medidas: _medidasDeInfo(info),
+      imagenPng: png != null ? base64Encode(png) : base?.imagenPng);
+  }
+
+  void _reemplazarPartida(CotizacionItem vieja, CotizacionItem nueva) {
+    final i = _items.indexWhere((x) => identical(x, vieja));
+    if (i >= 0) _items[i] = nueva; else _items.add(nueva);
+  }
+
+  // Dibujo del diseño con todas sus cotas, como PNG, para la partida del PDF
+  Future<Uint8List?> _pngDeDiseno(Map<String, dynamic> info, List<List<List<double>>> trazos) async {
+    if (trazos.isEmpty) return null;
+    try {
+      final es3D = info['tipo'] == 'stl' || info['tipo'] == 'obj';
+      const tam = Size(640, 460);
+      final rec = ui.PictureRecorder();
+      final canvas = Canvas(rec);
+      canvas.drawRect(Offset.zero & tam, Paint()..color = Colors.white);
+      _PiezaPainter(trazos, largo: ((info['largo'] as num?) ?? 0).toDouble(), ancho: ((info['ancho'] as num?) ?? 0).toDouble(),
+        es3D: es3D, cotas: es3D ? null : cotasDe(trazos), sinCuadricula: true).paint(canvas, tam);
+      final img = await rec.endRecording().toImage(tam.width.toInt(), tam.height.toInt());
+      final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+      return bytes?.buffer.asUint8List();
+    } catch (_) {
+      return null;
+    }
   }
 
   // La pieza del archivo como partida de la cotización (nombre, cantidad y
@@ -633,6 +681,9 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   Future<void> _agregarPiezaComoPartida([_PiezaExtra? extra]) async {
     final i = extra?.info ?? _archivoInfo;
     if (i == null) return;
+    // Si el diseño ya está en la cotización, sólo se le pone precio y cantidad
+    final ligada = extra != null ? extra.partida : _partidaPrincipal;
+    final yaEsta = ligada != null && _items.any((x) => identical(x, ligada));
     final n = TextEditingController(text: (i['nombre'] as String? ?? '').replaceFirst(RegExp(r'\.[^.]+$'), ''));
     final c = TextEditingController(text: '1');
     final p = TextEditingController();
@@ -654,11 +705,15 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: Text(tr('Agregar a cotización'))),
       ]));
     if (ok != true || n.text.trim().isEmpty) return;
-    setState(() => _items.add(CotizacionItem(
+    final nueva = CotizacionItem(
       nombreProducto: n.text.trim(),
       cantidad: int.tryParse(c.text) ?? 1,
       precioUnitario: double.tryParse(p.text.replaceAll(',', '.')) ?? 0,
-      sku: null, medidas: _medidasDeInfo(i))));
+      sku: null, medidas: _medidasDeInfo(i), imagenPng: ligada?.imagenPng);
+    setState(() {
+      if (yaEsta) _reemplazarPartida(ligada, nueva); else _items.add(nueva);
+      if (extra != null) extra.partida = nueva; else _partidaPrincipal = nueva;
+    });
   }
 
   // "120 × 80 mm" o "120 × 80 × 15 mm" desde la ficha técnica de un archivo
@@ -686,15 +741,23 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (r.geo != null && _archivoInfo == null) _aplicarGeo(r.geo!);
       if (r.imagenPng != null) _archivoPng = r.imagenPng;
     }
+    final ligada = extra != null ? extra.partida : _partidaPrincipal;
+    final reemplazar = lista.length == 1 && ligada != null && _items.any((x) => identical(x, ligada));
     setState(() {
       for (final r in lista) {
       final desc = r.descripcion;
-      _items.add(CotizacionItem(
+      final nueva = (CotizacionItem(
         nombreProducto: '${r.emoji} ${r.servicio}${desc.isNotEmpty ? " — $desc" : ""}',
         cantidad: r.cantidad, precioUnitario: r.precioUnitario, sku: null,
         materialId: r.materialId, materialCantidad: r.materialUnidades > 0 ? r.materialUnidades : null,
         tiempoMin: r.tiempoMin, maquinaId: r.maquinaId, tipoMaterial: r.tipoMaterial, espesorMm: r.espesorMm,
-        imagenPng: r.imagenPng != null ? base64Encode(r.imagenPng!) : null, medidas: r.medidas.isNotEmpty ? r.medidas : null));
+        imagenPng: r.imagenPng != null ? base64Encode(r.imagenPng!) : ligada?.imagenPng, medidas: r.medidas.isNotEmpty ? r.medidas : null));
+      if (reemplazar) {
+        _reemplazarPartida(ligada, nueva);
+        if (extra != null) extra.partida = nueva; else _partidaPrincipal = nueva;
+      } else {
+        _items.add(nueva);
+      }
       }
       if (_ctrlPro('proceso', '').text.trim().isEmpty) _ctrlPro('proceso', '').text = r.servicio;
       if (r.tiempoHoras > 0 && _ctrlPro('operaciones', '').text.trim().isEmpty) {
@@ -748,8 +811,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         Wrap(spacing: 6, runSpacing: 4, alignment: WrapAlignment.end, children: [
           OutlinedButton.icon(
             onPressed: _agregarPiezaComoPartida,
-            icon: const Icon(Icons.playlist_add, size: 15),
-            label: Text(tr('Agregar como partida'), style: const TextStyle(fontSize: 12))),
+            icon: Icon(_partidaPrincipal != null && _items.any((x) => identical(x, _partidaPrincipal)) ? Icons.edit_outlined : Icons.playlist_add, size: 15),
+            label: Text(_partidaPrincipal != null && _items.any((x) => identical(x, _partidaPrincipal)) ? tr('Precio y cantidad') : tr('Agregar como partida'), style: const TextStyle(fontSize: 12))),
           OutlinedButton.icon(
             onPressed: _escalarArchivo,
             icon: const Icon(Icons.open_in_full, size: 15),
@@ -807,29 +870,51 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       if (!es3D && ((i['barrenos'] as num?) ?? 0) > 0) trf('{0} barrenos', [i['barrenos']]),
       if (es3D) '${n(i['volumen_cm3'], 1)} cm³',
     ].join(' · ');
+    final cs = es3D ? const <Cota>[] : p.cotas;
     return Container(
       margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(width: 84, height: 84,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // El diseño en grande, con todas sus cotas, igual que la pieza principal
+        Container(height: p.trazos.isEmpty ? 84 : 260, width: double.infinity,
           decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6), border: Border.all(color: AppColors.grisBorde, width: 0.5)),
           child: p.trazos.isEmpty ? const Icon(Icons.view_in_ar_outlined, color: AppColors.textoSecundario)
-            : CustomPaint(painter: _PiezaPainter(p.trazos, largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D))),
-        const SizedBox(width: 8),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            : CustomPaint(painter: _PiezaPainter(p.trazos, largo: ((i['largo'] as num?) ?? 0).toDouble(), ancho: ((i['ancho'] as num?) ?? 0).toDouble(), es3D: es3D,
+                cotas: cs.isEmpty ? null : cs))),
+        if (cs.isNotEmpty) _listaCotas(cs),
+        const SizedBox(height: 4),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('${i['nombre']}', style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
           Text(datos, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
           Wrap(spacing: 2, children: [
             TextButton.icon(onPressed: () => _calcularConSimulador(p), icon: const Icon(Icons.calculate_outlined, size: 15),
               label: Text(tr('Simulador'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact)),
-            TextButton.icon(onPressed: () => _agregarPiezaComoPartida(p), icon: const Icon(Icons.playlist_add, size: 15),
-              label: Text(tr('Partida'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact)),
-            TextButton.icon(onPressed: () => setState(() => _otrasPiezas.remove(p)), icon: const Icon(Icons.close, size: 15),
+            TextButton.icon(onPressed: () => _agregarPiezaComoPartida(p), icon: const Icon(Icons.edit_outlined, size: 15),
+              label: Text(tr('Precio y cantidad'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact)),
+            TextButton.icon(onPressed: () => setState(() {
+                _otrasPiezas.remove(p);
+                final it = p.partida;
+                if (it != null && it.precioUnitario == 0) _items.removeWhere((x) => identical(x, it));
+              }), icon: const Icon(Icons.close, size: 15),
               label: Text(tr('Quitar'), style: const TextStyle(fontSize: 11.5)), style: TextButton.styleFrom(visualDensity: VisualDensity.compact, foregroundColor: AppColors.rojo)),
           ]),
-        ])),
+        ]),
       ]));
   }
+
+  // Lista plegable de cotas de un diseño extra
+  Widget _listaCotas(List<Cota> cs) => Theme(
+    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+    child: ExpansionTile(
+      tilePadding: EdgeInsets.zero, dense: true, childrenPadding: const EdgeInsets.only(bottom: 6),
+      title: Text(trf('Todas las cotas · {0}', [resumenCotas(cs)]), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+      children: [
+        Wrap(spacing: 10, runSpacing: 2, children: [
+          for (final c in cs) SizedBox(width: 150, child: Text(
+            '${c.n}. ${tr(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' · ${tr('arco')} ${fmtMm(c.largoArco)}' : ''}',
+            style: const TextStyle(fontSize: 11.5))),
+        ]),
+      ]));
 
   bool get _eraProfesional => _esEdicion && _tipoOriginal == 'profesional';
 
@@ -2623,7 +2708,8 @@ class _PiezaPainter extends CustomPainter {
   final double largo, ancho;
   final bool es3D;
   final List<Cota>? cotas; // todas las cotas del dibujo (null = sólo las totales)
-  _PiezaPainter(this.trazos, {this.largo = 0, this.ancho = 0, this.es3D = false, this.cotas});
+  final bool sinCuadricula; // para el dibujo que va al PDF
+  _PiezaPainter(this.trazos, {this.largo = 0, this.ancho = 0, this.es3D = false, this.cotas, this.sinCuadricula = false});
   @override
   void paint(Canvas canvas, Size size) {
     double maxX = 0, maxY = 0;
@@ -2639,8 +2725,10 @@ class _PiezaPainter extends CustomPainter {
     double Y(double y) => oyTop + rh - y * esc;
     // Papel cuadriculado tenue, como plano
     final grid = Paint()..color = const Color(0xFFEDF1F7)..strokeWidth = 0.6;
-    for (double x = 0; x <= size.width; x += 12) canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
-    for (double y = 0; y <= size.height; y += 12) canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    if (!sinCuadricula) {
+      for (double x = 0; x <= size.width; x += 12) canvas.drawLine(Offset(x, 0), Offset(x, size.height), grid);
+      for (double y = 0; y <= size.height; y += 12) canvas.drawLine(Offset(0, y), Offset(size.width, y), grid);
+    }
     // Relleno tenue de la pieza (contornos cerrados) y trazos
     final relleno = Paint()..color = AppColors.azul.withOpacity(0.06)..style = PaintingStyle.fill;
     final p = Paint()..color = AppColors.azul..strokeWidth = es3D ? 1.2 : 1.4
@@ -2781,6 +2869,8 @@ class _PiezaExtra {
   final Map<String, dynamic> info;
   final List<List<List<double>>> trazos;
   final GeoCad? geo;
+  CotizacionItem? partida; // el producto de la cotización que corresponde a este diseño
+  late final List<Cota> cotas = cotasDe(trazos);
   _PiezaExtra(this.info, this.trazos, this.geo);
   factory _PiezaExtra.deGeo(GeoCad g) => _PiezaExtra(g.toInfo(), g.trazos, g);
   factory _PiezaExtra.deJson(Map<String, dynamic> m) =>
