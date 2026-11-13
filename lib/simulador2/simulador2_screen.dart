@@ -42,6 +42,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   // Datos del taller
   List<Maquina2> _maquinas = [];
   List<Material2> _materiales = [];
+  String? _grupoMat; // filtro de familia del material (null = todas)
   List<Acabado2> _acabados = [];
   Taller2 _taller = const Taller2();
 
@@ -77,7 +78,7 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   double? _margen; // null = el del taller
   double? _tiempoManual;
   Resultado2? _r;
-  bool _verDesglose = false, _verVolumen = false, _verHoja = false, _verComparar = false;
+  bool _verDesglose = true, _verVolumen = false, _verHoja = false, _verComparar = false;
   List<Map<String, dynamic>> _parecidos = [];
   Entrega? _entrega;
 
@@ -579,16 +580,55 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
         final imp = vel.impresionCm3H > 0 ? vel.impresionCm3H : (_maq?.impresionCm3H ?? 0);
         velTxt = imp > 0 ? '${imp.toStringAsFixed(0)} cm³/h' : ''; break;
     }
+    // Familias presentes para esta máquina; el filtro sólo muestra las que hay
+    final grupos = <String>[for (final g in _ordenGrupos) if (lista.any((m) => _grupoDe(m) == g)) g];
+    final grupoSel = grupos.contains(_grupoMat) ? _grupoMat : null;
+    final visibles = (grupoSel == null ? lista : lista.where((m) => _grupoDe(m) == grupoSel).toList())
+      ..sort((a, b) {
+        final g = _ordenGrupos.indexOf(_grupoDe(a)).compareTo(_ordenGrupos.indexOf(_grupoDe(b)));
+        if (g != 0) return g;
+        // primero los de tu inventario, luego los de referencia; dentro, por tipo y espesor
+        final r = (Simulador2Data.esReferenciaMaterial(a) ? 1 : 0).compareTo(Simulador2Data.esReferenciaMaterial(b) ? 1 : 0);
+        if (r != 0) return r;
+        final t = a.tipo.compareTo(b.tipo);
+        return t != 0 ? t : a.espesorMm.compareTo(b.espesorMm);
+      });
+    // El material elegido siempre debe estar en la lista del menú
+    if (_mat != null && !visibles.contains(_mat)) visibles.insert(0, _mat!);
+    final items = <DropdownMenuItem<String>>[];
+    String? grupoAnt;
+    for (final m in visibles) {
+      final g = _grupoDe(m);
+      if (grupoSel == null && g != grupoAnt) {
+        items.add(DropdownMenuItem<String>(value: '__grupo_$g', enabled: false,
+          child: Text(_nombreGrupo(g).toUpperCase(), style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: AppColors.textoSecundario, letterSpacing: 0.6))));
+        grupoAnt = g;
+      }
+      items.add(DropdownMenuItem<String>(value: m.id, child: Row(children: [
+        if (m.esRetazo) const Padding(padding: EdgeInsets.only(right: 4), child: Icon(Icons.content_cut, size: 12, color: AppColors.ambar)),
+        Expanded(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(m.nombre, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+          Text(_caracteristicas(m), style: const TextStyle(fontSize: 10, color: AppColors.textoSecundario), overflow: TextOverflow.ellipsis),
+        ])),
+        Text('${_fmt.format(m.precio)}/${m.unidad}', style: const TextStyle(fontSize: 11, color: AppColors.verde, fontWeight: FontWeight.w700)),
+      ])));
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (grupos.length > 1) Padding(padding: const EdgeInsets.only(bottom: 6), child: SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+        for (final g in [null, ...grupos]) Padding(padding: const EdgeInsets.only(right: 6), child: ChoiceChip(
+          label: Text(g == null ? tr('Todos') : _nombreGrupo(g), style: const TextStyle(fontSize: 11.5)),
+          selected: grupoSel == g, visualDensity: VisualDensity.compact,
+          onSelected: (_) => setState(() => _grupoMat = g))),
+      ]))),
       DropdownButtonFormField<String>(
-        value: _mat?.id, isExpanded: true,
+        value: _mat?.id, isExpanded: true, itemHeight: 52,
         decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
-        items: lista.map((m) => DropdownMenuItem(value: m.id, child: Row(children: [
-          if (m.esRetazo) const Padding(padding: EdgeInsets.only(right: 4), child: Icon(Icons.content_cut, size: 12, color: AppColors.ambar)),
-          Expanded(child: Text(m.nombre, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis)),
-          Text(_fmt.format(m.precio), style: const TextStyle(fontSize: 11, color: AppColors.verde, fontWeight: FontWeight.w700)),
-        ]))).toList(),
-        onChanged: (id) { setState(() { _mat = lista.firstWhere((m) => m.id == id); _tiempoManual = null; }); _recalcular(); }),
+        selectedItemBuilder: (_) => items.map((it) {
+          final m = visibles.cast<Material2?>().firstWhere((x) => x!.id == it.value, orElse: () => null);
+          return Align(alignment: Alignment.centerLeft, child: Text(m?.nombre ?? '', style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis));
+        }).toList(),
+        items: items,
+        onChanged: (id) { if (id == null || id.startsWith('__grupo_')) return; setState(() { _mat = lista.firstWhere((m) => m.id == id); _tiempoManual = null; }); _recalcular(); }),
       if (_mat != null) Padding(padding: const EdgeInsets.only(top: 6), child: Wrap(spacing: 6, runSpacing: 4, children: [
         _chip('${tipoMaterialPorClave(_mat!.tipo)?.nombre ?? _mat!.tipo}${_mat!.espesorMm > 0 ? ' ${_mat!.espesorMm % 1 == 0 ? _mat!.espesorMm.toInt() : _mat!.espesorMm} mm' : ''}', AppColors.azulClaro, AppColors.azul),
         if (_mat!.esHoja) _chip('${tr('hoja')} ${_mat!.hojaLargo.round()}×${_mat!.hojaAncho.round()}', AppColors.gris, AppColors.textoSecundario)
@@ -857,16 +897,26 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
     final d = r.desglose;
     final an = r.anidado;
     return [
-      _plegable(tr('Ver desglose'), _verDesglose, () => setState(() => _verDesglose = !_verDesglose), Column(children: [
+      _plegable(tr('Cómo se calculó el precio'), _verDesglose, () => setState(() => _verDesglose = !_verDesglose), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Primero el tiempo, que es de donde salen máquina, operador y gastos fijos
+        if (r.explicacionTiempo.isNotEmpty) Container(
+          width: double.infinity, margin: const EdgeInsets.only(bottom: 6), padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(color: AppColors.azulClaro, borderRadius: BorderRadius.circular(8)),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(trf('Tiempo de máquina: {0} min por pieza', [r.tiempoMaquinaMinPieza.toStringAsFixed(1)]), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+            Text(r.explicacionTiempo, style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+            Text(_comoSaleTiempo(r.servicio), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+          ])),
         _fila(tr('Material'), _comoMaterial(r), d.material),
         _fila(tr('Máquina'), '${(r.tiempoMaquinaMinPieza * r.cantidad).toStringAsFixed(0)} min × ${_fmt.format(_maq?.costoHora ?? 0)}/h', d.maquina),
         _fila(tr('Operador'), '${(r.tiempoMaquinaMinPieza * r.cantidad + _taller.manejoMinPieza * r.cantidad).toStringAsFixed(0)} min × ${_fmt.format(_taller.costoHoraOperador)}/h', d.operador),
         _fila(tr('Preparación'), '${(_maq?.preparacionMin ?? 0).toStringAsFixed(0)} min · ${tr('una vez')}', d.preparacion),
         _fila(tr('Gastos fijos'), '${(r.tiempoTotalMin / 60).toStringAsFixed(2)} h × ${_fmt.format(_taller.gastosFijosHora)}/h', d.fijos),
-        if (d.acabados > 0) _fila(tr('Acabados'), '', d.acabados),
+        if (d.acabados > 0) _fila(tr('Acabados'), tr('precio por pieza o por m² de cada acabado'), d.acabados),
         const Divider(height: 10),
-        _fila(tr('Costo real'), '', d.costo, negrita: true),
-        _fila(trf('Precio con margen {0} %', [r.margenPct.round()]), '÷ ${(1 - r.margenPct / 100).toStringAsFixed(2)}', r.precioTotal, negrita: true, color: AppColors.verde),
+        _fila(tr('Costo real'), tr('suma de todo lo de arriba'), d.costo, negrita: true),
+        _fila(trf('Precio con margen {0} %', [r.margenPct.round()]), trf('costo ÷ (1 − {0} %) = costo ÷ {1}', [r.margenPct.round(), (1 - r.margenPct / 100).toStringAsFixed(2)]), r.precioTotal, negrita: true, color: AppColors.verde),
+        _fila(tr('Ganas'), tr('precio − costo real'), r.utilidad),
         if (_taller.ivaPct > 0) _fila(trf('Con IVA {0} %', [_taller.ivaPct.round()]), '', r.precioTotal * (1 + _taller.ivaPct / 100)),
       ])),
       if (an.cabe && _mat != null) _plegable(trf('Anidado en la hoja · {0} por hoja · {1} hoja(s)', [an.piezasPorHoja, an.hojasCompra]), _verHoja, () => setState(() => _verHoja = !_verHoja), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -905,6 +955,39 @@ class _Simulador2ScreenState extends State<Simulador2Screen> {
   String _fechaLarga(DateTime d) { try { return DateFormat('EEE d MMM', localeFormato).format(d); } catch (_) { return '${d.day}/${d.month}'; } }
 
   String _fecha(dynamic iso) { try { return DateFormat('d MMM yy', localeFormato).format(DateTime.parse(iso.toString()).toLocal()); } catch (_) { return ''; } }
+
+  // ── Familias de material para el filtro ──
+  static const _ordenGrupos = ['madera', 'plastico', 'metal', 'filamento', 'otro'];
+  String _grupoDe(Material2 m) => tipoMaterialPorClave(m.tipo)?.grupo ?? 'otro';
+  String _nombreGrupo(String g) {
+    switch (g) {
+      case 'madera': return tr('Maderas y tableros');
+      case 'plastico': return tr('Plásticos');
+      case 'metal': return tr('Metales');
+      case 'filamento': return tr('Filamentos y resinas');
+      default: return tr('Otros');
+    }
+  }
+  // Tipo, espesor, presentación y densidad en una línea
+  String _caracteristicas(Material2 m) {
+    final t = tipoMaterialPorClave(m.tipo);
+    final esp = m.espesorMm > 0 ? '${m.espesorMm % 1 == 0 ? m.espesorMm.toInt() : m.espesorMm} mm' : '';
+    final pres = m.esHoja ? '${m.hojaLargo.round()}×${m.hojaAncho.round()} mm' : m.porPeso ? tr('por kg') : '';
+    final dens = (t?.densidad ?? 0) > 0 ? '${t!.densidad.toStringAsFixed(2)} g/cm³' : '';
+    final ref = Simulador2Data.esReferenciaMaterial(m) ? tr('referencia') : tr('tu inventario');
+    return [t?.nombre ?? m.tipo, esp, pres, dens, ref].where((x) => x.isNotEmpty).join(' · ');
+  }
+
+  // De dónde salen los datos del tiempo, en palabras
+  String _comoSaleTiempo(Servicio2 s) {
+    switch (s) {
+      case Servicio2.corte2D: return tr('Los metros de corte son la suma de todas las líneas del archivo; la velocidad es la de esta máquina con este material y espesor (tuya, o la sugerida por HETNA hasta que la confirmes).');
+      case Servicio2.grabado: return tr('El área a grabar sale del archivo; la velocidad de grabado es la de esta máquina con este material.');
+      case Servicio2.relieve3D: return tr('El volumen a quitar es el bloque de material menos la pieza; la tasa de remoción es la de esta máquina con este material.');
+      case Servicio2.impresion3D: return tr('El volumen sale del modelo; se imprime sólo el relleno y las paredes.');
+      case Servicio2.torno: return tr('El volumen a quitar es el cilindro de material menos la pieza.');
+    }
+  }
 
   String _comoMaterial(Resultado2 r) {
     final m = _mat; if (m == null) return '';

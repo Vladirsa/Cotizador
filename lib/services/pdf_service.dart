@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -12,6 +13,7 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import 'archivo_cad_service.dart';
+import 'cotas_service.dart';
 import 'auth_service.dart';
 import 'whatsapp_service.dart';
 import '../main.dart';
@@ -555,11 +557,15 @@ class PdfService {
     double numPro(String k) => double.tryParse(v(k).replaceAll(',', '.')) ?? 0;
     final infoArch = d['archivo_info'] is Map ? Map<String, dynamic>.from(d['archivo_info'] as Map) : null;
     final trazosArch = GeoCad.geoDeJson(d['archivo_geo']);
+    // Todas las cotas del archivo 2D: van sobre el croquis y en una tabla
+    final es3DArch = infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj');
+    final cotasPdf = es3DArch ? <Cota>[] : cotasDe(trazosArch);
     final croquis = _croquisPieza(
       largo: numPro('croquis_largo'), ancho: numPro('croquis_ancho'),
       espesor: numPro('croquis_espesor'), barrenoD: numPro('croquis_barreno_d'),
       barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto,
-      trazos: trazosArch, es3D: infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj'));
+      trazos: trazosArch, es3D: infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj'),
+      cotas: cotasPdf);
     // Dibujo de la pieza que mandó el Simulador 2.0 (3D sombreado o 2D con cotas)
     pw.Widget? imagenPieza;
     if (d['archivo_png'] is String) {
@@ -691,6 +697,7 @@ class PdfService {
           // Pieza 3D: la imagen sombreada en vez del croquis plano; 2D: el croquis con cotas
           if (imagenPieza != null && (croquis == null || (infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj')))) ...[pw.SizedBox(height: 8), imagenPieza]
           else if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
+          if (cotasPdf.isNotEmpty) ...[pw.SizedBox(height: 6), _tablaCotasPdf(cotasPdf, grisTexto)],
         ],
 
         // ─── 4. FABRICACIÓN ─────────────────
@@ -850,6 +857,7 @@ class PdfService {
     required double barrenoD, required int barrenos,
     required PdfColor azul, required PdfColor gris,
     List<List<List<double>>> trazos = const [], bool es3D = false,
+    List<Cota> cotas = const [],
   }) {
     // Con archivo: el dibujo es la pieza real y las medidas salen de él
     if (trazos.isNotEmpty) {
@@ -977,10 +985,12 @@ class PdfService {
               child: pw.Text(mm(largo), style: estilo, textAlign: pw.TextAlign.center))),
             pw.Positioned(left: rx - 48, top: ryTop + rh / 2 - 5, child: pw.SizedBox(width: 22,
               child: pw.Text(mm(ancho), style: estilo, textAlign: pw.TextAlign.right))),
-            pw.Positioned(left: rx, top: ryTop + rh + 6, child: pw.SizedBox(width: rw,
+            pw.Positioned(left: rx, top: ryTop + rh + (cotas.isNotEmpty ? 12 : 6), child: pw.SizedBox(width: rw,
               child: pw.Text(es3D ? _t('Vista superior (malla)') : _t('Vista superior'), style: estiloGris, textAlign: pw.TextAlign.center))),
+            // Cotas de cada tramo: la medida si cabe, si no su número (ver la tabla)
+            ..._etiquetasCotas(cotas, rx: rx, ryTop: ryTop, rh: rh, esc: esc, maxX: largo, maxY: ancho, gris: gris),
             if (holes.isNotEmpty)
-              pw.Positioned(left: rx, top: ryTop + rh + 16, child: pw.SizedBox(width: rw,
+              pw.Positioned(left: rx, top: ryTop + rh + (cotas.isNotEmpty ? 22 : 16), child: pw.SizedBox(width: rw,
                 child: pw.Text('${holes.length} x Ø${mm(barrenoD)}', style: estilo, textAlign: pw.TextAlign.center))),
             if (tieneLado) ...[
               pw.Positioned(left: lx + lw + 28, top: lyTop + lh / 2 - 5,
@@ -992,6 +1002,58 @@ class PdfService {
         pw.Text(_t('Medidas en mm. Croquis ilustrativo, no a escala.'), style: estiloGris),
       ]));
   }
+
+  static List<pw.Widget> _etiquetasCotas(List<Cota> cotas, {required double rx, required double ryTop, required double rh,
+      required double esc, required double maxX, required double maxY, required PdfColor gris}) {
+    if (cotas.isEmpty) return const [];
+    const naranja = PdfColor.fromInt(0xFFC2560A);
+    final soloNumeros = cotas.length > 60;
+    double px(double x) => rx + x * esc;
+    double top(double y) => ryTop + rh - y * esc;
+    final cx0 = px(maxX / 2), cy0 = top(maxY / 2);
+    double anchoTxt(String t) => t.length * 3.1 + 2;
+    pw.Widget tag(String t, double x, double y, PdfColor color) {
+      final w = anchoTxt(t);
+      return pw.Positioned(left: x - w / 2, top: y - 3.5, child: pw.Container(
+        width: w, color: PdfColors.white,
+        child: pw.Text(t, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 5.5, color: color, fontWeight: pw.FontWeight.bold))));
+    }
+    final out = <pw.Widget>[];
+    for (final c in cotas) {
+      switch (c.tipo) {
+        case TipoCota.linea:
+          final ax = px(c.x1), ay = top(c.y1), bx = px(c.x2), by = top(c.y2);
+          final dx = bx - ax, dy = by - ay, l = math.sqrt(dx * dx + dy * dy);
+          if (l < 0.5) break;
+          var nx = -dy / l, ny = dx / l;
+          final mx = (ax + bx) / 2, my = (ay + by) / 2;
+          if (math.pow(mx + nx - cx0, 2) + math.pow(my + ny - cy0, 2) < math.pow(mx - cx0, 2) + math.pow(my - cy0, 2)) { nx = -nx; ny = -ny; }
+          final cabe = !soloNumeros && l >= anchoTxt(c.texto) + 4;
+          out.add(tag(cabe ? c.texto : '${c.n}', mx + nx * 5, my + ny * 5, cabe ? naranja : gris));
+          break;
+        case TipoCota.arco:
+          final cx = px(c.cx), cy = top(c.cy), ex = px(c.ex), ey = top(c.ey);
+          final vx = ex - cx, vy = ey - cy, d = math.sqrt(vx * vx + vy * vy);
+          out.add(tag(soloNumeros ? '${c.n}' : c.texto, d > 0 ? ex + vx / d * 6 : ex, d > 0 ? ey + vy / d * 6 : ey, naranja));
+          break;
+        case TipoCota.diametro:
+          final rr = c.r * esc;
+          out.add(tag(soloNumeros ? '${c.n}' : c.texto, px(c.cx) + (rr + 6) * 0.7071, top(c.cy) - (rr + 6) * 0.7071, naranja));
+          break;
+      }
+    }
+    return out;
+  }
+
+  static pw.Widget _tablaCotasPdf(List<Cota> cotas, PdfColor gris) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+    pw.Text('${_t('COTAS DE LA PIEZA')} · ${_limpiarTexto(resumenCotas(cotas))}', style: pw.TextStyle(fontSize: 7.5, color: gris, fontWeight: pw.FontWeight.bold)),
+    pw.SizedBox(height: 2),
+    pw.Wrap(spacing: 8, runSpacing: 1, children: [
+      for (final c in cotas) pw.SizedBox(width: 118, child: pw.Text(
+        _limpiarTexto('${c.n}. ${_t(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' (arco ${fmtMm(c.largoArco)})' : ''}'),
+        style: const pw.TextStyle(fontSize: 6.5))),
+    ]),
+  ]);
 
   // Fix 3: Limpiar caracteres especiales que aparecen como "tachas" en el PDF
   static String _limpiarTexto(String texto) {
