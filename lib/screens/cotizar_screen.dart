@@ -500,13 +500,6 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     ('norma', 'Norma o especificación (si aplica)', 1, ''),
   ];
   // Croquis: con largo y ancho el PDF dibuja la pieza acotada (como plano)
-  static const _camposCroquis = [
-    ('croquis_largo', 'Largo (mm)', 1, ''),
-    ('croquis_ancho', 'Ancho (mm)', 1, ''),
-    ('croquis_espesor', 'Espesor (mm)', 1, ''),
-    ('croquis_barreno_d', 'Diámetro de barrenos (mm, opcional)', 1, ''),
-    ('croquis_barrenos', 'Número de barrenos (opcional)', 1, ''),
-  ];
   static const _camposFabricacion = [
     ('proceso', 'Proceso (ej. router CNC 3 ejes)', 1, ''),
     ('maquina', 'Máquina', 1, ''),
@@ -1332,7 +1325,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         _bloquePro(tr('Detalle técnico'), Icons.straighten_outlined, _camposTecnicos),
         _bloque(tr('Archivo de la pieza y croquis con medidas'), Icons.architecture_outlined, Column(children: [
           Padding(padding: const EdgeInsets.only(bottom: 8),
-            child: Text(tr('Sube el DXF, SVG, STL u OBJ: la app saca las medidas, la longitud de corte, contornos, barrenos o volumen, y el PDF lleva el dibujo real de la pieza con sus cotas y los datos técnicos. Si no tienes archivo, escribe largo y ancho y se dibuja un croquis.'),
+            child: Text(tr('Sube los DXF, SVG, STL u OBJ: la app saca las medidas, la longitud de corte, contornos, barrenos o volumen y todas las cotas. En \"Material y aprovechamiento\" de cada pieza pon su material y espesor. El PDF lleva al final, como anexo, el croquis de cada pieza con sus cotas.'),
               style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario))),
           if (_archivoInfo == null)
             Padding(padding: const EdgeInsets.only(bottom: 10),
@@ -1358,15 +1351,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
                 label: Text(_otrasPiezas.isEmpty ? tr('Agregar otro diseño a esta cotización') : trf('Agregar otro diseño ({0} en total)', [_otrasPiezas.length + 1]), style: const TextStyle(fontSize: 13)),
                 style: OutlinedButton.styleFrom(foregroundColor: AppColors.azul, side: const BorderSide(color: AppColors.azul))))),
           ],
-          ..._camposCroquis.map((f) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: TextField(
-              controller: _ctrlPro(f.$1, f.$4),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                labelText: tr(f.$2), isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))))),
+          // Material y espesor se capturan por pieza en "Material y aprovechamiento" (salen en su croquis del anexo)
         ])),
         _bloquePro(tr('Especificaciones de fabricación'), Icons.precision_manufacturing_outlined, _camposFabricacion),
         _bloquePro(tr('Calidad y cambios'), Icons.verified_outlined, _camposCondiciones),
