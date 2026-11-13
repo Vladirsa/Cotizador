@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:convert';
@@ -17,6 +18,8 @@ import '../services/archivo_cad_service.dart';
 import '../services/cotas_service.dart';
 import '../services/puente_cotizacion.dart';
 import '../widgets/calculo_material.dart';
+import '../services/aprovechamiento.dart';
+import '../simulador2/motor.dart' show anidarVarias;
 import 'simulador_screen.dart';
 import '../simulador2/simulador2_screen.dart';
 import '../simulador2/simulador2_data.dart';
@@ -814,6 +817,12 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           subtitle: Text(tr('Piezas por tablón u hoja, cuánto material compras y su costo por pieza'), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
           children: [
             CalculoMaterial(pzLargo: l, pzAncho: a, datos: inicial,
+              corteMm: ((info['longitud_corte'] as num?) ?? 0).toDouble(),
+              perforaciones: ((info['contornos'] as num?) ?? 0).toInt(),
+              onPrecio: !enCotizacion ? null : (precio) {
+                setState(() => partida.precioUnitario = precio);
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Precio del producto: {0} por pieza', [Pais.fmt().format(precio)])), backgroundColor: AppColors.verde));
+              },
               onCambio: (m) {
                 // Se conserva el texto del aprovechamiento aplicado y el producto toma material, espesor y acabado
                 final nuevo = {...m, if (datos['aprovechamiento'] != null) 'aprovechamiento': datos['aprovechamiento']};
@@ -906,9 +915,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         ]),
         children: [
           Wrap(spacing: 10, runSpacing: 2, children: [
-            for (final c in cs) SizedBox(width: 150, child: Text(
-              '${c.n}. ${tr(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' · ${tr('arco')} ${fmtMm(c.largoArco)}' : ''}',
-              style: const TextStyle(fontSize: 11.5))),
+            for (final c in cs) SizedBox(width: c.tipo == TipoCota.diametro ? 220 : 150, child: Text(_textoCota(c), style: const TextStyle(fontSize: 11.5))),
           ]),
         ]));
   }
@@ -978,6 +985,61 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     });
   }
 
+  // Piezas del mismo material, espesor y medida de hoja acomodadas JUNTAS en las mismas
+  // hojas (anidado del simulador): normalmente se compran menos hojas que por separado.
+  Widget _materialJunto() {
+    final todas = <(String, Map<String, dynamic>, Map<String, dynamic>)>[
+      if (_archivoInfo != null) ('1', _archivoInfo!, _materialPrincipal),
+      for (int k = 0; k < _otrasPiezas.length; k++) ('${k + 2}', _otrasPiezas[k].info, _otrasPiezas[k].material),
+    ];
+    double nm(Map<String, dynamic> m, String k) => double.tryParse('${m[k] ?? ''}'.replaceAll(',', '.')) ?? 0;
+    final grupos = <String, List<(String, Map<String, dynamic>, Map<String, dynamic>)>>{};
+    for (final p in todas) {
+      final m = p.$3;
+      if (nm(m, 'mat_l') <= 0 || nm(m, 'mat_a') <= 0 || nm(m, 'piezas') <= 0) continue;
+      if (((p.$2['largo'] as num?) ?? 0) <= 0) continue;
+      final clave = '${'${m['material'] ?? ''}'.trim().toLowerCase()}|${nm(m, 'espesor')}|${nm(m, 'mat_l')}x${nm(m, 'mat_a')}';
+      grupos.putIfAbsent(clave, () => []).add(p);
+    }
+    final juntos = grupos.values.where((g) => g.length > 1).toList();
+    if (juntos.isEmpty) return const SizedBox.shrink();
+    final fmt = Pais.fmt(centavos: false);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(10), width: double.infinity,
+      decoration: BoxDecoration(color: AppColors.verdeClaro, borderRadius: BorderRadius.circular(8)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(tr('Material de toda la cotización (piezas juntas en la misma hoja)'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800)),
+        for (final g in juntos) Builder(builder: (_) {
+          final m0 = g.first.$3;
+          final L = nm(m0, 'mat_l'), A = nm(m0, 'mat_a');
+          final sep = g.map((p) => nm(p.$3, 'sep')).reduce(math.max), orilla = g.map((p) => nm(p.$3, 'orilla')).reduce(math.max);
+          final precio = g.map((p) => nm(p.$3, 'precio')).firstWhere((x) => x > 0, orElse: () => 0);
+          final separadas = g.fold<int>(0, (s, p) => s + calcularMaterial(pzL: ((p.$2['largo'] as num?) ?? 0).toDouble(), pzA: ((p.$2['ancho'] as num?) ?? 0).toDouble(),
+            matL: L, matA: A, sep: nm(p.$3, 'sep'), orilla: nm(p.$3, 'orilla'), piezas: nm(p.$3, 'piezas').round()).unidades);
+          final an = anidarVarias(hojaLargo: L, hojaAncho: A, separacion: sep, margen: orilla, tipos: [
+            for (final p in g) (largo: ((p.$2['largo'] as num?) ?? 0).toDouble(), ancho: ((p.$2['ancho'] as num?) ?? 0).toDouble(), cantidad: nm(p.$3, 'piezas').round()),
+          ]);
+          final juntas = an.noCaben.isEmpty ? math.min(an.hojasCompra, separadas) : separadas;
+          final hoja = A >= 600;
+          final us = hoja ? tr('hojas') : tr('tablones');
+          final mat = [('${m0['material'] ?? ''}').trim(), if (nm(m0, 'espesor') > 0) '${fmtMm(nm(m0, 'espesor'))} mm'].where((x) => x.isNotEmpty).join(' ');
+          return Padding(padding: const EdgeInsets.only(top: 6), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${mat.isEmpty ? tr('Material') : mat} · ${L.round()} × ${A.round()} mm · ${tr('piezas')} ${g.map((p) => p.$1).join(', ')}',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+            Text(trf('Juntas: {0} {1} · por separado serían {2}', [juntas, us, separadas]), style: const TextStyle(fontSize: 12)),
+            if (separadas > juntas) Text(trf('Ahorras {0} {1}{2}', [separadas - juntas, us, precio > 0 ? ' (${fmt.format((separadas - juntas) * precio)})' : '']),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.verde)),
+            if (precio > 0) Text(trf('Material total: {0} {1} × {2} = {3}', [juntas, us, fmt.format(precio), fmt.format(juntas * precio)]), style: const TextStyle(fontSize: 11.5)),
+          ]));
+        }),
+      ]));
+  }
+
+  // "9. Barreno Ø8 mm · X 30 · Y 40" (ubicación desde la esquina inferior izquierda)
+  String _textoCota(Cota c) => '${c.n}. ${tr(c.nombreTipo)} ${c.texto} mm'
+    '${c.tipo == TipoCota.arco ? ' · ${tr('arco')} ${fmtMm(c.largoArco)}' : ''}'
+    '${c.tipo == TipoCota.diametro ? ' · ${c.ubicacion}' : ''}';
+
   // Lista plegable de cotas de un diseño extra
   Widget _listaCotas(List<Cota> cs) => Theme(
     data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -986,9 +1048,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
       title: Text(trf('Todas las cotas · {0}', [resumenCotas(cs)]), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
       children: [
         Wrap(spacing: 10, runSpacing: 2, children: [
-          for (final c in cs) SizedBox(width: 150, child: Text(
-            '${c.n}. ${tr(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' · ${tr('arco')} ${fmtMm(c.largoArco)}' : ''}',
-            style: const TextStyle(fontSize: 11.5))),
+          for (final c in cs) SizedBox(width: c.tipo == TipoCota.diametro ? 220 : 150, child: Text(_textoCota(c), style: const TextStyle(fontSize: 11.5))),
         ]),
       ]));
 
@@ -1411,6 +1471,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           else _resumenArchivo(),
           if (_archivoInfo != null) ...[
             ..._otrasPiezas.map(_tarjetaOtraPieza),
+            _materialJunto(),
             Padding(padding: const EdgeInsets.only(bottom: 10),
               child: SizedBox(width: double.infinity, child: OutlinedButton.icon(
                 onPressed: _leyendoArchivo ? null : _subirArchivoPieza,
@@ -2915,6 +2976,17 @@ class _PiezaPainter extends CustomPainter {
           final dir = const Offset(0.7071, -0.7071);
           canvas.drawLine(cen + dir * rPx, cen + dir * (rPx + 8), Paint()..color = const Color(0xFFC2560A)..strokeWidth = 0.7);
           etiqueta(soloNumeros ? '${c.n}' : c.texto, cen + dir * (rPx + 14));
+          break;
+        case TipoCota.distancia:
+          // Centro a centro entre barrenos: línea punteada fina y su medida
+          final a = Offset(X(c.x1), Y(c.y1)), b = Offset(X(c.x2), Y(c.y2));
+          final d = b - a, largoPx = d.distance;
+          if (largoPx < 4) break;
+          final paso = d / largoPx;
+          final pl = Paint()..color = const Color(0xFF1F5FBF)..strokeWidth = 0.7;
+          for (double t = 0; t < largoPx; t += 6) { canvas.drawLine(a + paso * t, a + paso * math.min(t + 3, largoPx), pl); }
+          final cabe = !soloNumeros && largoPx >= anchoTexto(c.texto) + 6;
+          etiqueta(cabe ? c.texto : '${c.n}', (a + b) / 2 + Offset(-paso.dy, paso.dx) * 7, color: const Color(0xFF1F5FBF));
           break;
       }
     }

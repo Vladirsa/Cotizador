@@ -10,7 +10,7 @@
 //   - tramos cortos que giran parejo       → un arco con su radio
 import 'dart:math' as math;
 
-enum TipoCota { linea, arco, diametro }
+enum TipoCota { linea, arco, diametro, distancia }
 
 class Cota {
   final int n; // número para la tabla y para el dibujo cuando no cabe el texto
@@ -22,14 +22,18 @@ class Cota {
   final double cx, cy, r;
   // Dónde poner la etiqueta (mm, mismo sistema que los trazos)
   final double ex, ey;
+  // Barrenos: ubicación del centro desde la esquina inferior izquierda de la pieza
+  final double posX, posY;
   const Cota({required this.n, required this.tipo, required this.valor, this.largoArco = 0,
     this.x1 = 0, this.y1 = 0, this.x2 = 0, this.y2 = 0, this.cx = 0, this.cy = 0, this.r = 0,
-    required this.ex, required this.ey});
+    required this.ex, required this.ey, this.posX = 0, this.posY = 0});
 
   String get prefijo => tipo == TipoCota.diametro ? 'Ø' : tipo == TipoCota.arco ? 'R' : '';
   /// "120", "R5", "Ø8.5"
   String get texto => '$prefijo${fmtMm(valor)}';
-  String get nombreTipo => tipo == TipoCota.linea ? 'Línea' : tipo == TipoCota.arco ? 'Arco' : 'Barreno';
+  String get nombreTipo => tipo == TipoCota.linea ? 'Línea' : tipo == TipoCota.arco ? 'Arco' : tipo == TipoCota.diametro ? 'Barreno' : 'Entre barrenos';
+  /// "X 30 · Y 40" para los barrenos
+  String get ubicacion => tipo == TipoCota.diametro ? 'X ${fmtMm(posX)} · Y ${fmtMm(posY)}' : '';
 }
 
 String fmtMm(double v) {
@@ -66,6 +70,10 @@ bool _cerrado(List<List<double>> p) =>
 List<Cota> cotasDe(List<List<List<double>>> trazos, {double minMm = 0.5}) {
   final out = <Cota>[];
   int n = 0;
+  // Esquina inferior izquierda de la pieza: de ahí se miden las ubicaciones
+  double minX = double.infinity, minY = double.infinity;
+  for (final t in trazos) { for (final q in t) { if (q.length >= 2) { minX = math.min(minX, q[0]); minY = math.min(minY, q[1]); } } }
+  if (!minX.isFinite) { minX = 0; minY = 0; }
   for (final t0 in trazos) {
     // Quita puntos repetidos
     final t = <List<double>>[];
@@ -87,7 +95,8 @@ List<Cota> cotasDe(List<List<List<double>>> trazos, {double minMm = 0.5}) {
       }
       if (rmax > 0 && (rmax - rmin) / rmax < 0.06) {
         final r = rsum / (t.length - 1);
-        out.add(Cota(n: ++n, tipo: TipoCota.diametro, valor: 2 * r, cx: cx, cy: cy, r: r, ex: cx + r * 0.7071, ey: cy + r * 0.7071));
+        out.add(Cota(n: ++n, tipo: TipoCota.diametro, valor: 2 * r, cx: cx, cy: cy, r: r, ex: cx + r * 0.7071, ey: cy + r * 0.7071,
+          posX: cx - minX, posY: cy - minY));
         continue;
       }
     }
@@ -138,6 +147,31 @@ List<Cota> cotasDe(List<List<List<double>>> trazos, {double minMm = 0.5}) {
       i = k + 1;
     }
   }
+  // Distancia entre barrenos que están en la misma fila o columna (centro a centro)
+  final barrenos = out.where((c) => c.tipo == TipoCota.diametro).toList();
+  void entre(List<Cota> grupo, bool horizontal) {
+    grupo.sort((a, b) => horizontal ? a.cx.compareTo(b.cx) : a.cy.compareTo(b.cy));
+    for (int k = 0; k + 1 < grupo.length; k++) {
+      final a = grupo[k], b = grupo[k + 1];
+      final d = horizontal ? (b.cx - a.cx).abs() : (b.cy - a.cy).abs();
+      if (d < minMm) continue;
+      out.add(Cota(n: ++n, tipo: TipoCota.distancia, valor: d, x1: a.cx, y1: a.cy, x2: b.cx, y2: b.cy,
+        ex: (a.cx + b.cx) / 2, ey: (a.cy + b.cy) / 2));
+    }
+  }
+  final usadosFila = <Cota>{}, usadosCol = <Cota>{};
+  for (final c in barrenos) {
+    if (!usadosFila.contains(c)) {
+      final fila = barrenos.where((o) => (o.cy - c.cy).abs() < 0.5).toList();
+      usadosFila.addAll(fila);
+      if (fila.length > 1) entre(fila, true);
+    }
+    if (!usadosCol.contains(c)) {
+      final col = barrenos.where((o) => (o.cx - c.cx).abs() < 0.5).toList();
+      usadosCol.addAll(col);
+      if (col.length > 1) entre(col, false);
+    }
+  }
   return out;
 }
 
@@ -146,10 +180,12 @@ String resumenCotas(List<Cota> cs) {
   final l = cs.where((c) => c.tipo == TipoCota.linea).length;
   final a = cs.where((c) => c.tipo == TipoCota.arco).length;
   final d = cs.where((c) => c.tipo == TipoCota.diametro).length;
+  final e = cs.where((c) => c.tipo == TipoCota.distancia).length;
   return [
     '${cs.length} cotas',
     if (l > 0) '$l ${l == 1 ? 'línea' : 'líneas'}',
     if (a > 0) '$a ${a == 1 ? 'arco' : 'arcos'}',
     if (d > 0) '$d ${d == 1 ? 'barreno' : 'barrenos'}',
+    if (e > 0) '$e entre barrenos',
   ].join(' · ');
 }

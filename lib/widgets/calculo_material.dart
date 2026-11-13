@@ -4,6 +4,7 @@
 // material → piezas por tablón/hoja, cuántos se compran (completos) y el costo
 // de material por pieza. Ver services/aprovechamiento.dart.
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 import '../main.dart';
 import '../services/aprovechamiento.dart';
 import '../services/pais.dart';
@@ -26,7 +27,15 @@ class CalculoMaterial extends StatefulWidget {
   final void Function(ResultadoMaterial r, String descripcion)? onAplicar;
   /// Materiales de la bodega (inventario). Por omisión, los del taller en Supabase.
   final Future<List<Material2>> Function()? cargarInventario;
-  const CalculoMaterial({super.key, required this.pzLargo, required this.pzAncho, required this.datos, required this.onCambio, this.onAplicar, this.cargarInventario});
+  /// Para el precio sugerido: largo de corte de la pieza (mm) y perforaciones (contornos)
+  final double corteMm;
+  final int perforaciones;
+  /// Pone el precio sugerido por pieza en el producto de la cotización
+  final ValueChanged<double>? onPrecio;
+  /// Costo por hora de máquina y margen del taller (para llenar el precio sugerido)
+  final Future<({double costoHora, double margen})> Function()? cargarCostos;
+  const CalculoMaterial({super.key, required this.pzLargo, required this.pzAncho, required this.datos, required this.onCambio, this.onAplicar,
+    this.cargarInventario, this.corteMm = 0, this.perforaciones = 0, this.onPrecio, this.cargarCostos});
   @override
   State<CalculoMaterial> createState() => _CalculoMaterialState();
 }
@@ -49,6 +58,11 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
       'material': TextEditingController(text: v('material', '')),
       'espesor': TextEditingController(text: v('espesor', '')),
       'acabado': TextEditingController(text: v('acabado', '')),
+      // Precio sugerido por pieza
+      'vel': TextEditingController(text: v('vel', '')),
+      'costo_hora': TextEditingController(text: v('costo_hora', '')),
+      'acabado_pz': TextEditingController(text: v('acabado_pz', '')),
+      'margen': TextEditingController(text: v('margen', '35')),
     };
     _materialId = widget.datos['material_id'] as String?;
     _stock = double.tryParse('${widget.datos['stock'] ?? ''}');
@@ -59,6 +73,31 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
   String? _materialId; // fila de inventario_bodega elegida
   double? _stock;      // existencias en bodega (en hojas o tablones)
   bool _cargando = false;
+
+  bool _verPrecio = false, _costosCargados = false;
+
+  static Future<({double costoHora, double margen})> _costosDelTaller() async {
+    try {
+      final t = await Simulador2Data.taller();
+      final maqs = await Simulador2Data.maquinas();
+      final conCosto = maqs.where((m) => m.costoHora > 0).toList();
+      return (costoHora: conCosto.isNotEmpty ? conCosto.first.costoHora : 0.0, margen: t.margenPct);
+    } catch (_) {
+      return (costoHora: 0.0, margen: 35.0);
+    }
+  }
+
+  // La primera vez que se abre el precio sugerido se llenan costo por hora y margen del taller
+  Future<void> _abrirPrecio() async {
+    setState(() => _verPrecio = !_verPrecio);
+    if (!_verPrecio || _costosCargados) return;
+    _costosCargados = true;
+    final c = await (widget.cargarCostos ?? _costosDelTaller)();
+    if (!mounted) return;
+    if (_n('costo_hora') <= 0 && c.costoHora > 0) _c['costo_hora']!.text = c.costoHora.toStringAsFixed(0);
+    if (_c['margen']!.text.trim().isEmpty || (widget.datos['margen'] == null && c.margen > 0)) _c['margen']!.text = c.margen.toStringAsFixed(0);
+    _guardar();
+  }
 
   Future<List<Material2>> _inventario() => (widget.cargarInventario ?? Simulador2Data.materiales)();
 
@@ -198,6 +237,57 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
             icon: const Icon(Icons.check, size: 16),
             label: Text(tr('Usar en el producto'), style: const TextStyle(fontSize: 12)))),
         ])),
+      const SizedBox(height: 8),
+      InkWell(onTap: _abrirPrecio, child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Row(children: [
+        const Icon(Icons.price_change_outlined, size: 18, color: AppColors.verde),
+        const SizedBox(width: 6),
+        Expanded(child: Text(tr('Precio sugerido por pieza (material + máquina + acabado)'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700))),
+        Icon(_verPrecio ? Icons.expand_less : Icons.expand_more, size: 20, color: AppColors.textoSecundario),
+      ]))),
+      if (_verPrecio) _precioSugerido(r),
+    ]);
+  }
+
+  // material por pieza + tiempo de corte × $/hora + acabado, ÷ (1 − margen)
+  Widget _precioSugerido(ResultadoMaterial r) {
+    Widget campo(String k, String etiqueta, {String? sufijo, String? prefijo}) => SizedBox(width: 128, child: TextField(
+      controller: _c[k], keyboardType: const TextInputType.numberWithOptions(decimal: true), onChanged: (_) => _guardar(),
+      decoration: InputDecoration(labelText: etiqueta, suffixText: sufijo, prefixText: prefijo, isDense: true, border: const OutlineInputBorder())));
+    final fmt2 = Pais.fmt();
+    final vel = _n('vel'), costoHora = _n('costo_hora'), acabado = _n('acabado_pz'), margen = _n('margen').clamp(0, 90).toDouble();
+    final metros = widget.corteMm / 1000;
+    const segPerf = 2.0;
+    final tiempo = vel > 0 ? metros / vel + widget.perforaciones * segPerf / 60 : 0.0;
+    final maquina = tiempo / 60 * costoHora;
+    final material = _n('precio') > 0 ? r.costoPorPieza : 0.0;
+    final costo = material + maquina + acabado;
+    final precio = margen >= 90 ? costo : costo / (1 - margen / 100);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        campo('vel', tr('Velocidad de corte'), sufijo: 'm/min'),
+        campo('costo_hora', tr('Costo por hora de máquina'), prefijo: '\$'),
+        campo('acabado_pz', tr('Acabado por pieza'), prefijo: '\$'),
+        campo('margen', tr('Margen'), sufijo: '%'),
+      ]),
+      const SizedBox(height: 8),
+      Container(
+        width: double.infinity, padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: AppColors.grisBorde)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (vel <= 0) Text(tr('Pon la velocidad de corte de tu máquina con este material para calcular el tiempo.'), style: const TextStyle(fontSize: 11.5, color: AppColors.naranja))
+          else Text(trf('Tiempo por pieza: {0} m ÷ {1} m/min + {2} perforaciones × 2 s = {3} min', [metros.toStringAsFixed(2), vel.toStringAsFixed(1), widget.perforaciones, tiempo.toStringAsFixed(2)]),
+            style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+          Text(trf('Material {0} + máquina {1} + acabado {2} = costo {3}', [fmt2.format(material), fmt2.format(maquina), fmt2.format(acabado), fmt2.format(costo)]),
+            style: const TextStyle(fontSize: 11.5)),
+          if (_n('precio') <= 0) Text(tr('Sin precio del material: el costo de material queda en \$0.'), style: const TextStyle(fontSize: 10.5, color: AppColors.naranja)),
+          const SizedBox(height: 4),
+          Text(trf('Precio sugerido: {0} por pieza (margen {1} %)', [fmt2.format(precio), margen.toStringAsFixed(0)]),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.verde)),
+          if (widget.onPrecio != null && precio > 0) Align(alignment: Alignment.centerRight, child: TextButton.icon(
+            onPressed: () => widget.onPrecio!(double.parse(precio.toStringAsFixed(2))),
+            icon: const Icon(Icons.check, size: 16),
+            label: Text(tr('Usar este precio en el producto'), style: const TextStyle(fontSize: 12)))),
+        ])),
     ]);
   }
 
@@ -216,7 +306,19 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
             ? trf('Alcanza con lo de bodega; te quedan {0}.', [hay - r.unidades])
             : trf('Faltan {0} {1} por comprar{2}.', [faltan, unidades, costoFalta > 0 ? ' (${Pais.fmt(centavos: false).format(costoFalta)})' : '']),
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: alcanza ? AppColors.verde : AppColors.naranja)),
+        if (!alcanza) Align(alignment: Alignment.centerRight, child: TextButton.icon(
+          onPressed: () => Share.share(_textoPedido(faltan, unidades)),
+          icon: const Icon(Icons.shopping_cart_outlined, size: 16),
+          label: Text(tr('Pedir al proveedor'), style: const TextStyle(fontSize: 12)))),
       ]));
+  }
+
+  // Mensaje listo para mandar por WhatsApp o correo al proveedor
+  String _textoPedido(int faltan, String unidades) {
+    final mat = _c['material']!.text.trim(), esp = _c['espesor']!.text.trim();
+    final med = '${_n('mat_l').toStringAsFixed(0)} × ${_n('mat_a').toStringAsFixed(0)} mm';
+    return trf('Hola, quiero pedir {0} {1} de {2}{3}, medida {4}. ¿Me confirmas precio y tiempo de entrega? Gracias.',
+      [faltan, unidades, mat.isEmpty ? tr('material') : mat, esp.isEmpty ? '' : ' $esp mm', med]);
   }
 
   String _descripcion(ResultadoMaterial r, String unidades) {

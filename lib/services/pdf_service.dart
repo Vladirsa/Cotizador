@@ -1026,6 +1026,19 @@ class PdfService {
                   linea(h.$1, h.$2 - rB - 3, h.$1, h.$2 + rB + 3);
                   c.setLineWidth(0.8);
                 }
+                // Distancia entre barrenos: línea punteada de centro a centro
+                c.setStrokeColor(const PdfColor.fromInt(0xFF1F5FBF));
+                c.setLineWidth(0.4);
+                for (final ct in cotas.where((x) => x.tipo == TipoCota.distancia)) {
+                  final ax = rx + ct.x1 * esc, at = ryTop + rh - ct.y1 * esc, bx = rx + ct.x2 * esc, bt = ryTop + rh - ct.y2 * esc;
+                  final l = math.sqrt((bx - ax) * (bx - ax) + (bt - at) * (bt - at));
+                  if (l < 2) continue;
+                  final ux = (bx - ax) / l, ut = (bt - at) / l;
+                  for (double t = 0; t < l; t += 4) {
+                    final t2 = math.min(t + 2, l);
+                    linea(ax + ux * t, at + ut * t, ax + ux * t2, at + ut * t2);
+                  }
+                }
                 // Cotas
                 c.setStrokeColor(gris);
                 c.setLineWidth(0.5);
@@ -1142,6 +1155,14 @@ class PdfService {
           final rr = c.r * esc;
           out.add(tag(soloNumeros ? '${c.n}' : c.texto, px(c.cx) + (rr + 6) * 0.7071, top(c.cy) - (rr + 6) * 0.7071, naranja));
           break;
+        case TipoCota.distancia:
+          const azulCota = PdfColor.fromInt(0xFF1F5FBF);
+          final ax = px(c.x1), ay = top(c.y1), bx = px(c.x2), by = top(c.y2);
+          final dx = bx - ax, dy = by - ay, l = math.sqrt(dx * dx + dy * dy);
+          if (l < 2) break;
+          final cabe = !soloNumeros && l >= anchoTxt(c.texto) + 4;
+          out.add(tag(cabe ? c.texto : '${c.n}', (ax + bx) / 2 - dy / l * 5, (ay + by) / 2 + dx / l * 5, azulCota));
+          break;
       }
     }
     return out;
@@ -1151,10 +1172,13 @@ class PdfService {
     pw.Text('${_t('COTAS DE LA PIEZA')} · ${_limpiarTexto(resumenCotas(cotas))}', style: pw.TextStyle(fontSize: 7.5, color: gris, fontWeight: pw.FontWeight.bold)),
     pw.SizedBox(height: 2),
     pw.Wrap(spacing: 8, runSpacing: 1, children: [
-      for (final c in cotas) pw.SizedBox(width: 118, child: pw.Text(
-        _limpiarTexto('${c.n}. ${_t(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' (arco ${fmtMm(c.largoArco)})' : ''}'),
+      for (final c in cotas) pw.SizedBox(width: c.tipo == TipoCota.diametro ? 160 : 118, child: pw.Text(
+        _limpiarTexto('${c.n}. ${_t(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' (arco ${fmtMm(c.largoArco)})' : ''}'
+          '${c.tipo == TipoCota.diametro ? ' en ${c.ubicacion}' : ''}'),
         style: const pw.TextStyle(fontSize: 6.5))),
     ]),
+    if (cotas.any((c) => c.tipo == TipoCota.diametro)) pw.Text(_t('Ubicación de barrenos (X, Y) desde la esquina inferior izquierda de la pieza; "Entre barrenos" es de centro a centro.'),
+      style: pw.TextStyle(fontSize: 6, color: gris, fontStyle: pw.FontStyle.italic)),
   ]);
 
   // Fix 3: Limpiar caracteres especiales que aparecen como "tachas" en el PDF

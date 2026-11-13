@@ -60,4 +60,22 @@ void main() {
     expect(find.textContaining('En bodega: 5 tablones'), findsOneWidget);
     expect(find.textContaining('Faltan 11 tablones por comprar'), findsOneWidget);
   });
+
+  testWidgets('precio sugerido: material + tiempo de máquina + acabado, con margen', (tester) async {
+    double? precio;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: SingleChildScrollView(child: CalculoMaterial(
+      pzLargo: 80, pzAncho: 110, corteMm: 720, perforaciones: 1,
+      datos: const {'mat_l': '2400', 'mat_a': '100', 'sep': '10', 'piezas': '320', 'precio': '330', 'vel': '2'},
+      onCambio: (_) {}, onPrecio: (p) => precio = p,
+      cargarCostos: () async => (costoHora: 180.0, margen: 35.0),
+    )))));
+    await tester.ensureVisible(find.textContaining('Precio sugerido por pieza'));
+    await tester.tap(find.textContaining('Precio sugerido por pieza'));
+    await tester.pumpAndSettle();
+    // tiempo = 0.72 m ÷ 2 + 1 × 2 s = 0.393 min → máquina $1.18; material $16.50; costo $17.68 ÷ 0.65 = $27.20
+    expect(find.textContaining('= 0.39 min'), findsOneWidget);
+    await tester.ensureVisible(find.text('Usar este precio en el producto'));
+    await tester.tap(find.text('Usar este precio en el producto'));
+    expect(precio, closeTo(27.20, 0.01));
+  });
 }
