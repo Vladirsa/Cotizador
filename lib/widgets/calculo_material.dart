@@ -41,6 +41,9 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
       'orilla': TextEditingController(text: v('orilla', '0')),
       'piezas': TextEditingController(text: v('piezas', '1')),
       'precio': TextEditingController(text: v('precio', '')),
+      // Material y espesor de ESTA pieza: salen en su croquis del PDF
+      'material': TextEditingController(text: v('material', '')),
+      'espesor': TextEditingController(text: v('espesor', '')),
     };
   }
 
@@ -71,7 +74,15 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
       decoration: InputDecoration(labelText: etiqueta, suffixText: sufijo, prefixText: prefijo, isDense: true, border: const OutlineInputBorder())));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(trf('Pieza: {0} × {1} mm', [widget.pzLargo.toStringAsFixed(0), widget.pzAncho.toStringAsFixed(0)]), style: const TextStyle(fontSize: 11.5, color: AppColors.textoSecundario)),
-      const SizedBox(height: 6),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(flex: 3, child: TextField(controller: _c['material'], onChanged: (_) => _guardar(), textCapitalization: TextCapitalization.sentences,
+          decoration: InputDecoration(labelText: tr('Material (ej. MDF, pino, acrílico)'), isDense: true, border: const OutlineInputBorder()))),
+        const SizedBox(width: 8),
+        Expanded(flex: 2, child: TextField(controller: _c['espesor'], onChanged: (_) => _guardar(), keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: tr('Espesor'), suffixText: 'mm', isDense: true, border: const OutlineInputBorder()))),
+      ]),
+      const SizedBox(height: 8),
       Wrap(spacing: 6, runSpacing: 4, children: [
         for (final p in presetsMaterial) ActionChip(label: Text(tr(p.$1), style: const TextStyle(fontSize: 11)), visualDensity: VisualDensity.compact,
           onPressed: () => _preset(p.$2, p.$3)),
@@ -114,7 +125,10 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
 
   String _descripcion(ResultadoMaterial r, String unidades) {
     final med = '${_n('mat_l').toStringAsFixed(0)} × ${_n('mat_a').toStringAsFixed(0)} mm';
-    final base = trf('Material: {0} {1} de {2} ({3} pz por {4})', [r.unidades, unidades, med, r.porUnidad, _esHoja ? tr('hoja') : tr('tablón')]);
+    final mat = _c['material']!.text.trim(), esp = _c['espesor']!.text.trim();
+    final que = [if (mat.isNotEmpty) mat, if (esp.isNotEmpty) '$esp mm'].join(' ');
+    final base = trf('Material: {0} {1} de {2} ({3} pz por {4})', [r.unidades, unidades, med, r.porUnidad, _esHoja ? tr('hoja') : tr('tablón')])
+      + (que.isNotEmpty ? ' · $que' : '');
     return _n('precio') > 0 ? '$base · ${trf('material {0} por pieza', [Pais.fmt().format(r.costoPorPieza)])}' : base;
   }
 }

@@ -1033,4 +1033,11 @@ const Map<String, String> textosEnExtra = {
   'Piezas por tablón u hoja, cuánto material compras y su costo por pieza': 'Parts per board or sheet, how much stock to buy and its cost per part',
   'Producto actualizado: {0} piezas': 'Line item updated: {0} parts',
   'Diseño {0}': 'Design {0}',
+  // Anexos y material por pieza
+  'Material (ej. MDF, pino, acrílico)': 'Material (e.g. MDF, pine, acrylic)',
+  'ANEXO': 'ANNEX',
+  'ANEXOS: CROQUIS DE LAS PIEZAS': 'ANNEXES: PART DRAWINGS',
+  'Croquis, cotas, material y espesor de cada pieza: ver anexos al final ({0}).': 'Drawings, dimensions, material and thickness of each part: see annexes at the end ({0}).',
+  '{0} pz por {1} de {2} x {3} mm · {4} {5} para {6} pz': '{0} pcs per {1} of {2} x {3} mm · {4} {5} for {6} pcs',
+  'Sube los DXF, SVG, STL u OBJ: la app saca las medidas, la longitud de corte, contornos, barrenos o volumen y todas las cotas. En "Material y aprovechamiento" de cada pieza pon su material y espesor. El PDF lleva al final, como anexo, el croquis de cada pieza con sus cotas.': 'Upload DXF, SVG, STL or OBJ files: the app reads sizes, cut length, contours, holes or volume and every dimension. In each part\'s "Material and yield" enter its material and thickness. The PDF ends with an annex: each part\'s drawing with its dimensions.',
 };

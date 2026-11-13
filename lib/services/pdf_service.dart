@@ -14,6 +14,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/models.dart';
 import 'archivo_cad_service.dart';
 import 'cotas_service.dart';
+import 'aprovechamiento.dart';
 import 'auth_service.dart';
 import 'whatsapp_service.dart';
 import '../main.dart';
@@ -569,21 +570,27 @@ class PdfService {
         final tz = GeoCad.geoDeJson(m['geo']);
         final es3D = info['tipo'] == 'stl' || info['tipo'] == 'obj';
         final cs = es3D ? <Cota>[] : cotasDe(tz);
+        final mat = m['material'] is Map ? Map<String, dynamic>.from(m['material'] as Map) : <String, dynamic>{};
         final cq = _croquisPieza(largo: ((info['largo'] as num?) ?? 0).toDouble(), ancho: ((info['ancho'] as num?) ?? 0).toDouble(),
-          espesor: es3D ? ((info['alto'] as num?) ?? 0).toDouble() : 0, barrenoD: 0, barrenos: 0, azul: azul, gris: grisTexto,
-          trazos: tz, es3D: es3D, cotas: cs, titulo: _limpiarTexto('${_t('DISEÑO')} ${++k}: ${info['nombre'] ?? ''}'));
+          espesor: _numMat(mat['espesor']) ?? (es3D ? ((info['alto'] as num?) ?? 0).toDouble() : 0), barrenoD: 0, barrenos: 0, azul: azul, gris: grisTexto,
+          trazos: tz, es3D: es3D, cotas: cs, titulo: _limpiarTexto('${_t('ANEXO')} ${++k}: ${info['nombre'] ?? ''}'),
+          nota: _notaMaterial(mat, info));
         if (cq == null) continue;
-        otrasPiezas.add(pw.SizedBox(height: 8));
-        otrasPiezas.add(cq);
+        otrasPiezas.add(pw.SizedBox(height: 12));
+        otrasPiezas.add(_entero(cq));
         if (cs.isNotEmpty) { otrasPiezas.add(pw.SizedBox(height: 4)); otrasPiezas.add(_tablaCotasPdf(cs, grisTexto)); }
       }
     }
+    final matPrincipal = d['material_principal'] is Map ? Map<String, dynamic>.from(d['material_principal'] as Map) : <String, dynamic>{};
+    final espPrincipal = _numMat(matPrincipal['espesor']) ?? numPro('croquis_espesor');
     final croquis = _croquisPieza(
       largo: numPro('croquis_largo'), ancho: numPro('croquis_ancho'),
-      espesor: numPro('croquis_espesor'), barrenoD: numPro('croquis_barreno_d'),
+      espesor: espPrincipal, barrenoD: numPro('croquis_barreno_d'),
       barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto,
       trazos: trazosArch, es3D: infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj'),
-      cotas: cotasPdf);
+      cotas: cotasPdf,
+      titulo: _limpiarTexto('${_t('ANEXO')} 1: ${infoArch?['nombre'] ?? _t('CROQUIS DE LA PIEZA')}'),
+      nota: _notaMaterial(matPrincipal, infoArch));
     // Dibujo de la pieza que mandó el Simulador 2.0 (3D sombreado o 2D con cotas)
     pw.Widget? imagenPieza;
     if (d['archivo_png'] is String) {
@@ -597,6 +604,8 @@ class PdfService {
         }
       } catch (_) {}
     }
+    final numAnexos = (croquis != null || imagenPieza != null ? 1 : 0) + otrasPiezas.whereType<pw.Row>().length;
+    final hayAnexos = numAnexos > 0;
     // Datos técnicos que salen del archivo (DXF/SVG/STL/OBJ)
     if (infoArch != null) {
       String nf(dynamic x, [int dec = 1]) => _fmtN(((x as num?) ?? 0).toDouble(), dec);
@@ -709,14 +718,12 @@ class PdfService {
         ],
 
         // ─── 3. DETALLE TÉCNICO ─────────────
-        if (hay(tecnicos) || croquis != null || imagenPieza != null || otrasPiezas.isNotEmpty) ...[
+        if (hay(tecnicos) || hayAnexos) ...[
           titulo(sig(), _t('DETALLE TÉCNICO')),
           if (hay(tecnicos)) datos(tecnicos),
-          // Pieza 3D: la imagen sombreada en vez del croquis plano; 2D: el croquis con cotas
-          if (imagenPieza != null && (croquis == null || (infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj')))) ...[pw.SizedBox(height: 8), imagenPieza]
-          else if (croquis != null) ...[pw.SizedBox(height: 8), croquis],
-          if (cotasPdf.isNotEmpty) ...[pw.SizedBox(height: 6), _tablaCotasPdf(cotasPdf, grisTexto)],
-          ...otrasPiezas,
+          if (hayAnexos) pw.Padding(padding: const pw.EdgeInsets.only(top: 4), child: pw.Text(
+            _tf('Croquis, cotas, material y espesor de cada pieza: ver anexos al final ({0}).', [numAnexos]),
+            style: pw.TextStyle(fontSize: 8.5, color: grisTexto, fontStyle: pw.FontStyle.italic))),
         ],
 
         // ─── 4. FABRICACIÓN ─────────────────
@@ -818,6 +825,17 @@ class PdfService {
           pw.SizedBox(width: 14),
           pw.Expanded(child: _lineaFirma(_t('Fecha'))),
         ]),
+
+        // ─── ANEXOS: croquis de cada pieza con sus cotas, material y espesor ───
+        if (hayAnexos) ...[
+          pw.NewPage(),
+          titulo('A', _t('ANEXOS: CROQUIS DE LAS PIEZAS')),
+          // Pieza 3D: la imagen sombreada en vez del croquis plano; 2D: el croquis con cotas
+          if (imagenPieza != null && (croquis == null || es3DArch)) ...[pw.SizedBox(height: 8), _entero(imagenPieza)]
+          else if (croquis != null) ...[pw.SizedBox(height: 8), _entero(croquis)],
+          if (cotasPdf.isNotEmpty) ...[pw.SizedBox(height: 6), _tablaCotasPdf(cotasPdf, grisTexto)],
+          ...otrasPiezas,
+        ],
       ],
     ));
     return pdf.save();
@@ -878,6 +896,7 @@ class PdfService {
     List<List<List<double>>> trazos = const [], bool es3D = false,
     List<Cota> cotas = const [],
     String? titulo,
+    String? nota,
   }) {
     // Con archivo: el dibujo es la pieza real y las medidas salen de él
     if (trazos.isNotEmpty) {
@@ -927,6 +946,7 @@ class PdfService {
       padding: const pw.EdgeInsets.all(6),
       child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
         pw.Text(titulo ?? _t('CROQUIS DE LA PIEZA'), style: pw.TextStyle(fontSize: 8, color: gris, fontWeight: pw.FontWeight.bold)),
+        if (nota != null && nota.isNotEmpty) pw.Text(nota, style: pw.TextStyle(fontSize: 8, color: azul, fontWeight: pw.FontWeight.bold)),
         pw.SizedBox(
           width: W, height: H,
           child: pw.Stack(children: [
@@ -1025,6 +1045,35 @@ class PdfService {
           ])),
         pw.Text(_t('Medidas en mm. Croquis ilustrativo, no a escala.'), style: estiloGris),
       ]));
+  }
+
+  // Un bloque que no se parte entre páginas (si no cabe, pasa entero a la siguiente)
+  static pw.Widget _entero(pw.Widget w) => pw.Row(children: [pw.Expanded(child: w)]);
+
+  static double? _numMat(dynamic v) {
+    final d = double.tryParse('${v ?? ''}'.replaceAll(',', '.').trim());
+    return d != null && d > 0 ? d : null;
+  }
+
+  /// "Material: MDF · Espesor: 18 mm · 20 pz por hoja de 2440 × 1220 mm · 16 hojas para 320 pz"
+  static String _notaMaterial(Map<String, dynamic> m, Map<String, dynamic>? info) {
+    final partes = <String>[];
+    final mat = '${m['material'] ?? ''}'.trim();
+    final esp = _numMat(m['espesor']);
+    if (mat.isNotEmpty) partes.add('${_t('Material')}: $mat');
+    if (esp != null) partes.add('${_t('Espesor')}: ${_fmtN(esp, esp % 1 == 0 ? 0 : 1)} mm');
+    final mL = _numMat(m['mat_l']), mA = _numMat(m['mat_a']);
+    final pL = ((info?['largo'] as num?) ?? 0).toDouble(), pA = ((info?['ancho'] as num?) ?? 0).toDouble();
+    if (mL != null && mA != null && pL > 0 && pA > 0) {
+      final piezas = (_numMat(m['piezas']) ?? 1).round();
+      final r = calcularMaterial(pzL: pL, pzA: pA, matL: mL, matA: mA, sep: _numMat(m['sep']) ?? 0, orilla: _numMat(m['orilla']) ?? 0, piezas: piezas);
+      if (r.cabe) {
+        final hoja = mA >= 600;
+        final u = hoja ? _t('hoja') : _t('tablón'), us = r.unidades == 1 ? u : (hoja ? _t('hojas') : _t('tablones'));
+        partes.add(_tf('{0} pz por {1} de {2} x {3} mm · {4} {5} para {6} pz', [r.porUnidad, u, mL.round(), mA.round(), r.unidades, us, r.piezas]));
+      }
+    }
+    return _limpiarTexto(partes.join(' · '));
   }
 
   static List<pw.Widget> _etiquetasCotas(List<Cota> cotas, {required double rx, required double ryTop, required double rh,
