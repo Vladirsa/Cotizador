@@ -606,24 +606,52 @@ class PdfService {
     }
     final numAnexos = (croquis != null || imagenPieza != null ? 1 : 0) + otrasPiezas.whereType<pw.Row>().length;
     final hayAnexos = numAnexos > 0;
-    // Datos técnicos que salen del archivo (DXF/SVG/STL/OBJ)
-    if (infoArch != null) {
+    // Todas las piezas de la cotización en una tabla: la principal y los demás diseños
+    final filasPiezas = <List<String>>[];
+    void agregarPieza(Map<String, dynamic> info, Map<String, dynamic> mat) {
       String nf(dynamic x, [int dec = 1]) => _fmtN(((x as num?) ?? 0).toDouble(), dec);
-      final es3D = infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj';
-      tecnicos.add((_t('Archivo analizado'), _limpiarTexto('${infoArch['nombre']} (${(infoArch['tipo'] as String).toUpperCase()}, ${infoArch['unidades']})')));
-      tecnicos.add((_t('Medidas totales'), es3D
-        ? '${nf(infoArch['largo'])} x ${nf(infoArch['ancho'])} x ${nf(infoArch['alto'])} mm'
-        : '${nf(infoArch['largo'])} x ${nf(infoArch['ancho'])} mm'));
-      if (!es3D) {
-        tecnicos.add((_t('Longitud de corte'), '${nf(((infoArch['longitud_corte'] as num?) ?? 0) / 1000, 2)} m'));
-        tecnicos.add((_t('Contornos cerrados'), '${infoArch['contornos']}'));
-        if (((infoArch['barrenos'] as num?) ?? 0) > 0) tecnicos.add((_t('Barrenos'), '${infoArch['barrenos']}'));
-        if (((infoArch['area_pieza'] as num?) ?? 0) > 0) tecnicos.add((_t('Área de la pieza'), '${nf(((infoArch['area_pieza'] as num?) ?? 0) / 100, 1)} cm2'));
-      } else {
-        tecnicos.add((_t('Volumen'), '${nf(infoArch['volumen_cm3'], 2)} cm3'));
-        tecnicos.add((_t('Área superficial'), '${nf(infoArch['area_superficial_cm2'], 1)} cm2'));
-        tecnicos.add((_t('Malla'), _tf('{0} triángulos', [infoArch['triangulos']])));
+      final es3D = info['tipo'] == 'stl' || info['tipo'] == 'obj';
+      final esp = _numMat(mat['espesor']) ?? (es3D ? ((info['alto'] as num?) ?? 0).toDouble() : null);
+      filasPiezas.add([
+        '${filasPiezas.length + 1}',
+        _limpiarTexto('${info['nombre'] ?? ''}'),
+        es3D ? '${nf(info['largo'])} x ${nf(info['ancho'])} x ${nf(info['alto'])}' : '${nf(info['largo'])} x ${nf(info['ancho'])}',
+        esp != null && esp > 0 ? _fmtN(esp, esp % 1 == 0 ? 0 : 1) : '-',
+        _limpiarTexto('${mat['material'] ?? ''}'.trim().isEmpty ? '-' : '${mat['material']}'.trim()),
+        _limpiarTexto('${mat['acabado'] ?? ''}'.trim().isEmpty ? '-' : '${mat['acabado']}'.trim()),
+        es3D ? '${nf(info['volumen_cm3'], 1)} cm3' : '${nf(((info['longitud_corte'] as num?) ?? 0) / 1000, 2)} m',
+        es3D ? '-' : '${info['barrenos'] ?? 0}',
+        es3D ? '-' : '${nf(((info['area_pieza'] as num?) ?? 0) / 100, 1)} cm2',
+      ]);
+    }
+    if (infoArch != null) agregarPieza(infoArch, matPrincipal);
+    if (d['otras_piezas'] is List) {
+      for (final m in (d['otras_piezas'] as List).whereType<Map>()) {
+        agregarPieza(Map<String, dynamic>.from((m['info'] as Map?) ?? const {}),
+          m['material'] is Map ? Map<String, dynamic>.from(m['material'] as Map) : <String, dynamic>{});
       }
+    }
+    // Con archivos, las medidas y el archivo de cada pieza ya van en la tabla
+    if (filasPiezas.isNotEmpty) tecnicos.removeWhere((f) => f.$1 == _t('Medidas / espesor') || f.$1 == _t('Archivo recibido'));
+    pw.Widget? tablaPiezas;
+    if (filasPiezas.isNotEmpty) {
+      pw.Widget c(String t, {bool enc = false, bool der = false}) => pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: pw.Text(t, textAlign: der ? pw.TextAlign.right : pw.TextAlign.left,
+          style: pw.TextStyle(fontSize: enc ? 7.5 : 8, color: enc ? PdfColors.white : PdfColors.black, fontWeight: enc ? pw.FontWeight.bold : pw.FontWeight.normal)));
+      tablaPiezas = pw.Table(
+        border: pw.TableBorder.all(color: grisLinea, width: 0.5),
+        columnWidths: {
+          0: const pw.FixedColumnWidth(18), 1: const pw.FlexColumnWidth(2.2), 2: const pw.FlexColumnWidth(1.6), 3: const pw.FixedColumnWidth(40),
+          4: const pw.FlexColumnWidth(1.6), 5: const pw.FlexColumnWidth(1.4), 6: const pw.FixedColumnWidth(48), 7: const pw.FixedColumnWidth(50), 8: const pw.FixedColumnWidth(52),
+        },
+        children: [
+          pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
+            for (final t in ['#', _t('Pieza'), _t('Medidas (mm)'), _t('Esp. mm'), _t('Material'), _t('Acabado'), _t('Corte'), _t('Barrenos'), _t('Área')]) c(t, enc: true),
+          ]),
+          for (int k = 0; k < filasPiezas.length; k++) pw.TableRow(
+            decoration: pw.BoxDecoration(color: k.isEven ? PdfColors.white : grisClaro),
+            children: [for (int col = 0; col < filasPiezas[k].length; col++) c(filasPiezas[k][col], der: col == 6 || col == 7 || col == 8)]),
+        ]);
     }
 
     int n = 0;
@@ -718,8 +746,9 @@ class PdfService {
         ],
 
         // ─── 3. DETALLE TÉCNICO ─────────────
-        if (hay(tecnicos) || hayAnexos) ...[
-          titulo(sig(), _t('DETALLE TÉCNICO')),
+        if (hay(tecnicos) || hayAnexos || tablaPiezas != null) ...[
+          titulo(sig(), _t('DETALLE TÉCNICO DE LAS PIEZAS')),
+          if (tablaPiezas != null) ...[tablaPiezas, pw.SizedBox(height: 6)],
           if (hay(tecnicos)) datos(tecnicos),
           if (hayAnexos) pw.Padding(padding: const pw.EdgeInsets.only(top: 4), child: pw.Text(
             _tf('Croquis, cotas, material y espesor de cada pieza: ver anexos al final ({0}).', [numAnexos]),

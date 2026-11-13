@@ -1052,4 +1052,12 @@ const Map<String, String> textosEnExtra = {
   'Elegir material de mi bodega': 'Pick material from my warehouse',
   'Alcanza con lo de bodega; te quedan {0}.': 'Stock is enough; {0} left over.',
   'Faltan {0} {1} por comprar{2}.': '{0} {1} still to buy{2}.',
+  // Tabla de piezas y acabado
+  'Acabado (ej. barniz, pintura, pulido, sin acabado)': 'Finish (e.g. varnish, paint, polish, none)',
+  'DETALLE TÉCNICO DE LAS PIEZAS': 'PARTS TECHNICAL DETAIL',
+  'Medidas (mm)': 'Size (mm)',
+  'Esp. mm': 'Thk. mm',
+  'Barrenos': 'Holes',
+  'Área': 'Area',
+  '{0} {1} de {2} ({3} pz por {4})': '{0} {1} of {2} ({3} pcs per {4})',
 };

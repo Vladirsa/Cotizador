@@ -750,6 +750,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         tiempoMin: r.tiempoMin, maquinaId: r.maquinaId, tipoMaterial: r.tipoMaterial, espesorMm: r.espesorMm,
         imagenPng: r.imagenPng != null ? base64Encode(r.imagenPng!) : ligada?.imagenPng, medidas: r.medidas.isNotEmpty ? r.medidas : null));
       if (reemplazar) {
+        nueva.descripcion ??= _descripcionPieza(extra != null ? extra.material : _materialPrincipal);
         _reemplazarPartida(ligada, nueva);
         if (extra != null) extra.partida = nueva; else _partidaPrincipal = nueva;
       } else {
@@ -812,12 +813,33 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           title: Text(tr('Material y aprovechamiento'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
           subtitle: Text(tr('Piezas por tablón u hoja, cuánto material compras y su costo por pieza'), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
           children: [
-            CalculoMaterial(pzLargo: l, pzAncho: a, datos: inicial, onCambio: onCambio,
+            CalculoMaterial(pzLargo: l, pzAncho: a, datos: inicial,
+              onCambio: (m) {
+                // Se conserva el texto del aprovechamiento aplicado y el producto toma material, espesor y acabado
+                final nuevo = {...m, if (datos['aprovechamiento'] != null) 'aprovechamiento': datos['aprovechamiento']};
+                onCambio(nuevo);
+                datos..clear()..addAll(nuevo);
+                if (enCotizacion) setState(() => partida.descripcion = _descripcionPieza(nuevo));
+              },
               onAplicar: !enCotizacion ? null : (r, desc) {
-                setState(() { partida.cantidad = r.piezas; partida.descripcion = desc; });
+                datos['aprovechamiento'] = desc;
+                onCambio({...datos});
+                setState(() { partida.cantidad = r.piezas; partida.descripcion = _descripcionPieza(datos); });
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(trf('Producto actualizado: {0} piezas', [r.piezas])), backgroundColor: AppColors.verde));
               }),
           ])));
+  }
+
+  // Lo que va en el concepto del producto: "Material: MDF · Espesor: 18 mm · Acabado: barniz · 2 hojas de …"
+  String? _descripcionPieza(Map<String, dynamic> m) {
+    String t(String k) => '${m[k] ?? ''}'.trim();
+    final partes = [
+      if (t('material').isNotEmpty) '${tr('Material')}: ${t('material')}',
+      if (t('espesor').isNotEmpty) '${tr('Espesor')}: ${t('espesor')} mm',
+      if (t('acabado').isNotEmpty) '${tr('Acabado')}: ${t('acabado')}',
+      if (t('aprovechamiento').isNotEmpty) t('aprovechamiento'),
+    ];
+    return partes.isEmpty ? null : partes.join(' · ');
   }
 
   Widget _resumenArchivo() {
@@ -1026,6 +1048,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           else { for (final p in _otrasPiezas) { if (p.info['nombre'] == archivo) { ligada = p.partida; extra = p; break; } } }
         }
         if (ligada != null && _items.any((x) => identical(x, ligada))) {
+          nueva.descripcion ??= _descripcionPieza(extra != null ? extra.material : _materialPrincipal);
           _reemplazarPartida(ligada, nueva);
           if (extra != null) extra.partida = nueva; else _partidaPrincipal = nueva;
         } else {

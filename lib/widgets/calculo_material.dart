@@ -48,6 +48,7 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
       // Material y espesor de ESTA pieza: salen en su croquis del PDF
       'material': TextEditingController(text: v('material', '')),
       'espesor': TextEditingController(text: v('espesor', '')),
+      'acabado': TextEditingController(text: v('acabado', '')),
     };
     _materialId = widget.datos['material_id'] as String?;
     _stock = double.tryParse('${widget.datos['stock'] ?? ''}');
@@ -156,6 +157,9 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
           decoration: InputDecoration(labelText: tr('Espesor'), suffixText: 'mm', isDense: true, border: const OutlineInputBorder()))),
       ]),
       const SizedBox(height: 8),
+      TextField(controller: _c['acabado'], onChanged: (_) => _guardar(), textCapitalization: TextCapitalization.sentences,
+        decoration: InputDecoration(labelText: tr('Acabado (ej. barniz, pintura, pulido, sin acabado)'), isDense: true, border: const OutlineInputBorder())),
+      const SizedBox(height: 8),
       Wrap(spacing: 6, runSpacing: 4, children: [
         for (final p in presetsMaterial) ActionChip(label: Text(tr(p.$1), style: const TextStyle(fontSize: 11)), visualDensity: VisualDensity.compact,
           onPressed: () => _preset(p.$2, p.$3)),
@@ -217,10 +221,7 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
 
   String _descripcion(ResultadoMaterial r, String unidades) {
     final med = '${_n('mat_l').toStringAsFixed(0)} × ${_n('mat_a').toStringAsFixed(0)} mm';
-    final mat = _c['material']!.text.trim(), esp = _c['espesor']!.text.trim();
-    final que = [if (mat.isNotEmpty) mat, if (esp.isNotEmpty) '$esp mm'].join(' ');
-    final base = trf('Material: {0} {1} de {2} ({3} pz por {4})', [r.unidades, unidades, med, r.porUnidad, _esHoja ? tr('hoja') : tr('tablón')])
-      + (que.isNotEmpty ? ' · $que' : '');
+    final base = trf('{0} {1} de {2} ({3} pz por {4})', [r.unidades, unidades, med, r.porUnidad, _esHoja ? tr('hoja') : tr('tablón')]);
     return _n('precio') > 0 ? '$base · ${trf('material {0} por pieza', [Pais.fmt().format(r.costoPorPieza)])}' : base;
   }
 }
