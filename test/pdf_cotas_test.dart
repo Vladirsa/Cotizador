@@ -22,14 +22,26 @@ void main() {
     ], datosPro: {
       'archivo_info': {'nombre': 'placa.dxf', 'tipo': 'dxf', 'unidades': 'mm', 'largo': 120, 'ancho': 80, 'alto': 0, 'longitud_corte': 520, 'contornos': 3, 'barrenos': 2, 'area_pieza': 9500},
       'archivo_geo': geo,
-      'material_principal': {'material': 'MDF', 'espesor': '18', 'acabado': 'Barniz', 'mat_l': '2440', 'mat_a': '1220', 'sep': '6', 'piezas': '50'},
+      'proyecto': 'Letreros recepción', 'proyecto_num': 'PRJ-2026-014', 'cliente_ref': 'CLI-0042', 'tiempo_entrega': '15 días hábiles',
+      'condiciones_lista': 'Pago: anticipo del 50% y saldo contra entrega.\nInicio del plazo: el tiempo de fabricación comienza al recibir el anticipo y la aprobación de los archivos técnicos.\nGarantía: los defectos de fabricación reportados dentro de los 15 días siguientes a la entrega se corrigen sin costo.',
+      'calidad_lista': 'Inspección: dimensiones críticas y características acordadas, antes de la entrega.\nTolerancias: según plano aprobado.\nTrazabilidad: folio de la cotización y orden de trabajo en cada entrega.',
+      'confidencialidad': 'Los planos y archivos CAD del cliente son confidenciales.\nLos archivos se usan exclusivamente para el proyecto cotizado.',
+      'material_principal': {'material': 'MDF', 'grado': 'E1', 'espesor': '18', 'acabado': 'Barniz', 'nombre': 'Placa de montaje', 'parte_cliente': 'CL-7781', 'proceso': 'Router CNC 2D', 'tolerancia': '±0.2 mm', 'rev_cad': 'B', 'criticas': '9, 10', 'mat_l': '2440', 'mat_a': '1220', 'sep': '6', 'piezas': '50'},
       'otras_piezas': [
         {'info': {'nombre': 'PIEZA 2.dxf', 'tipo': 'dxf', 'largo': 120, 'ancho': 150}, 'material': {'material': 'Acrílico', 'espesor': '6'}, 'geo': [[[0.0, 0.0], [120.0, 0.0], [120.0, 150.0], [90.0, 150.0], [90.0, 110.0], [30.0, 110.0], [30.0, 150.0], [0.0, 150.0], [0.0, 0.0]]]},
         {'info': {'nombre': 'PIEZA 3.dxf', 'tipo': 'dxf', 'largo': 80, 'ancho': 110}, 'material': {'material': 'Pino', 'espesor': '40', 'acabado': 'Lijado', 'mat_l': '2400', 'mat_a': '100', 'sep': '10', 'piezas': '320'}, 'geo': [[[0.0, 0.0], [80.0, 0.0], [80.0, 110.0], [60.0, 110.0], ...arco(40, 110, 20, 0, -math.pi, 16).skip(1), [0.0, 110.0], [0.0, 0.0]]]},
       ],
     });
-    final bytes = await tester.runAsync(() => PdfService.generarCotizacionProfesional(cotizacion: c, empresa: {'nombre': 'Taller de prueba'}, ingles: false));
+    final bytes = await tester.runAsync(() => PdfService.generarCotizacionProfesional(cotizacion: c, empresa: {'nombre_comercial': 'HetNa CNC', 'eslogan': 'CNC Manufacturing & Digital Solutions', 'rfc': 'XAXX010101000', 'direccion': 'Calle 5 No. 12, Col. Centro, Tlaxcala, Tlax., C.P. 90000', 'contacto_nombre': 'Vladimir Sánchez', 'contacto_cargo': 'Director comercial', 'correo': 'contacto@hetnacnc.com', 'telefono': '2461217072', 'sitio_web': 'www.hetnacnc.com', 'prefijo_parte': 'HT-CNC'}, ingles: false));
     expect(bytes, isNotNull);
+    // Versión internacional: en inglés y en dólares, con Incoterm acordado
+    c.datosPro['moneda'] = 'USD';
+    c.datosPro['incoterm'] = 'FCA Tlaxcala';
+    c.datosPro['envio_terminos'] = 'Paquetería a cargo del cliente';
+    final en = await tester.runAsync(() => PdfService.generarCotizacionProfesional(cotizacion: c, empresa: {'nombre_comercial': 'HetNa CNC'}, ingles: true));
+    expect(en, isNotNull);
+    final salidaEn = Platform.environment['SALIDA_PDF_EN'];
+    if (salidaEn != null) File(salidaEn).writeAsBytesSync(en!);
     File(Platform.environment['SALIDA_PDF'] ?? '/tmp/cotas.pdf').writeAsBytesSync(bytes!);
   });
 }

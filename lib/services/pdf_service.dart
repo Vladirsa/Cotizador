@@ -478,11 +478,19 @@ class PdfService {
     final nombreEmpresa = _limpiarTexto((_vacio(empresa['nombre_comercial']) ? AuthService.marcaTaller : empresa['nombre_comercial']));
     final rfcEmpresa = empresa['rfc'] ?? '';
     final direccion = _limpiarTexto(empresa['direccion'] ?? '');
-    final tel1 = empresa['telefono1'] ?? '';
+    // El teléfono se guarda en "telefono" (antes se buscaba "telefono1" y nunca salía)
+    final tel1 = _telInternacional('${empresa['telefono1'] ?? empresa['telefono'] ?? ''}');
     final correoEmpresa = empresa['correo'] ?? '';
-    final web = empresa['sitio_web'] ?? '';
+    final web = '${empresa['sitio_web'] ?? ''}'.trim();
+    final eslogan = _limpiarTexto('${empresa['eslogan'] ?? ''}'.trim());
+    final contactoNombre = _limpiarTexto('${empresa['contacto_nombre'] ?? ''}'.trim());
+    final contactoCargo = _limpiarTexto('${empresa['contacto_cargo'] ?? ''}'.trim());
     final cliente = cotizacion.cliente;
     final folio = cotizacion.folio ?? 'COT-${DateTime.now().millisecondsSinceEpoch}';
+    // Identificador del cliente y número de proyecto (si no se escribe, el del cliente sale de la app)
+    final clienteRef = v('cliente_ref').isNotEmpty ? v('cliente_ref')
+      : (cotizacion.clienteId != null && cotizacion.clienteId!.replaceAll('-', '').length >= 6 ? 'CLI-${cotizacion.clienteId!.replaceAll('-', '').substring(0, 6).toUpperCase()}' : '');
+    final proyectoNum = v('proyecto_num');
     final revision = v('revision').isEmpty ? 'A' : v('revision');
     final moneda = v('moneda').isEmpty ? _moneda(empresa) : v('moneda');
     final fecha = _fmtFecha.format(cotizacion.createdAt ?? DateTime.now());
@@ -503,7 +511,7 @@ class PdfService {
 
     // Tabla etiqueta / valor con solo los campos llenos
     pw.Widget datos(List<(String, String)> filas) {
-      final llenas = filas.where((f) => f.$2.isNotEmpty).toList();
+      final llenas = filas.where((f) => f.$2.isNotEmpty).map((f) => f.$1.isEmpty ? ('-', f.$2) : f).toList();
       return pw.Table(
         border: pw.TableBorder.all(color: grisLinea, width: 0.5),
         columnWidths: {0: const pw.FixedColumnWidth(150), 1: const pw.FlexColumnWidth()},
@@ -530,6 +538,26 @@ class PdfService {
           ]))),
       ]));
 
+    // "Tema: texto" por renglón → filas de tabla (se traducen si existe la traducción)
+    List<(String, String)> temas(String k) => lineas(k).map((l) {
+      final t = _t(l);
+      final i = t.indexOf(':');
+      String may(String x) => x.isEmpty ? x : x[0].toUpperCase() + x.substring(1);
+      return i > 0 && i < 40 ? (t.substring(0, i).trim(), may(t.substring(i + 1).trim())) : ('', t);
+    }).toList();
+    final condicionesLista = temas('condiciones_lista');
+    final calidadLista = temas('calidad_lista');
+    final confidencialidad = lineas('confidencialidad').map(_t).toList();
+    // Términos internacionales: con moneda distinta al peso, PDF en inglés o Incoterm acordado
+    final internacional = (moneda != 'MXN' || _en || v('incoterm').isNotEmpty) ? <(String, String)>[
+      (_t('País de origen'), v('origen').isEmpty ? _t('México') : _t(v('origen'))),
+      (_t('Tiempo de fabricación'), _t(v('tiempo_entrega'))),
+      (_t('Términos de envío'), v('envio_terminos').isNotEmpty ? _t(v('envio_terminos')) : _limpiarTexto(_t(cotizacion.condicionEntrega ?? ''))),
+      (_t('Empaque'), _t(v('empaque'))),
+      (_t('Documentación de exportación'), _t('Cuando aplique, según el destino.')),
+      if (v('incoterm').isNotEmpty) (_t('Incoterms 2020'), v('incoterm')),
+      (_t('Impuestos y aranceles'), _t('Los impuestos y aranceles del país de destino corren por cuenta del importador, salvo acuerdo por escrito.')),
+    ] : <(String, String)>[];
     final incluye = lineas('incluye');
     final noIncluye = lineas('no_incluye');
     final tecnicos = <(String, String)>[
@@ -549,9 +577,9 @@ class PdfService {
       (_t('Lugar de entrega'), _limpiarTexto(_t(cotizacion.condicionEntrega ?? ''))),
       (_t('Vigencia de la oferta'), _tf('{0} días (hasta {1})', [vigenciaDias, fechaVigencia])),
       (_t('Moneda'), moneda),
-      (_t('Impuestos'), cotizacion.ivaPct > 0 ? _tf('{0} {1}% incluido en el total', [_etqIva(empresa), pctTexto(cotizacion.ivaPct)]) : _tf('Precios sin {0}', [_etqIva(empresa)])),
+      (_t('Impuestos'), cotizacion.ivaPct > 0 ? _tf('{0} {1}% desglosado. Total con impuestos incluidos.', [_etqIva(empresa), pctTexto(cotizacion.ivaPct)]) : _tf('Precios sin {0}', [_etqIva(empresa)])),
       (_t('Envíos'), _leyendaEnvio(empresa)),
-      (_t('Cambios y cancelaciones'), _t(v('cambios'))),
+      if (v('condiciones_lista').isEmpty) (_t('Cambios y cancelaciones'), _t(v('cambios'))),
       (_t('Notas'), _limpiarTexto(cotizacion.notas ?? '')),
     ];
 
@@ -561,37 +589,94 @@ class PdfService {
     // Todas las cotas del archivo 2D: van sobre el croquis y en una tabla
     final es3DArch = infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj');
     final cotasPdf = es3DArch ? <Cota>[] : cotasDe(trazosArch);
-    // Los demás diseños de la cotización, cada uno con su croquis y sus cotas
-    final otrasPiezas = <pw.Widget>[];
+    // ── Piezas de la cotización: la principal y los demás diseños ──
+    final matPrincipal = d['material_principal'] is Map ? Map<String, dynamic>.from(d['material_principal'] as Map) : <String, dynamic>{};
+    final piezasPdf = <({Map<String, dynamic> info, Map<String, dynamic> mat, List<List<List<double>>> tz, bool es3D, List<Cota> cotas})>[];
+    if (infoArch != null) piezasPdf.add((info: infoArch, mat: matPrincipal, tz: trazosArch, es3D: es3DArch, cotas: cotasPdf));
     if (d['otras_piezas'] is List) {
-      int k = 1;
       for (final m in (d['otras_piezas'] as List).whereType<Map>()) {
         final info = Map<String, dynamic>.from((m['info'] as Map?) ?? const {});
         final tz = GeoCad.geoDeJson(m['geo']);
         final es3D = info['tipo'] == 'stl' || info['tipo'] == 'obj';
-        final cs = es3D ? <Cota>[] : cotasDe(tz);
         final mat = m['material'] is Map ? Map<String, dynamic>.from(m['material'] as Map) : <String, dynamic>{};
-        final cq = _croquisPieza(largo: ((info['largo'] as num?) ?? 0).toDouble(), ancho: ((info['ancho'] as num?) ?? 0).toDouble(),
-          espesor: _numMat(mat['espesor']) ?? (es3D ? ((info['alto'] as num?) ?? 0).toDouble() : 0), barrenoD: 0, barrenos: 0, azul: azul, gris: grisTexto,
-          trazos: tz, es3D: es3D, cotas: cs, titulo: _limpiarTexto('${_t('ANEXO')} ${++k}: ${info['nombre'] ?? ''}'),
-          nota: _notaMaterial(mat, info));
-        if (cq == null) continue;
-        otrasPiezas.add(pw.SizedBox(height: 12));
-        otrasPiezas.add(_entero(cq));
-        if (cs.isNotEmpty) { otrasPiezas.add(pw.SizedBox(height: 4)); otrasPiezas.add(_tablaCotasPdf(cs, grisTexto)); }
+        piezasPdf.add((info: info, mat: mat, tz: tz, es3D: es3D, cotas: es3D ? <Cota>[] : cotasDe(tz)));
       }
     }
-    final matPrincipal = d['material_principal'] is Map ? Map<String, dynamic>.from(d['material_principal'] as Map) : <String, dynamic>{};
-    final espPrincipal = _numMat(matPrincipal['espesor']) ?? numPro('croquis_espesor');
-    final croquis = _croquisPieza(
-      largo: numPro('croquis_largo'), ancho: numPro('croquis_ancho'),
-      espesor: espPrincipal, barrenoD: numPro('croquis_barreno_d'),
-      barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto,
-      trazos: trazosArch, es3D: infoArch != null && (infoArch['tipo'] == 'stl' || infoArch['tipo'] == 'obj'),
-      cotas: cotasPdf,
-      titulo: _limpiarTexto('${_t('ANEXO')} 1: ${infoArch?['nombre'] ?? _t('CROQUIS DE LA PIEZA')}'),
-      nota: _notaMaterial(matPrincipal, infoArch));
-    // Dibujo de la pieza que mandó el Simulador 2.0 (3D sombreado o 2D con cotas)
+    // Número de parte del taller y número de plano: prefijo + número del folio + consecutivo
+    final gruposFolio = RegExp(r'\d+').allMatches(folio).map((x) => x.group(0)!).toList();
+    final folioCorto = gruposFolio.isEmpty ? '0' : gruposFolio.last;
+    final prefijoCfg = '${empresa['prefijo_parte'] ?? ''}'.trim().toUpperCase();
+    final prefijo = prefijoCfg.isNotEmpty ? prefijoCfg : _iniciales(nombreEmpresa);
+    String nn(int i) => (i + 1).toString().padLeft(2, '0');
+    String parteTaller(int i) => '$prefijo-$folioCorto-${nn(i)}';
+    String numPlano(int i) => 'PL-$folioCorto-${nn(i)}';
+    final revisor = contactoNombre.isNotEmpty ? contactoNombre : nombreEmpresa;
+    String tm(Map<String, dynamic> m, String k) => _limpiarTexto('${m[k] ?? ''}'.trim());
+    Set<int> criticasDe(Map<String, dynamic> m) => RegExp(r'\d+').allMatches('${m['criticas'] ?? ''}').map((x) => int.parse(x.group(0)!)).toSet();
+    String nombrePieza(int i) {
+      final p = piezasPdf[i];
+      final n = tm(p.mat, 'nombre');
+      return n.isNotEmpty ? n : _limpiarTexto('${p.info['nombre'] ?? ''}'.replaceFirst(RegExp(r'\.[^.]+$'), ''));
+    }
+    String materialPieza(Map<String, dynamic> m) {
+      final x = [tm(m, 'material'), tm(m, 'grado')].where((e) => e.isNotEmpty).join(' - ');
+      return x.isNotEmpty ? x : (v('material').isNotEmpty ? v('material') : '-');
+    }
+    String espesorPieza(Map<String, dynamic> m, Map<String, dynamic> info, bool es3D) {
+      final e = _numMat(m['espesor']) ?? (es3D ? ((info['alto'] as num?) ?? 0).toDouble() : null);
+      return e != null && e > 0 ? '${_fmtN(e, e % 1 == 0 ? 0 : 1)} mm' : '-';
+    }
+    String toleranciaPieza(Map<String, dynamic> m) =>
+      tm(m, 'tolerancia').isNotEmpty ? tm(m, 'tolerancia') : (v('tolerancia').isNotEmpty ? v('tolerancia') : _t('Según plano aprobado'));
+
+    // Especificación técnica de cada pieza (Detalle técnico): PART NUMBER y sus datos de fabricación
+    pw.Widget specPieza(int i) {
+      final p = piezasPdf[i];
+      final m = p.mat, info = p.info;
+      String nf(dynamic x, [int dec = 1]) => _fmtN(((x as num?) ?? 0).toDouble(), dec);
+      final piezas = (_numMat(m['piezas']) ?? 0).round();
+      final celdas = <(String, String)>[
+        (_t('N.º de parte del cliente'), tm(m, 'parte_cliente').isEmpty ? '-' : tm(m, 'parte_cliente')),
+        (_t('Proceso'), tm(m, 'proceso').isNotEmpty ? tm(m, 'proceso') : (v('proceso').isNotEmpty ? v('proceso') : '-')),
+        (_t('Material y grado'), materialPieza(m)),
+        (_t('Espesor'), espesorPieza(m, info, p.es3D)),
+        (_t('Dimensiones'), p.es3D ? '${nf(info['largo'])} x ${nf(info['ancho'])} x ${nf(info['alto'])} mm' : '${nf(info['largo'])} x ${nf(info['ancho'])} mm'),
+        (_t('Cantidad'), piezas > 0 ? '$piezas ${piezas == 1 ? _t('pieza') : _t('piezas')}' : '-'),
+        (_t('Archivo'), _limpiarTexto('${info['nombre'] ?? '-'}')),
+        (_t('Revisión CAD'), 'Rev. ${tm(m, 'rev_cad').isEmpty ? 'A' : tm(m, 'rev_cad')}'),
+        (_t('Plano'), '${numPlano(i)} (${_t('Anexo')} ${i + 1})'),
+        (_t('Tolerancia'), toleranciaPieza(m)),
+        (_t('Acabado superficial'), tm(m, 'acabado').isNotEmpty ? tm(m, 'acabado') : (v('acabado').isNotEmpty ? v('acabado') : '-')),
+        p.es3D
+          ? (_t('Volumen'), '${nf(info['volumen_cm3'], 1)} cm3')
+          : (_t('Corte / barrenos'), '${nf(((info['longitud_corte'] as num?) ?? 0) / 1000, 2)} m / ${info['barrenos'] ?? 0}'),
+      ];
+      pw.Widget celda((String, String) c) => pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Text(c.$1, style: const pw.TextStyle(fontSize: 6.5, color: grisTexto)),
+          pw.Text(c.$2, style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold)),
+        ]));
+      return _entero(pw.Container(
+        margin: const pw.EdgeInsets.only(bottom: 6),
+        decoration: pw.BoxDecoration(border: pw.Border.all(color: azul, width: 0.6), borderRadius: pw.BorderRadius.circular(4)),
+        child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+          pw.Container(color: azul, padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            child: pw.Row(children: [
+              pw.Text('PART NUMBER  ${parteTaller(i)}', style: pw.TextStyle(fontSize: 9, color: PdfColors.white, fontWeight: pw.FontWeight.bold)),
+              pw.Spacer(),
+              pw.Text(nombrePieza(i), style: const pw.TextStyle(fontSize: 8.5, color: PdfColors.white)),
+            ])),
+          pw.Table(
+            border: const pw.TableBorder(horizontalInside: pw.BorderSide(color: grisLinea, width: 0.4), verticalInside: pw.BorderSide(color: grisLinea, width: 0.4)),
+            children: [
+              for (int k = 0; k < celdas.length; k += 3)
+                pw.TableRow(children: [for (int c = k; c < k + 3; c++) c < celdas.length ? celda(celdas[c]) : pw.SizedBox()]),
+            ]),
+        ])));
+    }
+    final specs = [for (int i = 0; i < piezasPdf.length; i++) specPieza(i)];
+
+    // Dibujo de la pieza que mandó el Simulador 2.0 (3D sombreado)
     pw.Widget? imagenPieza;
     if (d['archivo_png'] is String) {
       try {
@@ -604,55 +689,49 @@ class PdfService {
         }
       } catch (_) {}
     }
-    final numAnexos = (croquis != null || imagenPieza != null ? 1 : 0) + otrasPiezas.whereType<pw.Row>().length;
-    final hayAnexos = numAnexos > 0;
-    // Todas las piezas de la cotización en una tabla: la principal y los demás diseños
-    final filasPiezas = <List<String>>[];
-    void agregarPieza(Map<String, dynamic> info, Map<String, dynamic> mat) {
-      String nf(dynamic x, [int dec = 1]) => _fmtN(((x as num?) ?? 0).toDouble(), dec);
-      final es3D = info['tipo'] == 'stl' || info['tipo'] == 'obj';
-      final esp = _numMat(mat['espesor']) ?? (es3D ? ((info['alto'] as num?) ?? 0).toDouble() : null);
-      filasPiezas.add([
-        '${filasPiezas.length + 1}',
-        _limpiarTexto('${info['nombre'] ?? ''}'),
-        es3D ? '${nf(info['largo'])} x ${nf(info['ancho'])} x ${nf(info['alto'])}' : '${nf(info['largo'])} x ${nf(info['ancho'])}',
-        esp != null && esp > 0 ? _fmtN(esp, esp % 1 == 0 ? 0 : 1) : '-',
-        _limpiarTexto('${mat['material'] ?? ''}'.trim().isEmpty ? '-' : '${mat['material']}'.trim()),
-        _limpiarTexto('${mat['acabado'] ?? ''}'.trim().isEmpty ? '-' : '${mat['acabado']}'.trim()),
-        es3D ? '${nf(info['volumen_cm3'], 1)} cm3' : '${nf(((info['longitud_corte'] as num?) ?? 0) / 1000, 2)} m',
-        es3D ? '-' : '${info['barrenos'] ?? 0}',
-        es3D ? '-' : '${nf(((info['area_pieza'] as num?) ?? 0) / 100, 1)} cm2',
-      ]);
-    }
-    if (infoArch != null) agregarPieza(infoArch, matPrincipal);
-    if (d['otras_piezas'] is List) {
-      for (final m in (d['otras_piezas'] as List).whereType<Map>()) {
-        agregarPieza(Map<String, dynamic>.from((m['info'] as Map?) ?? const {}),
-          m['material'] is Map ? Map<String, dynamic>.from(m['material'] as Map) : <String, dynamic>{});
+
+    // Planos del anexo: croquis con cotas y su cajetín (plano, pieza, revisión, escala…)
+    final anexos = <pw.Widget>[];
+    for (int i = 0; i < piezasPdf.length; i++) {
+      final p = piezasPdf[i];
+      final crit = criticasDe(p.mat);
+      final titulo = _limpiarTexto('${_t('ANEXO')} ${i + 1} - ${_t('PLANO')} ${numPlano(i)}: ${nombrePieza(i)}');
+      pw.Widget? dibujo;
+      if (i == 0 && p.es3D && imagenPieza != null) {
+        dibujo = pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Text(titulo, style: pw.TextStyle(fontSize: 8, color: grisTexto, fontWeight: pw.FontWeight.bold)), pw.SizedBox(height: 3), imagenPieza]);
+      } else {
+        dibujo = _croquisPieza(
+          largo: ((p.info['largo'] as num?) ?? 0).toDouble(), ancho: ((p.info['ancho'] as num?) ?? 0).toDouble(),
+          espesor: _numMat(p.mat['espesor']) ?? (i == 0 ? numPro('croquis_espesor') : (p.es3D ? ((p.info['alto'] as num?) ?? 0).toDouble() : 0)),
+          barrenoD: 0, barrenos: 0, azul: azul, gris: grisTexto,
+          trazos: p.tz, es3D: p.es3D, cotas: p.cotas, criticas: crit, titulo: titulo, nota: _notaMaterial(p.mat, p.info));
       }
+      if (dibujo == null) continue;
+      anexos.add(pw.SizedBox(height: 10));
+      anexos.add(_entero(pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+        dibujo,
+        _cajetin(azul: azul, gris: grisTexto, celdas: [
+          (_t('Plano No.'), numPlano(i)), (_t('N.º de parte'), [parteTaller(i), if (tm(p.mat, 'parte_cliente').isNotEmpty) tm(p.mat, 'parte_cliente')].join(' / ')),
+          (_t('Revisión'), tm(p.mat, 'rev_cad').isEmpty ? 'A' : tm(p.mat, 'rev_cad')), (_t('Unidades'), 'mm'),
+          (_t('Escala'), _t('S/E (sin escala)')), (_t('Fecha'), fecha),
+          (_t('Material'), materialPieza(p.mat)), (_t('Espesor'), espesorPieza(p.mat, p.info, p.es3D)),
+          (_t('Tolerancias generales'), toleranciaPieza(p.mat)), (_t('Referencia'), _t('X0 Y0: esquina inferior izquierda')),
+          (_t('Revisó'), revisor), (_t('Cotización'), '$folio Rev. $revision'),
+        ]),
+      ])));
+      if (p.cotas.isNotEmpty) { anexos.add(pw.SizedBox(height: 4)); anexos.add(_tablaCotasPdf(p.cotas, grisTexto, criticas: crit)); }
     }
-    // Con archivos, las medidas y el archivo de cada pieza ya van en la tabla
-    if (filasPiezas.isNotEmpty) tecnicos.removeWhere((f) => f.$1 == _t('Medidas / espesor') || f.$1 == _t('Archivo recibido'));
-    pw.Widget? tablaPiezas;
-    if (filasPiezas.isNotEmpty) {
-      pw.Widget c(String t, {bool enc = false, bool der = false}) => pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        child: pw.Text(t, textAlign: der ? pw.TextAlign.right : pw.TextAlign.left,
-          style: pw.TextStyle(fontSize: enc ? 7.5 : 8, color: enc ? PdfColors.white : PdfColors.black, fontWeight: enc ? pw.FontWeight.bold : pw.FontWeight.normal)));
-      tablaPiezas = pw.Table(
-        border: pw.TableBorder.all(color: grisLinea, width: 0.5),
-        columnWidths: {
-          0: const pw.FixedColumnWidth(18), 1: const pw.FlexColumnWidth(2.2), 2: const pw.FlexColumnWidth(1.6), 3: const pw.FixedColumnWidth(40),
-          4: const pw.FlexColumnWidth(1.6), 5: const pw.FlexColumnWidth(1.4), 6: const pw.FixedColumnWidth(48), 7: const pw.FixedColumnWidth(50), 8: const pw.FixedColumnWidth(52),
-        },
-        children: [
-          pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
-            for (final t in ['#', _t('Pieza'), _t('Medidas (mm)'), _t('Esp. mm'), _t('Material'), _t('Acabado'), _t('Corte'), _t('Barrenos'), _t('Área')]) c(t, enc: true),
-          ]),
-          for (int k = 0; k < filasPiezas.length; k++) pw.TableRow(
-            decoration: pw.BoxDecoration(color: k.isEven ? PdfColors.white : grisClaro),
-            children: [for (int col = 0; col < filasPiezas[k].length; col++) c(filasPiezas[k][col], der: col == 6 || col == 7 || col == 8)]),
-        ]);
+    // Cotizaciones viejas sin archivo: el croquis de rectángulo con largo y ancho escritos a mano
+    if (piezasPdf.isEmpty) {
+      final viejo = _croquisPieza(largo: numPro('croquis_largo'), ancho: numPro('croquis_ancho'), espesor: numPro('croquis_espesor'),
+        barrenoD: numPro('croquis_barreno_d'), barrenos: numPro('croquis_barrenos').round(), azul: azul, gris: grisTexto);
+      if (viejo != null) { anexos.add(pw.SizedBox(height: 10)); anexos.add(_entero(viejo)); }
     }
+    final numAnexos = anexos.whereType<pw.Row>().length;
+    final hayAnexos = numAnexos > 0;
+    // Con archivos, las medidas y el archivo de cada pieza ya van en su especificación
+    if (piezasPdf.isNotEmpty) tecnicos.removeWhere((f) => f.$1 == _t('Medidas / espesor') || f.$1 == _t('Archivo recibido'));
 
     int n = 0;
     String sig() => '${++n}';
@@ -676,14 +755,16 @@ class PdfService {
         pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Expanded(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
             if (logoImage != null)
-              pw.Image(logoImage, width: 130, height: 38, fit: pw.BoxFit.contain)
+              pw.Image(logoImage, width: 150, height: 46, fit: pw.BoxFit.contain)
             else
               pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold, color: azul)),
-            pw.SizedBox(height: 6),
-            pw.Text(nombreEmpresa, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 5),
+            pw.Text(eslogan.isEmpty ? nombreEmpresa : '$nombreEmpresa - $eslogan', style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: azul)),
             if (rfcEmpresa.isNotEmpty) pw.Text('${_etqRfc(empresa)}: $rfcEmpresa', style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
-            if (direccion.isNotEmpty) pw.Text(direccion, style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
-            pw.Text([if (tel1.isNotEmpty) _tf('Tel: {0}', [tel1]), if (correoEmpresa.isNotEmpty) correoEmpresa, if (web.toString().isNotEmpty) web].join('  ·  '),
+            if (direccion.isNotEmpty) pw.Text(_tf('Domicilio fiscal: {0}', [direccion]), style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+            if (contactoNombre.isNotEmpty) pw.Text(_tf('Contacto comercial: {0}', [contactoCargo.isEmpty ? contactoNombre : '$contactoNombre, $contactoCargo']),
+              style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
+            pw.Text([if (tel1.isNotEmpty) _tf('Tel: {0}', [tel1]), if (correoEmpresa.isNotEmpty) correoEmpresa, if (web.isNotEmpty) web].join('  ·  '),
               style: const pw.TextStyle(fontSize: 8, color: grisTexto)),
           ])),
           pw.Container(
@@ -698,6 +779,8 @@ class PdfService {
                 _filaEnc(_t('Folio'), folio, azul), _filaEnc(_t('Revisión'), revision, azul),
                 _filaEnc(_t('Fecha'), fecha, azul), _filaEnc(_t('Vigente hasta'), fechaVigencia, azul),
                 _filaEnc(_t('Moneda'), moneda, azul),
+                if (proyectoNum.isNotEmpty) _filaEnc(_t('Proyecto No.'), proyectoNum, azul),
+                if (clienteRef.isNotEmpty) _filaEnc(_t('ID de cliente'), clienteRef, azul),
               ])),
             ])),
         ]),
@@ -726,6 +809,7 @@ class PdfService {
               pw.SizedBox(height: 3),
               pw.Text(v('proyecto').isEmpty ? '-' : v('proyecto'),
                 style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold, color: azul)),
+
             ]))),
         ]),
 
@@ -746,12 +830,12 @@ class PdfService {
         ],
 
         // ─── 3. DETALLE TÉCNICO ─────────────
-        if (hay(tecnicos) || hayAnexos || tablaPiezas != null) ...[
+        if (hay(tecnicos) || hayAnexos || specs.isNotEmpty) ...[
           titulo(sig(), _t('DETALLE TÉCNICO DE LAS PIEZAS')),
-          if (tablaPiezas != null) ...[tablaPiezas, pw.SizedBox(height: 6)],
+          ...specs,
           if (hay(tecnicos)) datos(tecnicos),
           if (hayAnexos) pw.Padding(padding: const pw.EdgeInsets.only(top: 4), child: pw.Text(
-            _tf('Croquis, cotas, material y espesor de cada pieza: ver anexos al final ({0}).', [numAnexos]),
+            _tf('Plano de cada pieza con sus cotas, material, espesor y tolerancias: ver anexos al final ({0}).', [numAnexos]),
             style: pw.TextStyle(fontSize: 8.5, color: grisTexto, fontStyle: pw.FontStyle.italic))),
         ],
 
@@ -817,17 +901,28 @@ class PdfService {
               pw.Text('TOTAL $moneda', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
               pw.Text('${Pais.simbolo}${_fmt.format(cotizacion.total)}', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold, color: azul)),
             ]),
+            if (cotizacion.ivaPct > 0) pw.Padding(padding: const pw.EdgeInsets.only(top: 2), child: pw.Text(
+              _tf('{0} desglosado. Total con impuestos incluidos.', [_etqIva(empresa)]),
+              textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 7, color: grisTexto))),
           ])),
         ]),
 
         // ─── 6. CONDICIONES COMERCIALES ─────
         titulo(sig(), _t('CONDICIONES COMERCIALES')),
         datos(comerciales),
+        if (condicionesLista.isNotEmpty) ...[pw.SizedBox(height: 4), datos(condicionesLista)],
+
+        // ─── TÉRMINOS INTERNACIONALES ───────
+        if (internacional.any((f) => f.$2.isNotEmpty)) ...[
+          titulo(sig(), _t('TÉRMINOS INTERNACIONALES')),
+          datos(internacional),
+        ],
 
         // ─── 7. CALIDAD ─────────────────────
-        if (v('calidad').isNotEmpty || v('tolerancia').isNotEmpty) ...[
+        if (calidadLista.isNotEmpty || v('calidad').isNotEmpty || v('tolerancia').isNotEmpty) ...[
           titulo(sig(), _t('CONDICIONES TÉCNICAS Y DE CALIDAD')),
-          pw.Container(
+          if (calidadLista.isNotEmpty) ...[datos(calidadLista), pw.SizedBox(height: 4)],
+          if (v('calidad').isNotEmpty || v('tolerancia').isNotEmpty || (empresa['leyenda_pdf'] as String?)?.isNotEmpty == true) pw.Container(
             width: double.infinity,
             padding: const pw.EdgeInsets.all(8),
             decoration: pw.BoxDecoration(color: azulClaro, borderRadius: pw.BorderRadius.circular(4)),
@@ -840,6 +935,16 @@ class PdfService {
                   child: pw.Text(_limpiarTexto(empresa['leyenda_pdf']),
                     style: pw.TextStyle(fontSize: 8, color: grisTexto, fontStyle: pw.FontStyle.italic))),
             ])),
+        ],
+
+        // ─── CONFIDENCIALIDAD ───────────────
+        if (confidencialidad.isNotEmpty) ...[
+          titulo(sig(), _t('CONFIDENCIALIDAD Y PROPIEDAD INTELECTUAL')),
+          ...confidencialidad.map((l) => pw.Padding(padding: const pw.EdgeInsets.only(bottom: 2),
+            child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('-  ', style: const pw.TextStyle(fontSize: 8.5)),
+              pw.Expanded(child: pw.Text(l, style: const pw.TextStyle(fontSize: 8.5))),
+            ]))),
         ],
 
         // ─── 8. APROBACIÓN ──────────────────
@@ -858,12 +963,8 @@ class PdfService {
         // ─── ANEXOS: croquis de cada pieza con sus cotas, material y espesor ───
         if (hayAnexos) ...[
           pw.NewPage(),
-          titulo('A', _t('ANEXOS: CROQUIS DE LAS PIEZAS')),
-          // Pieza 3D: la imagen sombreada en vez del croquis plano; 2D: el croquis con cotas
-          if (imagenPieza != null && (croquis == null || es3DArch)) ...[pw.SizedBox(height: 8), _entero(imagenPieza)]
-          else if (croquis != null) ...[pw.SizedBox(height: 8), _entero(croquis)],
-          if (cotasPdf.isNotEmpty) ...[pw.SizedBox(height: 6), _tablaCotasPdf(cotasPdf, grisTexto)],
-          ...otrasPiezas,
+          titulo('A', _t('ANEXOS: PLANOS DE LAS PIEZAS')),
+          ...anexos,
         ],
       ],
     ));
@@ -926,6 +1027,7 @@ class PdfService {
     List<Cota> cotas = const [],
     String? titulo,
     String? nota,
+    Set<int> criticas = const {},
   }) {
     // Con archivo: el dibujo es la pieza real y las medidas salen de él
     if (trazos.isNotEmpty) {
@@ -1026,6 +1128,14 @@ class PdfService {
                   linea(h.$1, h.$2 - rB - 3, h.$1, h.$2 + rB + 3);
                   c.setLineWidth(0.8);
                 }
+                // Ejes del origen (X0 Y0) en la esquina inferior izquierda de la pieza
+                if (trazos.isNotEmpty && !es3D) {
+                  c.setStrokeColor(const PdfColor.fromInt(0xFFB42318));
+                  c.setLineWidth(0.6);
+                  final ox0 = rx, oy0 = ryTop + rh;
+                  linea(ox0, oy0, ox0 + 14, oy0); linea(ox0 + 14, oy0, ox0 + 11, oy0 - 1.5); linea(ox0 + 14, oy0, ox0 + 11, oy0 + 1.5);
+                  linea(ox0, oy0, ox0, oy0 - 14); linea(ox0, oy0 - 14, ox0 - 1.5, oy0 - 11); linea(ox0, oy0 - 14, ox0 + 1.5, oy0 - 11);
+                }
                 // Distancia entre barrenos: línea punteada de centro a centro
                 c.setStrokeColor(const PdfColor.fromInt(0xFF1F5FBF));
                 c.setLineWidth(0.4);
@@ -1071,7 +1181,11 @@ class PdfService {
             pw.Positioned(left: rx, top: ryTop + rh + (cotas.isNotEmpty ? 12 : 6), child: pw.SizedBox(width: rw,
               child: pw.Text(es3D ? _t('Vista superior (malla)') : _t('Vista superior'), style: estiloGris, textAlign: pw.TextAlign.center))),
             // Cotas de cada tramo: la medida si cabe, si no su número (ver la tabla)
-            ..._etiquetasCotas(cotas, rx: rx, ryTop: ryTop, rh: rh, esc: esc, maxX: largo, maxY: ancho, gris: gris),
+            ..._etiquetasCotas(cotas, rx: rx, ryTop: ryTop, rh: rh, esc: esc, maxX: largo, maxY: ancho, gris: gris, criticas: criticas),
+            // Origen del sistema de referencia: X0 Y0 en la esquina inferior izquierda
+            if (trazos.isNotEmpty && !es3D) ...[
+              pw.Positioned(left: rx - 27, top: ryTop + rh + 2, child: pw.Text('X0 Y0', style: pw.TextStyle(fontSize: 5.5, color: gris, fontWeight: pw.FontWeight.bold))),
+            ],
             if (holes.isNotEmpty)
               pw.Positioned(left: rx, top: ryTop + rh + (cotas.isNotEmpty ? 22 : 16), child: pw.SizedBox(width: rw,
                 child: pw.Text('${holes.length} x Ø${mm(barrenoD)}', style: estilo, textAlign: pw.TextAlign.center))),
@@ -1087,6 +1201,35 @@ class PdfService {
           ])),
         pw.Text(_t('Medidas en mm. Croquis ilustrativo, no a escala.'), style: estiloGris),
       ]));
+  }
+
+  /// 10 dígitos sin lada internacional → "+52 246 121 7072" (México). Lo demás se deja como venga.
+  static String _telInternacional(String t) {
+    final limpio = t.trim();
+    final dig = limpio.replaceAll(RegExp(r'\D'), '');
+    if (limpio.startsWith('+') || dig.length != 10) return limpio;
+    return '+52 ${dig.substring(0, 3)} ${dig.substring(3, 6)} ${dig.substring(6)}';
+  }
+
+  /// "HetNa CNC" → "HC". Prefijo de los números de parte si el taller no puso uno.
+  static String _iniciales(String nombre) {
+    final l = nombre.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).map((w) => w[0].toUpperCase()).join();
+    return l.isEmpty ? 'PZ' : (l.length > 3 ? l.substring(0, 3) : l);
+  }
+
+  /// Cajetín del plano: 12 datos en 2 renglones de 6
+  static pw.Widget _cajetin({required PdfColor azul, required PdfColor gris, required List<(String, String)> celdas}) {
+    pw.Widget c((String, String) x) => pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(x.$1, style: pw.TextStyle(fontSize: 5.8, color: gris)),
+        pw.Text(_limpiarTexto(x.$2), style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold, color: azul)),
+      ]));
+    return pw.Table(
+      border: pw.TableBorder.all(color: azul, width: 0.6),
+      children: [
+        for (int k = 0; k < celdas.length; k += 6)
+          pw.TableRow(children: [for (int i = k; i < k + 6; i++) i < celdas.length ? c(celdas[i]) : pw.SizedBox()]),
+      ]);
   }
 
   // Un bloque que no se parte entre páginas (si no cabe, pasa entero a la siguiente)
@@ -1119,22 +1262,35 @@ class PdfService {
   }
 
   static List<pw.Widget> _etiquetasCotas(List<Cota> cotas, {required double rx, required double ryTop, required double rh,
-      required double esc, required double maxX, required double maxY, required PdfColor gris}) {
+      required double esc, required double maxX, required double maxY, required PdfColor gris, Set<int> criticas = const {}}) {
     if (cotas.isEmpty) return const [];
-    const naranja = PdfColor.fromInt(0xFFC2560A);
+    const naranjaBase = PdfColor.fromInt(0xFFC2560A);
+    const rojo = PdfColor.fromInt(0xFFB42318);
     final soloNumeros = cotas.length > 60;
     double px(double x) => rx + x * esc;
     double top(double y) => ryTop + rh - y * esc;
     final cx0 = px(maxX / 2), cy0 = top(maxY / 2);
     double anchoTxt(String t) => t.length * 3.1 + 2;
-    pw.Widget tag(String t, double x, double y, PdfColor color) {
-      final w = anchoTxt(t);
+    pw.Widget tag(String t, double x, double y, PdfColor color, {bool critica = false}) {
+      final w = anchoTxt(t) + (critica ? 4 : 0);
       return pw.Positioned(left: x - w / 2, top: y - 3.5, child: pw.Container(
-        width: w, color: PdfColors.white,
-        child: pw.Text(t, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 5.5, color: color, fontWeight: pw.FontWeight.bold))));
+        width: w,
+        decoration: pw.BoxDecoration(color: PdfColors.white, border: critica ? pw.Border.all(color: rojo, width: 0.6) : null),
+        child: pw.Text(t, textAlign: pw.TextAlign.center, style: pw.TextStyle(fontSize: 5.5, color: critica ? rojo : color, fontWeight: pw.FontWeight.bold))));
+    }
+    // Una orilla recta del contorno que mide lo mismo que la medida total ya acotada afuera: no se repite
+    bool repiteTotal(Cota c) {
+      if (c.tipo != TipoCota.linea) return false;
+      const t = 0.5;
+      final horizontal = (c.y1 - c.y2).abs() < t && ((c.y1).abs() < t || (c.y1 - maxY).abs() < t);
+      final vertical = (c.x1 - c.x2).abs() < t && ((c.x1).abs() < t || (c.x1 - maxX).abs() < t);
+      return (horizontal && (c.valor - maxX).abs() < t) || (vertical && (c.valor - maxY).abs() < t);
     }
     final out = <pw.Widget>[];
     for (final c in cotas) {
+      final critica = criticas.contains(c.n);
+      final naranja = critica ? rojo : naranjaBase;
+      if (!critica && repiteTotal(c)) continue;
       switch (c.tipo) {
         case TipoCota.linea:
           final ax = px(c.x1), ay = top(c.y1), bx = px(c.x2), by = top(c.y2);
@@ -1144,16 +1300,16 @@ class PdfService {
           final mx = (ax + bx) / 2, my = (ay + by) / 2;
           if (math.pow(mx + nx - cx0, 2) + math.pow(my + ny - cy0, 2) < math.pow(mx - cx0, 2) + math.pow(my - cy0, 2)) { nx = -nx; ny = -ny; }
           final cabe = !soloNumeros && l >= anchoTxt(c.texto) + 4;
-          out.add(tag(cabe ? c.texto : '${c.n}', mx + nx * 5, my + ny * 5, cabe ? naranja : gris));
+          out.add(tag(cabe ? c.texto : '${c.n}', mx + nx * 5, my + ny * 5, cabe ? naranja : gris, critica: critica));
           break;
         case TipoCota.arco:
           final cx = px(c.cx), cy = top(c.cy), ex = px(c.ex), ey = top(c.ey);
           final vx = ex - cx, vy = ey - cy, d = math.sqrt(vx * vx + vy * vy);
-          out.add(tag(soloNumeros ? '${c.n}' : c.texto, d > 0 ? ex + vx / d * 6 : ex, d > 0 ? ey + vy / d * 6 : ey, naranja));
+          out.add(tag(soloNumeros ? '${c.n}' : c.texto, d > 0 ? ex + vx / d * 6 : ex, d > 0 ? ey + vy / d * 6 : ey, naranja, critica: critica));
           break;
         case TipoCota.diametro:
           final rr = c.r * esc;
-          out.add(tag(soloNumeros ? '${c.n}' : c.texto, px(c.cx) + (rr + 6) * 0.7071, top(c.cy) - (rr + 6) * 0.7071, naranja));
+          out.add(tag(soloNumeros ? '${c.n}' : c.texto, px(c.cx) + (rr + 6) * 0.7071, top(c.cy) - (rr + 6) * 0.7071, naranja, critica: critica));
           break;
         case TipoCota.distancia:
           const azulCota = PdfColor.fromInt(0xFF1F5FBF);
@@ -1161,25 +1317,53 @@ class PdfService {
           final dx = bx - ax, dy = by - ay, l = math.sqrt(dx * dx + dy * dy);
           if (l < 2) break;
           final cabe = !soloNumeros && l >= anchoTxt(c.texto) + 4;
-          out.add(tag(cabe ? c.texto : '${c.n}', (ax + bx) / 2 - dy / l * 5, (ay + by) / 2 + dx / l * 5, azulCota));
+          out.add(tag(cabe ? c.texto : '${c.n}', (ax + bx) / 2 - dy / l * 5, (ay + by) / 2 + dx / l * 5, critica ? rojo : azulCota, critica: critica));
           break;
       }
     }
     return out;
   }
 
-  static pw.Widget _tablaCotasPdf(List<Cota> cotas, PdfColor gris) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-    pw.Text('${_t('COTAS DE LA PIEZA')} · ${_limpiarTexto(resumenCotas(cotas))}', style: pw.TextStyle(fontSize: 7.5, color: gris, fontWeight: pw.FontWeight.bold)),
-    pw.SizedBox(height: 2),
-    pw.Wrap(spacing: 8, runSpacing: 1, children: [
-      for (final c in cotas) pw.SizedBox(width: c.tipo == TipoCota.diametro ? 160 : 118, child: pw.Text(
-        _limpiarTexto('${c.n}. ${_t(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' (arco ${fmtMm(c.largoArco)})' : ''}'
-          '${c.tipo == TipoCota.diametro ? ' en ${c.ubicacion}' : ''}'),
-        style: const pw.TextStyle(fontSize: 6.5))),
-    ]),
-    if (cotas.any((c) => c.tipo == TipoCota.diametro)) pw.Text(_t('Ubicación de barrenos (X, Y) desde la esquina inferior izquierda de la pieza; "Entre barrenos" es de centro a centro.'),
-      style: pw.TextStyle(fontSize: 6, color: gris, fontStyle: pw.FontStyle.italic)),
-  ]);
+  /// Tabla de cotas: las líneas y arcos de la misma medida van juntos ("2 x Línea 100 mm (1, 5)")
+  /// y las cotas críticas se marcan. Los barrenos van uno por uno con su ubicación.
+  static pw.Widget _tablaCotasPdf(List<Cota> cotas, PdfColor gris, {Set<int> criticas = const {}}) {
+    const rojo = PdfColor.fromInt(0xFFB42318);
+    final renglones = <({String texto, bool critica})>[];
+    final grupos = <String, List<Cota>>{};
+    for (final c in cotas) {
+      if (c.tipo == TipoCota.linea || c.tipo == TipoCota.arco) {
+        grupos.putIfAbsent('${c.tipo.name}|${c.texto}', () => []).add(c);
+      }
+    }
+    final yaAgrupadas = <String>{};
+    for (final c in cotas) {
+      final crit = criticas.contains(c.n);
+      if (c.tipo == TipoCota.linea || c.tipo == TipoCota.arco) {
+        final clave = '${c.tipo.name}|${c.texto}';
+        final g = grupos[clave]!;
+        final algunaCritica = g.any((x) => criticas.contains(x.n));
+        if (g.length > 1 && !algunaCritica) {
+          if (!yaAgrupadas.add(clave)) continue;
+          renglones.add((texto: '${g.length} x ${_t(c.nombreTipo)} ${c.texto} mm (${g.map((x) => x.n).join(', ')})', critica: false));
+          continue;
+        }
+        renglones.add((texto: '${c.n}. ${_t(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.arco ? ' (arco ${fmtMm(c.largoArco)})' : ''}', critica: crit));
+      } else {
+        renglones.add((texto: '${c.n}. ${_t(c.nombreTipo)} ${c.texto} mm${c.tipo == TipoCota.diametro ? ' en ${c.ubicacion}' : ''}', critica: crit));
+      }
+    }
+    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      pw.Text('${_t('COTAS DE LA PIEZA')} · ${_limpiarTexto(resumenCotas(cotas))}', style: pw.TextStyle(fontSize: 7.5, color: gris, fontWeight: pw.FontWeight.bold)),
+      pw.SizedBox(height: 2),
+      pw.Wrap(spacing: 8, runSpacing: 1, children: [
+        for (final r in renglones) pw.SizedBox(width: r.texto.length > 30 ? 175 : 118, child: pw.Text(
+          _limpiarTexto(r.critica ? '${r.texto}  * ${_t('CRÍTICA')}' : r.texto),
+          style: pw.TextStyle(fontSize: 6.5, color: r.critica ? rojo : PdfColors.black, fontWeight: r.critica ? pw.FontWeight.bold : pw.FontWeight.normal))),
+      ]),
+      pw.Text(_t('Las orillas que miden lo mismo que la medida total sólo se acotan una vez. Ubicación de barrenos (X, Y) desde el origen X0 Y0 (esquina inferior izquierda); "Entre barrenos" es de centro a centro. Las cotas críticas van en rojo.'),
+        style: pw.TextStyle(fontSize: 6, color: gris, fontStyle: pw.FontStyle.italic)),
+    ]);
+  }
 
   // Fix 3: Limpiar caracteres especiales que aparecen como "tachas" en el PDF
   static String _limpiarTexto(String texto) {

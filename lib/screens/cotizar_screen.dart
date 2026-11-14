@@ -487,6 +487,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
   // (clave en datos_pro, etiqueta, renglones, texto inicial)
   static const _camposProyecto = [
     ('proyecto', 'Proyecto / referencia del cliente', 1, ''),
+    ('proyecto_num', 'Número de proyecto', 1, ''),
+    ('cliente_ref', 'ID del cliente (si lo dejas vacío se usa el de la app)', 1, ''),
     ('revision', 'Revisión', 1, 'A'),
     ('moneda', 'Moneda', 1, 'MXN'),
     ('resumen', 'Resumen: qué se cotiza y supuestos principales', 3, ''),
@@ -511,11 +513,42 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
     ('setups', 'Número de setups', 1, ''),
     ('inspeccion', 'Inspección (calibrador, micrómetro...)', 1, ''),
   ];
+  // Condiciones del PDF profesional: una por renglón, "Tema: texto". Vienen con un texto
+  // base que el taller ajusta a su forma de trabajar.
   static const _camposCondiciones = [
-    ('calidad', 'Condiciones técnicas y de calidad', 3,
-      'Inspección dimensional en cotas críticas antes de la entrega.'),
-    ('cambios', 'Cambios y cancelaciones', 2,
-      'Cambios de diseño o de cantidad después de aprobar pueden modificar precio y tiempo de entrega.'),
+    ('condiciones_lista', 'Condiciones comerciales (una por renglón: "Tema: texto")', 8,
+      'Pago: anticipo y saldo según la forma de pago indicada; transferencia, depósito o pago en línea.\n'
+      'Inicio del plazo: el tiempo de fabricación comienza al recibir el anticipo y la aprobación de los archivos técnicos.\n'
+      'Aprobación del diseño: el cliente aprueba por escrito los planos o archivos antes de fabricar.\n'
+      'Modificaciones: los cambios de diseño, material o cantidad después de aprobar pueden modificar el precio y el tiempo de entrega.\n'
+      'Cancelación: con la fabricación iniciada se cobran el material y el trabajo realizado.\n'
+      'Garantía: los defectos de fabricación reportados dentro de los 15 días siguientes a la entrega se corrigen sin costo.\n'
+      'Material del cliente: si el cliente proporciona el material, no se responde por sus defectos ni por las mermas normales del proceso.\n'
+      'Empaque: las piezas se entregan protegidas para su traslado.\n'
+      'Transporte: el costo de envío se indica por separado, salvo que se diga lo contrario.\n'
+      'Exclusiones: no incluye diseño, ensamble ni instalación, salvo que se indique en el alcance.'),
+    ('calidad_lista', 'Condiciones de calidad (una por renglón: "Tema: texto")', 7,
+      'Inspección: dimensiones críticas y características acordadas, antes de la entrega.\n'
+      'Tolerancias: según plano aprobado.\n'
+      'Material: identificación y documentación cuando se solicite.\n'
+      'Evidencia: fotografías del producto terminado.\n'
+      'Reporte dimensional: disponible bajo solicitud o incluido según el proyecto.\n'
+      'No conformidades: se notifican al cliente y se corrigen o reponen según lo acordado.\n'
+      'Trazabilidad: folio de la cotización y orden de trabajo en cada entrega.'),
+    ('calidad', 'Notas de calidad adicionales (opcional)', 2, ''),
+    ('confidencialidad', 'Confidencialidad y propiedad intelectual (una por renglón)', 5,
+      'Los planos y archivos CAD del cliente son confidenciales.\n'
+      'No se reproducen ni se comparten diseños sin autorización.\n'
+      'Los archivos se usan exclusivamente para el proyecto cotizado.\n'
+      'Los cambios de ingeniería requieren aprobación del cliente.\n'
+      'La propiedad intelectual de los diseños permanece con quien corresponda según el acuerdo entre las partes.'),
+  ];
+  // Sólo para clientes de otros países o cotizaciones en dólares (sale en el PDF si aplica)
+  static const _camposInternacional = [
+    ('origen', 'País de origen', 1, 'México'),
+    ('envio_terminos', 'Términos de envío (ej. paquetería a cargo del cliente)', 1, ''),
+    ('empaque', 'Especificaciones de empaque', 1, 'Empaque protegido para transporte.'),
+    ('incoterm', 'Incoterms 2020 (sólo si se acordó: EXW, FCA, FOB, DAP…)', 1, ''),
   ];
   final Map<String, TextEditingController> _pro = {};
   // Archivo de la pieza (DXF/SVG/STL/OBJ) leído por ArchivoCadService
@@ -813,8 +846,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 8), dense: true, childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
           leading: const Icon(Icons.grid_on_outlined, size: 18, color: AppColors.azul),
-          title: Text(tr('Material y aprovechamiento'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-          subtitle: Text(tr('Piezas por tablón u hoja, cuánto material compras y su costo por pieza'), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
+          title: Text(tr('Especificación, material y aprovechamiento'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+          subtitle: Text(tr('N.º de parte, proceso, tolerancia, material, piezas por hoja y precio sugerido'), style: const TextStyle(fontSize: 10.5, color: AppColors.textoSecundario)),
           children: [
             CalculoMaterial(pzLargo: l, pzAncho: a, datos: inicial,
               corteMm: ((info['longitud_corte'] as num?) ?? 0).toDouble(),
@@ -1484,7 +1517,8 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           // Material y espesor se capturan por pieza en "Material y aprovechamiento" (salen en su croquis del anexo)
         ])),
         _bloquePro(tr('Especificaciones de fabricación'), Icons.precision_manufacturing_outlined, _camposFabricacion),
-        _bloquePro(tr('Calidad y cambios'), Icons.verified_outlined, _camposCondiciones),
+        _bloquePro(tr('Condiciones, calidad y confidencialidad'), Icons.verified_outlined, _camposCondiciones),
+        _bloquePro(tr('Comercio internacional (opcional)'), Icons.public, _camposInternacional),
       ],
       _bloque(tr('Condiciones'), Icons.local_shipping_outlined, Column(children: [
         Row(children: [
