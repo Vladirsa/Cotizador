@@ -279,10 +279,20 @@ class SupabaseService {
     }).select().single();
     final cotId = (resCot as Map<String, dynamic>)['id'] as String;
     if (items.isNotEmpty) {
-      await _db.from('cotizacion_items').insert(
-        items.map((i) => i.toJson(cotId)).toList());
+      await _insertarItems(items.map((i) => i.toJson(cotId)).toList());
     }
     return Cotizacion.fromJson(resCot);
+  }
+
+  // Guarda las partidas. Si la base todavía no tiene la columna "categoria"
+  // (falta correr supabase/categoria_conceptos.sql), las guarda sin ella.
+  static Future<void> _insertarItems(List<Map<String, dynamic>> filas) async {
+    try {
+      await _db.from('cotizacion_items').insert(filas);
+    } on PostgrestException catch (e) {
+      if (!e.message.contains('categoria') || !filas.any((f) => f.containsKey('categoria'))) rethrow;
+      await _db.from('cotizacion_items').insert(filas.map((f) => Map.of(f)..remove('categoria')).toList());
+    }
   }
 
   static Future<void> eliminarCliente(String id) async {
@@ -390,8 +400,7 @@ class SupabaseService {
     }).eq('id', cotizacion.id!);
     await _db.from('cotizacion_items').delete().eq('cotizacion_id', cotizacion.id!);
     if (items.isNotEmpty) {
-      await _db.from('cotizacion_items').insert(
-        items.map((i) => i.toJson(cotizacion.id!)).toList());
+      await _insertarItems(items.map((i) => i.toJson(cotizacion.id!)).toList());
     }
   }
 

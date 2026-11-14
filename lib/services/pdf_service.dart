@@ -11,6 +11,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
+import 'categorias_concepto.dart';
 import '../models/models.dart';
 import 'archivo_cad_service.dart';
 import 'cotas_service.dart';
@@ -453,6 +454,7 @@ class PdfService {
     required Map<String, dynamic> empresa,
     bool? ingles,
   }) async {
+    final grupos = agruparPorCategoria(cotizacion.items);
     _en = ingles ?? enIngles;
     final pdf = pw.Document();
     pw.MemoryImage? logoImage;
@@ -857,13 +859,14 @@ class PdfService {
             pw.TableRow(decoration: pw.BoxDecoration(color: azul), children: [
               _cH('#'), _cH(_t('CONCEPTO')), _cH(_t('CANT.')), _cH(_t('P. UNITARIO')), _cH(_t('IMPORTE')),
             ]),
-            ...List.generate(cotizacion.items.length, (i) {
-              final item = cotizacion.items[i];
+            ...() {
+              // Con más de una categoría: encabezado y subtotal por categoría
+              pw.TableRow fila(CotizacionItem item, int n, int i) {
               final desc = (item.descripcion ?? '').trim();
               return pw.TableRow(
                 decoration: pw.BoxDecoration(color: i.isEven ? PdfColors.white : grisClaro),
                 children: [
-                  _cD('${i + 1}', center: true),
+                  _cD('$n', center: true),
                   pw.Padding(padding: const pw.EdgeInsets.all(6),
                     child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
                       if (_miniatura(item.imagenPng) != null) ...[
@@ -885,10 +888,45 @@ class PdfService {
                   _cD('${Pais.simbolo}${_fmt.format(item.precioUnitario)}', right: true),
                   _cD('${Pais.simbolo}${_fmt.format(item.subtotal)}', right: true),
                 ]);
-            }),
+              }
+              if (grupos.length < 2) return [for (int i = 0; i < cotizacion.items.length; i++) fila(cotizacion.items[i], i + 1, i)];
+              final filas = <pw.TableRow>[];
+              int n = 0;
+              for (final g in grupos) {
+                filas.add(pw.TableRow(decoration: pw.BoxDecoration(color: azulClaro), children: [
+                  pw.SizedBox(),
+                  pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: pw.Text(_t(g.nombre).toUpperCase(), style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: azul, letterSpacing: 0.5))),
+                  pw.SizedBox(), pw.SizedBox(), pw.SizedBox(),
+                ]));
+                for (int j = 0; j < g.items.length; j++) { n++; filas.add(fila(g.items[j], n, j)); }
+                if (g.items.length > 1) filas.add(pw.TableRow(verticalAlignment: pw.TableCellVerticalAlignment.middle, children: [
+                  pw.SizedBox(), pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: pw.Text(_tf('Subtotal {0}', [_t(g.nombre)]), textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8, color: grisTexto, fontStyle: pw.FontStyle.italic))),
+                  pw.SizedBox(), pw.SizedBox(),
+                  pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    child: pw.Text('${Pais.simbolo}${_fmt.format(g.subtotal)}', textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 8.5, fontWeight: pw.FontWeight.bold, color: azul))),
+                ]));
+              }
+              return filas;
+            }(),
           ]),
         pw.SizedBox(height: 8),
-        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          if (grupos.length > 1) pw.Expanded(child: pw.Container(
+            margin: const pw.EdgeInsets.only(right: 16),
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(border: pw.Border.all(color: grisLinea, width: 0.5), borderRadius: pw.BorderRadius.circular(4)),
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text(_t('RESUMEN POR CATEGORÍA'), style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: azul)),
+              pw.SizedBox(height: 4),
+              ...grupos.map((g) => pw.Padding(padding: const pw.EdgeInsets.only(bottom: 2), child: pw.Row(children: [
+                pw.Expanded(child: pw.Text(_t(g.nombre), style: const pw.TextStyle(fontSize: 8))),
+                pw.Text(cotizacion.subtotal > 0 ? '${(g.subtotal / cotizacion.subtotal * 100).round()}%' : '', style: const pw.TextStyle(fontSize: 7.5, color: grisTexto)),
+                pw.SizedBox(width: 8),
+                pw.SizedBox(width: 70, child: pw.Text('${Pais.simbolo}${_fmt.format(g.subtotal)}', textAlign: pw.TextAlign.right, style: const pw.TextStyle(fontSize: 8))),
+              ]))),
+            ]))),
           pw.Container(width: 230, child: pw.Column(children: [
             _tR(_t('Subtotal'), '${Pais.simbolo}${_fmt.format(cotizacion.subtotal)}', grisTexto),
             if (cotizacion.montoDescuento > 0)
