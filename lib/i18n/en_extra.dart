@@ -1182,4 +1182,12 @@ const Map<String, String> textosEnExtra = {
   'Grado comercial del material (ej. MDF E1, acero A36, aluminio 6061-T6)': 'Material grade (e.g. MDF E1, A36 steel, 6061-T6 aluminum)',
   'Especificación, material y aprovechamiento': 'Specification, material and yield',
   'N.º de parte, proceso, tolerancia, material, piezas por hoja y precio sugerido': 'Part no., process, tolerance, material, parts per sheet and suggested price',
+  'Fabricación': 'Manufacturing',
+  'Programación CNC': 'CNC programming',
+  'Diseño e ingeniería': 'Design & engineering',
+  'Inspección y calidad': 'Inspection & quality',
+  'Transporte': 'Shipping',
+  'Categoría': 'Category',
+  'Subtotal {0}': '{0} subtotal',
+  'RESUMEN POR CATEGORÍA': 'SUMMARY BY CATEGORY',
 };

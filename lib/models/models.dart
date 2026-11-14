@@ -217,6 +217,9 @@ class CotizacionItem {
   int cantidad;
   double precioUnitario;
   double descuentoItemPct;
+  // Categoría del concepto en la cotización profesional (fabricacion,
+  // material, acabados...). Null = se adivina por el nombre.
+  String? categoria;
 
   CotizacionItem({
     this.id,
@@ -235,6 +238,7 @@ class CotizacionItem {
     this.cantidad = 1,
     required this.precioUnitario,
     this.descuentoItemPct = 0,
+    this.categoria,
   });
 
   double get subtotal {
@@ -267,6 +271,7 @@ class CotizacionItem {
         cantidad: json['cantidad'] ?? 1,
         precioUnitario: (json['precio_unitario'] ?? 0).toDouble(),
         descuentoItemPct: (json['descuento_item_pct'] ?? 0).toDouble(),
+        categoria: json['categoria'],
       );
 
   Map<String, dynamic> toJson(String cotizacionId) => {
@@ -287,6 +292,9 @@ class CotizacionItem {
         'cantidad': cantidad,
         'precio_unitario': precioUnitario,
         'descuento_item_pct': descuentoItemPct,
+        // Sólo si se eligió: así se guarda aunque la base no tenga la columna
+        // (supabase/categoria_conceptos.sql)
+        if (categoria != null) 'categoria': categoria,
         'subtotal': subtotal,
       };
 }

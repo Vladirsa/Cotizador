@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import '../main.dart';
 import '../models/models.dart';
+import '../services/categorias_concepto.dart';
 import '../services/supabase_service.dart';
 import '../services/pdf_service.dart';
 import '../services/whatsapp_service.dart';
@@ -1472,6 +1473,7 @@ class _NuevaCotizacionState extends State<_NuevaCotizacion> {
           onEliminar: () => setState(() => _items.remove(item)),
           onCantidadChanged: (v) => setState(() => item.cantidad = v),
           onPrecioChanged: (v) => setState(() => item.precioUnitario = v),
+          onCategoriaChanged: _tipo == 'profesional' ? (v) => setState(() => item.categoria = v) : null,
           onDetalleChanged: (titulo, desc) => setState(() {
             item.nombreProducto = titulo;
             item.descripcion = desc;
@@ -2136,9 +2138,26 @@ class _ItemRow extends StatelessWidget {
   final ValueChanged<int> onCantidadChanged;
   final ValueChanged<double> onPrecioChanged;
   final void Function(String titulo, String? descripcion) onDetalleChanged;
+  // Sólo en la profesional: categoría del concepto para agrupar en el PDF
+  final ValueChanged<String>? onCategoriaChanged;
   const _ItemRow({super.key, required this.item, required this.onEliminar,
     required this.onCantidadChanged, required this.onPrecioChanged,
-    required this.onDetalleChanged});
+    required this.onDetalleChanged, this.onCategoriaChanged});
+
+  Widget _categoria() {
+    final actual = categoriaDe(item);
+    return Padding(padding: const EdgeInsets.only(top: 6), child: Row(children: [
+      const Icon(Icons.folder_outlined, size: 14, color: AppColors.textoSecundario),
+      const SizedBox(width: 4),
+      Text(tr('Categoría'), style: const TextStyle(fontSize: 11, color: AppColors.textoSecundario)),
+      const SizedBox(width: 8),
+      Flexible(child: DropdownButton<String>(
+        value: actual, isDense: true, isExpanded: true, underline: const SizedBox.shrink(),
+        style: const TextStyle(fontSize: 12, color: AppColors.azul, fontWeight: FontWeight.w600),
+        items: [for (final c in categoriasConcepto) DropdownMenuItem(value: c.clave, child: Text(tr(c.nombre)))],
+        onChanged: (v) { if (v != null) onCategoriaChanged!(v); })),
+    ]));
+  }
 
   Future<void> _editarDetalle(BuildContext context) async {
     final tituloCtrl = TextEditingController(text: item.nombreProducto);
@@ -2204,6 +2223,7 @@ class _ItemRow extends StatelessWidget {
           IconButton(icon: const Icon(Icons.close, size: 16, color: AppColors.rojo),
             padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: onEliminar),
         ]),
+        if (onCategoriaChanged != null) _categoria(),
         const SizedBox(height: 6),
         Row(children: [
           Expanded(flex: 3, child: TextFormField(
