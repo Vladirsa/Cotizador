@@ -36,6 +36,12 @@ class _ConfigScreenState extends State<ConfigScreen> {
   final _direccionCtrl= TextEditingController();
   final _rfcCtrl      = TextEditingController();
   final _leyendaCtrl  = TextEditingController();
+  // Encabezado de la cotización profesional
+  final _esloganCtrl  = TextEditingController();
+  final _webCtrl      = TextEditingController();
+  final _contactoCtrl = TextEditingController();
+  final _cargoCtrl    = TextEditingController();
+  final _prefijoCtrl  = TextEditingController();
   // Idioma, moneda e impuesto
   final _impuestoCtrl = TextEditingController(text: '16');
   String _moneda = 'MXN';
@@ -98,6 +104,7 @@ class _ConfigScreenState extends State<ConfigScreen> {
   void dispose() {
     _nombreCtrl.dispose(); _telefonoCtrl.dispose(); _correoCtrl.dispose();
     _direccionCtrl.dispose(); _rfcCtrl.dispose(); _leyendaCtrl.dispose();
+    _esloganCtrl.dispose(); _webCtrl.dispose(); _contactoCtrl.dispose(); _cargoCtrl.dispose(); _prefijoCtrl.dispose();
     _apiKeyCtrl.dispose(); _apiUrlCtrl.dispose();
     _rfcEmisorCtrl.dispose(); _serieCtrl.dispose(); _impuestoCtrl.dispose();
     _codigoVinculo.dispose();
@@ -113,6 +120,11 @@ class _ConfigScreenState extends State<ConfigScreen> {
       _direccionCtrl.text = cfg['direccion'] ?? '';
       _rfcCtrl.text       = cfg['rfc'] ?? '';
       _leyendaCtrl.text   = cfg['leyenda_pdf'] ?? '';
+      _esloganCtrl.text   = cfg['eslogan'] ?? '';
+      _webCtrl.text       = cfg['sitio_web'] ?? '';
+      _contactoCtrl.text  = cfg['contacto_nombre'] ?? '';
+      _cargoCtrl.text     = cfg['contacto_cargo'] ?? '';
+      _prefijoCtrl.text   = cfg['prefijo_parte'] ?? '';
       _logoUrl            = cfg['logo_url'];
       _colorPrimario      = cfg['color_primario'] ?? '#1a3a5c';
       _colorSecundario    = cfg['color_secundario'] ?? '#185fa5';
@@ -191,6 +203,17 @@ class _ConfigScreenState extends State<ConfigScreen> {
       });
       // Columna nueva: aparte, por si la base todavía no la tiene
       await SupabaseService.guardarConfiguracion({'pais_factura': _paisFactura});
+      // Encabezado de la cotización profesional (supabase/encabezado_cotizacion.sql);
+      // aparte y sin detener el guardado si la base todavía no tiene las columnas
+      try {
+        await SupabaseService.guardarConfiguracion({
+          'eslogan': _esloganCtrl.text.trim(),
+          'sitio_web': _webCtrl.text.trim(),
+          'contacto_nombre': _contactoCtrl.text.trim(),
+          'contacto_cargo': _cargoCtrl.text.trim(),
+          'prefijo_parte': _prefijoCtrl.text.trim().toUpperCase(),
+        });
+      } catch (_) {}
       WhatsAppService.paisTaller = _paisFactura;
       Pais.desdeConfig({'pais_factura': _paisFactura, 'moneda': _moneda});
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -265,13 +288,20 @@ class _ConfigScreenState extends State<ConfigScreen> {
               _seccion(tr('🏢 DATOS DE LA EMPRESA')),
               const SizedBox(height: 8),
               _campo(_nombreCtrl, tr('Nombre comercial'), Icons.store_outlined, requerido: true),
+              _campo(_esloganCtrl, tr('Giro o eslogan (sale bajo el nombre)'), Icons.short_text,
+                hint: tr('Ej: CNC Manufacturing & Digital Solutions')),
               _campo(_rfcCtrl, Pais.de(_paisFactura).etqId, Icons.badge_outlined, mayusculas: true,
                 hint: _paisFactura == 'MX' ? 'XAXX010101000' : ''),
               _campo(_telefonoCtrl, tr('Teléfono / WhatsApp'), Icons.phone_outlined,
                 tipo: TextInputType.phone),
               _campo(_correoCtrl, tr('Correo electrónico'), Icons.email_outlined,
                 tipo: TextInputType.emailAddress),
-              _campo(_direccionCtrl, tr('Dirección'), Icons.location_on_outlined, lineas: 2),
+              _campo(_direccionCtrl, tr('Domicilio fiscal completo'), Icons.location_on_outlined, lineas: 2),
+              _campo(_webCtrl, tr('Sitio web'), Icons.language, tipo: TextInputType.url, hint: 'www.tutaller.com'),
+              _campo(_contactoCtrl, tr('Contacto comercial (nombre)'), Icons.person_outline),
+              _campo(_cargoCtrl, tr('Cargo del contacto'), Icons.work_outline, hint: tr('Ej: Gerente comercial')),
+              _campo(_prefijoCtrl, tr('Prefijo de número de parte'), Icons.tag, mayusculas: true,
+                hint: tr('Ej: HT-CNC (queda HT-CNC-0019-01)')),
               _campo(_leyendaCtrl, tr('Leyenda en PDF'), Icons.notes_outlined, lineas: 2,
                 hint: tr('Ej: Garantía 6 meses en productos de madera')),
 

@@ -32,6 +32,7 @@ void main() {
     expect(find.textContaining('20 piezas por tablón'), findsOneWidget);
     expect(find.textContaining('16 tablones completos'), findsOneWidget);
     expect(find.textContaining('16.50'), findsOneWidget);
+    await tester.ensureVisible(find.text('Usar en el producto'));
     await tester.tap(find.text('Usar en el producto'));
     expect(aplicado?['piezas'], 320);
     expect(aplicado?['desc'], contains('16 tablones de 2400 × 100 mm (20 pz por tablón)'));
@@ -47,6 +48,7 @@ void main() {
         Material2(id: 'inv1', nombre: 'Pino tablón 3/4', tipo: 'madera', espesorMm: 19, precio: 330, unidad: 'pza', hojaLargo: 2400, hojaAncho: 100, stock: 5),
       ],
     )))));
+    await tester.ensureVisible(find.text('Elegir material de mi bodega'));
     await tester.tap(find.text('Elegir material de mi bodega'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Pino tablón 3/4'));

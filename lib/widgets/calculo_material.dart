@@ -58,6 +58,14 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
       'material': TextEditingController(text: v('material', '')),
       'espesor': TextEditingController(text: v('espesor', '')),
       'acabado': TextEditingController(text: v('acabado', '')),
+      // Especificación técnica de la pieza (sale en el PDF y en su plano del anexo)
+      'nombre': TextEditingController(text: v('nombre', '')),
+      'parte_cliente': TextEditingController(text: v('parte_cliente', '')),
+      'proceso': TextEditingController(text: v('proceso', '')),
+      'grado': TextEditingController(text: v('grado', '')),
+      'tolerancia': TextEditingController(text: v('tolerancia', '')),
+      'rev_cad': TextEditingController(text: v('rev_cad', 'A')),
+      'criticas': TextEditingController(text: v('criticas', '')),
       // Precio sugerido por pieza
       'vel': TextEditingController(text: v('vel', '')),
       'costo_hora': TextEditingController(text: v('costo_hora', '')),
@@ -180,7 +188,31 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
       controller: _c[k], keyboardType: const TextInputType.numberWithOptions(decimal: true),
       onChanged: (_) => _guardar(),
       decoration: InputDecoration(labelText: etiqueta, suffixText: sufijo, prefixText: prefijo, isDense: true, border: const OutlineInputBorder())));
+    Widget texto(String k, String etiqueta, {String? ayuda}) => TextField(controller: _c[k], onChanged: (_) => _guardar(),
+      textCapitalization: TextCapitalization.sentences,
+      decoration: InputDecoration(labelText: etiqueta, helperText: ayuda, isDense: true, border: const OutlineInputBorder()));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // ── Especificación técnica de la pieza ──
+      Text(tr('Especificación técnica'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.azul)),
+      const SizedBox(height: 6),
+      texto('nombre', tr('Nombre y descripción de la pieza')),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: texto('parte_cliente', tr('N.º de parte del cliente'))),
+        const SizedBox(width: 8),
+        SizedBox(width: 110, child: texto('rev_cad', tr('Revisión CAD'))),
+      ]),
+      const SizedBox(height: 8),
+      texto('proceso', tr('Proceso (Router CNC 2D, plasma, láser, torno…)')),
+      const SizedBox(height: 8),
+      Row(children: [
+        Expanded(child: texto('tolerancia', tr('Tolerancia'), ayuda: tr('Ej: ±0.2 mm o "según plano aprobado"'))),
+        const SizedBox(width: 8),
+        Expanded(child: texto('criticas', tr('Cotas críticas (números)'), ayuda: tr('Ej: 3, 5, 9 (de la lista de cotas)'))),
+      ]),
+      const Divider(height: 22),
+      Text(tr('Material y aprovechamiento'), style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.azul)),
+      const SizedBox(height: 4),
       Text(trf('Pieza: {0} × {1} mm', [widget.pzLargo.toStringAsFixed(0), widget.pzAncho.toStringAsFixed(0)]), style: const TextStyle(fontSize: 11.5, color: AppColors.textoSecundario)),
       const SizedBox(height: 8),
       SizedBox(width: double.infinity, child: OutlinedButton.icon(
@@ -195,6 +227,8 @@ class _CalculoMaterialState extends State<CalculoMaterial> {
         Expanded(flex: 2, child: TextField(controller: _c['espesor'], onChanged: (_) => _guardar(), keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: InputDecoration(labelText: tr('Espesor'), suffixText: 'mm', isDense: true, border: const OutlineInputBorder()))),
       ]),
+      const SizedBox(height: 8),
+      texto('grado', tr('Grado comercial del material (ej. MDF E1, acero A36, aluminio 6061-T6)')),
       const SizedBox(height: 8),
       TextField(controller: _c['acabado'], onChanged: (_) => _guardar(), textCapitalization: TextCapitalization.sentences,
         decoration: InputDecoration(labelText: tr('Acabado (ej. barniz, pintura, pulido, sin acabado)'), isDense: true, border: const OutlineInputBorder())),
