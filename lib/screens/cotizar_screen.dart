@@ -56,10 +56,14 @@ class _CotizarScreenState extends State<CotizarScreen> with SingleTickerProvider
           labelColor: AppColors.azul,
           unselectedLabelColor: AppColors.textoSecundario,
           indicatorColor: AppColors.azul,
+          // En celulares angostos "Mis cotizaciones" no cabía: menos relleno y el texto se
+          // achica lo necesario para verse completo (nunca se corta)
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+          labelStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+          unselectedLabelStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500),
           tabs: [
-            Tab(text: tr('Nueva')),
-            Tab(text: tr('Mis cotizaciones')),
-            Tab(text: tr('Catálogo')),
+            for (final t in [tr('Nueva'), tr('Mis cotizaciones'), tr('Catálogo')])
+              Tab(child: FittedBox(fit: BoxFit.scaleDown, child: Text(t, maxLines: 1, softWrap: false))),
           ],
         ),
       ),
